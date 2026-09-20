@@ -1,0 +1,8 @@
+.DS_Store
+.sites-runtime/
+.wrangler/
+node_modules/
+.dev.vars
+.env
+.env.*
+!.dev.vars.example

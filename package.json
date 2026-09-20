@@ -1,0 +1,21 @@
+{
+  "name": "gmach-karov1",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "פלטפורמה קהילתית חינמית להשאלת ציוד, על Cloudflare Workers, D1 ו-R2",
+  "scripts": {
+    "dev": "wrangler dev",
+    "check": "node --check worker/index.js && node --check dist/app.js",
+    "test": "node test/smoke.mjs",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "deploy": "npm run db:migrate:remote && wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "4.135.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

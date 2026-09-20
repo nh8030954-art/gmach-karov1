@@ -1,0 +1,2 @@
+# Optional: comma-separated emails that should become administrators on registration.
+ADMIN_EMAILS=owner@example.com
