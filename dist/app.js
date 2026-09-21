@@ -22,25 +22,6 @@
     box: '<path d="m4 7 8-4 8 4-8 4ZM4 7v10l8 4 8-4V7M12 11v10"/>'
   });
 
-  const DEMO_ITEMS = [
-    ["demo-01", "סט קשתות פרחים לאירוע", "אירועים", "שלוש קשתות בגבהים שונים, פרחים לבנים וורודים ובסיסים יציבים. מתאים לחופה, ברית או בת מצווה.", "מצוין", "ירושלים", "רמת שלמה", "available", 1, "decor", "#f7e7ee", "גמ״ח שמחות רמת שלמה", true],
-    ["demo-02", "מקדחה נטענת + סט ביטים", "כלי עבודה", "מקדחה 18V עם שתי סוללות, מטען וערכת ביטים. להשאלה עד שלושה ימים.", "כמו חדש", "בני ברק", "פרדס כץ", "available", 2, "drill", "#e6eef7", "גמ״ח כלי עבודה כהן", true],
-    ["demo-03", "עריסה מתקפלת לתינוק", "תינוקות", "עריסה קלה לנסיעות עם מזרן וכיסוי נקי. מתקפלת לתיק נשיאה קומפקטי.", "מצוין", "בית שמש", "רמה ד׳", "available", 1, "baby", "#f4e8ee", "גמ״ח יד לאם", true],
-    ["demo-04", "כיסא גלגלים מתקפל", "רפואה", "כיסא גלגלים תקני, קל לקיפול ונכנס לרכב משפחתי. כולל משענות רגליים נשלפות.", "טוב", "פתח תקווה", "הדר גנים", "available", 1, "medical", "#e2eff5", "גמ״ח רפואה וסיוע", true],
-    ["demo-05", "אוהל משפחתי ל־6 אנשים", "טיולים", "אוהל עמיד ונוח להקמה, כולל יריעה תחתונה ויתדות. מתאים לקמפינג משפחתי.", "מצוין", "מודיעין עילית", "ברכפלד", "available", 1, "tent", "#e7efdc", "גמ״ח מטיילים ביחד", false],
-    ["demo-06", "שולחנות מתקפלים לאירוח", "בית ואירוח", "שישה שולחנות מתקפלים באורך 1.80 מ׳. ניתן לקחת גם חלק מהכמות.", "טוב", "אשדוד", "רובע ז׳", "available", 6, "table", "#eee9df", "גמ״ח אירוח מכל הלב", true],
-    ["demo-07", "רמקול מוגבר עם מיקרופון", "אירועים", "רמקול נייד לאירוע קטן, כולל מיקרופון אלחוטי, חצובה וכבל טעינה.", "מצוין", "ירושלים", "נווה יעקב", "reserved", 1, "speaker", "#e8e8f3", "גמ״ח ציוד לאירועים", true],
-    ["demo-08", "מזוודות גדולות לנסיעה", "טיולים", "זוג מזוודות קשיחות עם ארבעה גלגלים. ניתן להשאיל בנפרד או יחד.", "טוב", "בני ברק", "מרכז העיר", "available", 2, "luggage", "#e8edf4", "גמ״ח בדרך טובה", true],
-    ["demo-09", "סולם אלומיניום 7 שלבים", "כלי עבודה", "סולם ביתי יציב וקל. מתאים לצביעה, תלייה ותיקונים בבית.", "טוב", "בית שמש", "הקריה החרדית", "available", 1, "ladder", "#e9edf0", "גמ״ח מתקנים בבית", false],
-    ["demo-10", "מכונת תפירה ביתית", "בית ואירוח", "מכונה נוחה לשימוש עם דוושה, חוטים בסיסיים וחוברת הדרכה בעברית.", "מצוין", "פתח תקווה", "עמישב", "available", 1, "sewing", "#f4e7e3", "גמ״ח תופרות חסד", true],
-    ["demo-11", "מקרן ומסך מתקפל", "אירועים", "מקרן Full HD ומסך 100 אינץ׳. מתאים למצגות, ערבי משפחה ושיעורים.", "כמו חדש", "מודיעין עילית", "קריית ספר", "available", 1, "projector", "#e3edf1", "גמ״ח מציגים", true],
-    ["demo-12", "ארגז כלי עבודה מלא", "כלי עבודה", "פטיש, פליירים, מפתחות, מברגים, מטר וציוד בסיסי לתיקונים קטנים.", "טוב", "אשדוד", "רובע ג׳", "available", 1, "tools", "#f3eadb", "גמ״ח עושים יחד", true]
-  ].map((row, index) => ({
-    id: row[0], title: row[1], category: row[2], description: row[3], condition: row[4], city: row[5], neighborhood: row[6],
-    availability_status: row[7], quantity: row[8], icon: row[9], cover_color: row[10], organizations: { name: row[11], verified: row[12] },
-    image_urls: [], created_at: new Date(Date.UTC(2026, 8, 18 - index)).toISOString()
-  }));
-
   const state = {
     serverAvailable: false, items: [], filteredItems: [], favorites: new Set(), user: null, selectedItem: null,
     visibleCount: 8, activeCategory: "", pendingAction: null, dashboardTab: "requests", myOrganizations: [], dashboard: null, authMode: "login"
@@ -87,7 +68,7 @@
   function renderSkeletons() { $("#items-grid").innerHTML = Array.from({ length: 8 }, () => '<div class="skeleton-card" aria-hidden="true"></div>').join(""); }
   async function loadItems() {
     renderSkeletons();
-    if (!state.serverAvailable) { state.items = DEMO_ITEMS; applyFilters(); return; }
+    if (!state.serverAvailable) { state.items = []; applyFilters(); return; }
     try { const data = await api("/api/items"); state.items = data.items || []; applyFilters(); }
     catch (error) { console.error("Unable to load items", error); $("#items-grid").innerHTML = ""; $("#empty-state").hidden = false; $("#empty-state h3").textContent = "לא הצלחנו לטעון את הפריטים"; $("#empty-state p").textContent = "כדאי לרענן את הדף בעוד רגע."; $("#results-summary").textContent = "שגיאה בטעינת הקטלוג"; }
   }
@@ -104,7 +85,32 @@
     return `<article class="item-card" data-item-id="${escapeHTML(item.id)}"><div class="item-card-media" style="--media-bg:${safeColor(item.cover_color)}">${image ? `<img src="${escapeHTML(image)}" alt="${escapeHTML(item.title)}" loading="lazy">` : `<span class="item-symbol">${iconSvg(item.icon)}</span>`}<span class="availability-badge ${available ? "" : "is-busy"}">${available ? "זמין עכשיו" : "בתיאום"}</span><button class="favorite-button ${favorite ? "is-favorite" : ""}" type="button" data-favorite-id="${escapeHTML(item.id)}" aria-label="${favorite ? "הסרה מהמועדפים" : "הוספה למועדפים"}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS.heart}</svg></button></div><div class="item-card-body"><div class="item-card-topline"><span class="item-category-label">${escapeHTML(item.category)}</span><span>${escapeHTML(quantityText)}</span></div><h3>${escapeHTML(item.title)}</h3><p>${escapeHTML(item.description)}</p><div class="item-card-footer"><span class="item-location"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>${escapeHTML([item.city, item.neighborhood].filter(Boolean).join(", "))}</span><button class="item-card-open" type="button" data-open-item="${escapeHTML(item.id)}">לפרטים ←</button></div></div></article>`;
   }
   function renderItems() {
-    const visible = state.filteredItems.slice(0, state.visibleCount); $("#items-grid").innerHTML = visible.map(itemCardMarkup).join(""); $("#empty-state").hidden = state.filteredItems.length > 0; $("#items-grid").hidden = state.filteredItems.length === 0; $("#load-more-button").hidden = state.visibleCount >= state.filteredItems.length; $("#results-summary").textContent = state.filteredItems.length ? `${state.filteredItems.length} פריטים מתאימים נמצאו` : "אין כרגע תוצאות שמתאימות לסינון";
+    const visible = state.filteredItems.slice(0, state.visibleCount);
+    const isEmpty = state.filteredItems.length === 0;
+    const isLaunchEmpty = state.serverAvailable && state.items.length === 0;
+    const isOffline = !state.serverAvailable;
+    $("#items-grid").innerHTML = visible.map(itemCardMarkup).join("");
+    $("#empty-state").hidden = !isEmpty;
+    $("#items-grid").hidden = isEmpty;
+    $("#load-more-button").hidden = isEmpty || state.visibleCount >= state.filteredItems.length;
+    if (state.filteredItems.length) {
+      $("#results-summary").textContent = `${state.filteredItems.length} פריטים מתאימים נמצאו`;
+    } else if (isOffline) {
+      $("#results-summary").textContent = "הקטלוג אינו זמין כרגע";
+      $("#empty-state h3").textContent = "לא הצלחנו להתחבר כרגע";
+      $("#empty-state p").textContent = "נסו לרענן את הדף בעוד רגע.";
+      $("#empty-clear-button").textContent = "ניסיון נוסף";
+    } else if (isLaunchEmpty) {
+      $("#results-summary").textContent = "הקטלוג מוכן לפריטים האמיתיים הראשונים";
+      $("#empty-state h3").textContent = "הקטלוג נפתח — הציוד הראשון יופיע כאן";
+      $("#empty-state p").textContent = "מנהלים גמ״ח או ציוד קהילתי? פתחו עמוד בחינם והיו הראשונים לעזור באזור שלכם.";
+      $("#empty-clear-button").textContent = "פתיחת הגמ״ח הראשון";
+    } else {
+      $("#results-summary").textContent = "אין כרגע תוצאות שמתאימות לסינון";
+      $("#empty-state h3").textContent = "לא מצאנו פריט מתאים כרגע";
+      $("#empty-state p").textContent = "נסו להרחיב את האזור או לבחור קטגוריה אחרת.";
+      $("#empty-clear-button").textContent = "ניקוי החיפוש";
+    }
     $$('[data-open-item]').forEach(button => button.addEventListener("click", () => openItem(button.dataset.openItem))); $$('[data-favorite-id]').forEach(button => button.addEventListener("click", event => { event.stopPropagation(); toggleFavorite(button.dataset.favoriteId); })); $$(".item-card").forEach(card => card.addEventListener("dblclick", () => openItem(card.dataset.itemId)));
   }
   function findItem(id) { return state.items.find(item => String(item.id) === String(id)); }
@@ -181,6 +187,11 @@
   async function toggleItemAvailability(id, current) { const availabilityStatus = current === "available" ? "unavailable" : "available"; try { await api(`/api/items/${encodeURIComponent(id)}/availability`, { method: "PATCH", body: { availabilityStatus } }); toast("זמינות הפריט עודכנה"); await loadItems(); showDashboard("items"); } catch (error) { toast(error.message, "error"); } }
   function showHome() { $("#dashboard-view").hidden = true; $("#home-view").hidden = false; history.replaceState(null, "", "#/"); window.scrollTo({ top: 0, behavior: "smooth" }); }
   function resetFilters() { $("#search-form").reset(); $("#category-filter").value = ""; $("#condition-filter").value = ""; $("#available-only").checked = true; state.activeCategory = ""; $$('[data-category]').forEach(button => button.classList.toggle("is-active", button.dataset.category === "")); applyFilters(); }
+  async function handleEmptyAction() {
+    if (!state.serverAvailable) { await detectServer(); await loadItems(); return; }
+    if (state.items.length === 0) { openGmachForm(); return; }
+    resetFilters();
+  }
 
   const INFO_CONTENT = Object.freeze({
     safety: '<h2 id="info-dialog-title">כללי השאלה בטוחה</h2><p>גמ״ח קרוב מחבר בין מלווים לשואלים, והאחריות לתיאום ולהשאלה נשארת בידי שני הצדדים.</p><h3>לפני האיסוף</h3><ul><li>ודאו שהפריט מתאים לצורך ולמועד.</li><li>תאמו מקום ושעת איסוף ברורים.</li><li>אל תעבירו פרטי תשלום — כל ההשאלות בפלטפורמה חינמיות.</li></ul><h3>בעת ההחזרה</h3><ul><li>החזירו בזמן, נקי ובמצב שבו התקבל.</li><li>דווחו מיד על נזק או עיכוב.</li></ul>',
@@ -193,7 +204,7 @@
     $("#current-year").textContent = new Date().getFullYear(); const today = new Date().toISOString().slice(0, 10); $("#date-filter").min = today; $("#request-start").min = today; $("#request-end").min = today; $("#request-start").addEventListener("change", () => { $("#request-end").min = $("#request-start").value || today; });
     $("#mobile-menu-button").addEventListener("click", () => { const menu = $("#mobile-menu"); menu.hidden = !menu.hidden; $("#mobile-menu-button").setAttribute("aria-expanded", String(!menu.hidden)); }); $$("#mobile-menu a, #mobile-menu button").forEach(el => el.addEventListener("click", () => { $("#mobile-menu").hidden = true; $("#mobile-menu-button").setAttribute("aria-expanded", "false"); }));
     $("#search-form").addEventListener("submit", event => { event.preventDefault(); applyFilters(); $("#catalog").scrollIntoView({ behavior: "smooth", block: "start" }); }); ["#city-filter", "#category-filter", "#condition-filter", "#available-only", "#sort-select"].forEach(selector => $(selector).addEventListener("change", () => applyFilters())); $("#date-filter").addEventListener("change", () => applyFilters());
-    $("#filters-button").addEventListener("click", () => { const panel = $("#filter-panel"); panel.hidden = !panel.hidden; $("#filters-button").setAttribute("aria-expanded", String(!panel.hidden)); }); $("#clear-filters").addEventListener("click", resetFilters); $("#empty-clear-button").addEventListener("click", resetFilters); $("#all-categories-button").addEventListener("click", () => { resetFilters(); $("#catalog").scrollIntoView({ behavior: "smooth" }); });
+    $("#filters-button").addEventListener("click", () => { const panel = $("#filter-panel"); panel.hidden = !panel.hidden; $("#filters-button").setAttribute("aria-expanded", String(!panel.hidden)); }); $("#clear-filters").addEventListener("click", resetFilters); $("#empty-clear-button").addEventListener("click", handleEmptyAction); $("#all-categories-button").addEventListener("click", () => { resetFilters(); $("#catalog").scrollIntoView({ behavior: "smooth" }); });
     $$('[data-category]').forEach(button => button.addEventListener("click", () => { state.activeCategory = button.dataset.category; $("#category-filter").value = button.dataset.category; $$('[data-category]').forEach(other => other.classList.toggle("is-active", other === button)); applyFilters(); $("#catalog").scrollIntoView({ behavior: "smooth", block: "start" }); })); $("#load-more-button").addEventListener("click", () => { state.visibleCount += 8; renderItems(); });
     $$('[data-close-dialog]').forEach(button => button.addEventListener("click", () => closeDialog(button.closest("dialog")))); $$("dialog").forEach(dialog => { dialog.addEventListener("click", event => { if (event.target === dialog) closeDialog(dialog); }); dialog.addEventListener("close", () => { if (!$("dialog[open]")) document.body.classList.remove("dialog-open"); }); }); $$('[data-auth-mode]').forEach(button => button.addEventListener("click", () => setAuthMode(button.dataset.authMode)));
 

@@ -9,7 +9,7 @@ const mf = new Miniflare(convertV4MiniflareOptions({
   compatibilityDate: "2026-09-20",
   d1Databases: { DB: "smoke-db" },
   r2Buckets: ["ITEM_IMAGES"],
-  bindings: { ADMIN_EMAILS: "admin@example.com" }
+  bindings: { ADMIN_EMAILS: "" }
 }));
 
 async function request(path, { method = "GET", body, cookie, form, origin = base } = {}) {
@@ -33,9 +33,11 @@ async function request(path, { method = "GET", body, cookie, form, origin = base
 
 try {
   const db = await mf.getD1Database("DB");
-  const migration = await readFile("migrations/0001_initial.sql", "utf8");
-  const statements = migration.split(/;\s*(?:\r?\n|$)/).map(statement => statement.trim()).filter(Boolean);
-  await db.batch(statements.map(statement => db.prepare(statement)));
+  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql"]) {
+    const migration = await readFile(`migrations/${filename}`, "utf8");
+    const statements = migration.split(/;\s*(?:\r?\n|$)/).map(statement => statement.trim()).filter(Boolean);
+    await db.batch(statements.map(statement => db.prepare(statement)));
+  }
 
   let result = await request("/api/health");
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
@@ -43,7 +45,7 @@ try {
 
   result = await request("/api/items");
   assert.equal(result.response.status, 200);
-  assert.equal(result.data.items.length, 12);
+  assert.equal(result.data.items.length, 0);
   assert.equal(result.data.items.every(item => item.is_free !== false), true);
 
   result = await request("/api/auth/register", { method: "POST", body: { fullName: "מנהלת האתר", email: "admin@example.com", password: "StrongPass!123" } });

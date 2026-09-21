@@ -101,7 +101,12 @@ async function register(request, env, ctx, url) {
   const salt = randomToken(16);
   const passwordHash = await derivePassword(password, salt, PASSWORD_ITERATIONS);
   const admins = String(env.ADMIN_EMAILS || "").split(",").map(normalizeEmailLoose).filter(Boolean);
-  const role = admins.includes(email) ? "admin" : "member";
+  const [userCount, existingAdmin] = await Promise.all([
+    env.DB.prepare("SELECT COUNT(*) AS count FROM users").first(),
+    env.DB.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").first()
+  ]);
+  const isFirstAccount = Number(userCount?.count || 0) === 0;
+  const role = admins.includes(email) || (!existingAdmin && isFirstAccount) ? "admin" : "member";
   const sessionToken = randomToken(32);
   const tokenHash = await sha256(sessionToken);
   const expiresAt = new Date(Date.now() + SESSION_SECONDS * 1000).toISOString();
