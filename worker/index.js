@@ -49,6 +49,7 @@ async function routeApi(request, env, ctx, url) {
     await env.DB.prepare("SELECT 1 AS ok").first();
     return json({ ok: true, database: "D1", storage: "R2" });
   }
+  if (method === "GET" && path === "/api/health/auth") return authHealth(env);
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
   if (method === "POST" && path === "/api/auth/login") return login(request, env, ctx, url);
@@ -138,6 +139,35 @@ async function register(request, env, ctx, url) {
   }
 
   return json({ user: { id, email, fullName, role } }, 201, { "Set-Cookie": sessionCookie(sessionToken, url) });
+}
+
+async function authHealth(env) {
+  const id = crypto.randomUUID();
+  const email = `health-${id}@example.invalid`;
+  const salt = randomToken(16);
+  let hash;
+  try {
+    hash = await derivePassword("HealthCheck!123", salt, PASSWORD_ITERATIONS);
+  } catch {
+    return json({ ok: false, stage: "crypto" }, 500, { "X-Gmach-Auth-Test": "crypto" });
+  }
+
+  try {
+    const role = await compatibleMemberRole(env);
+    const tokenHash = await sha256(randomToken(32));
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role) VALUES (?,?,?,?,?,?,?)")
+        .bind(id, email, hash, salt, PASSWORD_ITERATIONS, "בדיקת מערכת", role),
+      env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)")
+        .bind(tokenHash, id, new Date(Date.now() + 60_000).toISOString()),
+      env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(id),
+      env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id)
+    ]);
+  } catch {
+    return json({ ok: false, stage: "database" }, 500, { "X-Gmach-Auth-Test": "database" });
+  }
+
+  return json({ ok: true, stage: "complete" }, 200, { "X-Gmach-Auth-Test": "complete" });
 }
 
 async function login(request, env, ctx, url) {
