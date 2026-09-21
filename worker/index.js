@@ -147,9 +147,14 @@ async function authHealth(env) {
   const salt = randomToken(16);
   let hash;
   try {
-    hash = await derivePassword("HealthCheck!123", salt, PASSWORD_ITERATIONS);
-  } catch {
-    return json({ ok: false, stage: "crypto" }, 500, { "X-Gmach-Auth-Test": "crypto" });
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode("HealthCheck!123"), "PBKDF2", false, ["deriveBits"]);
+    const saltBytes = fromBase64Url(salt);
+    const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations: 100_000 }, key, 256);
+    hash = toBase64Url(new Uint8Array(bits));
+  } catch (error) {
+    const detail = String(error?.message || error || "").toLowerCase();
+    const stage = detail.includes("iteration") ? "crypto-iterations" : detail.includes("algorithm") || detail.includes("pbkdf") ? "crypto-algorithm" : "crypto-runtime";
+    return json({ ok: false, stage }, 500, { "X-Gmach-Auth-Test": stage });
   }
 
   try {
