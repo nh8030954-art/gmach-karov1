@@ -1,6 +1,6 @@
 const SESSION_COOKIE = "gmach_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
-const PASSWORD_ITERATIONS = 210000;
+const PASSWORD_ITERATIONS = 100000;
 const MAX_JSON_BYTES = 32 * 1024;
 const IMAGE_TYPES = new Map([
   ["image/jpeg", "jpg"],
@@ -49,7 +49,6 @@ async function routeApi(request, env, ctx, url) {
     await env.DB.prepare("SELECT 1 AS ok").first();
     return json({ ok: true, database: "D1", storage: "R2" });
   }
-  if (method === "GET" && path === "/api/health/auth") return authHealth(env);
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
   if (method === "POST" && path === "/api/auth/login") return login(request, env, ctx, url);
@@ -139,40 +138,6 @@ async function register(request, env, ctx, url) {
   }
 
   return json({ user: { id, email, fullName, role } }, 201, { "Set-Cookie": sessionCookie(sessionToken, url) });
-}
-
-async function authHealth(env) {
-  const id = crypto.randomUUID();
-  const email = `health-${id}@example.invalid`;
-  const salt = randomToken(16);
-  let hash;
-  try {
-    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode("HealthCheck!123"), "PBKDF2", false, ["deriveBits"]);
-    const saltBytes = fromBase64Url(salt);
-    const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations: 100_000 }, key, 256);
-    hash = toBase64Url(new Uint8Array(bits));
-  } catch (error) {
-    const detail = String(error?.message || error || "").toLowerCase();
-    const stage = detail.includes("iteration") ? "crypto-iterations" : detail.includes("algorithm") || detail.includes("pbkdf") ? "crypto-algorithm" : "crypto-runtime";
-    return json({ ok: false, stage }, 500, { "X-Gmach-Auth-Test": stage });
-  }
-
-  try {
-    const role = await compatibleMemberRole(env);
-    const tokenHash = await sha256(randomToken(32));
-    await env.DB.batch([
-      env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role) VALUES (?,?,?,?,?,?,?)")
-        .bind(id, email, hash, salt, PASSWORD_ITERATIONS, "בדיקת מערכת", role),
-      env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)")
-        .bind(tokenHash, id, new Date(Date.now() + 60_000).toISOString()),
-      env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(id),
-      env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id)
-    ]);
-  } catch {
-    return json({ ok: false, stage: "database" }, 500, { "X-Gmach-Auth-Test": "database" });
-  }
-
-  return json({ ok: true, stage: "complete" }, 200, { "X-Gmach-Auth-Test": "complete" });
 }
 
 async function login(request, env, ctx, url) {

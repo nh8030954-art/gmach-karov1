@@ -5,7 +5,7 @@ CREATE TABLE users (
   email TEXT NOT NULL UNIQUE COLLATE NOCASE,
   password_hash TEXT NOT NULL,
   password_salt TEXT NOT NULL,
-  password_iterations INTEGER NOT NULL DEFAULT 210000,
+  password_iterations INTEGER NOT NULL DEFAULT 100000,
   full_name TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('member', 'admin')),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
