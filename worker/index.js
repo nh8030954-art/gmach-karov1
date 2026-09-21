@@ -61,16 +61,26 @@ async function routeApi(request, env, ctx, url) {
   if (method === "GET" && path === "/api/items") return listItems(env, url);
   const itemDetail = path.match(/^\/api\/items\/([^/]+)$/);
   if (method === "GET" && itemDetail) return getItem(env, decodeURIComponent(itemDetail[1]));
+  if (method === "PATCH" && itemDetail) return updateItem(request, env, decodeURIComponent(itemDetail[1]));
 
   const favorite = path.match(/^\/api\/favorites\/([^/]+)$/);
   if (favorite && method === "POST") return addFavorite(request, env, decodeURIComponent(favorite[1]));
   if (favorite && method === "DELETE") return removeFavorite(request, env, decodeURIComponent(favorite[1]));
 
   if (method === "POST" && path === "/api/organizations") return createOrganization(request, env);
+  const organizationDetail = path.match(/^\/api\/organizations\/([^/]+)$/);
+  if (method === "PATCH" && organizationDetail) return updateOrganization(request, env, decodeURIComponent(organizationDetail[1]));
   if (method === "POST" && path === "/api/items") return createItem(request, env);
   const imageUpload = path.match(/^\/api\/items\/([^/]+)\/images$/);
   if (method === "POST" && imageUpload) return uploadImages(request, env, decodeURIComponent(imageUpload[1]));
   if (method === "POST" && path === "/api/loan-requests") return createLoanRequest(request, env);
+  const requestMessages = path.match(/^\/api\/loan-requests\/([^/]+)\/messages$/);
+  if (method === "GET" && requestMessages) return listRequestMessages(request, env, decodeURIComponent(requestMessages[1]));
+  if (method === "POST" && requestMessages) return createRequestMessage(request, env, decodeURIComponent(requestMessages[1]));
+
+  if (method === "GET" && path === "/api/notifications") return listNotifications(request, env);
+  if (method === "POST" && path === "/api/notifications/read-all") return markNotificationsRead(request, env);
+  if (method === "POST" && path === "/api/reports") return createReport(request, env);
 
   if (method === "GET" && path === "/api/me/dashboard") return dashboard(request, env);
   const requestStatus = path.match(/^\/api\/loan-requests\/([^/]+)\/status$/);
@@ -83,6 +93,8 @@ async function routeApi(request, env, ctx, url) {
   if (method === "PATCH" && adminOrganization) return moderateOrganization(request, env, decodeURIComponent(adminOrganization[1]));
   const adminItem = path.match(/^\/api\/admin\/items\/([^/]+)$/);
   if (method === "PATCH" && adminItem) return moderateItem(request, env, decodeURIComponent(adminItem[1]));
+  const adminReport = path.match(/^\/api\/admin\/reports\/([^/]+)$/);
+  if (method === "PATCH" && adminReport) return moderateReport(request, env, decodeURIComponent(adminReport[1]));
 
   throw new HttpError(404, "הכתובת לא נמצאה");
 }
@@ -152,10 +164,12 @@ async function logout(request, env, url) {
 
 async function listItems(env, url) {
   const params = [];
-  const where = ["i.status = 'active'", "i.is_free = 1", "o.status = 'approved'"];
+  const where = ["i.status = 'active'", "i.is_free = 1", "o.status = 'approved'", "o.is_hidden = 0"];
   const query = cleanOptional(url.searchParams.get("q"), 120);
   const category = cleanOptional(url.searchParams.get("category"), 40);
   const city = cleanOptional(url.searchParams.get("city"), 80);
+  const requestedDate = cleanOptional(url.searchParams.get("date"), 10);
+  const availableOnly = url.searchParams.get("available_only") === "true";
   if (query) {
     where.push("(i.title LIKE ? OR i.description LIKE ? OR o.name LIKE ?)");
     const like = `%${query.replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
@@ -163,6 +177,14 @@ async function listItems(env, url) {
   }
   if (category) { where.push("i.category = ?"); params.push(category); }
   if (city) { where.push("i.city = ?"); params.push(city); }
+  if (availableOnly) where.push("i.availability_status = 'available'");
+  if (requestedDate) {
+    const date = validateDate(requestedDate, "תאריך החיפוש");
+    where.push(`(SELECT COUNT(*) FROM loan_requests lr
+      WHERE lr.item_id = i.id AND lr.status IN ('approved','collected')
+      AND lr.requested_from <= ? AND lr.requested_until >= ?) < i.quantity`);
+    params.push(date, date);
+  }
   const result = await env.DB.prepare(`
     SELECT i.*, o.id AS org_id, o.name AS org_name, o.verified AS org_verified
     FROM items i JOIN organizations o ON o.id = i.organization_id
@@ -177,7 +199,7 @@ async function getItem(env, id) {
   const row = await env.DB.prepare(`
     SELECT i.*, o.id AS org_id, o.name AS org_name, o.verified AS org_verified
     FROM items i JOIN organizations o ON o.id = i.organization_id
-    WHERE i.id = ? AND i.status = 'active' AND i.is_free = 1 AND o.status = 'approved'
+    WHERE i.id = ? AND i.status = 'active' AND i.is_free = 1 AND o.status = 'approved' AND o.is_hidden = 0
   `).bind(id).first();
   if (!row) throw new HttpError(404, "הפריט לא נמצא");
   return json({ item: mapItem(row) });
@@ -218,6 +240,43 @@ async function createOrganization(request, env) {
   return json({ organization: { id, ...values, primaryCategory: category, status: "pending", verified: false } }, 201);
 }
 
+async function updateOrganization(request, env, id) {
+  const user = await requireUser(request, env);
+  const body = await readJson(request);
+  const existing = await env.DB.prepare(`SELECT o.*, c.contact_phone FROM organizations o
+    LEFT JOIN organization_contacts c ON c.organization_id = o.id
+    WHERE o.id = ? AND (o.owner_id = ? OR ? = 'admin')`).bind(id, user.id, user.role).first();
+  if (!existing) throw new HttpError(404, "הגמ״ח לא נמצא או שאין הרשאה לערוך אותו");
+
+  if (typeof body.hidden === "boolean" && Object.keys(body).length === 1) {
+    await env.DB.prepare("UPDATE organizations SET is_hidden = ?, updated_at = ? WHERE id = ?")
+      .bind(body.hidden ? 1 : 0, new Date().toISOString(), id).run();
+    return json({ id, hidden: body.hidden, status: existing.status });
+  }
+
+  const category = cleanText(body.primaryCategory, 2, 40, "תחום");
+  if (!CATEGORIES.has(category)) throw new HttpError(400, "נא לבחור תחום תקין");
+  const values = {
+    name: cleanText(body.name, 2, 90, "שם הגמ״ח"),
+    city: cleanText(body.city, 2, 80, "עיר"),
+    neighborhood: cleanOptional(body.neighborhood, 80),
+    description: cleanText(body.description, 10, 600, "תיאור"),
+    phone: validatePhone(body.phone)
+  };
+  const publicChanged = values.name !== existing.name || category !== existing.primary_category || values.city !== existing.city ||
+    (values.neighborhood || null) !== (existing.neighborhood || null) || values.description !== existing.description;
+  const status = user.role === "admin" || !publicChanged ? existing.status : "pending";
+  const verified = status === "approved" ? existing.verified : 0;
+  const now = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare(`UPDATE organizations SET name = ?, primary_category = ?, city = ?, neighborhood = ?, description = ?,
+      status = ?, verified = ?, updated_at = ? WHERE id = ?`)
+      .bind(values.name, category, values.city, values.neighborhood, values.description, status, verified, now, id),
+    env.DB.prepare("UPDATE organization_contacts SET contact_phone = ? WHERE organization_id = ?").bind(values.phone, id)
+  ]);
+  return json({ organization: { id, ...values, primaryCategory: category, status, verified: Boolean(verified), hidden: Boolean(existing.is_hidden) } });
+}
+
 async function createItem(request, env) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
@@ -248,6 +307,46 @@ async function createItem(request, env) {
     organization.neighborhood
   ).run();
   return json({ item: { id, status: "pending" } }, 201);
+}
+
+async function updateItem(request, env, id) {
+  const user = await requireUser(request, env);
+  const body = await readJson(request);
+  const existing = await env.DB.prepare(`SELECT i.*, o.owner_id, o.city AS org_city, o.neighborhood AS org_neighborhood
+    FROM items i JOIN organizations o ON o.id = i.organization_id
+    WHERE i.id = ? AND (o.owner_id = ? OR ? = 'admin')`).bind(id, user.id, user.role).first();
+  if (!existing) throw new HttpError(404, "הפריט לא נמצא או שאין הרשאה לערוך אותו");
+
+  if (typeof body.archived === "boolean" && Object.keys(body).length === 1) {
+    if (body.archived) {
+      const active = await env.DB.prepare("SELECT id FROM loan_requests WHERE item_id = ? AND status IN ('pending','approved','collected') LIMIT 1").bind(id).first();
+      if (active) throw new HttpError(409, "אי אפשר להסתיר פריט בזמן שיש לו בקשה או השאלה פעילה");
+    }
+    const status = body.archived ? "archived" : "pending";
+    await env.DB.prepare("UPDATE items SET status = ?, updated_at = ? WHERE id = ?").bind(status, new Date().toISOString(), id).run();
+    return json({ id, status });
+  }
+
+  const category = cleanText(body.category, 2, 40, "קטגוריה");
+  const condition = cleanText(body.condition, 2, 20, "מצב הפריט");
+  if (!CATEGORIES.has(category) || category === "כללי") throw new HttpError(400, "נא לבחור קטגוריה תקינה");
+  if (!CONDITIONS.has(condition)) throw new HttpError(400, "נא לבחור מצב פריט תקין");
+  const quantity = Number(body.quantity);
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw new HttpError(400, "כמות הפריטים אינה תקינה");
+  const values = {
+    title: cleanText(body.title, 2, 120, "שם הפריט"),
+    description: cleanText(body.description, 10, 1200, "תיאור"),
+    loanConditions: cleanOptional(body.loanConditions, 300)
+  };
+  const changed = values.title !== existing.title || category !== existing.category || values.description !== existing.description ||
+    condition !== existing.condition || quantity !== Number(existing.quantity) || (values.loanConditions || null) !== (existing.loan_conditions || null);
+  const status = user.role === "admin" || !changed ? existing.status : "pending";
+  await env.DB.prepare(`UPDATE items SET title = ?, category = ?, description = ?, condition = ?, quantity = ?, loan_conditions = ?,
+    city = ?, neighborhood = ?, status = ?, updated_at = ? WHERE id = ?`).bind(
+    values.title, category, values.description, condition, quantity, values.loanConditions,
+    existing.org_city, existing.org_neighborhood, status, new Date().toISOString(), id
+  ).run();
+  return json({ item: { id, status } });
 }
 
 async function uploadImages(request, env, itemId) {
@@ -288,7 +387,7 @@ async function createLoanRequest(request, env) {
   const body = await readJson(request);
   const itemId = cleanText(body.itemId, 1, 100, "פריט");
   const item = await env.DB.prepare(`
-    SELECT i.id, i.availability_status, o.owner_id
+    SELECT i.id, i.title, i.availability_status, o.owner_id
     FROM items i JOIN organizations o ON o.id = i.organization_id
     WHERE i.id = ? AND i.status = 'active' AND i.is_free = 1 AND o.status = 'approved'
   `).bind(itemId).first();
@@ -307,19 +406,23 @@ async function createLoanRequest(request, env) {
     .bind(itemId, user.id).first();
   if (duplicate) throw new HttpError(409, "כבר קיימת בקשה פעילה שלכם לפריט הזה");
   const id = crypto.randomUUID();
-  await env.DB.prepare("INSERT INTO loan_requests (id,item_id,borrower_id,requested_from,requested_until,phone,note,status) VALUES (?,?,?,?,?,?,?,'pending')")
-    .bind(id, itemId, user.id, from, until, validatePhone(body.phone), cleanOptional(body.note, 500)).run();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO loan_requests (id,item_id,borrower_id,requested_from,requested_until,phone,note,status) VALUES (?,?,?,?,?,?,?,'pending')")
+      .bind(id, itemId, user.id, from, until, validatePhone(body.phone), cleanOptional(body.note, 500)),
+    notificationStatement(env, item.owner_id, "request", "בקשת השאלה חדשה", `${user.full_name} ביקש/ה לשאול את ${item.title}`, id)
+  ]);
   return json({ request: { id, status: "pending" } }, 201);
 }
 
 async function dashboard(request, env) {
   const user = await requireUser(request, env);
   const [organizationsResult, itemsResult, requestsResult, favoritesResult] = await env.DB.batch([
-    env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,o.verified,o.created_at,c.contact_phone
+    env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,o.verified,o.is_hidden,o.created_at,c.contact_phone
       FROM organizations o LEFT JOIN organization_contacts c ON c.organization_id = o.id WHERE o.owner_id = ? ORDER BY o.created_at DESC`).bind(user.id),
-    env.DB.prepare(`SELECT i.id,i.title,i.status,i.availability_status,i.created_at,o.name AS org_name
+    env.DB.prepare(`SELECT i.id,i.organization_id,i.title,i.category,i.description,i.condition,i.quantity,i.loan_conditions,i.image_urls,
+      i.status,i.availability_status,i.created_at,o.name AS org_name
       FROM items i JOIN organizations o ON o.id = i.organization_id WHERE o.owner_id = ? ORDER BY i.created_at DESC`).bind(user.id),
-    env.DB.prepare(`SELECT lr.id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,lr.created_at,
+    env.DB.prepare(`SELECT lr.id,lr.item_id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,lr.manager_note,lr.created_at,
       i.title AS item_title,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,
       CASE WHEN o.owner_id = ? THEN 'incoming' ELSE 'outgoing' END AS direction,
       CASE WHEN lr.borrower_id = ? AND lr.status IN ('approved','collected') THEN c.contact_phone ELSE NULL END AS contact_phone
@@ -328,14 +431,15 @@ async function dashboard(request, env) {
       WHERE lr.borrower_id = ? OR o.owner_id = ? ORDER BY lr.created_at DESC`).bind(user.id, user.id, user.id, user.id),
     env.DB.prepare("SELECT item_id FROM favorites WHERE user_id = ?").bind(user.id)
   ]);
-  const organizations = organizationsResult.results.map(row => ({ ...row, verified: Boolean(row.verified) }));
-  const items = itemsResult.results.map(row => ({ ...row, organizations: { name: row.org_name } }));
+  const organizations = organizationsResult.results.map(row => ({ ...row, verified: Boolean(row.verified), is_hidden: Boolean(row.is_hidden) }));
+  const items = itemsResult.results.map(row => ({ ...row, image_urls: parseJsonArray(row.image_urls), organizations: { name: row.org_name } }));
   const requests = requestsResult.results.map(row => ({
     id: row.id,
     status: row.status,
     requested_from: row.requested_from,
     requested_until: row.requested_until,
     note: row.note,
+    manager_note: row.manager_note,
     direction: row.direction,
     borrower_name: row.direction === "incoming" ? row.borrower_name : undefined,
     borrower_phone: row.direction === "incoming" ? row.phone : undefined,
@@ -360,7 +464,8 @@ async function updateRequestStatus(request, env, id) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
   const target = cleanText(body.status, 2, 20, "סטטוס");
-  const row = await env.DB.prepare(`SELECT lr.status,lr.borrower_id,o.owner_id FROM loan_requests lr
+  const row = await env.DB.prepare(`SELECT lr.status,lr.borrower_id,lr.item_id,lr.requested_from,lr.requested_until,lr.manager_note,
+    i.title AS item_title,i.quantity,o.owner_id FROM loan_requests lr
     JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id WHERE lr.id = ?`).bind(id).first();
   if (!row) throw new HttpError(404, "הבקשה לא נמצאה");
   let allowed = false;
@@ -371,9 +476,31 @@ async function updateRequestStatus(request, env, id) {
     allowed = allowed || (row.status === "collected" && target === "returned");
   }
   if (!allowed) throw new HttpError(403, "מעבר הסטטוס הזה אינו מורשה");
-  await env.DB.prepare("UPDATE loan_requests SET status = ?, updated_at = ? WHERE id = ?")
-    .bind(target, new Date().toISOString(), id).run();
-  return json({ id, status: target });
+  let managerNote = row.manager_note;
+  if (target === "declined") managerNote = cleanText(body.managerNote, 3, 500, "סיבת הדחייה");
+  else if (target === "approved") managerNote = cleanOptional(body.managerNote, 500);
+  const now = new Date().toISOString();
+  let result;
+  if (target === "approved") {
+    result = await env.DB.prepare(`UPDATE loan_requests SET status = 'approved', manager_note = ?, updated_at = ?
+      WHERE id = ? AND status = 'pending' AND (
+        SELECT COUNT(*) FROM loan_requests other
+        WHERE other.item_id = ? AND other.id <> ? AND other.status IN ('approved','collected')
+          AND other.requested_from <= ? AND other.requested_until >= ?
+      ) < ?`).bind(managerNote, now, id, row.item_id, id, row.requested_until, row.requested_from, Number(row.quantity)).run();
+    if (!result.meta.changes) throw new HttpError(409, "כל היחידות תפוסות בתאריכים האלה. אפשר לדחות את הבקשה או לתאם תאריכים אחרים בצ׳אט");
+  } else {
+    result = await env.DB.prepare("UPDATE loan_requests SET status = ?, manager_note = ?, updated_at = ? WHERE id = ? AND status = ?")
+      .bind(target, managerNote, now, id, row.status).run();
+    if (!result.meta.changes) throw new HttpError(409, "הבקשה כבר עודכנה. רעננו את האזור האישי");
+  }
+
+  const statusText = { approved: "אושרה", declined: "נדחתה", cancelled: "בוטלה", collected: "סומנה כנאספה", returned: "סומנה כהוחזרה" }[target] || "עודכנה";
+  const recipientId = row.borrower_id === user.id ? row.owner_id : row.borrower_id;
+  await env.DB.batch([
+    notificationStatement(env, recipientId, "status", `הבקשה ${statusText}`, `הבקשה עבור ${row.item_title} ${statusText}.`, id)
+  ]);
+  return json({ id, status: target, managerNote });
 }
 
 async function updateAvailability(request, env, id) {
@@ -389,15 +516,93 @@ async function updateAvailability(request, env, id) {
   return json({ id, availabilityStatus: availability });
 }
 
+async function getRequestParticipant(request, env, requestId, { allowAdmin = true } = {}) {
+  const user = await requireUser(request, env);
+  const row = await env.DB.prepare(`SELECT lr.id,lr.borrower_id,lr.status,i.title AS item_title,o.owner_id,o.name AS org_name
+    FROM loan_requests lr JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id
+    WHERE lr.id = ?`).bind(requestId).first();
+  if (!row) throw new HttpError(404, "בקשת ההשאלה לא נמצאה");
+  const participant = row.borrower_id === user.id || row.owner_id === user.id;
+  if (!participant && !(allowAdmin && user.role === "admin")) throw new HttpError(403, "השיחה זמינה רק לצדדים בבקשת ההשאלה");
+  return { user, row, participant };
+}
+
+async function listRequestMessages(request, env, requestId) {
+  const { user, row } = await getRequestParticipant(request, env, requestId);
+  const result = await env.DB.prepare(`SELECT m.id,m.body,m.created_at,m.sender_id,u.full_name AS sender_name
+    FROM request_messages m JOIN users u ON u.id = m.sender_id
+    WHERE m.request_id = ? ORDER BY m.created_at ASC LIMIT 300`).bind(requestId).all();
+  return json({
+    request: { id: row.id, status: row.status, itemTitle: row.item_title, organizationName: row.org_name },
+    messages: result.results.map(message => ({ ...message, isMine: message.sender_id === user.id }))
+  });
+}
+
+async function createRequestMessage(request, env, requestId) {
+  const { user, row, participant } = await getRequestParticipant(request, env, requestId, { allowAdmin: false });
+  if (!participant) throw new HttpError(403, "רק השואל ומנהל הגמ״ח יכולים לשלוח הודעות");
+  const body = await readJson(request);
+  const message = cleanText(body.message, 1, 1000, "הודעה");
+  const recent = await env.DB.prepare(`SELECT COUNT(*) AS count FROM request_messages
+    WHERE sender_id = ? AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 minute')`).bind(user.id).first();
+  if (Number(recent?.count || 0) >= 10) throw new HttpError(429, "נשלחו יותר מדי הודעות. נסו שוב בעוד דקה");
+  const id = crypto.randomUUID();
+  const recipientId = row.borrower_id === user.id ? row.owner_id : row.borrower_id;
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO request_messages (id,request_id,sender_id,body) VALUES (?,?,?,?)").bind(id, requestId, user.id, message),
+    notificationStatement(env, recipientId, "message", `הודעה חדשה על ${row.item_title}`, `${user.full_name}: ${message.slice(0, 120)}`, requestId)
+  ]);
+  return json({ message: { id, request_id: requestId, sender_id: user.id, sender_name: user.full_name, body: message, isMine: true, created_at: new Date().toISOString() } }, 201);
+}
+
+async function listNotifications(request, env) {
+  const user = await requireUser(request, env);
+  const [items, unread] = await env.DB.batch([
+    env.DB.prepare(`SELECT id,type,title,body,request_id,read_at,created_at FROM notifications
+      WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`).bind(user.id),
+    env.DB.prepare("SELECT COUNT(*) AS count FROM notifications WHERE user_id = ? AND read_at IS NULL").bind(user.id)
+  ]);
+  return json({ notifications: items.results, unread: Number(unread.results[0]?.count || 0) });
+}
+
+async function markNotificationsRead(request, env) {
+  const user = await requireUser(request, env);
+  await env.DB.prepare("UPDATE notifications SET read_at = ? WHERE user_id = ? AND read_at IS NULL")
+    .bind(new Date().toISOString(), user.id).run();
+  return json({ ok: true });
+}
+
+async function createReport(request, env) {
+  const user = await requireUser(request, env);
+  const body = await readJson(request);
+  const itemId = cleanText(body.itemId, 1, 100, "פריט");
+  const reason = cleanText(body.reason, 2, 30, "סיבת הדיווח");
+  if (!["incorrect", "unsafe", "commercial", "unavailable", "other"].includes(reason)) throw new HttpError(400, "סיבת הדיווח אינה תקינה");
+  const item = await env.DB.prepare("SELECT id FROM items WHERE id = ?").bind(itemId).first();
+  if (!item) throw new HttpError(404, "הפריט לא נמצא");
+  try {
+    const id = crypto.randomUUID();
+    await env.DB.prepare("INSERT INTO reports (id,reporter_id,item_id,reason,details) VALUES (?,?,?,?,?)")
+      .bind(id, user.id, itemId, reason, cleanOptional(body.details, 800)).run();
+    return json({ report: { id, status: "pending" } }, 201);
+  } catch (error) {
+    if (String(error).toLowerCase().includes("unique")) throw new HttpError(409, "כבר שלחתם דיווח פתוח על הפריט הזה");
+    throw error;
+  }
+}
+
 async function adminPending(request, env) {
   await requireAdmin(request, env);
-  const [organizations, items] = await env.DB.batch([
+  const [organizations, items, reports] = await env.DB.batch([
     env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,o.verified,o.created_at,u.full_name AS owner_name,u.email AS owner_email
       FROM organizations o LEFT JOIN users u ON u.id = o.owner_id WHERE o.status = 'pending' ORDER BY o.created_at ASC`),
     env.DB.prepare(`SELECT i.id,i.title,i.category,i.description,i.condition,i.quantity,i.status,i.created_at,o.name AS org_name,o.status AS org_status
-      FROM items i JOIN organizations o ON o.id = i.organization_id WHERE i.status = 'pending' ORDER BY i.created_at ASC`)
+      FROM items i JOIN organizations o ON o.id = i.organization_id WHERE i.status = 'pending' ORDER BY i.created_at ASC`),
+    env.DB.prepare(`SELECT r.id,r.reason,r.details,r.created_at,i.title AS item_title,u.full_name AS reporter_name,u.email AS reporter_email
+      FROM reports r JOIN items i ON i.id = r.item_id JOIN users u ON u.id = r.reporter_id
+      WHERE r.status = 'pending' ORDER BY r.created_at ASC`)
   ]);
-  return json({ organizations: organizations.results, items: items.results });
+  return json({ organizations: organizations.results, items: items.results, reports: reports.results });
 }
 
 async function moderateOrganization(request, env, id) {
@@ -425,6 +630,17 @@ async function moderateItem(request, env, id) {
   const result = await env.DB.prepare("UPDATE items SET status = ?, updated_at = ? WHERE id = ?")
     .bind(status, new Date().toISOString(), id).run();
   if (!result.meta.changes) throw new HttpError(404, "הפריט לא נמצא");
+  return json({ id, status });
+}
+
+async function moderateReport(request, env, id) {
+  await requireAdmin(request, env);
+  const body = await readJson(request);
+  const status = cleanText(body.status, 2, 20, "סטטוס");
+  if (!["reviewed", "dismissed"].includes(status)) throw new HttpError(400, "סטטוס הדיווח אינו תקין");
+  const result = await env.DB.prepare("UPDATE reports SET status = ?, updated_at = ? WHERE id = ? AND status = 'pending'")
+    .bind(status, new Date().toISOString(), id).run();
+  if (!result.meta.changes) throw new HttpError(404, "הדיווח לא נמצא או כבר טופל");
   return json({ id, status });
 }
 
@@ -459,6 +675,11 @@ async function requireAdmin(request, env) {
   const user = await requireUser(request, env);
   if (user.role !== "admin") throw new HttpError(403, "הפעולה מיועדת למנהלי האתר");
   return user;
+}
+
+function notificationStatement(env, userId, type, title, body, requestId = null) {
+  return env.DB.prepare("INSERT INTO notifications (id,user_id,type,title,body,request_id) VALUES (?,?,?,?,?,?)")
+    .bind(crypto.randomUUID(), userId, type, title, body, requestId);
 }
 
 async function enforceAuthRateLimit(env, email, action, ctx) {

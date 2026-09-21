@@ -36,6 +36,10 @@
       </nav>
 
       <div class="header-actions">
+        <button class="icon-button notification-button" id="notifications-button" type="button" aria-label="התראות" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+          <span class="notification-badge" id="notification-badge" hidden>0</span>
+        </button>
         <button class="text-button" id="dashboard-button" type="button" data-requires-auth>האזור שלי</button>
         <button class="button button-primary button-small" id="add-gmach-button" type="button">פרסום גמ״ח</button>
         <button class="icon-button mobile-menu-button" id="mobile-menu-button" type="button" aria-label="פתיחת תפריט" aria-expanded="false" aria-controls="mobile-menu">
@@ -231,14 +235,14 @@
 
   <dialog class="modal modal-wide" id="gmach-dialog" aria-labelledby="gmach-form-title">
     <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת החלון">×</button>
-    <div class="dialog-heading align-start"><span class="section-kicker">מצטרפים לקהילה</span><h2 id="gmach-form-title">פתיחת עמוד גמ״ח</h2><p>ממלאים פרטים בסיסיים. העמוד יפורסם לאחר בדיקה קצרה.</p></div>
+    <div class="dialog-heading align-start"><span class="section-kicker">מצטרפים לקהילה</span><h2 id="gmach-form-title">פתיחת עמוד גמ״ח</h2><p id="gmach-form-description">ממלאים פרטים בסיסיים. העמוד יפורסם לאחר בדיקה קצרה.</p></div>
     <form id="gmach-form" class="stack-form">
       <div class="two-columns"><label><span>שם הגמ״ח</span><input id="gmach-name" required maxlength="90" placeholder="למשל: גמ״ח אירועים משפחת לוי"></label><label><span>תחום מרכזי</span><select id="gmach-category" required><option value="">בחירה</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option><option>כללי</option></select></label></div>
       <div class="two-columns"><label><span>עיר</span><input id="gmach-city" required autocomplete="address-level2"></label><label><span>שכונה <small>(רשות)</small></span><input id="gmach-neighborhood"></label></div>
       <label><span>תיאור קצר</span><textarea id="gmach-description" rows="3" maxlength="600" required placeholder="מה אפשר להשאיל, למי מיועד ואיך מתאמים"></textarea></label>
       <label><span>טלפון לתיאום <small>(לא יוצג ללא אישורכם)</small></span><input id="gmach-phone" type="tel" inputmode="tel" dir="ltr" required></label>
       <label class="consent-row"><input id="gmach-consent" type="checkbox" required><span>אני מאשר/ת שכל הפריטים בגמ״ח מוצעים להשאלה ללא תשלום.</span></label>
-      <button class="button button-primary button-full" type="submit">שליחה לבדיקה</button>
+      <button class="button button-primary button-full" id="gmach-submit" type="submit">שליחה לבדיקה</button>
     </form>
   </dialog>
 
@@ -253,7 +257,48 @@
       <label><span>תנאי השאלה <small>(רשות)</small></span><input id="item-conditions" maxlength="300" placeholder="למשל: איסוף עצמי, החזרה תוך 3 ימים"></label>
       <label><span>תמונות <small>(עד 4, כל תמונה עד 5MB)</small></span><input id="item-images" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
       <label class="consent-row"><input id="item-free" type="checkbox" checked required><span>הפריט מוצע להשאלה חינמית בלבד.</span></label>
-      <button class="button button-primary button-full" type="submit">פרסום הפריט</button>
+      <button class="button button-primary button-full" id="item-submit" type="submit">פרסום הפריט</button>
+    </form>
+  </dialog>
+
+  <dialog class="modal modal-narrow" id="decision-dialog" aria-labelledby="decision-title">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת החלון">×</button>
+    <div class="dialog-heading align-start"><span class="section-kicker">עדכון בקשה</span><h2 id="decision-title">אישור בקשת ההשאלה</h2><p id="decision-description">אפשר לצרף הוראות איסוף או הודעה קצרה.</p></div>
+    <form id="decision-form" class="stack-form">
+      <input id="decision-request-id" type="hidden">
+      <input id="decision-status" type="hidden">
+      <label><span id="decision-note-label">הודעה לשואל/ת <small>(רשות)</small></span><textarea id="decision-note" rows="4" maxlength="500"></textarea></label>
+      <button class="button button-primary button-full" id="decision-submit" type="submit">אישור הבקשה</button>
+    </form>
+  </dialog>
+
+  <dialog class="modal modal-medium chat-dialog" id="chat-dialog" aria-labelledby="chat-title">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת השיחה">×</button>
+    <div class="dialog-heading align-start"><span class="section-kicker">שיחה פרטית</span><h2 id="chat-title">תיאום ההשאלה</h2><p id="chat-subtitle"></p></div>
+    <div class="chat-messages" id="chat-messages" aria-live="polite"></div>
+    <form id="chat-form" class="chat-form">
+      <label class="sr-only" for="chat-message">כתיבת הודעה</label>
+      <textarea id="chat-message" rows="2" maxlength="1000" required placeholder="כתבו הודעה לשואל/ת או למנהל/ת הגמ״ח"></textarea>
+      <button class="button button-primary" type="submit">שליחה</button>
+    </form>
+    <p class="form-note">השיחה זמינה רק לשואל/ת, למנהל/ת הגמ״ח ולמנהל האתר.</p>
+  </dialog>
+
+  <dialog class="modal modal-medium" id="notifications-dialog" aria-labelledby="notifications-title">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת ההתראות">×</button>
+    <div class="dialog-heading align-start"><span class="section-kicker">נשארים מעודכנים</span><h2 id="notifications-title">התראות</h2></div>
+    <div class="notification-list" id="notification-list"></div>
+    <button class="link-button" id="mark-notifications-read" type="button">סימון הכול כנקרא</button>
+  </dialog>
+
+  <dialog class="modal modal-narrow" id="report-dialog" aria-labelledby="report-title">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת הדיווח">×</button>
+    <div class="dialog-heading align-start"><span class="section-kicker">שומרים על הקהילה</span><h2 id="report-title">דיווח על פריט</h2><p>הדיווח נשלח למנהל האתר ואינו מוצג למפרסם.</p></div>
+    <form id="report-form" class="stack-form">
+      <input id="report-item-id" type="hidden">
+      <label><span>מה הבעיה?</span><select id="report-reason" required><option value="">בחירה</option><option value="incorrect">מידע לא נכון</option><option value="unsafe">פריט לא בטיחותי</option><option value="commercial">בקשת תשלום</option><option value="unavailable">הפריט אינו זמין</option><option value="other">אחר</option></select></label>
+      <label><span>פרטים נוספים <small>(רשות)</small></span><textarea id="report-details" rows="4" maxlength="800"></textarea></label>
+      <button class="button button-primary button-full" type="submit">שליחת דיווח</button>
     </form>
   </dialog>
 
