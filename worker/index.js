@@ -118,7 +118,9 @@ async function register(request, env, ctx, url) {
     env.DB.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").first()
   ]);
   const isFirstAccount = Number(userCount?.count || 0) === 0;
-  const role = admins.includes(email) || (!existingAdmin && isFirstAccount) ? "admin" : "member";
+  const role = admins.includes(email) || (!existingAdmin && isFirstAccount)
+    ? "admin"
+    : await compatibleMemberRole(env);
   const sessionToken = randomToken(32);
   const tokenHash = await sha256(sessionToken);
   const expiresAt = new Date(Date.now() + SESSION_SECONDS * 1000).toISOString();
@@ -689,6 +691,17 @@ async function enforceAuthRateLimit(env, email, action, ctx) {
   if (Number(row?.count || 0) >= 10) throw new HttpError(429, "יותר מדי ניסיונות. נסו שוב בעוד 15 דקות");
   await env.DB.prepare("INSERT INTO auth_events (identity_hash,action) VALUES (?,?)").bind(identity, action).run();
   ctx.waitUntil(env.DB.prepare("DELETE FROM auth_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')").run());
+}
+
+async function compatibleMemberRole(env) {
+  // Early deployments used borrower/gmach_manager while the current schema
+  // uses member/admin. Inspect the live table definition so registrations keep
+  // working on databases created by either version without weakening roles.
+  const schema = await env.DB.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'").first();
+  const definition = String(schema?.sql || "").toLowerCase();
+  if (definition.includes("'member'")) return "member";
+  if (definition.includes("'borrower'")) return "borrower";
+  return "member";
 }
 
 async function readJson(request) {
