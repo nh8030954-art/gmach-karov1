@@ -853,9 +853,21 @@ function toBase64Url(bytes) {
 }
 
 function fromBase64Url(value) {
-  const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
-  const binary = atob(normalized + "=".repeat((4 - normalized.length % 4) % 4));
-  return Uint8Array.from(binary, char => char.charCodeAt(0));
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  const bytes = [];
+  let buffer = 0;
+  let bits = 0;
+  for (const char of String(value || "").replace(/=+$/g, "")) {
+    const index = alphabet.indexOf(char);
+    if (index < 0) throw new Error("Invalid base64url value");
+    buffer = (buffer << 6) | index;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((buffer >>> bits) & 0xff);
+    }
+  }
+  return Uint8Array.from(bytes);
 }
 
 function constantTimeEqual(a, b) {
