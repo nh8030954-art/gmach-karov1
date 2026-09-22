@@ -47,7 +47,7 @@ async function routeApi(request, env, ctx, url) {
 
   if (method === "GET" && path === "/api/health") {
     await env.DB.prepare("SELECT 1 AS ok").first();
-    return json({ ok: true, database: "D1", storage: "R2", email: Boolean(env.RESEND_API_KEY && env.RESEND_FROM_EMAIL), timestamp: new Date().toISOString() });
+    return json({ ok: true, release: "platform-2026-09-22", database: "D1", storage: "R2", email: Boolean(env.RESEND_API_KEY && env.RESEND_FROM_EMAIL), timestamp: new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
