@@ -52,13 +52,19 @@ async function routeApi(request, env, ctx, url) {
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
   if (method === "POST" && path === "/api/auth/login") return login(request, env, ctx, url);
+  if (method === "POST" && path === "/api/auth/2fa/verify-login") return verifyTwoFactorLogin(request, env, url);
   if (method === "POST" && path === "/api/auth/logout") return logout(request, env, url);
+  if (method === "POST" && path === "/api/auth/change-password") return changePassword(request, env);
+  if (method === "POST" && path === "/api/auth/2fa/setup") return setupTwoFactor(request, env);
+  if (method === "POST" && path === "/api/auth/2fa/confirm") return confirmTwoFactor(request, env);
+  if (method === "POST" && path === "/api/auth/2fa/disable") return disableTwoFactor(request, env);
   if (method === "GET" && path === "/api/auth/me") {
     const user = await currentUser(request, env);
     return json({ user: user ? publicUser(user) : null });
   }
 
   if (method === "GET" && path === "/api/items") return listItems(env, url);
+  if (method === "GET" && path === "/api/site-settings") return getSiteSettings(env);
   const itemDetail = path.match(/^\/api\/items\/([^/]+)$/);
   if (method === "GET" && itemDetail) return getItem(env, decodeURIComponent(itemDetail[1]));
   if (method === "PATCH" && itemDetail) return updateItem(request, env, decodeURIComponent(itemDetail[1]));
@@ -89,6 +95,12 @@ async function routeApi(request, env, ctx, url) {
   if (method === "PATCH" && itemAvailability) return updateAvailability(request, env, decodeURIComponent(itemAvailability[1]));
 
   if (method === "GET" && path === "/api/admin/pending") return adminPending(request, env);
+  if (method === "GET" && path === "/api/admin/overview") return adminOverview(request, env);
+  if (method === "GET" && path === "/api/admin/site-settings") return adminSiteSettings(request, env);
+  if (method === "PATCH" && path === "/api/admin/site-settings") return updateSiteSettings(request, env);
+  const restoreSettings = path.match(/^\/api\/admin\/site-settings\/versions\/([^/]+)\/restore$/);
+  if (method === "POST" && restoreSettings) return restoreSiteSettings(request, env, decodeURIComponent(restoreSettings[1]));
+  if (method === "GET" && path === "/api/admin/users") return adminUsers(request, env);
   const adminOrganization = path.match(/^\/api\/admin\/organizations\/([^/]+)$/);
   if (method === "PATCH" && adminOrganization) return moderateOrganization(request, env, decodeURIComponent(adminOrganization[1]));
   const adminItem = path.match(/^\/api\/admin\/items\/([^/]+)$/);
@@ -147,15 +159,88 @@ async function login(request, env, ctx, url) {
   await enforceAuthRateLimit(env, email, "login", ctx);
   const user = await env.DB.prepare("SELECT * FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
   if (!user) throw new HttpError(401, "האימייל או הסיסמה אינם נכונים");
+  if (user.account_status === "suspended") throw new HttpError(403, "החשבון הושעה. יש לפנות למנהל האתר");
   const candidate = await derivePassword(password, user.password_salt, user.password_iterations);
   if (!constantTimeEqual(candidate, user.password_hash)) throw new HttpError(401, "האימייל או הסיסמה אינם נכונים");
+
+  if (Number(user.totp_enabled || 0) === 1) {
+    const challenge = randomToken(32);
+    const challengeHash = await sha256(challenge);
+    await env.DB.prepare("INSERT INTO auth_challenges (token_hash,user_id,purpose,expires_at) VALUES (?,?, 'login_2fa', ?)")
+      .bind(challengeHash, user.id, new Date(Date.now() + 5 * 60 * 1000).toISOString()).run();
+    return json({ requiresTwoFactor: true, challenge });
+  }
 
   const sessionToken = randomToken(32);
   const tokenHash = await sha256(sessionToken);
   const expiresAt = new Date(Date.now() + SESSION_SECONDS * 1000).toISOString();
   await env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)").bind(tokenHash, user.id, expiresAt).run();
+  await env.DB.prepare("UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?").bind(new Date().toISOString(), new Date().toISOString(), user.id).run();
   ctx.waitUntil(env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(new Date().toISOString()).run());
   return json({ user: publicUser(user) }, 200, { "Set-Cookie": sessionCookie(sessionToken, url) });
+}
+
+async function verifyTwoFactorLogin(request, env, url) {
+  const body = await readJson(request);
+  const challenge = cleanText(body.challenge, 20, 200, "אתגר אימות");
+  const code = cleanText(body.code, 6, 6, "קוד אימות");
+  const row = await env.DB.prepare(`SELECT c.token_hash,c.user_id,c.expires_at,u.* FROM auth_challenges c
+    JOIN users u ON u.id = c.user_id WHERE c.token_hash = ? AND c.purpose = 'login_2fa' AND c.expires_at > ?`)
+    .bind(await sha256(challenge), new Date().toISOString()).first();
+  if (!row || !row.totp_secret || !(await verifyTotp(row.totp_secret, code))) throw new HttpError(401, "קוד האימות אינו נכון או שפג תוקפו");
+  const sessionToken = randomToken(32);
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM auth_challenges WHERE token_hash = ?").bind(row.token_hash),
+    env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)")
+      .bind(await sha256(sessionToken), row.user_id, new Date(Date.now() + SESSION_SECONDS * 1000).toISOString()),
+    env.DB.prepare("UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?").bind(new Date().toISOString(), new Date().toISOString(), row.user_id)
+  ]);
+  return json({ user: publicUser(row) }, 200, { "Set-Cookie": sessionCookie(sessionToken, url) });
+}
+
+async function changePassword(request, env) {
+  const user = await requireUser(request, env);
+  const body = await readJson(request);
+  const currentPassword = validatePassword(body.currentPassword);
+  const newPassword = validatePassword(body.newPassword);
+  const candidate = await derivePassword(currentPassword, user.password_salt, user.password_iterations);
+  if (!constantTimeEqual(candidate, user.password_hash)) throw new HttpError(401, "הסיסמה הנוכחית אינה נכונה");
+  const salt = randomToken(16);
+  const hash = await derivePassword(newPassword, salt, PASSWORD_ITERATIONS);
+  await env.DB.batch([
+    env.DB.prepare("UPDATE users SET password_hash = ?, password_salt = ?, password_iterations = ?, updated_at = ? WHERE id = ?")
+      .bind(hash, salt, PASSWORD_ITERATIONS, new Date().toISOString(), user.id),
+    env.DB.prepare("DELETE FROM sessions WHERE user_id = ? AND token_hash != ?").bind(user.id, await sha256(cookieValue(request, SESSION_COOKIE)))
+  ]);
+  return json({ ok: true });
+}
+
+async function setupTwoFactor(request, env) {
+  const user = await requireUser(request, env);
+  const secret = base32Encode(crypto.getRandomValues(new Uint8Array(20)));
+  await env.DB.prepare("UPDATE users SET totp_secret = ?, totp_enabled = 0, updated_at = ? WHERE id = ?")
+    .bind(secret, new Date().toISOString(), user.id).run();
+  const label = encodeURIComponent(`גמ״ח ברגע:${user.email}`);
+  const issuer = encodeURIComponent("גמ״ח ברגע");
+  return json({ secret, otpauthUri: `otpauth://totp/${label}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30` });
+}
+
+async function confirmTwoFactor(request, env) {
+  const user = await requireUser(request, env);
+  const body = await readJson(request);
+  const fresh = await env.DB.prepare("SELECT totp_secret FROM users WHERE id = ?").bind(user.id).first();
+  if (!fresh?.totp_secret || !(await verifyTotp(fresh.totp_secret, cleanText(body.code, 6, 6, "קוד אימות")))) throw new HttpError(400, "קוד האימות אינו נכון");
+  await env.DB.prepare("UPDATE users SET totp_enabled = 1, updated_at = ? WHERE id = ?").bind(new Date().toISOString(), user.id).run();
+  return json({ ok: true });
+}
+
+async function disableTwoFactor(request, env) {
+  const user = await requireUser(request, env);
+  const body = await readJson(request);
+  const candidate = await derivePassword(validatePassword(body.password), user.password_salt, user.password_iterations);
+  if (!constantTimeEqual(candidate, user.password_hash)) throw new HttpError(401, "הסיסמה אינה נכונה");
+  await env.DB.prepare("UPDATE users SET totp_enabled = 0, totp_secret = NULL, updated_at = ? WHERE id = ?").bind(new Date().toISOString(), user.id).run();
+  return json({ ok: true });
 }
 
 async function logout(request, env, url) {
@@ -607,6 +692,83 @@ async function adminPending(request, env) {
   return json({ organizations: organizations.results, items: items.results, reports: reports.results });
 }
 
+async function getSiteSettings(env) {
+  const row = await env.DB.prepare("SELECT site_name,tagline,hero_title,hero_description,primary_color,secondary_color,accent_color,font_family,base_font_size,logo_url,updated_at FROM site_settings WHERE id = 1").first();
+  return json({ settings: row });
+}
+
+async function adminOverview(request, env) {
+  await requireAdmin(request, env);
+  const [users, organizations, items, requests, audit] = await env.DB.batch([
+    env.DB.prepare("SELECT COUNT(*) AS count FROM users"),
+    env.DB.prepare("SELECT COUNT(*) AS count FROM organizations"),
+    env.DB.prepare("SELECT COUNT(*) AS count FROM items"),
+    env.DB.prepare("SELECT COUNT(*) AS count FROM loan_requests"),
+    env.DB.prepare("SELECT a.id,a.action,a.entity_type,a.entity_id,a.created_at,u.full_name AS actor_name FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id ORDER BY a.created_at DESC LIMIT 30")
+  ]);
+  return json({ stats: { users: users.results[0]?.count || 0, organizations: organizations.results[0]?.count || 0, items: items.results[0]?.count || 0, requests: requests.results[0]?.count || 0 }, audit: audit.results });
+}
+
+async function adminSiteSettings(request, env) {
+  await requireAdmin(request, env);
+  const [settings, versions] = await env.DB.batch([
+    env.DB.prepare("SELECT * FROM site_settings WHERE id = 1"),
+    env.DB.prepare("SELECT v.id,v.created_at,u.full_name AS created_by_name FROM site_setting_versions v LEFT JOIN users u ON u.id = v.created_by ORDER BY v.created_at DESC LIMIT 50")
+  ]);
+  return json({ settings: settings.results[0], versions: versions.results });
+}
+
+async function updateSiteSettings(request, env) {
+  const user = await requireAdmin(request, env);
+  const current = await env.DB.prepare("SELECT * FROM site_settings WHERE id = 1").first();
+  if (!current) throw new HttpError(500, "הגדרות האתר אינן זמינות");
+  const body = await readJson(request);
+  const next = {
+    site_name: cleanText(body.siteName, 2, 60, "שם האתר"), tagline: cleanText(body.tagline, 2, 140, "סלוגן"),
+    hero_title: cleanText(body.heroTitle, 2, 100, "כותרת ראשית"), hero_description: cleanText(body.heroDescription, 10, 300, "תיאור ראשי"),
+    primary_color: validateColor(body.primaryColor), secondary_color: validateColor(body.secondaryColor), accent_color: validateColor(body.accentColor),
+    font_family: validateFont(body.fontFamily), base_font_size: Math.max(14, Math.min(22, Number(body.baseFontSize) || 16)),
+    logo_url: validateAssetUrl(body.logoUrl)
+  };
+  const versionId = crypto.randomUUID();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO site_setting_versions (id,settings_json,created_by) VALUES (?,?,?)").bind(versionId, JSON.stringify(current), user.id),
+    env.DB.prepare(`UPDATE site_settings SET site_name=?,tagline=?,hero_title=?,hero_description=?,primary_color=?,secondary_color=?,accent_color=?,font_family=?,base_font_size=?,logo_url=?,updated_by=?,updated_at=? WHERE id=1`)
+      .bind(next.site_name,next.tagline,next.hero_title,next.hero_description,next.primary_color,next.secondary_color,next.accent_color,next.font_family,next.base_font_size,next.logo_url,user.id,new Date().toISOString()),
+    auditStatement(env, user.id, "site.settings.update", "site_settings", "1", { versionId })
+  ]);
+  return json({ settings: next, versionId });
+}
+
+async function restoreSiteSettings(request, env, versionId) {
+  const user = await requireAdmin(request, env);
+  const [version, current] = await Promise.all([
+    env.DB.prepare("SELECT settings_json FROM site_setting_versions WHERE id = ?").bind(versionId).first(),
+    env.DB.prepare("SELECT * FROM site_settings WHERE id = 1").first()
+  ]);
+  if (!version) throw new HttpError(404, "הגרסה לא נמצאה");
+  const saved = JSON.parse(version.settings_json);
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO site_setting_versions (id,settings_json,created_by) VALUES (?,?,?)").bind(crypto.randomUUID(), JSON.stringify(current), user.id),
+    env.DB.prepare(`UPDATE site_settings SET site_name=?,tagline=?,hero_title=?,hero_description=?,primary_color=?,secondary_color=?,accent_color=?,font_family=?,base_font_size=?,logo_url=?,updated_by=?,updated_at=? WHERE id=1`)
+      .bind(saved.site_name,saved.tagline,saved.hero_title,saved.hero_description,saved.primary_color,saved.secondary_color,saved.accent_color,saved.font_family,saved.base_font_size,saved.logo_url,user.id,new Date().toISOString()),
+    auditStatement(env, user.id, "site.settings.restore", "site_setting_versions", versionId)
+  ]);
+  return json({ ok: true });
+}
+
+async function adminUsers(request, env) {
+  await requireAdmin(request, env);
+  const result = await env.DB.prepare(`SELECT id,email,full_name,role,email_verified,account_status,totp_enabled,created_at,last_login_at
+    FROM users ORDER BY created_at DESC LIMIT 500`).all();
+  return json({ users: result.results });
+}
+
+function auditStatement(env, actorId, action, entityType, entityId = null, metadata = {}) {
+  return env.DB.prepare("INSERT INTO audit_log (id,actor_id,action,entity_type,entity_id,metadata_json) VALUES (?,?,?,?,?,?)")
+    .bind(crypto.randomUUID(), actorId, action, entityType, entityId, JSON.stringify(metadata));
+}
+
 async function moderateOrganization(request, env, id) {
   await requireAdmin(request, env);
   const body = await readJson(request);
@@ -728,7 +890,7 @@ function assertSameOrigin(request, url) {
 }
 
 function publicUser(user) {
-  return { id: user.id, email: user.email, fullName: user.full_name, role: user.role };
+  return { id: user.id, email: user.email, fullName: user.full_name, role: user.role, emailVerified: Boolean(user.email_verified), twoFactorEnabled: Boolean(user.totp_enabled) };
 }
 
 function mapItem(row) {
@@ -801,10 +963,68 @@ function validateDate(value, label) {
   return date;
 }
 
+function validateColor(value) {
+  const color = String(value || "").trim();
+  if (!/^#[0-9a-f]{6}$/i.test(color)) throw new HttpError(400, "צבע חייב להיות בפורמט HEX תקין");
+  return color.toLowerCase();
+}
+
+function validateFont(value) {
+  const allowed = ["Arial, sans-serif", "Rubik, Arial, sans-serif", "Assistant, Arial, sans-serif", "Heebo, Arial, sans-serif", "David Libre, serif"];
+  const font = String(value || "").trim();
+  if (!allowed.includes(font)) throw new HttpError(400, "הגופן שנבחר אינו נתמך");
+  return font;
+}
+
+function validateAssetUrl(value) {
+  const url = String(value || "").trim();
+  if (!/^\/[a-z0-9_./-]+$/i.test(url) || url.includes("..")) throw new HttpError(400, "כתובת הלוגו אינה תקינה");
+  return url;
+}
+
 async function derivePassword(password, salt, iterations) {
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
   const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: fromBase64Url(salt), iterations }, key, 256);
   return toBase64Url(new Uint8Array(bits));
+}
+
+async function verifyTotp(secret, code) {
+  if (!/^\d{6}$/.test(String(code || ""))) return false;
+  const key = await crypto.subtle.importKey("raw", base32Decode(secret), { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
+  const counter = Math.floor(Date.now() / 30_000);
+  for (let drift = -1; drift <= 1; drift += 1) {
+    const bytes = new Uint8Array(8);
+    let value = counter + drift;
+    for (let index = 7; index >= 0; index -= 1) { bytes[index] = value & 0xff; value = Math.floor(value / 256); }
+    const digest = new Uint8Array(await crypto.subtle.sign("HMAC", key, bytes));
+    const offset = digest[digest.length - 1] & 0x0f;
+    const binary = ((digest[offset] & 0x7f) << 24) | (digest[offset + 1] << 16) | (digest[offset + 2] << 8) | digest[offset + 3];
+    if (String(binary % 1_000_000).padStart(6, "0") === code) return true;
+  }
+  return false;
+}
+
+function base32Encode(bytes) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let output = "", buffer = 0, bits = 0;
+  for (const byte of bytes) {
+    buffer = (buffer << 8) | byte; bits += 8;
+    while (bits >= 5) { bits -= 5; output += alphabet[(buffer >>> bits) & 31]; }
+  }
+  if (bits > 0) output += alphabet[(buffer << (5 - bits)) & 31];
+  return output;
+}
+
+function base32Decode(value) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const bytes = [];
+  let buffer = 0, bits = 0;
+  for (const char of String(value || "").toUpperCase().replace(/=+$/g, "")) {
+    const index = alphabet.indexOf(char); if (index < 0) throw new Error("Invalid base32 value");
+    buffer = (buffer << 5) | index; bits += 5;
+    if (bits >= 8) { bits -= 8; bytes.push((buffer >>> bits) & 0xff); }
+  }
+  return Uint8Array.from(bytes);
 }
 
 async function sha256(value) {
@@ -881,5 +1101,9 @@ function withSecurityHeaders(response) {
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
   headers.set("X-Frame-Options", "DENY");
+  headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+  headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  headers.set("Cross-Origin-Resource-Policy", "same-origin");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }

@@ -1,5 +1,5 @@
 {
-  "name": "gmach-karov1",
+  "name": "gmach-karov",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -17,5 +17,8 @@
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "qrcode-generator": "^1.4.4"
   }
 }

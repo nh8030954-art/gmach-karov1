@@ -33,7 +33,7 @@ async function request(path, { method = "GET", body, cookie, form, origin = base
 
 try {
   const db = await mf.getD1Database("DB");
-  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql"]) {
+  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql"]) {
     const migration = await readFile(`migrations/${filename}`, "utf8");
     const statements = migration.split(/;\s*(?:\r?\n|$)/).map(statement => statement.trim()).filter(Boolean);
     await db.batch(statements.map(statement => db.prepare(statement)));
@@ -48,10 +48,21 @@ try {
   assert.equal(result.data.items.length, 0);
   assert.equal(result.data.items.every(item => item.is_free !== false), true);
 
-  result = await request("/api/auth/register", { method: "POST", body: { fullName: "מנהלת האתר", email: "admin@example.com", password: "StrongPass!123" } });
-  assert.equal(result.response.status, 201);
+  result = await request("/api/auth/login", { method: "POST", body: { email: "netanelhirsh@gmail.com", password: "GbR!7qN9#vK4xP2mZ8sL" } });
+  assert.equal(result.response.status, 200);
   assert.equal(result.data.user.role, "admin");
   const adminCookie = result.response.headers.get("set-cookie").split(";", 1)[0];
+
+  result = await request("/api/admin/site-settings", { cookie: adminCookie });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.settings.site_name, "גמ״ח ברגע");
+  result = await request("/api/admin/site-settings", { method: "PATCH", cookie: adminCookie, body: { siteName: "גמ״ח ברגע", tagline: "גדולה גמילות חסדים יותר מן הצדקה", heroTitle: "מה צריך להשאיל היום?", heroDescription: "מוצאים ציוד זמין מגמחים ואנשים טובים באזור שלכם ללא תשלום.", primaryColor: "#243f75", secondaryColor: "#9d7137", accentColor: "#e7bd78", fontFamily: "Arial, sans-serif", baseFontSize: 16, logoUrl: "/gmach-berega-logo.jpg" } });
+  assert.equal(result.response.status, 200);
+  result = await request("/api/admin/users", { cookie: adminCookie });
+  assert.equal(result.data.users.some(user => user.email === "netanelhirsh@gmail.com"), true);
+  result = await request("/api/auth/2fa/setup", { method: "POST", cookie: adminCookie, body: {} });
+  assert.equal(result.response.status, 200);
+  assert.match(result.data.otpauthUri, /^otpauth:\/\/totp\//);
 
   result = await request("/api/organizations", { method: "POST", cookie: adminCookie, body: { name: "גמ״ח בדיקה", primaryCategory: "אירועים", city: "ירושלים", neighborhood: "מרכז", description: "ציוד חינמי לאירועים קהילתיים ולשמחות משפחתיות.", phone: "050-1234567" } });
   assert.equal(result.response.status, 201);
