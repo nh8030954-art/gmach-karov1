@@ -33,7 +33,7 @@ async function request(path, { method = "GET", body, cookie, form, origin = base
 
 try {
   const db = await mf.getD1Database("DB");
-  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql"]) {
+  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql"]) {
     const migration = await readFile(`migrations/${filename}`, "utf8");
     const statements = migration.split(/;\s*(?:\r?\n|$)/).map(statement => statement.trim()).filter(Boolean);
     await db.batch(statements.map(statement => db.prepare(statement)));
@@ -56,6 +56,7 @@ try {
   result = await request("/api/admin/site-settings", { cookie: adminCookie });
   assert.equal(result.response.status, 200);
   assert.equal(result.data.settings.site_name, "גמ״ח ברגע");
+  assert.equal(result.data.settings.hero_title, "מה תרצו לשאול היום?");
   result = await request("/api/admin/site-settings", { method: "PATCH", cookie: adminCookie, body: { siteName: "גמ״ח ברגע", tagline: "גדולה גמילות חסדים יותר מן הצדקה", heroTitle: "מה צריך להשאיל היום?", heroDescription: "מוצאים ציוד זמין מגמחים ואנשים טובים באזור שלכם ללא תשלום.", primaryColor: "#243f75", secondaryColor: "#9d7137", accentColor: "#e7bd78", fontFamily: "Arial, sans-serif", baseFontSize: 16, logoUrl: "/gmach-berega-logo.jpg" } });
   assert.equal(result.response.status, 200);
   result = await request("/api/admin/users", { cookie: adminCookie });

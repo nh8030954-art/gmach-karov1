@@ -104,10 +104,10 @@
       $("#empty-state p").textContent = "נסו לרענן את הדף בעוד רגע.";
       $("#empty-clear-button").textContent = "ניסיון נוסף";
     } else if (isLaunchEmpty) {
-      $("#results-summary").textContent = "הקטלוג מוכן לפריטים האמיתיים הראשונים";
-      $("#empty-state h3").textContent = "הקטלוג נפתח — הציוד הראשון יופיע כאן";
-      $("#empty-state p").textContent = "מנהלים גמ״ח או ציוד קהילתי? פתחו עמוד בחינם והיו הראשונים לעזור באזור שלכם.";
-      $("#empty-clear-button").textContent = "פתיחת הגמ״ח הראשון";
+      $("#results-summary").textContent = "הקטלוג נבנה יחד עם הקהילה";
+      $("#empty-state h3").textContent = "הקטלוג נבנה יחד עם הקהילה";
+      $("#empty-state p").textContent = "מנהלים גמ״ח או מחזיקים ציוד שאפשר להשאיל? פרסמו אותו בחינם ועזרו למשפחה הבאה.";
+      $("#empty-clear-button").textContent = "פרסום גמ״ח בחינם";
     } else {
       $("#results-summary").textContent = "אין כרגע תוצאות שמתאימות לסינון";
       $("#empty-state h3").textContent = "לא מצאנו פריט מתאים כרגע";
