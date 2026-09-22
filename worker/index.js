@@ -1,6 +1,8 @@
 const SESSION_COOKIE = "gmach_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
 const PASSWORD_ITERATIONS = 210000;
+const DEFAULT_FROM_EMAIL = "Gmach Berega <onboarding@resend.dev>";
+const DEFAULT_SUPPORT_EMAIL = "netanelhirsh@gmail.com";
 const MAX_JSON_BYTES = 32 * 1024;
 const IMAGE_TYPES = new Map([
   ["image/jpeg", "jpg"],
@@ -47,7 +49,7 @@ async function routeApi(request, env, ctx, url) {
 
   if (method === "GET" && path === "/api/health") {
     await env.DB.prepare("SELECT 1 AS ok").first();
-    return json({ ok: true, release: "platform-2026-09-22", database: "D1", storage: "R2", email: Boolean(env.RESEND_API_KEY && env.RESEND_FROM_EMAIL), timestamp: new Date().toISOString() });
+    return json({ ok: true, release: "platform-2026-09-22.1", database: "D1", storage: "R2", email: Boolean(env.RESEND_API_KEY), timestamp: new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
@@ -65,7 +67,7 @@ async function routeApi(request, env, ctx, url) {
     const user = await currentUser(request, env);
     return json({ user: user ? publicUser(user) : null });
   }
-  if (method === "GET" && path === "/api/public-config") return json({ supportEmail: env.SUPPORT_EMAIL ? String(env.SUPPORT_EMAIL) : null });
+  if (method === "GET" && path === "/api/public-config") return json({ supportEmail: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL) });
 
   if (method === "GET" && path === "/api/items") return listItems(env, url);
   if (method === "GET" && path === "/api/discovery") return discovery(env, url);
@@ -1261,7 +1263,7 @@ function validatePassword(value) {
 }
 
 function assertEmailDeliveryConfigured(env) {
-  if (!env.RESEND_API_KEY || !env.RESEND_FROM_EMAIL) throw new HttpError(503, "שירות אימות המייל עדיין אינו מוגדר");
+  if (!env.RESEND_API_KEY) throw new HttpError(503, "שירות אימות המייל עדיין אינו מוגדר");
 }
 
 function verificationCode() {
@@ -1277,12 +1279,12 @@ async function sendVerificationEmail(env, email, fullName, code) {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${env.RESEND_API_KEY}` },
     body: JSON.stringify({
-      from: String(env.RESEND_FROM_EMAIL),
+      from: String(env.RESEND_FROM_EMAIL || DEFAULT_FROM_EMAIL),
       to: [email],
       subject: "קוד האימות שלך לגמ״ח ברגע",
       text: `שלום ${fullName}, קוד האימות שלך הוא ${code}. הקוד תקף ל-10 דקות. אם לא ביקשת להירשם, אפשר להתעלם מהמייל.`,
       html: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#15313a"><h1 style="color:#243f75">גמ״ח ברגע</h1><p>שלום ${escapeHtmlEmail(fullName)},</p><p>קוד האימות שלך:</p><p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#243f75" dir="ltr">${code}</p><p>הקוד תקף ל־10 דקות. אם לא ביקשת להירשם, אפשר להתעלם מהמייל.</p></div>`,
-      reply_to: env.SUPPORT_EMAIL ? String(env.SUPPORT_EMAIL) : undefined
+      reply_to: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL)
     })
   });
   if (!response.ok) throw new Error(`Resend returned ${response.status}`);

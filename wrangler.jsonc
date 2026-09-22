@@ -25,9 +25,5 @@
   ],
   "observability": {
     "enabled": true
-  },
-  "vars": {
-    "RESEND_FROM_EMAIL": "Gmach Berega <onboarding@resend.dev>",
-    "SUPPORT_EMAIL": "netanelhirsh@gmail.com"
   }
 }
