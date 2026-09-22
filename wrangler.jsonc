@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "gmach-karov1",
+  "name": "gmach-karov",
   "main": "worker/index.js",
   "compatibility_date": "2026-09-20",
   "assets": {
@@ -13,17 +13,21 @@
     {
       "binding": "DB",
       "database_name": "gmach-karov-db",
-      "database_id": "787e7f13-62da-41c6-bf6a-edf5214e8823",
+      "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
   ],
   "r2_buckets": [
     {
       "binding": "ITEM_IMAGES",
-      "bucket_name": "gmach-karov-images","preview_bucket_name": "gmach-karov-images"
+      "bucket_name": "gmach-karov-images"
     }
   ],
   "observability": {
     "enabled": true
+  },
+  "vars": {
+    "RESEND_FROM_EMAIL": "Gmach Berega <onboarding@resend.dev>",
+    "SUPPORT_EMAIL": "netanelhirsh@gmail.com"
   }
 }
