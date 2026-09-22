@@ -74,15 +74,7 @@
             <span class="field-label">איפה?</span>
             <span class="field-control">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
-              <select id="city-filter">
-                <option value="">כל הארץ</option>
-                <option>ירושלים</option>
-                <option>בני ברק</option>
-                <option>בית שמש</option>
-                <option>פתח תקווה</option>
-                <option>מודיעין עילית</option>
-                <option>אשדוד</option>
-              </select>
+              <input id="city-filter" list="israel-cities" placeholder="כל הארץ" autocomplete="address-level2">
             </span>
           </label>
           <input id="date-filter" type="hidden" value="">
@@ -187,14 +179,18 @@
         <button role="tab" aria-selected="false" data-dashboard-tab="admin" id="admin-tab" hidden>ניהול האתר</button>
       </div>
       <div id="dashboard-content" class="dashboard-content"></div>
-      <button class="sign-out-button" id="sign-out-button" type="button">יציאה מהחשבון</button>
+      <div class="account-actions"><button class="sign-out-button" id="sign-out-button" type="button">יציאה מהחשבון</button><button class="delete-account-button" id="delete-account-button" type="button">מחיקת החשבון והמידע</button></div>
     </section>
   </main>
+
+  <datalist id="israel-cities">
+    <option value="אום אל-פחם"><option value="אור יהודה"><option value="אילת"><option value="אלעד"><option value="אריאל"><option value="אשדוד"><option value="אשקלון"><option value="באר שבע"><option value="בית שאן"><option value="בית שמש"><option value="בני ברק"><option value="בת ים"><option value="גבעת שמואל"><option value="גבעתיים"><option value="דימונה"><option value="הוד השרון"><option value="הרצליה"><option value="חדרה"><option value="חולון"><option value="חיפה"><option value="טבריה"><option value="טירת כרמל"><option value="טמרה"><option value="יבנה"><option value="יהוד-מונוסון"><option value="ירושלים"><option value="כפר יונה"><option value="כפר סבא"><option value="כרמיאל"><option value="לוד"><option value="מגדל העמק"><option value="מודיעין-מכבים-רעות"><option value="מודיעין עילית"><option value="מעלה אדומים"><option value="נהריה"><option value="נוף הגליל"><option value="נס ציונה"><option value="נצרת"><option value="נשר"><option value="נתיבות"><option value="נתניה"><option value="סח'נין"><option value="עכו"><option value="עפולה"><option value="ערד"><option value="פתח תקווה"><option value="צפת"><option value="קריית אונו"><option value="קריית אתא"><option value="קריית ביאליק"><option value="קריית גת"><option value="קריית ים"><option value="קריית מוצקין"><option value="קריית מלאכי"><option value="קריית שמונה"><option value="ראש העין"><option value="ראשון לציון"><option value="רהט"><option value="רחובות"><option value="רמלה"><option value="רמת גן"><option value="רמת השרון"><option value="רעננה"><option value="שדרות"><option value="שפרעם"><option value="תל אביב-יפו">
+  </datalist>
 
   <footer class="site-footer">
     <div class="footer-inner">
       <div class="footer-brand"><a class="brand brand-footer" href="#/"><span class="brand-mark brand-logo-crop" aria-hidden="true"><img src="./gmach-berega-logo.jpg" alt=""></span><span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span></a><p>מחברים בין מי שיש לו לבין מי שצריך — בחינם, בפשטות ובאחריות.</p></div>
-      <div class="footer-links"><div><strong>למצוא</strong><a href="#/catalog">כל הפריטים</a><a href="#how-it-works">איך זה עובד</a></div><div><strong>לשתף</strong><button type="button" data-footer-add-gmach>פרסום גמ״ח</button><button type="button" data-footer-add-item>הוספת פריט</button></div><div><strong>חשוב לדעת</strong><button type="button" data-open-info="safety">כללי השאלה בטוחה</button><button type="button" data-open-info="terms">תנאי שימוש</button><button type="button" data-open-info="privacy">פרטיות</button></div></div>
+      <div class="footer-links"><div><strong>למצוא</strong><a href="#/catalog">כל הפריטים</a><a href="#how-it-works">איך זה עובד</a></div><div><strong>לשתף</strong><button type="button" data-footer-add-gmach>פרסום גמ״ח</button><button type="button" data-footer-add-item>הוספת פריט</button></div><div><strong>חשוב לדעת</strong><button type="button" data-open-info="safety">כללי השאלה בטוחה</button><button type="button" data-open-info="terms">תנאי שימוש</button><button type="button" data-open-info="privacy">פרטיות</button><a id="support-email-link" hidden>יצירת קשר ותמיכה</a></div></div>
     </div>
     <div class="footer-bottom"><span>© <span id="current-year"></span> גמ״ח ברגע</span><span>קהילה שמשאילה, קהילה שצומחת</span></div>
   </footer>
@@ -222,6 +218,16 @@
     </form>
   </dialog>
 
+  <dialog class="modal modal-narrow" id="verify-email-dialog" aria-labelledby="verify-email-title">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת החלון">×</button>
+    <div class="dialog-heading"><span class="dialog-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span><h2 id="verify-email-title">אימות כתובת המייל</h2><p>שלחנו קוד בן 6 ספרות. הקוד תקף ל־10 דקות.</p></div>
+    <form id="verify-email-form" class="stack-form">
+      <label><span>קוד אימות</span><input id="verify-email-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required dir="ltr"></label>
+      <button class="button button-primary button-full" type="submit">אימות וכניסה</button>
+      <button class="link-button" id="resend-verification" type="button">שליחת קוד חדש</button>
+    </form>
+  </dialog>
+
   <dialog class="modal modal-medium" id="request-dialog" aria-labelledby="request-title">
     <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת החלון">×</button>
     <div class="dialog-heading"><span class="section-kicker">בקשת השאלה חינמית</span><h2 id="request-title">מתי תרצו את הפריט?</h2><p id="request-item-name"></p></div>
@@ -241,7 +247,7 @@
     <div class="dialog-heading align-start"><span class="section-kicker">מצטרפים לקהילה</span><h2 id="gmach-form-title">פתיחת עמוד גמ״ח</h2><p id="gmach-form-description">ממלאים פרטים בסיסיים. העמוד יפורסם לאחר בדיקה קצרה.</p></div>
     <form id="gmach-form" class="stack-form">
       <div class="two-columns"><label><span>שם הגמ״ח</span><input id="gmach-name" required maxlength="90" placeholder="למשל: גמ״ח אירועים משפחת לוי"></label><label><span>תחום מרכזי</span><select id="gmach-category" required><option value="">בחירה</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option><option>כללי</option></select></label></div>
-      <div class="two-columns"><label><span>עיר</span><input id="gmach-city" required autocomplete="address-level2"></label><label><span>שכונה <small>(רשות)</small></span><input id="gmach-neighborhood"></label></div>
+      <div class="two-columns"><label><span>עיר</span><input id="gmach-city" list="israel-cities" required autocomplete="address-level2"></label><label><span>שכונה <small>(רשות)</small></span><input id="gmach-neighborhood"></label></div>
       <label><span>תיאור קצר</span><textarea id="gmach-description" rows="3" maxlength="600" required placeholder="מה אפשר להשאיל, למי מיועד ואיך מתאמים"></textarea></label>
       <label><span>טלפון לתיאום <small>(לא יוצג ללא אישורכם)</small></span><input id="gmach-phone" type="tel" inputmode="tel" dir="ltr" required></label>
       <label class="consent-row"><input id="gmach-consent" type="checkbox" required><span>אני מאשר/ת שכל הפריטים בגמ״ח מוצעים להשאלה ללא תשלום.</span></label>

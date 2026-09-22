@@ -411,7 +411,10 @@ img { max-width: 100%; }
 .status-chip.pending { background: #fff2ce; color: #8a6119; }
 .status-chip.declined { background: #fae8e8; color: #9d3d3d; }
 .dashboard-empty { padding: 48px 20px; border: 1px dashed #b7cbc5; border-radius: 20px; text-align: center; color: var(--ink-soft); }
-.sign-out-button { margin-top: 35px; padding: 0; color: var(--danger); }
+.account-actions { margin-top: 35px; display: flex; gap: 18px; }
+.sign-out-button, .delete-account-button { padding: 0; border: 0; background: transparent; font: inherit; font-weight: 700; cursor: pointer; }
+.sign-out-button { color: var(--ink-soft); }
+.delete-account-button { color: var(--danger); }
 
 .site-footer { background: #fff; border-top: 1px solid var(--line); }
 .footer-inner { width: var(--shell); margin: 0 auto; padding: 55px 0 38px; display: grid; grid-template-columns: 1fr 1.4fr; gap: 70px; }

@@ -1,2 +1,6 @@
 # Optional: comma-separated emails that should become administrators on registration.
 ADMIN_EMAILS=owner@example.com
+# Resend transactional email. Store the real API key as a Cloudflare secret.
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxx
+RESEND_FROM_EMAIL=Gmach Berega <verify@example.org>
+SUPPORT_EMAIL=support@example.org

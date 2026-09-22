@@ -1,6 +1,6 @@
 const SESSION_COOKIE = "gmach_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
-const PASSWORD_ITERATIONS = 100000;
+const PASSWORD_ITERATIONS = 210000;
 const MAX_JSON_BYTES = 32 * 1024;
 const IMAGE_TYPES = new Map([
   ["image/jpeg", "jpg"],
@@ -47,14 +47,17 @@ async function routeApi(request, env, ctx, url) {
 
   if (method === "GET" && path === "/api/health") {
     await env.DB.prepare("SELECT 1 AS ok").first();
-    return json({ ok: true, database: "D1", storage: "R2" });
+    return json({ ok: true, database: "D1", storage: "R2", email: Boolean(env.RESEND_API_KEY && env.RESEND_FROM_EMAIL), timestamp: new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
+  if (method === "POST" && path === "/api/auth/verify-email") return verifyEmail(request, env, url);
+  if (method === "POST" && path === "/api/auth/resend-verification") return resendVerification(request, env, ctx);
   if (method === "POST" && path === "/api/auth/login") return login(request, env, ctx, url);
   if (method === "POST" && path === "/api/auth/2fa/verify-login") return verifyTwoFactorLogin(request, env, url);
   if (method === "POST" && path === "/api/auth/logout") return logout(request, env, url);
   if (method === "POST" && path === "/api/auth/change-password") return changePassword(request, env);
+  if (method === "DELETE" && path === "/api/me/account") return deleteAccount(request, env, url);
   if (method === "POST" && path === "/api/auth/2fa/setup") return setupTwoFactor(request, env);
   if (method === "POST" && path === "/api/auth/2fa/confirm") return confirmTwoFactor(request, env);
   if (method === "POST" && path === "/api/auth/2fa/disable") return disableTwoFactor(request, env);
@@ -62,6 +65,7 @@ async function routeApi(request, env, ctx, url) {
     const user = await currentUser(request, env);
     return json({ user: user ? publicUser(user) : null });
   }
+  if (method === "GET" && path === "/api/public-config") return json({ supportEmail: env.SUPPORT_EMAIL ? String(env.SUPPORT_EMAIL) : null });
 
   if (method === "GET" && path === "/api/items") return listItems(env, url);
   if (method === "GET" && path === "/api/site-settings") return getSiteSettings(env);
@@ -125,6 +129,7 @@ async function register(request, env, ctx, url) {
   const fullName = cleanText(body.fullName, 2, 80, "שם מלא");
   const password = validatePassword(body.password);
   await enforceAuthRateLimit(env, email, "register", ctx);
+  assertEmailDeliveryConfigured(env);
 
   const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
   if (existing) throw new HttpError(409, "כבר קיים חשבון עם כתובת האימייל הזו");
@@ -141,23 +146,68 @@ async function register(request, env, ctx, url) {
   const role = admins.includes(email) || (!existingAdmin && isFirstAccount)
     ? "admin"
     : await compatibleMemberRole(env);
-  const sessionToken = randomToken(32);
-  const tokenHash = await sha256(sessionToken);
-  const expiresAt = new Date(Date.now() + SESSION_SECONDS * 1000).toISOString();
+  const code = verificationCode();
+  const challengeHash = await sha256(`${id}:${code}`);
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
   try {
     await env.DB.batch([
       env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role) VALUES (?,?,?,?,?,?,?)")
         .bind(id, email, passwordHash, salt, PASSWORD_ITERATIONS, fullName, role),
-      env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)")
-        .bind(tokenHash, id, expiresAt)
+      env.DB.prepare("INSERT INTO auth_challenges (token_hash,user_id,purpose,expires_at) VALUES (?,?, 'email_verify', ?)")
+        .bind(challengeHash, id, expiresAt)
     ]);
   } catch (error) {
     if (String(error).toLowerCase().includes("unique")) throw new HttpError(409, "כבר קיים חשבון עם כתובת האימייל הזו");
     throw error;
   }
 
-  return json({ user: { id, email, fullName, role } }, 201, { "Set-Cookie": sessionCookie(sessionToken, url) });
+  try {
+    await sendVerificationEmail(env, email, fullName, code);
+  } catch (error) {
+    await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
+    console.error("Verification email delivery failed", error);
+    throw new HttpError(503, "לא הצלחנו לשלוח את קוד האימות. נסו שוב בעוד רגע");
+  }
+  return json({ verificationRequired: true, email, expiresInSeconds: 600 }, 201);
+}
+
+async function verifyEmail(request, env, url) {
+  const body = await readJson(request);
+  const email = normalizeEmail(body.email);
+  const code = cleanText(body.code, 6, 6, "קוד אימות");
+  if (!/^\d{6}$/.test(code)) throw new HttpError(400, "קוד האימות חייב להכיל 6 ספרות");
+  const user = await env.DB.prepare("SELECT * FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
+  if (!user) throw new HttpError(400, "קוד האימות אינו נכון או שפג תוקפו");
+  if (Number(user.email_verified || 0) === 1) throw new HttpError(409, "כתובת האימייל כבר אומתה");
+  const tokenHash = await sha256(`${user.id}:${code}`);
+  const challenge = await env.DB.prepare("SELECT token_hash FROM auth_challenges WHERE token_hash = ? AND user_id = ? AND purpose = 'email_verify' AND expires_at > ?")
+    .bind(tokenHash, user.id, new Date().toISOString()).first();
+  if (!challenge) throw new HttpError(400, "קוד האימות אינו נכון או שפג תוקפו");
+  const sessionToken = randomToken(32);
+  await env.DB.batch([
+    env.DB.prepare("UPDATE users SET email_verified = 1, last_login_at = ?, updated_at = ? WHERE id = ?").bind(new Date().toISOString(), new Date().toISOString(), user.id),
+    env.DB.prepare("DELETE FROM auth_challenges WHERE user_id = ? AND purpose = 'email_verify'").bind(user.id),
+    env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)").bind(await sha256(sessionToken), user.id, new Date(Date.now() + SESSION_SECONDS * 1000).toISOString())
+  ]);
+  return json({ user: publicUser({ ...user, email_verified: 1 }) }, 200, { "Set-Cookie": sessionCookie(sessionToken, url) });
+}
+
+async function resendVerification(request, env, ctx) {
+  const body = await readJson(request);
+  const email = normalizeEmail(body.email);
+  await enforceAuthRateLimit(env, email, "register", ctx);
+  assertEmailDeliveryConfigured(env);
+  const user = await env.DB.prepare("SELECT id,email,full_name,email_verified FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
+  if (!user || Number(user.email_verified || 0) === 1) return json({ ok: true });
+  const code = verificationCode();
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM auth_challenges WHERE user_id = ? AND purpose = 'email_verify'").bind(user.id),
+    env.DB.prepare("INSERT INTO auth_challenges (token_hash,user_id,purpose,expires_at) VALUES (?,?, 'email_verify', ?)")
+      .bind(await sha256(`${user.id}:${code}`), user.id, new Date(Date.now() + 10 * 60 * 1000).toISOString())
+  ]);
+  await sendVerificationEmail(env, user.email, user.full_name, code);
+  return json({ ok: true });
 }
 
 async function login(request, env, ctx, url) {
@@ -170,6 +220,7 @@ async function login(request, env, ctx, url) {
   if (user.account_status === "suspended") throw new HttpError(403, "החשבון הושעה. יש לפנות למנהל האתר");
   const candidate = await derivePassword(password, user.password_salt, user.password_iterations);
   if (!constantTimeEqual(candidate, user.password_hash)) throw new HttpError(401, "האימייל או הסיסמה אינם נכונים");
+  if (Number(user.email_verified || 0) !== 1) return json({ error: "יש לאמת את כתובת האימייל לפני הכניסה", verificationRequired: true, email: user.email }, 403);
 
   if (Number(user.totp_enabled || 0) === 1) {
     const challenge = randomToken(32);
@@ -221,6 +272,17 @@ async function changePassword(request, env) {
     env.DB.prepare("DELETE FROM sessions WHERE user_id = ? AND token_hash != ?").bind(user.id, await sha256(cookieValue(request, SESSION_COOKIE)))
   ]);
   return json({ ok: true });
+}
+
+async function deleteAccount(request, env, url) {
+  const user = await requireUser(request, env);
+  if (user.role === "admin") throw new HttpError(400, "מטעמי בטיחות, חשבון מנהל ניתן למחיקה רק לאחר העברת הרשאת הניהול");
+  const body = await readJson(request);
+  const password = validatePassword(body.password);
+  const candidate = await derivePassword(password, user.password_salt, user.password_iterations);
+  if (!constantTimeEqual(candidate, user.password_hash)) throw new HttpError(401, "הסיסמה אינה נכונה");
+  await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(user.id).run();
+  return json({ ok: true }, 200, { "Set-Cookie": clearSessionCookie(url) });
 }
 
 async function setupTwoFactor(request, env) {
@@ -1063,6 +1125,38 @@ function validatePassword(value) {
   const password = String(value || "");
   if (password.length < 10 || password.length > 128) throw new HttpError(400, "הסיסמה חייבת להכיל 10–128 תווים");
   return password;
+}
+
+function assertEmailDeliveryConfigured(env) {
+  if (!env.RESEND_API_KEY || !env.RESEND_FROM_EMAIL) throw new HttpError(503, "שירות אימות המייל עדיין אינו מוגדר");
+}
+
+function verificationCode() {
+  const bytes = new Uint32Array(1);
+  crypto.getRandomValues(bytes);
+  return String(100000 + (bytes[0] % 900000));
+}
+
+async function sendVerificationEmail(env, email, fullName, code) {
+  assertEmailDeliveryConfigured(env);
+  const deliver = env.RESEND_SERVICE?.fetch ? env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE) : fetch;
+  const response = await deliver("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${env.RESEND_API_KEY}` },
+    body: JSON.stringify({
+      from: String(env.RESEND_FROM_EMAIL),
+      to: [email],
+      subject: "קוד האימות שלך לגמ״ח ברגע",
+      text: `שלום ${fullName}, קוד האימות שלך הוא ${code}. הקוד תקף ל-10 דקות. אם לא ביקשת להירשם, אפשר להתעלם מהמייל.`,
+      html: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#15313a"><h1 style="color:#243f75">גמ״ח ברגע</h1><p>שלום ${escapeHtmlEmail(fullName)},</p><p>קוד האימות שלך:</p><p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#243f75" dir="ltr">${code}</p><p>הקוד תקף ל־10 דקות. אם לא ביקשת להירשם, אפשר להתעלם מהמייל.</p></div>`,
+      reply_to: env.SUPPORT_EMAIL ? String(env.SUPPORT_EMAIL) : undefined
+    })
+  });
+  if (!response.ok) throw new Error(`Resend returned ${response.status}`);
+}
+
+function escapeHtmlEmail(value) {
+  return String(value || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
 
 function validatePhone(value) {

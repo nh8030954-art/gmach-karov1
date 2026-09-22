@@ -3,13 +3,15 @@ import { readFile } from "node:fs/promises";
 import { FormData as WorkerFormData, Miniflare, convertV4MiniflareOptions } from "miniflare";
 
 const base = "http://local.test";
+const sentEmails = [];
 const mf = new Miniflare(convertV4MiniflareOptions({
   modules: true,
   scriptPath: "worker/index.js",
   compatibilityDate: "2026-09-20",
   d1Databases: { DB: "smoke-db" },
   r2Buckets: ["ITEM_IMAGES"],
-  bindings: { ADMIN_EMAILS: "" }
+  bindings: { ADMIN_EMAILS: "", RESEND_API_KEY: "re_test", RESEND_FROM_EMAIL: "Gmach Berega <verify@example.org>", SUPPORT_EMAIL: "support@example.org" },
+  serviceBindings: { RESEND_SERVICE: async request => { sentEmails.push(await request.json()); return Response.json({ id: crypto.randomUUID() }); } }
 }));
 
 async function request(path, { method = "GET", body, cookie, form, origin = base } = {}) {
@@ -31,6 +33,16 @@ async function request(path, { method = "GET", body, cookie, form, origin = base
   return { response, data };
 }
 
+async function verifyLatestEmail(email) {
+  const message = [...sentEmails].reverse().find(item => item.to?.includes(email));
+  assert.ok(message, `No verification email sent to ${email}`);
+  const code = message.text.match(/\b\d{6}\b/)?.[0];
+  assert.ok(code, "Verification code missing from email");
+  const verified = await request("/api/auth/verify-email", { method: "POST", body: { email, code } });
+  assert.equal(verified.response.status, 200, JSON.stringify(verified.data));
+  return verified.response.headers.get("set-cookie").split(";", 1)[0];
+}
+
 try {
   const db = await mf.getD1Database("DB");
   for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql"]) {
@@ -42,6 +54,7 @@ try {
   let result = await request("/api/health");
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(result.data.database, "D1");
+  assert.equal(result.data.email, true);
 
   result = await request("/api/items");
   assert.equal(result.response.status, 200);
@@ -99,8 +112,8 @@ try {
 
   result = await request("/api/auth/register", { method: "POST", body: { fullName: "שואלת ציוד", email: "borrower@example.com", password: "AnotherPass!456" } });
   assert.equal(result.response.status, 201);
-  assert.equal(result.data.user.role, "member");
-  const borrowerCookie = result.response.headers.get("set-cookie").split(";", 1)[0];
+  assert.equal(result.data.verificationRequired, true);
+  const borrowerCookie = await verifyLatestEmail("borrower@example.com");
 
   result = await request(`/api/favorites/${itemId}`, { method: "POST", cookie: borrowerCookie });
   assert.equal(result.response.status, 200);
@@ -143,7 +156,7 @@ try {
 
   result = await request("/api/auth/register", { method: "POST", body: { fullName: "שואל נוסף", email: "second@example.com", password: "ThirdPass!789" } });
   assert.equal(result.response.status, 201);
-  const secondCookie = result.response.headers.get("set-cookie").split(";", 1)[0];
+  const secondCookie = await verifyLatestEmail("second@example.com");
   result = await request(`/api/loan-requests/${requestId}/messages`, { cookie: secondCookie });
   assert.equal(result.response.status, 403);
   result = await request("/api/loan-requests", { method: "POST", cookie: secondCookie, body: { itemId, requestedFrom: "2026-10-02", requestedUntil: "2026-10-04", phone: "054-1112233", note: "צריך לאירוע נוסף" } });
