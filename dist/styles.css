@@ -35,6 +35,19 @@
 .totp-qr { width: fit-content; padding: 10px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
 .totp-qr svg { width: 220px; height: 220px; }
 .two-factor-card { margin-top: 16px; }
+.admin-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px; border: 1px solid color-mix(in srgb, var(--accent) 55%, white); border-radius: 18px; background: color-mix(in srgb, var(--accent) 12%, white); }
+.visual-edit-mode header *, .visual-edit-mode main *, .visual-edit-mode footer * { cursor: crosshair !important; }
+.visual-edit-mode header *:hover, .visual-edit-mode main *:hover, .visual-edit-mode footer *:hover { outline: 2px dashed var(--accent) !important; outline-offset: 3px; }
+.is-edit-selected { outline: 3px solid #2563eb !important; outline-offset: 4px !important; }
+#visual-editor-panel { position: fixed; z-index: 1000; top: 12px; left: 12px; width: min(390px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: auto; padding: 16px; border: 1px solid #ccd7e6; border-radius: 18px; background: #fff; color: #17243f; box-shadow: 0 24px 70px rgba(15, 35, 65, .28); direction: rtl; }
+#visual-editor-panel header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px; }
+#visual-editor-panel header button { border: 0; border-radius: 9px; padding: 8px 12px; background: #e9eef7; font: inherit; cursor: pointer; }
+#visual-editor-panel label { display: grid; gap: 5px; font-weight: 750; }
+#visual-editor-panel input, #visual-editor-panel select, #visual-editor-panel textarea { width: 100%; min-height: 38px; border: 1px solid #cbd5e1; border-radius: 9px; padding: 8px; }
+#visual-editor-panel .editor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+#visual-editor-panel .check { display: flex; align-items: center; grid-template-columns: auto 1fr; }
+#visual-editor-panel .check input { width: auto; min-height: auto; }
+#visual-editor-panel .editor-actions { display: flex; gap: 8px; margin-top: 12px; }
 @media (max-width: 720px) { .admin-overview, .admin-settings-grid { grid-template-columns: 1fr 1fr; } .admin-settings-grid .wide { grid-column: 1 / -1; } }
 
 * { box-sizing: border-box; }

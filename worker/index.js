@@ -65,6 +65,7 @@ async function routeApi(request, env, ctx, url) {
 
   if (method === "GET" && path === "/api/items") return listItems(env, url);
   if (method === "GET" && path === "/api/site-settings") return getSiteSettings(env);
+  if (method === "GET" && path === "/api/page-customizations") return getPageCustomizations(env);
   const itemDetail = path.match(/^\/api\/items\/([^/]+)$/);
   if (method === "GET" && itemDetail) return getItem(env, decodeURIComponent(itemDetail[1]));
   if (method === "PATCH" && itemDetail) return updateItem(request, env, decodeURIComponent(itemDetail[1]));
@@ -101,6 +102,13 @@ async function routeApi(request, env, ctx, url) {
   const restoreSettings = path.match(/^\/api\/admin\/site-settings\/versions\/([^/]+)\/restore$/);
   if (method === "POST" && restoreSettings) return restoreSiteSettings(request, env, decodeURIComponent(restoreSettings[1]));
   if (method === "GET" && path === "/api/admin/users") return adminUsers(request, env);
+  if (method === "GET" && path === "/api/admin/content") return adminContent(request, env);
+  if (method === "PUT" && path === "/api/admin/page-customizations") return savePageCustomization(request, env);
+  if (method === "DELETE" && path === "/api/admin/page-customizations") return resetPageCustomizations(request, env);
+  const restorePageVersion = path.match(/^\/api\/admin\/page-customizations\/versions\/([^/]+)\/restore$/);
+  if (method === "POST" && restorePageVersion) return restorePageCustomizationVersion(request, env, decodeURIComponent(restorePageVersion[1]));
+  const adminUser = path.match(/^\/api\/admin\/users\/([^/]+)$/);
+  if (method === "PATCH" && adminUser) return updateAdminUser(request, env, decodeURIComponent(adminUser[1]));
   const adminOrganization = path.match(/^\/api\/admin\/organizations\/([^/]+)$/);
   if (method === "PATCH" && adminOrganization) return moderateOrganization(request, env, decodeURIComponent(adminOrganization[1]));
   const adminItem = path.match(/^\/api\/admin\/items\/([^/]+)$/);
@@ -762,6 +770,112 @@ async function adminUsers(request, env) {
   const result = await env.DB.prepare(`SELECT id,email,full_name,role,email_verified,account_status,totp_enabled,created_at,last_login_at
     FROM users ORDER BY created_at DESC LIMIT 500`).all();
   return json({ users: result.results });
+}
+
+async function getPageCustomizations(env) {
+  const result = await env.DB.prepare("SELECT element_key,text_content,styles_json,attributes_json,updated_at FROM page_customizations ORDER BY element_key").all();
+  return json({ customizations: result.results.map(row => ({ key: row.element_key, text: row.text_content, styles: safeJsonObject(row.styles_json), attributes: safeJsonObject(row.attributes_json), updatedAt: row.updated_at })) });
+}
+
+async function savePageCustomization(request, env) {
+  const user = await requireAdmin(request, env);
+  const body = await readJson(request);
+  const key = cleanText(body.key, 2, 500, "מזהה רכיב");
+  if (!/^(#[a-z][\w:-]*|(?:[a-z][\w-]*(?::nth-of-type\(\d+\))?)(?:>(?:[a-z][\w-]*(?::nth-of-type\(\d+\))?))*)$/i.test(key)) throw new HttpError(400, "מזהה הרכיב אינו תקין");
+  const textContent = body.text === null || body.text === undefined ? null : cleanOptional(body.text, 3000);
+  const styles = sanitizeEditorStyles(body.styles);
+  const attributes = sanitizeEditorAttributes(body.attributes);
+  const existing = await env.DB.prepare("SELECT element_key,text_content,styles_json,attributes_json FROM page_customizations ORDER BY element_key").all();
+  const versionId = crypto.randomUUID();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO page_customization_versions (id,snapshot_json,created_by) VALUES (?,?,?)").bind(versionId, JSON.stringify(existing.results), user.id),
+    env.DB.prepare(`INSERT INTO page_customizations (element_key,text_content,styles_json,attributes_json,updated_by,updated_at) VALUES (?,?,?,?,?,?)
+      ON CONFLICT(element_key) DO UPDATE SET text_content=excluded.text_content,styles_json=excluded.styles_json,attributes_json=excluded.attributes_json,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
+      .bind(key, textContent, JSON.stringify(styles), JSON.stringify(attributes), user.id, new Date().toISOString()),
+    auditStatement(env, user.id, "page.element.update", "page_element", key, { versionId })
+  ]);
+  return json({ customization: { key, text: textContent, styles, attributes }, versionId });
+}
+
+async function resetPageCustomizations(request, env) {
+  const user = await requireAdmin(request, env);
+  const existing = await env.DB.prepare("SELECT element_key,text_content,styles_json,attributes_json FROM page_customizations ORDER BY element_key").all();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO page_customization_versions (id,snapshot_json,created_by) VALUES (?,?,?)").bind(crypto.randomUUID(), JSON.stringify(existing.results), user.id),
+    env.DB.prepare("DELETE FROM page_customizations"), auditStatement(env, user.id, "page.customizations.reset", "page", "home")
+  ]);
+  return json({ ok: true });
+}
+
+async function restorePageCustomizationVersion(request, env, versionId) {
+  const user = await requireAdmin(request, env);
+  const [version, current] = await Promise.all([
+    env.DB.prepare("SELECT snapshot_json FROM page_customization_versions WHERE id = ?").bind(versionId).first(),
+    env.DB.prepare("SELECT element_key,text_content,styles_json,attributes_json FROM page_customizations ORDER BY element_key").all()
+  ]);
+  if (!version) throw new HttpError(404, "גרסת העריכה לא נמצאה");
+  const rows = JSON.parse(version.snapshot_json || "[]");
+  const statements = [
+    env.DB.prepare("INSERT INTO page_customization_versions (id,snapshot_json,created_by) VALUES (?,?,?)").bind(crypto.randomUUID(), JSON.stringify(current.results), user.id),
+    env.DB.prepare("DELETE FROM page_customizations")
+  ];
+  for (const row of rows.slice(0, 1000)) statements.push(env.DB.prepare("INSERT INTO page_customizations (element_key,text_content,styles_json,attributes_json,updated_by) VALUES (?,?,?,?,?)").bind(row.element_key, row.text_content, row.styles_json || "{}", row.attributes_json || "{}", user.id));
+  statements.push(auditStatement(env, user.id, "page.customizations.restore", "page_customization_versions", versionId));
+  await env.DB.batch(statements);
+  return json({ ok: true });
+}
+
+async function adminContent(request, env) {
+  await requireAdmin(request, env);
+  const [organizations, items, requests, reports, versions] = await env.DB.batch([
+    env.DB.prepare(`SELECT o.id,o.name,o.city,o.neighborhood,o.status,o.verified,o.is_hidden,o.created_at,u.full_name AS owner_name,u.email AS owner_email FROM organizations o LEFT JOIN users u ON u.id=o.owner_id ORDER BY o.created_at DESC LIMIT 500`),
+    env.DB.prepare(`SELECT i.id,i.title,i.category,i.condition,i.quantity,i.status,i.availability_status,i.created_at,o.name AS organization_name FROM items i JOIN organizations o ON o.id=i.organization_id ORDER BY i.created_at DESC LIMIT 1000`),
+    env.DB.prepare(`SELECT lr.id,lr.status,lr.requested_from,lr.requested_until,lr.created_at,i.title AS item_title,b.full_name AS borrower_name,b.email AS borrower_email,o.name AS organization_name FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN users b ON b.id=lr.borrower_id JOIN organizations o ON o.id=i.organization_id ORDER BY lr.created_at DESC LIMIT 1000`),
+    env.DB.prepare(`SELECT r.id,r.reason,r.status,r.created_at,i.title AS item_title,u.full_name AS reporter_name FROM reports r JOIN items i ON i.id=r.item_id JOIN users u ON u.id=r.reporter_id ORDER BY r.created_at DESC LIMIT 500`),
+    env.DB.prepare(`SELECT v.id,v.created_at,u.full_name AS created_by_name FROM page_customization_versions v LEFT JOIN users u ON u.id=v.created_by ORDER BY v.created_at DESC LIMIT 100`)
+  ]);
+  return json({ organizations: organizations.results, items: items.results, requests: requests.results, reports: reports.results, visualVersions: versions.results });
+}
+
+async function updateAdminUser(request, env, id) {
+  const admin = await requireAdmin(request, env);
+  if (id === admin.id) throw new HttpError(400, "אי אפשר לשנות את הרשאות החשבון שמחובר כרגע");
+  const body = await readJson(request);
+  const role = body.role === "admin" ? "admin" : "member";
+  const status = body.accountStatus === "suspended" ? "suspended" : "active";
+  const verified = body.emailVerified === true ? 1 : 0;
+  const result = await env.DB.prepare("UPDATE users SET role=?,account_status=?,email_verified=?,updated_at=? WHERE id=?").bind(role,status,verified,new Date().toISOString(),id).run();
+  if (!result.meta.changes) throw new HttpError(404, "המשתמש לא נמצא");
+  await auditStatement(env, admin.id, "user.update", "user", id, { role, status, verified }).run();
+  return json({ id, role, accountStatus: status, emailVerified: Boolean(verified) });
+}
+
+function sanitizeEditorStyles(input) {
+  const allowed = new Set(["color","backgroundColor","fontFamily","fontSize","fontWeight","textAlign","lineHeight","letterSpacing","width","maxWidth","minHeight","marginTop","marginBottom","marginInlineStart","marginInlineEnd","paddingTop","paddingBottom","paddingInlineStart","paddingInlineEnd","borderRadius","opacity","order","transform","display"]);
+  const result = {};
+  if (!input || typeof input !== "object" || Array.isArray(input)) return result;
+  for (const [key, raw] of Object.entries(input)) {
+    if (!allowed.has(key)) continue;
+    const value = String(raw ?? "").trim();
+    if (value.length <= 100 && !/[;{}<>]/.test(value)) result[key] = value;
+  }
+  return result;
+}
+
+function sanitizeEditorAttributes(input) {
+  const result = {};
+  if (!input || typeof input !== "object" || Array.isArray(input)) return result;
+  if (typeof input.hidden === "boolean") result.hidden = input.hidden;
+  if (typeof input.disabled === "boolean") result.disabled = input.disabled;
+  if (typeof input.href === "string") {
+    const href = input.href.trim();
+    if (/^(#|\/|https:\/\/)[^\s<>]{0,500}$/.test(href)) result.href = href;
+  }
+  return result;
+}
+
+function safeJsonObject(value) {
+  try { const parsed = JSON.parse(value || "{}"); return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {}; } catch { return {}; }
 }
 
 function auditStatement(env, actorId, action, entityType, entityId = null, metadata = {}) {

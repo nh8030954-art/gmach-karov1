@@ -33,7 +33,7 @@ async function request(path, { method = "GET", body, cookie, form, origin = base
 
 try {
   const db = await mf.getD1Database("DB");
-  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql"]) {
+  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql"]) {
     const migration = await readFile(`migrations/${filename}`, "utf8");
     const statements = migration.split(/;\s*(?:\r?\n|$)/).map(statement => statement.trim()).filter(Boolean);
     await db.batch(statements.map(statement => db.prepare(statement)));
@@ -60,6 +60,13 @@ try {
   assert.equal(result.response.status, 200);
   result = await request("/api/admin/users", { cookie: adminCookie });
   assert.equal(result.data.users.some(user => user.email === "netanelhirsh@gmail.com"), true);
+  result = await request("/api/admin/page-customizations", { method: "PUT", cookie: adminCookie, body: { key: "#hero-title", text: "מה תרצו להשאיל?", styles: { fontSize: "64px", color: "#243f75", position: "fixed" }, attributes: { hidden: false } } });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.customization.styles.position, undefined);
+  result = await request("/api/page-customizations");
+  assert.equal(result.data.customizations[0].key, "#hero-title");
+  result = await request("/api/admin/content", { cookie: adminCookie });
+  assert.equal(Array.isArray(result.data.visualVersions), true);
   result = await request("/api/auth/2fa/setup", { method: "POST", cookie: adminCookie, body: {} });
   assert.equal(result.response.status, 200);
   assert.match(result.data.otpauthUri, /^otpauth:\/\/totp\//);
