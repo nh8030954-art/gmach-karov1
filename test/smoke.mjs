@@ -45,7 +45,7 @@ async function verifyLatestEmail(email) {
 
 try {
   const db = await mf.getD1Database("DB");
-  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql"]) {
+  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql", "0007_platform_expansion.sql"]) {
     const migration = await readFile(`migrations/${filename}`, "utf8");
     const statements = migration.split(/;\s*(?:\r?\n|$)/).map(statement => statement.trim()).filter(Boolean);
     await db.batch(statements.map(statement => db.prepare(statement)));
@@ -184,6 +184,27 @@ try {
   await request(`/api/organizations/${organizationId}`, { method: "PATCH", cookie: adminCookie, body: { hidden: false } });
   result = await request("/api/items");
   assert.equal(result.data.items.length, 1);
+
+  result = await request("/api/discovery?q=קישוט");
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.organizations[0].id, organizationId);
+  result = await request(`/api/organizations/${organizationId}/public`);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.items.length, 1);
+  result = await request("/api/help-requests", { method: "POST", cookie: borrowerCookie, body: { title: "צריך שולחן מתקפל", description: "דרוש שולחן מתקפל לאירוע משפחתי קרוב", category: "אירועים", city: "ירושלים", urgency: "urgent" } });
+  assert.equal(result.response.status, 201);
+  result = await request("/api/help-requests?city=ירושלים");
+  assert.equal(result.data.requests.length, 1);
+  result = await request("/api/analytics/events", { method: "POST", cookie: borrowerCookie, body: { eventType: "search", query: "קישוט", city: "ירושלים", category: "אירועים" } });
+  assert.equal(result.response.status, 201);
+  result = await request("/api/admin/analytics", { cookie: adminCookie });
+  assert.equal(result.response.status, 200);
+  result = await request(`/api/loan-requests/${requestId}/status`, { method: "PATCH", cookie: adminCookie, body: { status: "collected" } });
+  assert.equal(result.response.status, 200);
+  result = await request(`/api/loan-requests/${requestId}/status`, { method: "PATCH", cookie: adminCookie, body: { status: "returned" } });
+  assert.equal(result.response.status, 200);
+  result = await request("/api/reviews", { method: "POST", cookie: borrowerCookie, body: { requestId, rating: 5, comment: "שירות מצוין" } });
+  assert.equal(result.response.status, 201);
 
   result = await request("/api/auth/logout", { method: "POST", cookie: borrowerCookie });
   assert.equal(result.response.status, 200);

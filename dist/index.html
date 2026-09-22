@@ -28,9 +28,10 @@
       </a>
 
       <nav class="desktop-nav" aria-label="ניווט ראשי">
-        <a href="#/catalog">כל הפריטים</a>
+        <a href="#/catalog">חיפוש</a>
         <a href="#how-it-works">איך זה עובד</a>
-        <a href="#for-gmachim">למנהלי גמ״חים</a>
+        <a href="#gmachim">גמ״חים</a>
+        <button class="nav-button" id="nav-help-request" type="button">בקשת עזרה</button>
       </nav>
 
       <div class="header-actions">
@@ -39,16 +40,17 @@
           <span class="notification-badge" id="notification-badge" hidden>0</span>
         </button>
         <button class="text-button" id="dashboard-button" type="button" data-requires-auth>האזור שלי</button>
-        <button class="button button-primary button-small" id="add-gmach-button" type="button">פתיחת גמ״ח</button>
+        <button class="button button-primary button-small" id="add-gmach-button" type="button">הצטרפו כגמ״ח</button>
         <button class="icon-button mobile-menu-button" id="mobile-menu-button" type="button" aria-label="פתיחת תפריט" aria-expanded="false" aria-controls="mobile-menu">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
         </button>
       </div>
     </div>
     <nav class="mobile-menu" id="mobile-menu" aria-label="ניווט נייד" hidden>
-      <a href="#/catalog">כל הפריטים</a>
+      <a href="#/catalog">חיפוש</a>
       <a href="#how-it-works">איך זה עובד</a>
-      <a href="#for-gmachim">למנהלי גמ״חים</a>
+      <a href="#gmachim">גמ״חים</a>
+      <button type="button" id="mobile-help-request">בקשת עזרה</button>
       <button type="button" data-requires-auth>האזור שלי</button>
     </nav>
   </header>
@@ -67,7 +69,8 @@
             <span class="field-label">מה מחפשים?</span>
             <span class="field-control">
               <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-              <input id="search-input" type="search" placeholder="למשל: קשת פרחים, מקדחה, עגלת תינוק" autocomplete="off">
+              <input id="search-input" type="search" list="search-suggestions" placeholder="למשל: קשת פרחים, מקדחה, עגלת תינוק" autocomplete="off">
+              <datalist id="search-suggestions"></datalist>
             </span>
           </label>
           <label class="search-field">
@@ -88,6 +91,10 @@
           <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg> ללא תשלום</span>
           <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s8-4 8-11V5l-8-3-8 3v5c0 7 8 11 8 11Z"/></svg> גמ״חים מאומתים</span>
           <span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11h18M5 11l2 9h10l2-9M8 11V7a4 4 0 0 1 8 0v4"/></svg> איסוף קרוב לבית</span>
+        </div>
+        <div class="audience-paths" aria-label="בחירת מסלול">
+          <button type="button" id="path-borrower"><strong>אני מחפש/ת עזרה או ציוד</strong><span>חיפוש מהיר לפי צורך ואזור</span></button>
+          <button type="button" id="path-manager"><strong>אני מנהל/ת גמ״ח</strong><span>הצטרפות, מלאי ובקשות במקום אחד</span></button>
         </div>
       </section>
 
@@ -113,17 +120,22 @@
           <div class="catalog-controls">
             <button class="filter-button" id="filters-button" type="button" aria-expanded="false" aria-controls="filter-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg> סינון</button>
             <label class="sort-control"><span class="sr-only">מיון תוצאות</span><select id="sort-select"><option value="recommended">מומלצים</option><option value="newest">חדשים</option><option value="city">לפי עיר</option></select></label>
+            <div class="view-switch" role="group" aria-label="תצוגת תוצאות"><button type="button" id="list-view-button" class="is-active">רשימה</button><button type="button" id="map-view-button">מפה</button></div>
           </div>
         </div>
 
         <div class="filter-panel" id="filter-panel" hidden>
           <label><span>קטגוריה</span><select id="category-filter"><option value="">כל הקטגוריות</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option></select></label>
           <label><span>מצב הפריט</span><select id="condition-filter"><option value="">כל המצבים</option><option value="כמו חדש">כמו חדש</option><option value="מצוין">מצוין</option><option value="טוב">טוב</option></select></label>
+          <label><span>סוג</span><select id="type-filter"><option value="">הכול</option><option value="loan">השאלה</option><option value="donation">מסירה</option><option value="service">שירות</option></select></label>
+          <label><span>איסוף</span><select id="pickup-filter"><option value="">כל האפשרויות</option><option value="pickup">איסוף עצמי</option><option value="delivery">משלוח</option><option value="coordination">בתיאום</option></select></label>
+          <label class="checkbox-filter"><input id="verified-only" type="checkbox"><span>גמ״חים מאומתים בלבד</span></label>
           <label class="checkbox-filter"><input id="available-only" type="checkbox" checked><span>רק פריטים זמינים</span></label>
           <button class="link-button" id="clear-filters" type="button">ניקוי סינון</button>
         </div>
 
         <div class="items-grid" id="items-grid" aria-live="polite"></div>
+        <div class="map-results" id="map-results" hidden aria-live="polite"></div>
         <div class="empty-state" id="empty-state" hidden>
           <span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M8 11h6"/></svg></span>
           <h3>הקטלוג נבנה יחד עם הקהילה</h3>
@@ -131,6 +143,11 @@
           <button class="button button-primary" type="button" id="empty-clear-button">פרסום גמ״ח בחינם</button>
         </div>
         <div class="catalog-footer"><button class="button button-secondary" id="load-more-button" type="button">הצגת פריטים נוספים</button></div>
+      </section>
+
+      <section class="gmachim-section section-shell" id="gmachim" aria-labelledby="gmachim-title">
+        <div class="section-heading"><div><span class="section-kicker">קהילה פעילה</span><h2 id="gmachim-title">גמ״חים ברחבי הארץ</h2><p>עמודים מאומתים, מידע עדכני ופריטים זמינים.</p></div></div>
+        <div class="organizations-grid" id="organizations-grid"></div>
       </section>
 
       <section class="steps-section" id="how-it-works" aria-labelledby="steps-title">
@@ -163,6 +180,11 @@
           <div class="callout-actions"><button class="button button-light" id="callout-add-gmach" type="button">פתיחת גמ״ח בחינם</button><button class="callout-link" id="callout-learn-more" type="button">מה מקבלים? <span aria-hidden="true">←</span></button></div>
         </div>
         <ul class="callout-benefits"><li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg> ניהול זמינות</li><li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg> בקשות מסודרות</li><li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg> חשיפה קהילתית</li></ul>
+      </section>
+
+      <section class="faq-section section-shell" id="faq" aria-labelledby="faq-title">
+        <div class="section-heading centered-heading"><div><span class="section-kicker">חשוב לדעת</span><h2 id="faq-title">שאלות נפוצות</h2></div></div>
+        <div class="faq-list"><details><summary>האם השירות עולה כסף?</summary><p>לא. החיפוש, הפרסום וההשאלה דרך האתר חינמיים.</p></details><details><summary>איך יודעים שהגמ״ח אמין?</summary><p>חפשו את סימון האימות, זמן הפעילות האחרון, עדכון המלאי והביקורות.</p></details><details><summary>איך מקבלים ציוד?</summary><p>שולחים בקשה עם תאריכים, מקבלים אישור ומתאמים בצ׳אט הפרטי.</p></details><details><summary>לא מצאתי את מה שחיפשתי—מה עושים?</summary><p>שולחים בקשת עזרה והיא מופיעה לגמ״חים הרלוונטיים.</p></details></div>
       </section>
     </section>
 
@@ -248,6 +270,9 @@
     <form id="gmach-form" class="stack-form">
       <div class="two-columns"><label><span>שם הגמ״ח</span><input id="gmach-name" required maxlength="90" placeholder="למשל: גמ״ח אירועים משפחת לוי"></label><label><span>תחום מרכזי</span><select id="gmach-category" required><option value="">בחירה</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option><option>כללי</option></select></label></div>
       <div class="two-columns"><label><span>עיר</span><input id="gmach-city" list="israel-cities" required autocomplete="address-level2"></label><label><span>שכונה <small>(רשות)</small></span><input id="gmach-neighborhood"></label></div>
+      <div class="two-columns"><label><span>כתובת איסוף <small>(לא תוצג עד אישור)</small></span><input id="gmach-address" autocomplete="street-address"></label><label><span>אתר <small>(רשות)</small></span><input id="gmach-website" type="url" placeholder="https://"></label></div>
+      <label><span>אזור שירות</span><input id="gmach-service-area" maxlength="180" placeholder="למשל: פתח תקווה והסביבה"></label>
+      <div class="two-columns"><label><span>שעות פעילות</span><input id="gmach-hours" maxlength="60" placeholder="א׳–ה׳ 16:00–20:00"></label><fieldset class="inline-options"><legend>אפשרויות מסירה</legend><label><input type="checkbox" name="gmach-pickup" value="pickup" checked> איסוף עצמי</label><label><input type="checkbox" name="gmach-pickup" value="delivery"> משלוח</label><label><input type="checkbox" name="gmach-pickup" value="coordination"> בתיאום</label></fieldset></div>
       <label><span>תיאור קצר</span><textarea id="gmach-description" rows="3" maxlength="600" required placeholder="מה אפשר להשאיל, למי מיועד ואיך מתאמים"></textarea></label>
       <label><span>טלפון לתיאום <small>(לא יוצג ללא אישורכם)</small></span><input id="gmach-phone" type="tel" inputmode="tel" dir="ltr" required></label>
       <label class="consent-row"><input id="gmach-consent" type="checkbox" required><span>אני מאשר/ת שכל הפריטים בגמ״ח מוצעים להשאלה ללא תשלום.</span></label>
@@ -262,6 +287,8 @@
       <label><span>שייך לגמ״ח</span><select id="item-gmach" required><option value="">בחירת גמ״ח</option></select></label>
       <div class="two-columns"><label><span>שם הפריט</span><input id="item-name" maxlength="120" required placeholder="למשל: סט קשתות פרחים לאירוע"></label><label><span>קטגוריה</span><select id="item-category" required><option value="">בחירה</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option></select></label></div>
       <div class="two-columns"><label><span>מצב הפריט</span><select id="item-condition" required><option>כמו חדש</option><option selected>מצוין</option><option>טוב</option></select></label><label><span>כמות זמינה</span><input id="item-quantity" type="number" min="1" max="999" value="1" required></label></div>
+      <div class="two-columns"><label><span>סוג</span><select id="item-type"><option value="loan">השאלה</option><option value="donation">מסירה</option><option value="service">שירות</option></select></label><label><span>אופן קבלה</span><select id="item-pickup"><option value="pickup">איסוף עצמי</option><option value="delivery">משלוח</option><option value="coordination">בתיאום</option></select></label></div>
+      <div class="two-columns"><label><span>קטגוריית משנה</span><input id="item-subcategory" maxlength="80" placeholder="למשל: עגלות"></label><label><span>תגיות</span><input id="item-tags" maxlength="250" placeholder="תינוק, עגלה, נסיעות"></label></div>
       <label><span>תיאור והוראות שימוש</span><textarea id="item-description" rows="4" maxlength="1200" required></textarea></label>
       <label><span>תנאי השאלה <small>(רשות)</small></span><input id="item-conditions" maxlength="300" placeholder="למשל: איסוף עצמי, החזרה תוך 3 ימים"></label>
       <label><span>תמונות <small>(עד 4, כל תמונה עד 5MB)</small></span><input id="item-images" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
@@ -309,6 +336,23 @@
       <label><span>פרטים נוספים <small>(רשות)</small></span><textarea id="report-details" rows="4" maxlength="800"></textarea></label>
       <button class="button button-primary button-full" type="submit">שליחת דיווח</button>
     </form>
+  </dialog>
+
+  <dialog class="modal modal-medium" id="help-request-dialog" aria-labelledby="help-request-title">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="סגירה">×</button>
+    <div class="dialog-heading align-start"><span class="section-kicker">לא מצאתם?</span><h2 id="help-request-title">שליחת בקשת עזרה</h2><p>הבקשה תוצג ללא טלפון או אימייל לגמ״חים שעשויים לעזור.</p></div>
+    <form id="help-request-form" class="stack-form"><label><span>מה אתם צריכים?</span><input id="help-title" maxlength="120" required></label><div class="two-columns"><label><span>עיר</span><input id="help-city" list="israel-cities" required></label><label><span>קטגוריה</span><select id="help-category"><option value="">לא בטוח/ה</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option></select></label></div><label><span>תיאור</span><textarea id="help-description" rows="4" minlength="10" maxlength="800" required></textarea></label><label class="consent-row"><input id="help-urgent" type="checkbox"><span>הבקשה דחופה</span></label><button class="button button-primary button-full" type="submit">פרסום הבקשה</button></form>
+  </dialog>
+
+  <dialog class="modal modal-wide" id="organization-dialog" aria-labelledby="organization-title">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="סגירה">×</button>
+    <div id="organization-dialog-content"></div>
+  </dialog>
+
+  <dialog class="modal modal-narrow" id="review-dialog" aria-labelledby="review-title">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="סגירה">×</button>
+    <div class="dialog-heading"><h2 id="review-title">איך הייתה ההשאלה?</h2></div>
+    <form id="review-form" class="stack-form"><input id="review-request-id" type="hidden"><label><span>דירוג</span><select id="review-rating" required><option value="5">5 — מצוין</option><option value="4">4 — טוב מאוד</option><option value="3">3 — בסדר</option><option value="2">2 — טעון שיפור</option><option value="1">1 — לא טוב</option></select></label><label><span>ביקורת <small>(רשות)</small></span><textarea id="review-comment" rows="4" maxlength="800"></textarea></label><button class="button button-primary button-full" type="submit">פרסום ביקורת</button></form>
   </dialog>
 
   <dialog class="modal modal-medium" id="info-dialog" aria-labelledby="info-dialog-title">

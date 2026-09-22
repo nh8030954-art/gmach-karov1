@@ -68,6 +68,11 @@ async function routeApi(request, env, ctx, url) {
   if (method === "GET" && path === "/api/public-config") return json({ supportEmail: env.SUPPORT_EMAIL ? String(env.SUPPORT_EMAIL) : null });
 
   if (method === "GET" && path === "/api/items") return listItems(env, url);
+  if (method === "GET" && path === "/api/discovery") return discovery(env, url);
+  if (method === "POST" && path === "/api/analytics/events") return recordAnalytics(request, env);
+  if (method === "GET" && path === "/api/help-requests") return listHelpRequests(env, url);
+  if (method === "POST" && path === "/api/help-requests") return createHelpRequest(request, env);
+  if (method === "POST" && path === "/api/reviews") return createReview(request, env);
   if (method === "GET" && path === "/api/site-settings") return getSiteSettings(env);
   if (method === "GET" && path === "/api/page-customizations") return getPageCustomizations(env);
   const itemDetail = path.match(/^\/api\/items\/([^/]+)$/);
@@ -79,6 +84,11 @@ async function routeApi(request, env, ctx, url) {
   if (favorite && method === "DELETE") return removeFavorite(request, env, decodeURIComponent(favorite[1]));
 
   if (method === "POST" && path === "/api/organizations") return createOrganization(request, env);
+  const publicOrganization = path.match(/^\/api\/organizations\/([^/]+)\/public$/);
+  if (method === "GET" && publicOrganization) return getPublicOrganization(env, decodeURIComponent(publicOrganization[1]));
+  const savedOrganization = path.match(/^\/api\/saved-organizations\/([^/]+)$/);
+  if (method === "POST" && savedOrganization) return toggleSavedOrganization(request, env, decodeURIComponent(savedOrganization[1]), true);
+  if (method === "DELETE" && savedOrganization) return toggleSavedOrganization(request, env, decodeURIComponent(savedOrganization[1]), false);
   const organizationDetail = path.match(/^\/api\/organizations\/([^/]+)$/);
   if (method === "PATCH" && organizationDetail) return updateOrganization(request, env, decodeURIComponent(organizationDetail[1]));
   if (method === "POST" && path === "/api/items") return createItem(request, env);
@@ -107,6 +117,7 @@ async function routeApi(request, env, ctx, url) {
   if (method === "POST" && restoreSettings) return restoreSiteSettings(request, env, decodeURIComponent(restoreSettings[1]));
   if (method === "GET" && path === "/api/admin/users") return adminUsers(request, env);
   if (method === "GET" && path === "/api/admin/content") return adminContent(request, env);
+  if (method === "GET" && path === "/api/admin/analytics") return adminAnalytics(request, env);
   if (method === "PUT" && path === "/api/admin/page-customizations") return savePageCustomization(request, env);
   if (method === "DELETE" && path === "/api/admin/page-customizations") return resetPageCustomizations(request, env);
   const restorePageVersion = path.match(/^\/api\/admin\/page-customizations\/versions\/([^/]+)\/restore$/);
@@ -343,7 +354,11 @@ async function listItems(env, url) {
     params.push(date, date);
   }
   const result = await env.DB.prepare(`
-    SELECT i.*, o.id AS org_id, o.name AS org_name, o.verified AS org_verified
+    SELECT i.*, o.id AS org_id, o.name AS org_name, o.verified AS org_verified,
+      o.last_active_at AS org_last_active_at,
+      (SELECT ROUND(AVG(r.rating),1) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_rating,
+      (SELECT COUNT(*) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_review_count,
+      MAX(0, i.quantity - (SELECT COUNT(*) FROM loan_requests lr WHERE lr.item_id=i.id AND lr.status IN ('approved','collected'))) AS available_count
     FROM items i JOIN organizations o ON o.id = i.organization_id
     WHERE ${where.join(" AND ")}
     ORDER BY CASE i.availability_status WHEN 'available' THEN 0 ELSE 1 END, i.created_at DESC
@@ -354,12 +369,98 @@ async function listItems(env, url) {
 
 async function getItem(env, id) {
   const row = await env.DB.prepare(`
-    SELECT i.*, o.id AS org_id, o.name AS org_name, o.verified AS org_verified
+    SELECT i.*, o.id AS org_id, o.name AS org_name, o.verified AS org_verified,
+      o.last_active_at AS org_last_active_at,
+      (SELECT ROUND(AVG(r.rating),1) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_rating,
+      (SELECT COUNT(*) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_review_count,
+      MAX(0, i.quantity - (SELECT COUNT(*) FROM loan_requests lr WHERE lr.item_id=i.id AND lr.status IN ('approved','collected'))) AS available_count
     FROM items i JOIN organizations o ON o.id = i.organization_id
     WHERE i.id = ? AND i.status = 'active' AND i.is_free = 1 AND o.status = 'approved' AND o.is_hidden = 0
   `).bind(id).first();
   if (!row) throw new HttpError(404, "הפריט לא נמצא");
   return json({ item: mapItem(row) });
+}
+
+async function discovery(env, url) {
+  const query = cleanOptional(url.searchParams.get("q"), 80);
+  const like = `%${String(query || "").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
+  const [categories, cities, suggestions, organizations] = await env.DB.batch([
+    env.DB.prepare(`SELECT category,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY category ORDER BY count DESC`),
+    env.DB.prepare(`SELECT city,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY city ORDER BY count DESC LIMIT 80`),
+    env.DB.prepare(`SELECT DISTINCT title FROM items WHERE status='active' AND (?='' OR title LIKE ?) ORDER BY updated_at DESC LIMIT 8`).bind(query || "", like),
+    env.DB.prepare(`SELECT o.id,o.name,o.city,o.description,o.verified,o.last_active_at,
+      COUNT(DISTINCT i.id) AS item_count,
+      ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
+      FROM organizations o LEFT JOIN items i ON i.organization_id=o.id AND i.status='active'
+      LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
+      WHERE o.status='approved' AND o.is_hidden=0 GROUP BY o.id ORDER BY o.verified DESC,item_count DESC LIMIT 100`)
+  ]);
+  return json({ categories: categories.results, cities: cities.results, suggestions: suggestions.results.map(row => row.title), organizations: organizations.results });
+}
+
+async function getPublicOrganization(env, id) {
+  const organization = await env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,o.verified,
+    o.address,o.website_url,o.hours_json,o.service_area,o.pickup_options,o.last_active_at,o.verified_phone,o.verified_address,
+    ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
+    FROM organizations o LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
+    WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 GROUP BY o.id`).bind(id).first();
+  if (!organization) throw new HttpError(404, "הגמ״ח לא נמצא");
+  const [items, reviews] = await env.DB.batch([
+    env.DB.prepare(`SELECT i.*,o.id AS org_id,o.name AS org_name,o.verified AS org_verified,o.last_active_at AS org_last_active_at,
+      NULL AS org_rating,0 AS org_review_count,i.quantity AS available_count FROM items i JOIN organizations o ON o.id=i.organization_id
+      WHERE i.organization_id=? AND i.status='active' ORDER BY i.availability_status,i.updated_at DESC`).bind(id),
+    env.DB.prepare(`SELECT r.rating,r.comment,r.created_at,u.full_name AS author_name FROM reviews r JOIN users u ON u.id=r.author_id
+      WHERE r.organization_id=? AND r.status='published' ORDER BY r.created_at DESC LIMIT 30`).bind(id)
+  ]);
+  return json({ organization: { ...organization, verified: Boolean(organization.verified), verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options) }, items: items.results.map(mapItem), reviews: reviews.results });
+}
+
+async function toggleSavedOrganization(request, env, organizationId, save) {
+  const user = await requireUser(request, env);
+  const exists = await env.DB.prepare("SELECT id FROM organizations WHERE id=? AND status='approved'").bind(organizationId).first();
+  if (!exists) throw new HttpError(404, "הגמ״ח לא נמצא");
+  if (save) await env.DB.prepare("INSERT OR IGNORE INTO saved_organizations(user_id,organization_id) VALUES (?,?)").bind(user.id, organizationId).run();
+  else await env.DB.prepare("DELETE FROM saved_organizations WHERE user_id=? AND organization_id=?").bind(user.id, organizationId).run();
+  return json({ saved: save });
+}
+
+async function listHelpRequests(env, url) {
+  const city = cleanOptional(url.searchParams.get("city"), 80);
+  const category = cleanOptional(url.searchParams.get("category"), 40);
+  const where = ["h.status='open'"]; const params = [];
+  if (city) { where.push("h.city=?"); params.push(city); }
+  if (category) { where.push("h.category=?"); params.push(category); }
+  const result = await env.DB.prepare(`SELECT h.id,h.title,h.description,h.category,h.city,h.urgency,h.created_at,u.full_name AS requester_name
+    FROM help_requests h JOIN users u ON u.id=h.requester_id WHERE ${where.join(" AND ")} ORDER BY h.urgency='urgent' DESC,h.created_at DESC LIMIT 100`).bind(...params).all();
+  return json({ requests: result.results });
+}
+
+async function createHelpRequest(request, env) {
+  const user = await requireUser(request, env); const body = await readJson(request);
+  const category = cleanOptional(body.category, 40); if (category && !CATEGORIES.has(category)) throw new HttpError(400, "קטגוריה אינה תקינה");
+  const urgency = body.urgency === "urgent" ? "urgent" : "normal"; const id = crypto.randomUUID();
+  const values = [id,user.id,cleanText(body.title,2,120,"מה צריך"),cleanText(body.description,10,800,"תיאור"),category,cleanText(body.city,2,80,"עיר"),urgency];
+  await env.DB.prepare("INSERT INTO help_requests(id,requester_id,title,description,category,city,urgency) VALUES (?,?,?,?,?,?,?)").bind(...values).run();
+  return json({ request: { id, status: "open" } }, 201);
+}
+
+async function createReview(request, env) {
+  const user = await requireUser(request, env); const body = await readJson(request);
+  const requestId = cleanText(body.requestId,1,100,"בקשה"); const rating = Number(body.rating);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new HttpError(400, "הדירוג חייב להיות בין 1 ל־5");
+  const row = await env.DB.prepare(`SELECT lr.borrower_id,lr.status,o.id AS organization_id FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.id=?`).bind(requestId).first();
+  if (!row || row.borrower_id !== user.id || row.status !== "returned") throw new HttpError(403, "אפשר לדרג רק השאלה שהושלמה");
+  try { const id=crypto.randomUUID(); await env.DB.prepare("INSERT INTO reviews(id,request_id,author_id,organization_id,rating,comment) VALUES (?,?,?,?,?,?)").bind(id,requestId,user.id,row.organization_id,rating,cleanOptional(body.comment,800)).run(); return json({ review:{id,rating}},201); }
+  catch (error) { if (String(error).toLowerCase().includes("unique")) throw new HttpError(409,"כבר דירגתם את ההשאלה הזו"); throw error; }
+}
+
+async function recordAnalytics(request, env) {
+  const body = await readJson(request); const allowed = new Set(["search","no_results","item_view","request_created","share"]);
+  if (!allowed.has(body.eventType)) throw new HttpError(400,"אירוע אינו תקין");
+  const user = await currentUser(request, env);
+  await env.DB.prepare("INSERT INTO analytics_events(id,user_id,event_type,query,city,category,entity_id) VALUES (?,?,?,?,?,?,?)")
+    .bind(crypto.randomUUID(),user?.id||null,body.eventType,cleanOptional(body.query,120),cleanOptional(body.city,80),cleanOptional(body.category,40),cleanOptional(body.entityId,100)).run();
+  return json({ok:true},201);
 }
 
 async function addFavorite(request, env, itemId) {
@@ -387,11 +488,16 @@ async function createOrganization(request, env) {
     city: cleanText(body.city, 2, 80, "עיר"),
     neighborhood: cleanOptional(body.neighborhood, 80),
     description: cleanText(body.description, 10, 600, "תיאור"),
-    phone: validatePhone(body.phone)
+    phone: validatePhone(body.phone),
+    address: cleanOptional(body.address, 180),
+    websiteUrl: validateOptionalHttpsUrl(body.websiteUrl),
+    serviceArea: cleanOptional(body.serviceArea, 180),
+    hoursJson: sanitizeHours(body.hours),
+    pickupOptions: sanitizePickupOptions(body.pickupOptions)
   };
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO organizations (id,owner_id,name,primary_category,city,neighborhood,description,status) VALUES (?,?,?,?,?,?,?,'pending')")
-      .bind(id, user.id, values.name, category, values.city, values.neighborhood, values.description),
+    env.DB.prepare("INSERT INTO organizations (id,owner_id,name,primary_category,city,neighborhood,description,address,website_url,service_area,hours_json,pickup_options,last_active_at,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')")
+      .bind(id, user.id, values.name, category, values.city, values.neighborhood, values.description, values.address, values.websiteUrl, values.serviceArea, values.hoursJson, values.pickupOptions, new Date().toISOString()),
     env.DB.prepare("INSERT INTO organization_contacts (organization_id,contact_phone) VALUES (?,?)").bind(id, values.phone)
   ]);
   return json({ organization: { id, ...values, primaryCategory: category, status: "pending", verified: false } }, 201);
@@ -418,17 +524,20 @@ async function updateOrganization(request, env, id) {
     city: cleanText(body.city, 2, 80, "עיר"),
     neighborhood: cleanOptional(body.neighborhood, 80),
     description: cleanText(body.description, 10, 600, "תיאור"),
-    phone: validatePhone(body.phone)
+    phone: validatePhone(body.phone),
+    address: cleanOptional(body.address, 180), websiteUrl: validateOptionalHttpsUrl(body.websiteUrl),
+    serviceArea: cleanOptional(body.serviceArea, 180), hoursJson: sanitizeHours(body.hours), pickupOptions: sanitizePickupOptions(body.pickupOptions)
   };
   const publicChanged = values.name !== existing.name || category !== existing.primary_category || values.city !== existing.city ||
-    (values.neighborhood || null) !== (existing.neighborhood || null) || values.description !== existing.description;
+    (values.neighborhood || null) !== (existing.neighborhood || null) || values.description !== existing.description ||
+    (values.address || null) !== (existing.address || null) || (values.websiteUrl || null) !== (existing.website_url || null);
   const status = user.role === "admin" || !publicChanged ? existing.status : "pending";
   const verified = status === "approved" ? existing.verified : 0;
   const now = new Date().toISOString();
   await env.DB.batch([
-    env.DB.prepare(`UPDATE organizations SET name = ?, primary_category = ?, city = ?, neighborhood = ?, description = ?,
+    env.DB.prepare(`UPDATE organizations SET name = ?, primary_category = ?, city = ?, neighborhood = ?, description = ?,address=?,website_url=?,service_area=?,hours_json=?,pickup_options=?,last_active_at=?,
       status = ?, verified = ?, updated_at = ? WHERE id = ?`)
-      .bind(values.name, category, values.city, values.neighborhood, values.description, status, verified, now, id),
+      .bind(values.name, category, values.city, values.neighborhood, values.description,values.address,values.websiteUrl,values.serviceArea,values.hoursJson,values.pickupOptions,now,status, verified, now, id),
     env.DB.prepare("UPDATE organization_contacts SET contact_phone = ? WHERE organization_id = ?").bind(values.phone, id)
   ]);
   return json({ organization: { id, ...values, primaryCategory: category, status, verified: Boolean(verified), hidden: Boolean(existing.is_hidden) } });
@@ -449,8 +558,8 @@ async function createItem(request, env) {
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw new HttpError(400, "כמות הפריטים אינה תקינה");
   const id = crypto.randomUUID();
   await env.DB.prepare(`
-    INSERT INTO items (id,organization_id,title,category,description,condition,quantity,loan_conditions,city,neighborhood,status,availability_status,is_free,icon,cover_color)
-    VALUES (?,?,?,?,?,?,?,?,?,?,'pending','available',1,'box','#e6f2ef')
+    INSERT INTO items (id,organization_id,title,category,description,condition,quantity,loan_conditions,city,neighborhood,item_type,subcategory,tags_json,pickup_method,inventory_updated_at,status,availability_status,is_free,icon,cover_color)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending','available',1,'box','#e6f2ef')
   `).bind(
     id,
     organizationId,
@@ -461,7 +570,8 @@ async function createItem(request, env) {
     quantity,
     cleanOptional(body.loanConditions, 300),
     organization.city,
-    organization.neighborhood
+    organization.neighborhood,
+    sanitizeItemType(body.itemType), cleanOptional(body.subcategory, 80), JSON.stringify(sanitizeTags(body.tags)), sanitizePickupMethod(body.pickupMethod), new Date().toISOString()
   ).run();
   return json({ item: { id, status: "pending" } }, 201);
 }
@@ -493,14 +603,15 @@ async function updateItem(request, env, id) {
   const values = {
     title: cleanText(body.title, 2, 120, "שם הפריט"),
     description: cleanText(body.description, 10, 1200, "תיאור"),
-    loanConditions: cleanOptional(body.loanConditions, 300)
+    loanConditions: cleanOptional(body.loanConditions, 300), itemType: sanitizeItemType(body.itemType), pickupMethod: sanitizePickupMethod(body.pickupMethod),
+    subcategory: cleanOptional(body.subcategory,80), tagsJson: JSON.stringify(sanitizeTags(body.tags))
   };
   const changed = values.title !== existing.title || category !== existing.category || values.description !== existing.description ||
-    condition !== existing.condition || quantity !== Number(existing.quantity) || (values.loanConditions || null) !== (existing.loan_conditions || null);
+    condition !== existing.condition || quantity !== Number(existing.quantity) || (values.loanConditions || null) !== (existing.loan_conditions || null) || values.itemType !== (existing.item_type||"loan") || values.pickupMethod !== (existing.pickup_method||"pickup") || values.subcategory !== (existing.subcategory||null) || values.tagsJson !== (existing.tags_json||"[]");
   const status = user.role === "admin" || !changed ? existing.status : "pending";
-  await env.DB.prepare(`UPDATE items SET title = ?, category = ?, description = ?, condition = ?, quantity = ?, loan_conditions = ?,
+  await env.DB.prepare(`UPDATE items SET title = ?, category = ?, description = ?, condition = ?, quantity = ?, loan_conditions = ?,item_type=?,pickup_method=?,subcategory=?,tags_json=?,inventory_updated_at=?,
     city = ?, neighborhood = ?, status = ?, updated_at = ? WHERE id = ?`).bind(
-    values.title, category, values.description, condition, quantity, values.loanConditions,
+    values.title, category, values.description, condition, quantity, values.loanConditions,values.itemType,values.pickupMethod,values.subcategory,values.tagsJson,new Date().toISOString(),
     existing.org_city, existing.org_neighborhood, status, new Date().toISOString(), id
   ).run();
   return json({ item: { id, status } });
@@ -573,11 +684,11 @@ async function createLoanRequest(request, env) {
 
 async function dashboard(request, env) {
   const user = await requireUser(request, env);
-  const [organizationsResult, itemsResult, requestsResult, favoritesResult] = await env.DB.batch([
-    env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,o.verified,o.is_hidden,o.created_at,c.contact_phone
+  const [organizationsResult, itemsResult, requestsResult, favoritesResult, savedOrganizationsResult, helpRequestsResult] = await env.DB.batch([
+    env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,o.verified,o.is_hidden,o.created_at,c.contact_phone,o.address,o.website_url,o.service_area,o.hours_json,o.pickup_options
       FROM organizations o LEFT JOIN organization_contacts c ON c.organization_id = o.id WHERE o.owner_id = ? ORDER BY o.created_at DESC`).bind(user.id),
     env.DB.prepare(`SELECT i.id,i.organization_id,i.title,i.category,i.description,i.condition,i.quantity,i.loan_conditions,i.image_urls,
-      i.status,i.availability_status,i.created_at,o.name AS org_name
+      i.status,i.availability_status,i.created_at,o.name AS org_name,i.item_type,i.subcategory,i.tags_json,i.pickup_method,i.inventory_updated_at
       FROM items i JOIN organizations o ON o.id = i.organization_id WHERE o.owner_id = ? ORDER BY i.created_at DESC`).bind(user.id),
     env.DB.prepare(`SELECT lr.id,lr.item_id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,lr.manager_note,lr.created_at,
       i.title AS item_title,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,
@@ -586,10 +697,12 @@ async function dashboard(request, env) {
       FROM loan_requests lr JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id
       JOIN users u ON u.id = lr.borrower_id LEFT JOIN organization_contacts c ON c.organization_id = o.id
       WHERE lr.borrower_id = ? OR o.owner_id = ? ORDER BY lr.created_at DESC`).bind(user.id, user.id, user.id, user.id),
-    env.DB.prepare("SELECT item_id FROM favorites WHERE user_id = ?").bind(user.id)
+    env.DB.prepare("SELECT item_id FROM favorites WHERE user_id = ?").bind(user.id),
+    env.DB.prepare(`SELECT s.organization_id,o.name,o.city,o.verified FROM saved_organizations s JOIN organizations o ON o.id=s.organization_id WHERE s.user_id=? ORDER BY s.created_at DESC`).bind(user.id),
+    env.DB.prepare(`SELECT id,title,description,category,city,urgency,status,created_at FROM help_requests WHERE requester_id=? ORDER BY created_at DESC`).bind(user.id)
   ]);
-  const organizations = organizationsResult.results.map(row => ({ ...row, verified: Boolean(row.verified), is_hidden: Boolean(row.is_hidden) }));
-  const items = itemsResult.results.map(row => ({ ...row, image_urls: parseJsonArray(row.image_urls), organizations: { name: row.org_name } }));
+  const organizations = organizationsResult.results.map(row => ({ ...row, verified: Boolean(row.verified), is_hidden: Boolean(row.is_hidden), hours: safeJsonObject(row.hours_json), pickupOptions: parseJsonArray(row.pickup_options) }));
+  const items = itemsResult.results.map(row => ({ ...row, image_urls: parseJsonArray(row.image_urls), tags: parseJsonArray(row.tags_json), organizations: { name: row.org_name } }));
   const requests = requestsResult.results.map(row => ({
     id: row.id,
     status: row.status,
@@ -609,6 +722,8 @@ async function dashboard(request, env) {
     items,
     requests,
     favorites: favoritesResult.results.map(row => row.item_id),
+    savedOrganizations: savedOrganizationsResult.results,
+    helpRequests: helpRequestsResult.results,
     stats: {
       activeRequests: requests.filter(row => ["pending", "approved", "collected"].includes(row.status)).length,
       items: items.length,
@@ -777,6 +892,18 @@ async function adminOverview(request, env) {
     env.DB.prepare("SELECT a.id,a.action,a.entity_type,a.entity_id,a.created_at,u.full_name AS actor_name FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id ORDER BY a.created_at DESC LIMIT 30")
   ]);
   return json({ stats: { users: users.results[0]?.count || 0, organizations: organizations.results[0]?.count || 0, items: items.results[0]?.count || 0, requests: requests.results[0]?.count || 0 }, audit: audit.results });
+}
+
+async function adminAnalytics(request, env) {
+  await requireAdmin(request, env);
+  const [events, searches, cities, categories, success] = await env.DB.batch([
+    env.DB.prepare(`SELECT event_type,COUNT(*) AS count FROM analytics_events WHERE created_at>=datetime('now','-30 days') GROUP BY event_type`),
+    env.DB.prepare(`SELECT query,COUNT(*) AS count FROM analytics_events WHERE event_type IN ('search','no_results') AND query IS NOT NULL GROUP BY query ORDER BY count DESC LIMIT 30`),
+    env.DB.prepare(`SELECT city,COUNT(*) AS count FROM analytics_events WHERE city IS NOT NULL GROUP BY city ORDER BY count DESC LIMIT 20`),
+    env.DB.prepare(`SELECT category,COUNT(*) AS count FROM analytics_events WHERE category IS NOT NULL GROUP BY category ORDER BY count DESC LIMIT 20`),
+    env.DB.prepare(`SELECT COUNT(*) AS total,SUM(CASE WHEN status IN ('approved','collected','returned') THEN 1 ELSE 0 END) AS successful FROM loan_requests`)
+  ]);
+  return json({ events:events.results, searches:searches.results, cities:cities.results, categories:categories.results, matching:{ total:Number(success.results[0]?.total||0), successful:Number(success.results[0]?.successful||0) } });
 }
 
 async function adminSiteSettings(request, env) {
@@ -1077,7 +1204,13 @@ function mapItem(row) {
     description: row.description,
     condition: row.condition,
     quantity: row.quantity,
+    available_count: row.available_count === null || row.available_count === undefined ? row.quantity : Number(row.available_count),
     loan_conditions: row.loan_conditions,
+    item_type: row.item_type || "loan",
+    subcategory: row.subcategory || null,
+    tags: parseJsonArray(row.tags_json),
+    pickup_method: row.pickup_method || "pickup",
+    inventory_updated_at: row.inventory_updated_at || row.updated_at,
     city: row.city,
     neighborhood: row.neighborhood,
     image_urls: parseJsonArray(row.image_urls),
@@ -1085,7 +1218,7 @@ function mapItem(row) {
     icon: row.icon,
     cover_color: row.cover_color,
     created_at: row.created_at,
-    organizations: { id: row.org_id, name: row.org_name, verified: Boolean(row.org_verified) }
+    organizations: { id: row.org_id, name: row.org_name, verified: Boolean(row.org_verified), rating: row.org_rating ? Number(row.org_rating) : null, reviewCount: Number(row.org_review_count || 0), lastActiveAt: row.org_last_active_at || null }
   };
 }
 
@@ -1175,6 +1308,32 @@ function validateColor(value) {
   const color = String(value || "").trim();
   if (!/^#[0-9a-f]{6}$/i.test(color)) throw new HttpError(400, "צבע חייב להיות בפורמט HEX תקין");
   return color.toLowerCase();
+}
+
+function validateOptionalHttpsUrl(value) {
+  const text = cleanOptional(value, 500); if (!text) return null;
+  try { const parsed = new URL(text); if (parsed.protocol !== "https:") throw new Error(); return parsed.toString(); }
+  catch { throw new HttpError(400, "כתובת האתר חייבת להתחיל ב־https://"); }
+}
+
+function sanitizeHours(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "{}";
+  const result = {}; for (const [day, hours] of Object.entries(value).slice(0, 7)) {
+    if (/^[א-ת\s'-]{2,20}$/.test(day) && typeof hours === "string" && hours.length <= 60) result[day] = hours.trim();
+  } return JSON.stringify(result);
+}
+
+function sanitizePickupOptions(value) {
+  const allowed = new Set(["pickup","delivery","coordination"]);
+  const values = Array.isArray(value) ? value.filter(item => allowed.has(item)) : ["pickup"];
+  return JSON.stringify([...new Set(values)].slice(0,3).length ? [...new Set(values)].slice(0,3) : ["pickup"]);
+}
+
+function sanitizeItemType(value) { return ["loan","donation","service"].includes(value) ? value : "loan"; }
+function sanitizePickupMethod(value) { return ["pickup","delivery","coordination"].includes(value) ? value : "pickup"; }
+function sanitizeTags(value) {
+  const list = Array.isArray(value) ? value : String(value || "").split(",");
+  return [...new Set(list.map(item => String(item).trim()).filter(item => item.length >= 2 && item.length <= 30))].slice(0,10);
 }
 
 function validateFont(value) {
