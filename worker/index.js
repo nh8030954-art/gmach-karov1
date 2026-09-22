@@ -1084,7 +1084,7 @@ function validateColor(value) {
 }
 
 function validateFont(value) {
-  const allowed = ["Arial, sans-serif", "Rubik, Arial, sans-serif", "Assistant, Arial, sans-serif", "Heebo, Arial, sans-serif", "David Libre, serif"];
+  const allowed = ["Arial, sans-serif", "Alef, Arial, sans-serif", "Arimo, Arial, sans-serif", "Assistant, Arial, sans-serif", "Heebo, Arial, sans-serif", "IBM Plex Sans Hebrew, Arial, sans-serif", "Miriam Libre, Arial, sans-serif", "Noto Sans Hebrew, Arial, sans-serif", "Rubik, Arial, sans-serif", "Secular One, Arial, sans-serif", "Varela Round, Arial, sans-serif", "David Libre, serif", "Frank Ruhl Libre, serif", "Noto Serif Hebrew, serif", "Suez One, serif"];
   const font = String(value || "").trim();
   if (!allowed.includes(font)) throw new HttpError(400, "הגופן שנבחר אינו נתמך");
   return font;
