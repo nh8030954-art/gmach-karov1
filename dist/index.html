@@ -98,11 +98,10 @@
           <button type="button" id="path-borrower" hidden><strong>אני מחפש/ת עזרה או ציוד</strong><span>חיפוש מהיר לפי צורך ואזור</span></button>
           <button type="button" id="path-manager" style="transform:translateY(-12px)"><strong>אני מנהל/ת גמ״ח</strong><span>הצטרפות, מלאי ובקשות במקום אחד</span></button>
         </div>
-        <div id="scroll-connect-scene" aria-hidden="true" style="height:150px;position:relative;margin:4px auto 22px;width:min(780px,92%);overflow:hidden">
-          <div id="scroll-hand-left" style="position:absolute;left:4%;top:45px;font-size:58px;line-height:1;transform:translateX(0)">🤝</div>
-          <div id="scroll-hand-right" style="position:absolute;right:4%;top:45px;font-size:58px;line-height:1;transform:scaleX(-1) translateX(0)">🤝</div>
-          <div style="position:absolute;left:50%;top:68px;width:46%;height:3px;transform:translateX(-50%);background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:.45"></div>
-          <div id="scroll-connect-label" style="position:absolute;inset:auto 0 4px;text-align:center;font-weight:800;color:var(--navy);opacity:.55">מחברים בין מי שיש לו למי שצריך</div>
+        <div id="scroll-connect-scene" aria-hidden="true" style="height:112px;position:relative;margin:0 auto 18px;width:min(620px,88%);overflow:hidden">
+          <div id="scroll-hand-left" style="position:absolute;left:5%;top:15px;font-size:64px;line-height:1;will-change:transform">🫱</div>
+          <div id="scroll-hand-right" style="position:absolute;right:5%;top:15px;font-size:64px;line-height:1;will-change:transform">🫲</div>
+          <div id="scroll-connect-label" style="position:absolute;inset:auto 0 0;text-align:center;font-weight:800;color:#fff;opacity:.72">מחברים בין מי שיש לו למי שצריך</div>
         </div>
       </section>
 
@@ -391,29 +390,5 @@
 
 
 
-  <script>
-    (() => {
-      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      const scene=document.getElementById('scroll-connect-scene');
-      const left=document.getElementById('scroll-hand-left');
-      const right=document.getElementById('scroll-hand-right');
-      const label=document.getElementById('scroll-connect-label');
-      if(!scene||!left||!right)return;
-      let raf=0;
-      const draw=()=>{
-        const r=scene.getBoundingClientRect(), vh=innerHeight||800;
-        const p=Math.max(0,Math.min(1,(vh-r.top)/(vh*.42)));
-        const travel=Math.min(150,scene.clientWidth*.28);
-        left.style.transform='translateX('+(p*travel)+'px) rotate('+(p*8)+'deg)';
-        right.style.transform='scaleX(-1) translateX('+(p*travel)+'px) rotate('+(p*8)+'deg)';
-        label.style.opacity=String(.35+p*.65);
-        raf=0;
-      };
-      const onScroll=()=>{if(!raf)raf=requestAnimationFrame(draw)};
-      addEventListener('scroll',onScroll,{passive:true});
-      addEventListener('resize',onScroll,{passive:true});
-      draw();
-    })();
-  </script>
 </body>
 </html>
