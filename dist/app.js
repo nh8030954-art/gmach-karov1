@@ -518,27 +518,44 @@
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
 })();
 
-// Category carousel continuous autoplay v3
+// Seamless category carousel. It deliberately uses one animation engine only;
+// a second timer-based carousel causes visible resets and uneven motion.
 (()=>{
   const ready=()=>{
     const rail=document.getElementById('category-rail');
     if(!rail || rail.dataset.continuousCarousel==='1') return;
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     rail.dataset.continuousCarousel='1';
     rail.classList.add('carousel-ready','carousel-continuous');
     const originals=[...rail.children];
     if(originals.length<2) return;
-    originals.forEach(el=>{ const clone=el.cloneNode(true); clone.setAttribute('aria-hidden','true'); clone.tabIndex=-1; rail.appendChild(clone); });
+    const appendSet=()=>originals.forEach((original,index)=>{
+      const clone=original.cloneNode(true);
+      clone.setAttribute('aria-hidden','true');
+      clone.tabIndex=-1;
+      clone.dataset.carouselClone=String(index);
+      clone.addEventListener('click',()=>original.click());
+      rail.appendChild(clone);
+    });
+    // Keep at least two full viewport widths in the rail. This guarantees
+    // movement on desktop even when every original category initially fits.
+    const fillRail=()=>{
+      const gap=parseFloat(getComputedStyle(rail).gap)||0;
+      const setWidth=originals.reduce((width,item)=>width+item.getBoundingClientRect().width,0)+gap*(originals.length-1);
+      const requiredSets=Math.max(3,Math.ceil((rail.clientWidth*2+gap)/Math.max(setWidth,1)));
+      while(rail.children.length<originals.length*requiredSets) appendSet();
+      return setWidth+gap;
+    };
+    let cycleWidth=fillRail();
     let paused=false, last=performance.now(), raf=0;
-    const speed=window.innerWidth<=760 ? 62 : 48;
     const rtl=document.documentElement.dir==='rtl';
-    const half=()=>rail.scrollWidth/2;
+    const speed=()=>window.innerWidth<=760 ? 82 : 46;
     const tick=(now)=>{
       const dt=Math.min(40,now-last); last=now;
       if(!paused && !document.hidden){
-        const delta=speed*dt/1000;
+        const delta=speed()*dt/1000;
         rail.scrollLeft += rtl ? -delta : delta;
-        const h=half();
-        if(Math.abs(rail.scrollLeft)>=h-2) rail.scrollLeft=0;
+        if(Math.abs(rail.scrollLeft)>=cycleWidth) rail.scrollLeft+=rtl ? cycleWidth : -cycleWidth;
       }
       raf=requestAnimationFrame(tick);
     };
@@ -550,6 +567,7 @@
     rail.addEventListener('pointercancel',restart,{passive:true});
     rail.addEventListener('touchend',restart,{passive:true});
     rail.addEventListener('wheel',()=>{pause();restart();},{passive:true});
+    addEventListener('resize',()=>{ cycleWidth=fillRail(); },{passive:true});
     raf=requestAnimationFrame(tick);
   };
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',ready,{once:true}); else ready();

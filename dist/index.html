@@ -446,33 +446,5 @@
 
 
 
-  <script>
-    (() => {
-      const rail = document.getElementById('category-rail');
-      if (!rail) return;
-      rail.classList.add('carousel-ready');
-      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      let timer = null;
-      const step = () => {
-        const first = rail.querySelector('.category-card');
-        if (!first) return;
-        const gap = parseFloat(getComputedStyle(rail).gap || 0);
-        const amount = first.getBoundingClientRect().width + gap;
-        const max = rail.scrollWidth - rail.clientWidth;
-        const dir = document.documentElement.dir === 'rtl' ? -1 : 1;
-        const current = Math.abs(rail.scrollLeft);
-        if (current >= max - amount * 0.6) {
-          rail.scrollTo({left: 0, behavior:'smooth'});
-        } else {
-          rail.scrollBy({left: dir * amount, behavior:'smooth'});
-        }
-      };
-      const start = () => { stop(); timer = setInterval(step, 3200); };
-      const stop = () => { if (timer) clearInterval(timer); timer = null; };
-      ['pointerdown','touchstart','mouseenter','focusin'].forEach(ev => rail.addEventListener(ev, stop, {passive:true}));
-      ['pointerup','touchend','mouseleave','focusout'].forEach(ev => rail.addEventListener(ev, () => setTimeout(start, 1200), {passive:true}));
-      start();
-    })();
-  </script>
 </body>
 </html>
