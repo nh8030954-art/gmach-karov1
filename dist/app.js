@@ -465,3 +465,32 @@
   }
   init().catch(error => { document.documentElement.classList.remove("app-booting"); console.error("App initialization failed", error); toast("אירעה תקלה בטעינת האתר. נסו לרענן את הדף.", "error"); });
 })();
+
+
+// Scroll connection scene
+(() => {
+  const init = () => {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const scene=document.getElementById('scroll-connect-scene');
+    const left=document.getElementById('scroll-hand-left');
+    const right=document.getElementById('scroll-hand-right');
+    const label=document.getElementById('scroll-connect-label');
+    if(!scene||!left||!right)return;
+    let raf=0;
+    const draw=()=>{
+      const r=scene.getBoundingClientRect(), vh=innerHeight||800;
+      const raw=(vh*.86-r.top)/(vh*.34);
+      const p=Math.max(0,Math.min(1,raw));
+      const travel=Math.max(0,(scene.clientWidth-150)/2-32);
+      left.style.transform='translate3d('+(p*travel)+'px,0,0)';
+      right.style.transform='translate3d('+(-p*travel)+'px,0,0)';
+      if(label) label.style.opacity=String(.55+p*.45);
+      raf=0;
+    };
+    const tick=()=>{if(!raf)raf=requestAnimationFrame(draw)};
+    addEventListener('scroll',tick,{passive:true});
+    addEventListener('resize',tick,{passive:true});
+    draw();
+  };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init,{once:true}); else init();
+})();
