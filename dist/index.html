@@ -197,7 +197,7 @@
             <li><span class="step-number">3</span><span class="step-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 14h4l2-3 4 6 2-3h4"/><path d="M5 20h14M7 14V6h10v8"/></svg></span><h3>אוספים ומחזירים</h3><p>מקבלים את הפריט בחינם ומחזירים בזמן ובמצב טוב.</p></li>
           </ol>
           <div class="loan-journey" aria-hidden="true">
-            <div class="journey-person journey-borrower"><span></span><b>הקהילה</b></div>
+            <div class="journey-person journey-borrower"><span></span><b>קהילה</b></div>
             <div class="journey-track"><i></i></div>
             <div class="journey-stations">
               <span class="journey-station js1"><i><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM15 3v5h4M9 12h7M9 16h5"/></svg></i><b>בקשה</b></span>
@@ -205,10 +205,14 @@
               <span class="journey-station js3"><i><svg viewBox="0 0 24 24"><path d="M4 9 12 5l8 4-8 4zM4 9v8l8 4 8-4V9M12 13v8"/></svg></i><b>אוספים</b></span>
               <span class="journey-station js4"><i><svg viewBox="0 0 24 24"><path d="M5 8h10a5 5 0 0 1 0 10H8M5 8l4-4M5 8l4 4"/></svg></i><b>מחזירים</b></span>
             </div>
-            <div class="journey-token request-token"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM15 3v5h4M9 12h7M9 16h5"/></svg></div>
-            <div class="journey-token pickup-token"><svg viewBox="0 0 24 24"><path d="M4 9 12 5l8 4-8 4zM4 9v8l8 4 8-4V9M12 13v8"/></svg></div>
-            <div class="journey-token return-token"><svg viewBox="0 0 24 24"><path d="M5 8h10a5 5 0 0 1 0 10H8M5 8l4-4M5 8l4 4"/></svg></div>
-            <div class="journey-person journey-manager"><span class="gmach-building"><svg viewBox="0 0 64 64"><path d="M8 25 32 8l24 17v31H8zM16 25h32M18 34h8v8h-8zM38 34h8v8h-8zM27 56V43h10v13"/></svg></span><b>הגמ״ח</b></div>
+            <div class="journey-token journey-moving-token" data-stage="site">
+              <svg class="token-site" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="15" rx="2"/><path d="M3 8h18M7 6h.1M10 6h.1"/></svg>
+              <svg class="token-request" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM15 3v5h4M9 12h7M9 16h5"/></svg>
+              <svg class="token-approve" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg>
+              <svg class="token-pickup" viewBox="0 0 24 24"><path d="M4 9 12 5l8 4-8 4zM4 9v8l8 4 8-4V9M12 13v8"/></svg>
+              <svg class="token-return" viewBox="0 0 24 24"><path d="M5 8h10a5 5 0 0 1 0 10H8M5 8l4-4M5 8l4 4"/></svg>
+            </div>
+            <div class="journey-person journey-manager"><span class="gmach-building"><svg viewBox="0 0 64 64"><path d="M8 25 32 8l24 17v31H8zM16 25h32M18 34h8v8h-8zM38 34h8v8h-8zM27 56V43h10v13"/></svg></span><b>גמ״ח</b></div>
           </div>
         </div>
       </section>
@@ -226,8 +230,8 @@
 
       <section class="trust-section" aria-labelledby="trust-title">
         <div class="section-shell">
-          <svg class="trust-shield" viewBox="0 0 160 190" aria-hidden="true"><path d="M80 176S20 145 20 70V35L80 12l60 23v35c0 75-60 106-60 106Z"/><path d="m52 91 19 19 39-44"/></svg>
           <div class="section-heading centered-heading"><div><span class="section-kicker">משאילים בראש שקט</span><h2 id="trust-title">קהילה בטוחה, פרטיות ברורה</h2></div></div>
+          <svg class="trust-shield" viewBox="0 0 160 190" aria-hidden="true"><path d="M80 176S20 145 20 70V35L80 12l60 23v35c0 75-60 106-60 106Z"/><path d="m52 91 19 19 39-44"/></svg>
           <div class="trust-grid">
             <article><span class="trust-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s8-4 8-11V5l-8-3-8 3v5c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/></svg></span><h3>גמ״חים עוברים בדיקה</h3><p>עמודי גמ״חים נבדקים לפני הפרסום וניתן לדווח על מידע שגוי.</p></article>
             <article><span class="trust-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v2"/></svg></span><h3>פרטים אישיים נשארים פרטיים</h3><p>פרטי קשר אינם מוצגים בקטלוג הפתוח ונחשפים רק למי שצריך.</p></article>
@@ -256,6 +260,9 @@
           <span><svg viewBox="0 0 64 64"><path d="M16 31h32v20H16zM12 23h40v9H12zM22 15h20v8M22 51v6M42 51v6"/></svg></span>
           <span><svg viewBox="0 0 64 64"><path d="M17 10h23a8 8 0 0 1 8 8v36H21a7 7 0 0 1-7-7V13a3 3 0 0 1 3-3zM21 10v44M28 22h12"/></svg></span>
           <span><svg viewBox="0 0 64 64"><path d="M18 50V28a14 14 0 0 1 28 0v22M12 50h40M24 50V35h16v15M27 17h10M32 12v10"/></svg></span>
+          <span><svg viewBox="0 0 64 64"><circle cx="25" cy="19" r="8"/><circle cx="22" cy="43" r="13"/><path d="M29 28h15l7 12M22 30v13h18M40 43l7 11"/></svg></span>
+          <span><svg viewBox="0 0 64 64"><path d="M8 52 32 12l24 40zM20 52l12-21 12 21M8 52h48"/></svg></span>
+          <span><svg viewBox="0 0 64 64"><rect x="10" y="17" width="44" height="32" rx="5"/><circle cx="32" cy="33" r="9"/><path d="M18 17l4-6h20l4 6"/></svg></span>
           <svg class="help-magnifier" viewBox="0 0 80 80"><circle cx="33" cy="33" r="21"/><path d="m49 49 21 21"/></svg><i></i><i></i><i></i><i></i>
         </div>
         <div class="help-broadcast-copy"><span class="section-kicker">גם כשלא מצאתם</span><h2 id="help-broadcast-title">הבקשה שלכם יכולה להגיע לקהילה</h2><p>ספרו מה אתם צריכים. הבקשה תוצג בלי פרטי קשר אישיים לגמ״חים שעשויים לעזור.</p><button class="button button-primary" type="button" id="motion-help-request">בקשו עזרה</button></div>
