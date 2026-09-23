@@ -475,6 +475,7 @@
     const left=document.getElementById('scroll-hand-left');
     const right=document.getElementById('scroll-hand-right');
     const label=document.getElementById('scroll-connect-label');
+    const handshake=document.getElementById('scroll-handshake');
     if(!scene||!left||!right)return;
     let raf=0;
     const draw=()=>{
@@ -484,6 +485,10 @@
       const travel=Math.max(0,(scene.clientWidth-150)/2-32);
       left.style.transform='translate3d('+(p*travel)+'px,0,0)';
       right.style.transform='translate3d('+(-p*travel)+'px,0,0)';
+      const meet=Math.max(0,Math.min(1,(p-.72)/.18));
+      left.style.opacity=String(1-meet);
+      right.style.opacity=String(1-meet);
+      if(handshake){handshake.style.opacity=String(meet);handshake.style.transform='translateX(-50%) scale('+(0.7+meet*0.3)+')';}
       if(label) label.style.opacity=String(.55+p*.45);
       raf=0;
     };
