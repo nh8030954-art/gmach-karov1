@@ -41,7 +41,13 @@
     if(stopped()){
       state.scenes.forEach(({element,property,journey})=>{
         element.style.setProperty(property,'1');
-        if(journey){element.style.setProperty('--journey-request','1');element.style.setProperty('--journey-approved','1');}
+        if(journey){
+          element.style.setProperty('--journey-request','1');
+          element.style.setProperty('--journey-request-move','1');
+          element.style.setProperty('--journey-approved','1');
+          element.style.setProperty('--journey-collect','1');
+          element.style.setProperty('--journey-return','1');
+        }
       });
       return;
     }
@@ -53,7 +59,10 @@
       element.style.setProperty(property,progress.toFixed(4));
       if(journey){
         element.style.setProperty('--journey-request',clamp((progress-.2)*4).toFixed(4));
-        element.style.setProperty('--journey-approved',clamp((progress-.42)*4).toFixed(4));
+        element.style.setProperty('--journey-request-move',clamp(progress/.3).toFixed(4));
+        element.style.setProperty('--journey-approved',clamp((progress-.26)*8).toFixed(4));
+        element.style.setProperty('--journey-collect',clamp((progress-.34)/.27).toFixed(4));
+        element.style.setProperty('--journey-return',clamp((progress-.64)/.3).toFixed(4));
       }
     });
   };
