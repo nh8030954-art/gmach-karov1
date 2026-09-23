@@ -181,9 +181,10 @@ async function register(request, env, ctx, url) {
   try {
     await sendVerificationEmail(env, email, fullName, code);
   } catch (error) {
-    await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id).run();
     console.error("Verification email delivery failed", error);
-    throw new HttpError(503, "לא הצלחנו לשלוח את קוד האימות. נסו שוב בעוד רגע");
+    try { await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id).run(); }
+    catch (cleanupError) { console.error("Registration cleanup failed", cleanupError); }
+    throw new HttpError(503, "לא הצלחנו לשלוח את קוד האימות. שירות המייל אינו זמין כרגע");
   }
   return json({ verificationRequired: true, email, expiresInSeconds: 600 }, 201);
 }
