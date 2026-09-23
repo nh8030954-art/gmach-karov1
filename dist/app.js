@@ -526,6 +526,11 @@
    if(a==='contrast')root.classList.toggle('a11y-high-contrast');
    if(a==='links')root.classList.toggle('a11y-highlight-links');
    if(a==='motion')root.classList.toggle('a11y-stop-motion');
+   if(a==='grayscale')root.classList.toggle('a11y-grayscale');
+   if(a==='font')root.classList.toggle('a11y-readable-font');
+   if(a==='spacing')root.classList.toggle('a11y-line-space');
+   if(a==='cursor')root.classList.toggle('a11y-big-cursor');
+   if(a==='reset')root.classList.remove('a11y-large-text','a11y-high-contrast','a11y-highlight-links','a11y-stop-motion','a11y-grayscale','a11y-readable-font','a11y-line-space','a11y-big-cursor');
   }));
  };
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
