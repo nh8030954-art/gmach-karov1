@@ -498,23 +498,35 @@
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
 
-// In-site support form
+// Accessibility controls and in-site support
 (()=>{
- const init=()=>{
-  const open=document.getElementById('support-form-button'), dialog=document.getElementById('support-dialog'), form=document.getElementById('support-form');
-  if(!open||!dialog||!form)return;
-  open.addEventListener('click',()=>openDialog(dialog));
-  form.addEventListener('submit',async e=>{
-   e.preventDefault();
-   if(!form.reportValidity())return;
-   const submit=document.getElementById('support-submit'), status=document.getElementById('support-form-status');
+ const ready=()=>{
+  const show=d=>{if(d&&!d.open&&typeof d.showModal==='function')d.showModal()};
+  document.querySelectorAll('[data-close-dialog]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog')?.close()));
+  const supportButton=document.getElementById('support-form-button'),supportDialog=document.getElementById('support-dialog'),supportForm=document.getElementById('support-form');
+  supportButton?.addEventListener('click',()=>show(supportDialog));
+  supportForm?.addEventListener('submit',async e=>{
+   e.preventDefault();if(!supportForm.reportValidity())return;
+   const submit=document.getElementById('support-submit'),status=document.getElementById('support-form-status');
    submit.disabled=true;status.textContent='שולחים את הפנייה…';
    try{
-    await api('/api/support',{method:'POST',body:{name:form.name.value,email:form.email.value,subject:form.subject.value,message:form.message.value}});
-    form.reset();status.textContent='הפנייה נשלחה בהצלחה. נחזור אליכם בהקדם.';
-   }catch(err){status.textContent=err?.message||'לא הצלחנו לשלוח כרגע. נסו שוב בעוד רגע.'}
-   finally{submit.disabled=false}
+    const res=await fetch('/api/support',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:supportForm.elements.name.value,email:supportForm.elements.email.value,subject:supportForm.elements.subject.value,message:supportForm.elements.message.value})});
+    const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||'השליחה לא הושלמה');
+    supportForm.reset();status.textContent='הפנייה נשלחה בהצלחה.';
+   }catch(err){status.textContent=err.message||'לא הצלחנו לשלוח כרגע. נסו שוב בעוד רגע.'}finally{submit.disabled=false}
   });
+  const menu=document.getElementById('accessibility-dialog'),statement=document.getElementById('accessibility-statement-dialog');
+  document.getElementById('accessibility-button')?.addEventListener('click',()=>show(menu));
+  document.getElementById('accessibility-statement-button')?.addEventListener('click',()=>show(statement));
+  document.getElementById('accessibility-from-menu')?.addEventListener('click',()=>{menu?.close();show(statement)});
+  document.querySelectorAll('[data-a11y-action]').forEach(b=>b.addEventListener('click',()=>{
+   const a=b.dataset.a11yAction,root=document.documentElement;
+   if(a==='font-up')root.classList.add('a11y-large-text');
+   if(a==='font-reset')root.classList.remove('a11y-large-text');
+   if(a==='contrast')root.classList.toggle('a11y-high-contrast');
+   if(a==='links')root.classList.toggle('a11y-highlight-links');
+   if(a==='motion')root.classList.toggle('a11y-stop-motion');
+  }));
  };
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
 })();
