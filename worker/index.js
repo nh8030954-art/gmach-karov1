@@ -240,11 +240,11 @@ async function forgotPassword(request, env) {
   assertEmailDeliveryConfigured(env);
   const user = await env.DB.prepare("SELECT id,email,full_name,email_verified FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
   if (!user || Number(user.email_verified || 0) !== 1) return json({ ok: true });
-  const recent = await env.DB.prepare("SELECT id FROM auth_challenges WHERE user_id = ? AND purpose = 'password_reset' AND created_at > ? LIMIT 1")
+  const recent = await env.DB.prepare("SELECT token_hash FROM auth_challenges WHERE user_id = ? AND purpose = 'email_verify' AND created_at > ? LIMIT 1")
     .bind(user.id, new Date(Date.now() - 60 * 1000).toISOString()).first();
   if (recent) return json({ ok: true });
   const code = verificationCode();
-  await env.DB.prepare("INSERT INTO auth_challenges (token_hash,user_id,purpose,expires_at) VALUES (?,?, 'password_reset', ?)")
+  await env.DB.prepare("INSERT INTO auth_challenges (token_hash,user_id,purpose,expires_at) VALUES (?,?, 'email_verify', ?)")
     .bind(await sha256(`${user.id}:password_reset:${code}`), user.id, new Date(Date.now() + 10 * 60 * 1000).toISOString()).run();
   await sendPasswordResetEmail(env, user.email, user.full_name, code);
   return json({ ok: true });
@@ -259,14 +259,14 @@ async function resetPassword(request, env) {
   const user = await env.DB.prepare("SELECT id FROM users WHERE email = ? COLLATE NOCASE AND email_verified = 1").bind(email).first();
   if (!user) throw new HttpError(400, "הקוד אינו נכון או שפג תוקפו");
   const tokenHash = await sha256(`${user.id}:password_reset:${code}`);
-  const challenge = await env.DB.prepare("SELECT token_hash FROM auth_challenges WHERE token_hash = ? AND user_id = ? AND purpose = 'password_reset' AND expires_at > ?")
+  const challenge = await env.DB.prepare("SELECT token_hash FROM auth_challenges WHERE token_hash = ? AND user_id = ? AND purpose = 'email_verify' AND expires_at > ?")
     .bind(tokenHash, user.id, new Date().toISOString()).first();
   if (!challenge) throw new HttpError(400, "הקוד אינו נכון או שפג תוקפו");
   const salt = randomToken(16);
   const hash = await derivePassword(newPassword, salt, PASSWORD_ITERATIONS);
   await env.DB.batch([
     env.DB.prepare("UPDATE users SET password_hash = ?, password_salt = ?, password_iterations = ?, updated_at = ? WHERE id = ?").bind(hash, salt, PASSWORD_ITERATIONS, new Date().toISOString(), user.id),
-    env.DB.prepare("DELETE FROM auth_challenges WHERE user_id = ? AND purpose = 'password_reset'").bind(user.id),
+    env.DB.prepare("DELETE FROM auth_challenges WHERE user_id = ? AND purpose = 'email_verify'").bind(user.id),
     env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(user.id)
   ]);
   return json({ ok: true });
