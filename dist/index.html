@@ -37,12 +37,12 @@
 </style>
 
   <style id="accessibility-v1">
-    .header-inner{min-height:116px}
-    .site-header .header-logo{width:112px!important;height:108px!important;flex:0 0 112px!important;overflow:visible!important;background:transparent!important;border-radius:0!important;box-shadow:none!important;display:grid!important;place-items:center!important}
-    .site-header .header-logo img{position:static!important;display:block!important;width:108px!important;height:104px!important;max-width:108px!important;object-fit:contain!important;transform:none!important;margin:0!important}
+    .header-inner{min-height:132px}
+    .site-header .header-logo{width:142px!important;height:124px!important;flex:0 0 142px!important;overflow:visible!important;background:transparent!important;border-radius:0!important;box-shadow:none!important;display:grid!important;place-items:center!important}
+    .site-header .header-logo img{position:static!important;display:block!important;width:138px!important;height:120px!important;max-width:138px!important;object-fit:contain!important;transform:none!important;margin:0!important}
     #support-form textarea{resize:vertical;min-height:130px}
     #support-form-status:not(:empty){padding:8px 10px;border-radius:10px;background:#f4f7f5;font-weight:700}
-    .accessibility-fab{position:fixed;z-index:120;left:18px;bottom:18px;width:58px;height:58px;border:3px solid #fff;border-radius:50%;display:grid;place-items:center;background:#123c46;color:#fff;box-shadow:0 8px 24px rgba(7,28,34,.28);font-size:28px;cursor:pointer}
+    .accessibility-fab{position:fixed;z-index:120;left:18px;bottom:18px;width:62px;height:62px;border:4px solid #fff;border-radius:50%;display:grid;place-items:center;background:#0878c9;color:#fff;box-shadow:0 8px 24px rgba(7,28,34,.32);cursor:pointer}.accessibility-fab svg{width:38px;height:38px;fill:currentColor}
     .accessibility-fab:focus-visible{outline:4px solid #f4bd4d;outline-offset:3px}
     .accessibility-tools{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 18px}
     .accessibility-tools button{min-height:50px;padding:10px;border:2px solid #d7e1df;border-radius:12px;background:#fff;color:#123c46;font:inherit;font-weight:800}
@@ -51,8 +51,14 @@
     html.a11y-high-contrast body{background:#fff;color:#000}
     html.a11y-highlight-links a{text-decoration:underline!important;text-decoration-thickness:3px!important;text-underline-offset:3px!important}
     html.a11y-stop-motion *,html.a11y-stop-motion *::before,html.a11y-stop-motion *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
-    @media(max-width:760px){.header-inner{min-height:104px}.site-header .header-logo{width:98px!important;height:96px!important;flex-basis:98px!important}.site-header .header-logo img{width:94px!important;height:92px!important;max-width:94px!important}}
-    @media(max-width:420px){.site-header .header-logo{width:90px!important;height:88px!important;flex-basis:90px!important}.site-header .header-logo img{width:86px!important;height:84px!important;max-width:86px!important}.accessibility-fab{left:12px;bottom:12px;width:54px;height:54px}.accessibility-tools{grid-template-columns:1fr}}
+    html.a11y-grayscale{filter:grayscale(1)}
+    html.a11y-readable-font body{font-family:Arial,sans-serif!important}
+    html.a11y-readable-font *{font-family:Arial,sans-serif!important}
+    html.a11y-line-space body{line-height:1.8!important}
+    html.a11y-big-cursor,html.a11y-big-cursor *{cursor:default!important}
+    html.a11y-big-cursor a,html.a11y-big-cursor button,html.a11y-big-cursor summary{cursor:pointer!important}
+    @media(max-width:760px){.header-inner{min-height:116px}.site-header .header-logo{width:118px!important;height:108px!important;flex-basis:118px!important}.site-header .header-logo img{width:114px!important;height:104px!important;max-width:114px!important}}
+    @media(max-width:420px){.header-inner{min-height:112px}.site-header .header-logo{width:112px!important;height:104px!important;flex-basis:112px!important}.site-header .header-logo img{width:108px!important;height:100px!important;max-width:108px!important}.accessibility-fab{left:12px;bottom:12px;width:58px;height:58px}.accessibility-tools{grid-template-columns:1fr 1fr}}
     @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
     @media(forced-colors:active){:where(a,button,input,select,textarea,summary):focus-visible{outline:3px solid CanvasText!important}.accessibility-fab{forced-color-adjust:auto}}
   </style>
@@ -267,7 +273,7 @@
     <div class="footer-bottom"><span>© <span id="current-year"></span> גמ״ח ברגע</span><span>קהילה שמשאילה, קהילה שצומחת</span></div>
   </footer>
 
-  <button type="button" id="accessibility-button" class="accessibility-fab" aria-haspopup="dialog" aria-controls="accessibility-dialog" aria-label="פתיחת תפריט נגישות">♿</button>
+  <button type="button" id="accessibility-button" class="accessibility-fab" aria-haspopup="dialog" aria-controls="accessibility-dialog" aria-label="פתיחת תפריט נגישות"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4ZM10.4 8h3.1l.7 3.1h3.4v2.2h-4.9l-.5-2.1-1.3 3.2a4.8 4.8 0 1 0 5.8 5.4l2.1.8A7 7 0 1 1 9.4 12l1-4Zm4.5 7h2.3l2.7 5.2-2 1-2.2-4.1h-3.9l1-2.1h2.1Z"/></svg></button>
 
   <dialog class="modal modal-narrow" id="accessibility-dialog" aria-labelledby="accessibility-dialog-title">
     <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת תפריט נגישות">×</button>
@@ -278,6 +284,11 @@
       <button type="button" data-a11y-action="contrast">ניגודיות גבוהה</button>
       <button type="button" data-a11y-action="links">הדגשת קישורים</button>
       <button type="button" data-a11y-action="motion">עצירת אנימציות</button>
+      <button type="button" data-a11y-action="grayscale">גווני אפור</button>
+      <button type="button" data-a11y-action="font">גופן קריא</button>
+      <button type="button" data-a11y-action="spacing">ריווח שורות</button>
+      <button type="button" data-a11y-action="cursor">סמן גדול</button>
+      <button type="button" data-a11y-action="reset">איפוס נגישות</button>
     </div>
     <button type="button" class="button button-secondary" id="accessibility-from-menu">הצהרת נגישות</button>
   </dialog>
