@@ -36,31 +36,12 @@
       @keyframes ctaEmphasis{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(244,189,77,0)}50%{transform:scale(1.055);box-shadow:0 0 0 9px rgba(244,189,77,.18)}}
 </style>
 
-  <style id="accessibility-v1">
+  <style id="header-logo-size">
     .header-inner{min-height:132px}
     .site-header .header-logo{width:142px!important;height:124px!important;flex:0 0 142px!important;overflow:visible!important;background:transparent!important;border-radius:0!important;box-shadow:none!important;display:grid!important;place-items:center!important}
     .site-header .header-logo img{position:static!important;display:block!important;width:138px!important;height:120px!important;max-width:138px!important;object-fit:contain!important;transform:none!important;margin:0!important}
-    #support-form textarea{resize:vertical;min-height:130px}
-    #support-form-status:not(:empty){padding:8px 10px;border-radius:10px;background:#f4f7f5;font-weight:700}
-    .accessibility-fab{position:fixed;z-index:120;left:18px;bottom:18px;width:62px;height:62px;border:4px solid #fff;border-radius:50%;display:grid;place-items:center;background:#0878c9;color:#fff;box-shadow:0 8px 24px rgba(7,28,34,.32);cursor:pointer}.accessibility-fab svg{width:38px;height:38px;fill:currentColor}
-    .accessibility-fab:focus-visible{outline:4px solid #f4bd4d;outline-offset:3px}
-    .accessibility-tools{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 18px}
-    .accessibility-tools button{min-height:50px;padding:10px;border:2px solid #d7e1df;border-radius:12px;background:#fff;color:#123c46;font:inherit;font-weight:800}
-    html.a11y-large-text{font-size:118%}
-    html.a11y-high-contrast{filter:contrast(1.25)}
-    html.a11y-high-contrast body{background:#fff;color:#000}
-    html.a11y-highlight-links a{text-decoration:underline!important;text-decoration-thickness:3px!important;text-underline-offset:3px!important}
-    html.a11y-stop-motion *,html.a11y-stop-motion *::before,html.a11y-stop-motion *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
-    html.a11y-grayscale{filter:grayscale(1)}
-    html.a11y-readable-font body{font-family:Arial,sans-serif!important}
-    html.a11y-readable-font *{font-family:Arial,sans-serif!important}
-    html.a11y-line-space body{line-height:1.8!important}
-    html.a11y-big-cursor,html.a11y-big-cursor *{cursor:default!important}
-    html.a11y-big-cursor a,html.a11y-big-cursor button,html.a11y-big-cursor summary{cursor:pointer!important}
     @media(max-width:760px){.header-inner{min-height:116px}.site-header .header-logo{width:118px!important;height:108px!important;flex-basis:118px!important}.site-header .header-logo img{width:114px!important;height:104px!important;max-width:114px!important}}
-    @media(max-width:420px){.header-inner{min-height:112px}.site-header .header-logo{width:112px!important;height:104px!important;flex-basis:112px!important}.site-header .header-logo img{width:108px!important;height:100px!important;max-width:108px!important}.accessibility-fab{left:12px;bottom:12px;width:58px;height:58px}.accessibility-tools{grid-template-columns:1fr 1fr}}
-    @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
-    @media(forced-colors:active){:where(a,button,input,select,textarea,summary):focus-visible{outline:3px solid CanvasText!important}.accessibility-fab{forced-color-adjust:auto}}
+    @media(max-width:420px){.header-inner{min-height:112px}.site-header .header-logo{width:112px!important;height:104px!important;flex-basis:112px!important}.site-header .header-logo img{width:108px!important;height:100px!important;max-width:108px!important}}
   </style>
 </head>
 <body>
@@ -268,43 +249,10 @@
   <footer class="site-footer">
     <div class="footer-inner">
       <div class="footer-brand"><a class="brand brand-footer" href="#/"><span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:hidden;box-shadow:none;width:78px;height:78px;flex:0 0 78px;position:relative"><img src="./gmach-berega-logo.jpg" alt="" style="position:absolute;width:348px;height:auto;max-width:none;left:-142px;top:-36px;transform:none"></span><span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span></a><p>מחברים בין מי שיש לו לבין מי שצריך — בחינם, בפשטות ובאחריות.</p></div>
-      <div class="footer-links"><div><strong>למצוא</strong><a href="#/catalog">כל הפריטים</a><a href="#how-it-works">איך זה עובד</a></div><div><strong>לשתף</strong><button type="button" data-footer-add-gmach>פרסום גמ״ח</button><button type="button" data-footer-add-item>הוספת פריט</button></div><div><strong>חשוב לדעת</strong><button type="button" data-open-info="safety">כללי השאלה בטוחה</button><button type="button" data-open-info="terms">תנאי שימוש</button><button type="button" data-open-info="privacy">פרטיות</button><button type="button" id="accessibility-statement-button">הצהרת נגישות</button><button type="button" id="support-form-button">יצירת קשר ותמיכה</button></div></div>
+      <div class="footer-links"><div><strong>למצוא</strong><a href="#/catalog">כל הפריטים</a><a href="#how-it-works">איך זה עובד</a></div><div><strong>לשתף</strong><button type="button" data-footer-add-gmach>פרסום גמ״ח</button><button type="button" data-footer-add-item>הוספת פריט</button></div><div><strong>חשוב לדעת</strong><button type="button" data-open-info="safety">כללי השאלה בטוחה</button><button type="button" data-open-info="terms">תנאי שימוש</button><button type="button" data-open-info="privacy">פרטיות</button><button type="button" id="support-form-button">יצירת קשר ותמיכה</button></div></div>
     </div>
     <div class="footer-bottom"><span>© <span id="current-year"></span> גמ״ח ברגע</span><span>קהילה שמשאילה, קהילה שצומחת</span></div>
   </footer>
-
-  <button type="button" id="accessibility-button" class="accessibility-fab" aria-haspopup="dialog" aria-controls="accessibility-dialog" aria-label="פתיחת תפריט נגישות"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2a2.2 2.2 0 1 1 0 4.4 2.2 2.2 0 0 1 0-4.4ZM10.4 8h3.1l.7 3.1h3.4v2.2h-4.9l-.5-2.1-1.3 3.2a4.8 4.8 0 1 0 5.8 5.4l2.1.8A7 7 0 1 1 9.4 12l1-4Zm4.5 7h2.3l2.7 5.2-2 1-2.2-4.1h-3.9l1-2.1h2.1Z"/></svg></button>
-
-  <dialog class="modal modal-narrow" id="accessibility-dialog" aria-labelledby="accessibility-dialog-title">
-    <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת תפריט נגישות">×</button>
-    <div class="dialog-heading"><h2 id="accessibility-dialog-title">כלי נגישות</h2><p>התאימו את התצוגה לצורך שלכם.</p></div>
-    <div class="accessibility-tools">
-      <button type="button" data-a11y-action="font-up">הגדלת טקסט</button>
-      <button type="button" data-a11y-action="font-reset">גודל טקסט רגיל</button>
-      <button type="button" data-a11y-action="contrast">ניגודיות גבוהה</button>
-      <button type="button" data-a11y-action="links">הדגשת קישורים</button>
-      <button type="button" data-a11y-action="motion">עצירת אנימציות</button>
-      <button type="button" data-a11y-action="grayscale">גווני אפור</button>
-      <button type="button" data-a11y-action="font">גופן קריא</button>
-      <button type="button" data-a11y-action="spacing">ריווח שורות</button>
-      <button type="button" data-a11y-action="cursor">סמן גדול</button>
-      <button type="button" data-a11y-action="reset">איפוס נגישות</button>
-    </div>
-    <button type="button" class="button button-secondary" id="accessibility-from-menu">הצהרת נגישות</button>
-  </dialog>
-
-  <dialog class="modal modal-medium" id="accessibility-statement-dialog" aria-labelledby="accessibility-statement-title">
-    <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת הצהרת נגישות">×</button>
-    <div class="dialog-heading align-start"><h2 id="accessibility-statement-title">הצהרת נגישות</h2></div>
-    <div class="info-content">
-      <p>אנו פועלים כדי לאפשר שימוש נוח ונגיש באתר לאנשים עם מגוון צרכים ויכולות.</p>
-      <h3>התאמות נגישות באתר</h3>
-      <ul><li>ניווט באמצעות מקלדת ומיקוד חזותי ברור.</li><li>קישור דילוג ישירות לתוכן הראשי.</li><li>מבנה כותרות, טפסים ותיבות דו־שיח עם תוויות נגישות.</li><li>אפשרות להגדלת טקסט, ניגודיות גבוהה, הדגשת קישורים ועצירת אנימציות.</li><li>התחשבות בהגדרת המכשיר להפחתת תנועה.</li></ul>
-      <h3>נתקלתם בקושי?</h3>
-      <p>אם נתקלתם במחסום נגישות או בתוכן שאינו נגיש, השתמשו בכפתור „יצירת קשר ותמיכה” באתר וציינו מה ניסיתם לבצע ובאיזה עמוד.</p>
-      <p><strong>עדכון אחרון:</strong> 23 בספטמבר 2026.</p>
-    </div>
-  </dialog>
 
   <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
 
