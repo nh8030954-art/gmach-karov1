@@ -1,4 +1,3 @@
-npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
 const SESSION_COOKIE = "gmach_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
 // Keep PBKDF2 within the Cloudflare Workers CPU budget. Existing production
@@ -57,7 +56,7 @@ async function routeApi(request, env, ctx, url) {
       env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='auth_challenges'").first()
     ]);
     const userSql=String(usersTable?.sql||"").toLowerCase();
-    return json({ ok:true,release:"registration-fix-2026-09-23.2",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified")},timestamp:new Date().toISOString() });
+    return json({ ok:true,release:"registration-fix-2026-09-23.3",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified")},timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
