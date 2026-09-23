@@ -167,16 +167,22 @@ async function register(request, env, ctx, url) {
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
   try {
-    await env.DB.batch([
-      env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role) VALUES (?,?,?,?,?,?,?)")
-        .bind(id, email, passwordHash, salt, PASSWORD_ITERATIONS, fullName, role),
-      env.DB.prepare("INSERT INTO auth_challenges (token_hash,user_id,purpose,expires_at) VALUES (?,?, 'email_verify', ?)")
-        .bind(challengeHash, id, expiresAt)
-    ]);
+    await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role) VALUES (?,?,?,?,?,?,?)")
+      .bind(id, email, passwordHash, salt, PASSWORD_ITERATIONS, fullName, role).run();
   } catch (error) {
-    if (String(error).toLowerCase().includes("unique")) throw new HttpError(409, "כבר קיים חשבון עם כתובת האימייל הזו");
-    console.error("Registration database write failed", error);
-    throw new HttpError(503, "לא הצלחנו ליצור את החשבון במסד הנתונים");
+    const message=String(error).toLowerCase();
+    if (message.includes("unique")) throw new HttpError(409, "כבר קיים חשבון עם כתובת האימייל הזו");
+    const fallbackRole=role==="member"?"borrower":role==="borrower"?"member":null;
+    if (!fallbackRole) { console.error("Registration user write failed",error); throw new HttpError(503,"לא הצלחנו ליצור את החשבון במסד הנתונים"); }
+    try { await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role) VALUES (?,?,?,?,?,?,?)").bind(id,email,passwordHash,salt,PASSWORD_ITERATIONS,fullName,fallbackRole).run(); }
+    catch (fallbackError) { console.error("Registration user fallback failed",fallbackError); throw new HttpError(503,"לא הצלחנו ליצור את החשבון במסד הנתונים"); }
+  }
+  try {
+    await env.DB.prepare("INSERT INTO auth_challenges (token_hash,user_id,purpose,expires_at) VALUES (?,?, 'email_verify', ?)").bind(challengeHash,id,expiresAt).run();
+  } catch (error) {
+    console.error("Registration challenge write failed",error);
+    try { await env.DB.prepare("DELETE FROM users WHERE id=?").bind(id).run(); } catch {}
+    throw new HttpError(503,"לא הצלחנו ליצור קוד אימות. נסו שוב בעוד רגע");
   }
 
   try {
