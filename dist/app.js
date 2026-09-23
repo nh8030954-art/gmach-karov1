@@ -76,7 +76,7 @@
     $("#connection-banner").hidden = state.serverAvailable;
   }
   async function loadPublicConfig() {
-    if (!state.serverAvailable) return; try { const data = await api("/api/public-config"); state.supportEmail = data.supportEmail || ""; const link = $("#support-email-link"); if (state.supportEmail) { link.href = `mailto:${state.supportEmail}`; link.hidden = false; } } catch { /* Optional public configuration. */ }
+    if (!state.serverAvailable) return; try { const data = await api("/api/public-config"); state.supportEmail = data.supportEmail || ""; } catch { /* Optional public configuration. */ }
   }
   async function loadDiscovery(query = "") {
     if (!state.serverAvailable) return;
@@ -494,6 +494,27 @@
   addEventListener('scroll',trustTick,{passive:true});addEventListener('resize',trustTick,{passive:true});drawTrust();
   const cta=document.getElementById('callout-add-gmach');
   if(cta){cta.classList.add('fx-cta');const ctaIo=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('fx-cta-visible');ctaIo.unobserve(e.target)}}),{threshold:.65});ctaIo.observe(cta);}
+ };
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+})();
+
+// In-site support form
+(()=>{
+ const init=()=>{
+  const open=document.getElementById('support-form-button'), dialog=document.getElementById('support-dialog'), form=document.getElementById('support-form');
+  if(!open||!dialog||!form)return;
+  open.addEventListener('click',()=>openDialog(dialog));
+  form.addEventListener('submit',async e=>{
+   e.preventDefault();
+   if(!form.reportValidity())return;
+   const submit=document.getElementById('support-submit'), status=document.getElementById('support-form-status');
+   submit.disabled=true;status.textContent='שולחים את הפנייה…';
+   try{
+    await api('/api/support',{method:'POST',body:{name:form.name.value,email:form.email.value,subject:form.subject.value,message:form.message.value}});
+    form.reset();status.textContent='הפנייה נשלחה בהצלחה. נחזור אליכם בהקדם.';
+   }catch(err){status.textContent=err?.message||'לא הצלחנו לשלוח כרגע. נסו שוב בעוד רגע.'}
+   finally{submit.disabled=false}
+  });
  };
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
