@@ -43,6 +43,28 @@
     @media(max-width:760px){.header-inner{min-height:88px}.site-header .header-logo{width:150px!important;height:80px!important;flex-basis:150px!important}.site-header .header-logo img{width:146px!important;height:76px!important;max-width:146px!important}}
     @media(max-width:420px){.header-inner{min-height:76px}.site-header .header-logo{width:180px!important;height:72px!important;flex-basis:180px!important;display:grid!important;place-items:center!important;overflow:visible!important;transform:translateX(18px)!important}.site-header .header-logo img{width:176px!important;height:70px!important;max-width:176px!important;object-fit:contain!important;object-position:center!important}}
   </style>
+
+  <style id="category-carousel-v1">
+    .category-rail.carousel-ready{
+      display:flex!important;
+      gap:14px;
+      overflow-x:auto!important;
+      overflow-y:hidden;
+      scroll-snap-type:x proximity;
+      -webkit-overflow-scrolling:touch;
+      scrollbar-width:none;
+      overscroll-behavior-inline:contain;
+    }
+    .category-rail.carousel-ready::-webkit-scrollbar{display:none}
+    .category-rail.carousel-ready .category-card{
+      flex:0 0 auto;
+      scroll-snap-align:start;
+    }
+    @media(max-width:760px){
+      .category-rail.carousel-ready{gap:12px;padding-bottom:4px}
+      .category-rail.carousel-ready .category-card{min-width:168px}
+    }
+  </style>
 </head>
 <body>
   <a class="skip-link" href="#main-content">דלגו לתוכן הראשי</a>
@@ -436,5 +458,34 @@
 
 
 
+
+  <script>
+    (() => {
+      const rail = document.getElementById('category-rail');
+      if (!rail) return;
+      rail.classList.add('carousel-ready');
+      if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      let timer = null;
+      const step = () => {
+        const first = rail.querySelector('.category-card');
+        if (!first) return;
+        const gap = parseFloat(getComputedStyle(rail).gap || 0);
+        const amount = first.getBoundingClientRect().width + gap;
+        const max = rail.scrollWidth - rail.clientWidth;
+        const dir = document.documentElement.dir === 'rtl' ? -1 : 1;
+        const current = Math.abs(rail.scrollLeft);
+        if (current >= max - amount * 0.6) {
+          rail.scrollTo({left: 0, behavior:'smooth'});
+        } else {
+          rail.scrollBy({left: dir * amount, behavior:'smooth'});
+        }
+      };
+      const start = () => { stop(); timer = setInterval(step, 3200); };
+      const stop = () => { if (timer) clearInterval(timer); timer = null; };
+      ['pointerdown','touchstart','mouseenter','focusin'].forEach(ev => rail.addEventListener(ev, stop, {passive:true}));
+      ['pointerup','touchend','mouseleave','focusout'].forEach(ev => rail.addEventListener(ev, () => setTimeout(start, 1200), {passive:true}));
+      start();
+    })();
+  </script>
 </body>
 </html>
