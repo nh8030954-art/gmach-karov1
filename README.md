@@ -1,7 +1,7 @@
 # גמ״ח ברגע
 
 פלטפורמה מלאה בעברית להשאלה חינמית של ציוד בין גמ״חים, משפחות וקהילות. האתר פועל כולו על Cloudflare — ללא Supabase וללא שירות מסד נתונים חיצוני.
-
+TRIGGER: ACCESSABILITY UPDATE
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/nh8030954-art/smachim/tree/gmach-karov)
 
 ## מה כלול
