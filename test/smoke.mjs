@@ -110,7 +110,7 @@ try {
   result = await request(`/api/admin/items/${itemId}`, { method: "PATCH", cookie: adminCookie, body: { status: "active" } });
   assert.equal(result.response.status, 200);
 
-  result = await request("/api/auth/register", { method: "POST", body: { fullName: "שואלת ציוד", email: "borrower@example.com", password: "AnotherPass!456" } });
+  result = await request("/api/auth/register", { method: "POST", body: { fullName: "שואלת ציוד", email: "borrower@example.com", password: "AnotherPass!456", termsAccepted: true } });
   assert.equal(result.response.status, 201);
   assert.equal(result.data.verificationRequired, true);
   const borrowerCookie = await verifyLatestEmail("borrower@example.com");
@@ -154,7 +154,7 @@ try {
   result = await request("/api/notifications", { cookie: borrowerCookie });
   assert.equal(result.data.unread, 0);
 
-  result = await request("/api/auth/register", { method: "POST", body: { fullName: "שואל נוסף", email: "second@example.com", password: "ThirdPass!789" } });
+  result = await request("/api/auth/register", { method: "POST", body: { fullName: "שואל נוסף", email: "second@example.com", password: "ThirdPass!789", termsAccepted: true } });
   assert.equal(result.response.status, 201);
   const secondCookie = await verifyLatestEmail("second@example.com");
   result = await request(`/api/loan-requests/${requestId}/messages`, { cookie: secondCookie });
