@@ -48,3 +48,52 @@ html.a11y-stop-motion *,html.a11y-stop-motion *::before,html.a11y-stop-motion *:
 html.a11y-stop-motion .motion-reveal{opacity:1!important;transform:none!important}
 .hero-flow circle{animation:none}
 @media(prefers-reduced-motion:reduce){.hero-motion-world,.category-motion-scene,.nearby-motion-scene,.loan-journey,.connection-canvas>svg,.shared-object,.trust-shield,.publish-sequence,.help-search-visual,.community-network{animation:none!important;transition:none!important}.motion-reveal{opacity:1!important;transform:none!important}.search-panel,.hero-copy>*,.hero-trust,.audience-paths{opacity:1!important;transform:none!important}.motion-object{transform:none!important}.nearby-motion-scene,.connection-canvas,.help-search-visual,.community-network{--scene-p:1}.loan-journey{--journey-p:1;--journey-request:1;--journey-approved:1}}
+
+/* Motion refinement after desktop and mobile film review */
+.category-motion-scene span{width:46px;height:46px;display:grid;place-items:center}
+.category-motion-scene span svg{width:25px;height:25px;fill:none;stroke:var(--teal);stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.motion-story{padding-block:64px}
+.connection-canvas{min-height:300px}
+.motion-reveal.is-visible{transition-delay:var(--reveal-delay,0ms)}
+.motion-once-cta{animation:motionCta 1.15s var(--motion-ease) 2}
+.gmachim-section .dashboard-empty{min-height:0;padding:18px 0}
+@keyframes motionCta{50%{transform:translateY(-2px) scale(1.025);box-shadow:0 0 0 8px rgba(244,189,77,.16)}}
+@media(min-width:901px) and (min-height:700px){
+  .steps-section.motion-sticky{height:165vh}
+  .steps-section.motion-sticky>.section-shell{top:78px;min-height:calc(100vh - 88px)}
+  .steps-section.motion-sticky .steps-grid{bottom:10px;opacity:.2;transform:scale(.97)}
+  .steps-section.motion-sticky .loan-journey{margin-top:4px}
+}
+@media(max-width:590px){
+  .search-hero{padding-inline:16px!important}
+  .hero-copy h1{font-size:clamp(2.15rem,10.8vw,3.15rem)!important;line-height:1.04}
+  .hero-copy p{max-width:32ch;margin-inline:auto}
+  .motion-object{width:40px;height:40px;opacity:.44}
+  .motion-object svg{width:24px;height:24px}
+  .nearby-motion-scene{height:168px;margin-bottom:18px}
+  .story-item-card{width:86%;padding:13px}
+  .steps-section{padding-block:36px}
+  .loan-journey{padding:8px 0}
+  .connection-canvas{min-height:340px}
+  .soft-person span{width:64px;height:78px}
+  .soft-person span::before{width:30px;height:30px;left:17px}
+  .person-need{top:19%}.person-give{top:81%}
+  .shared-object{top:calc(74% - 48% * var(--scene-p));width:58px;height:58px}
+  .found-label{bottom:44%;font-size:1.25rem}
+  .trust-shield{width:120px}
+  .trust-section{padding-block:38px!important}
+  .gmachim-section{padding-block:36px!important}
+  .gmachim-section .dashboard-empty{padding-block:8px}
+  .gmach-callout{margin-block:36px!important}
+  .publish-sequence>i{height:16px}
+  .help-broadcast{gap:20px}
+  .help-search-visual{min-height:205px}
+  .help-broadcast-copy h2{font-size:1.9rem}
+  .community-story{padding-block:58px 44px}
+  .community-network{height:330px}
+  .community-network>svg{opacity:.55}
+  .node{width:56px;height:56px;font-size:.7rem}
+  .community-actions{margin-top:8px}
+  .motion-story{padding-block:44px}
+  .faq-section{padding-block:42px!important}
+}

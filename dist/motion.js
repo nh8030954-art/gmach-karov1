@@ -60,9 +60,9 @@
   const requestDraw=()=>{if(!state.raf)state.raf=requestAnimationFrame(draw)};
 
   const setupReveal=()=>{
-    const elements=[...document.querySelectorAll('.section-heading,.organizations-grid,.trust-grid article,.gmach-callout,.faq-list details')];
+    const elements=[...document.querySelectorAll('.section-heading,.organizations-grid,.steps-grid>li,.trust-grid article,.gmach-callout,.faq-list details')];
     if(stopped()){elements.forEach(el=>el.classList.add('is-visible'));return;}
-    elements.forEach(el=>el.classList.add('motion-reveal'));
+    elements.forEach((el,index)=>{el.classList.add('motion-reveal');el.style.setProperty('--reveal-delay',`${Math.min(index%4,3)*55}ms`);});
     const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{
       if(!entry.isIntersecting)return;
       entry.target.classList.add('is-visible');
@@ -118,6 +118,23 @@
     });
   };
 
+  const setupCategoryScene=()=>{
+    const targets=[...document.querySelectorAll('.category-motion-scene span')];
+    const sources=[...document.querySelectorAll('.category-card:not(.is-active) .category-icon svg')];
+    targets.forEach((target,index)=>{const source=sources[index];if(source)target.append(source.cloneNode(true));});
+  };
+
+  const setupOneTimeCta=()=>{
+    const button=document.getElementById('callout-add-gmach');
+    if(!button||stopped())return;
+    const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{
+      if(!entry.isIntersecting)return;
+      entry.target.classList.add('motion-once-cta');
+      observer.unobserve(entry.target);
+    }),{threshold:.7});
+    observer.observe(button);
+  };
+
   const rebuild=()=>{
     setupScenes();
     state.scenes.forEach(({element})=>element.style.removeProperty('will-change'));
@@ -126,7 +143,7 @@
 
   const init=()=>{
     root.classList.add('motion-ready','motion-active');
-    setupScenes(); setupReveal(); setupSkeletons(); setupCounts(); setupActions();
+    setupScenes(); setupCategoryScene(); setupReveal(); setupSkeletons(); setupCounts(); setupActions(); setupOneTimeCta();
     addEventListener('scroll',requestDraw,{passive:true});
     addEventListener('resize',rebuild,{passive:true});
     reduceQuery.addEventListener?.('change',requestDraw);
