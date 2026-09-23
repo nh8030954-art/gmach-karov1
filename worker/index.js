@@ -55,6 +55,8 @@ async function routeApi(request, env, ctx, url) {
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
   if (method === "POST" && path === "/api/auth/verify-email") return verifyEmail(request, env, url);
   if (method === "POST" && path === "/api/auth/resend-verification") return resendVerification(request, env, ctx);
+  if (method === "POST" && path === "/api/auth/forgot-password") return forgotPassword(request, env);
+  if (method === "POST" && path === "/api/auth/reset-password") return resetPassword(request, env);
   if (method === "POST" && path === "/api/auth/login") return login(request, env, ctx, url);
   if (method === "POST" && path === "/api/auth/2fa/verify-login") return verifyTwoFactorLogin(request, env, url);
   if (method === "POST" && path === "/api/auth/logout") return logout(request, env, url);
@@ -138,6 +140,7 @@ async function routeApi(request, env, ctx, url) {
 
 async function register(request, env, ctx, url) {
   const body = await readJson(request);
+  if (body.termsAccepted !== true) throw new HttpError(400, "יש לאשר את תנאי השימוש ומדיניות הפרטיות");
   const email = normalizeEmail(body.email);
   const fullName = cleanText(body.fullName, 2, 80, "שם מלא");
   const password = validatePassword(body.password);
@@ -220,6 +223,44 @@ async function resendVerification(request, env, ctx) {
       .bind(await sha256(`${user.id}:${code}`), user.id, new Date(Date.now() + 10 * 60 * 1000).toISOString())
   ]);
   await sendVerificationEmail(env, user.email, user.full_name, code);
+  return json({ ok: true });
+}
+
+async function forgotPassword(request, env) {
+  const body = await readJson(request);
+  const email = normalizeEmail(body.email);
+  assertEmailDeliveryConfigured(env);
+  const user = await env.DB.prepare("SELECT id,email,full_name,email_verified FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
+  if (!user || Number(user.email_verified || 0) !== 1) return json({ ok: true });
+  const recent = await env.DB.prepare("SELECT id FROM auth_challenges WHERE user_id = ? AND purpose = 'password_reset' AND created_at > ? LIMIT 1")
+    .bind(user.id, new Date(Date.now() - 60 * 1000).toISOString()).first();
+  if (recent) return json({ ok: true });
+  const code = verificationCode();
+  await env.DB.prepare("INSERT INTO auth_challenges (token_hash,user_id,purpose,expires_at) VALUES (?,?, 'password_reset', ?)")
+    .bind(await sha256(`${user.id}:password_reset:${code}`), user.id, new Date(Date.now() + 10 * 60 * 1000).toISOString()).run();
+  await sendPasswordResetEmail(env, user.email, user.full_name, code);
+  return json({ ok: true });
+}
+
+async function resetPassword(request, env) {
+  const body = await readJson(request);
+  const email = normalizeEmail(body.email);
+  const code = cleanText(body.code, 6, 6, "קוד איפוס");
+  const newPassword = validatePassword(body.newPassword);
+  if (!/^\d{6}$/.test(code)) throw new HttpError(400, "קוד האיפוס חייב להכיל 6 ספרות");
+  const user = await env.DB.prepare("SELECT id FROM users WHERE email = ? COLLATE NOCASE AND email_verified = 1").bind(email).first();
+  if (!user) throw new HttpError(400, "הקוד אינו נכון או שפג תוקפו");
+  const tokenHash = await sha256(`${user.id}:password_reset:${code}`);
+  const challenge = await env.DB.prepare("SELECT token_hash FROM auth_challenges WHERE token_hash = ? AND user_id = ? AND purpose = 'password_reset' AND expires_at > ?")
+    .bind(tokenHash, user.id, new Date().toISOString()).first();
+  if (!challenge) throw new HttpError(400, "הקוד אינו נכון או שפג תוקפו");
+  const salt = randomToken(16);
+  const hash = await derivePassword(newPassword, salt, PASSWORD_ITERATIONS);
+  await env.DB.batch([
+    env.DB.prepare("UPDATE users SET password_hash = ?, password_salt = ?, password_iterations = ?, updated_at = ? WHERE id = ?").bind(hash, salt, PASSWORD_ITERATIONS, new Date().toISOString(), user.id),
+    env.DB.prepare("DELETE FROM auth_challenges WHERE user_id = ? AND purpose = 'password_reset'").bind(user.id),
+    env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(user.id)
+  ]);
   return json({ ok: true });
 }
 
@@ -492,14 +533,13 @@ async function createOrganization(request, env) {
     description: cleanText(body.description, 10, 600, "תיאור"),
     phone: validatePhone(body.phone),
     address: cleanOptional(body.address, 180),
-    websiteUrl: validateOptionalHttpsUrl(body.websiteUrl),
     serviceArea: cleanOptional(body.serviceArea, 180),
     hoursJson: sanitizeHours(body.hours),
     pickupOptions: sanitizePickupOptions(body.pickupOptions)
   };
   await env.DB.batch([
     env.DB.prepare("INSERT INTO organizations (id,owner_id,name,primary_category,city,neighborhood,description,address,website_url,service_area,hours_json,pickup_options,last_active_at,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')")
-      .bind(id, user.id, values.name, category, values.city, values.neighborhood, values.description, values.address, values.websiteUrl, values.serviceArea, values.hoursJson, values.pickupOptions, new Date().toISOString()),
+      .bind(id, user.id, values.name, category, values.city, values.neighborhood, values.description, values.address, null, values.serviceArea, values.hoursJson, values.pickupOptions, new Date().toISOString()),
     env.DB.prepare("INSERT INTO organization_contacts (organization_id,contact_phone) VALUES (?,?)").bind(id, values.phone)
   ]);
   return json({ organization: { id, ...values, primaryCategory: category, status: "pending", verified: false } }, 201);
@@ -527,19 +567,19 @@ async function updateOrganization(request, env, id) {
     neighborhood: cleanOptional(body.neighborhood, 80),
     description: cleanText(body.description, 10, 600, "תיאור"),
     phone: validatePhone(body.phone),
-    address: cleanOptional(body.address, 180), websiteUrl: validateOptionalHttpsUrl(body.websiteUrl),
+    address: cleanOptional(body.address, 180),
     serviceArea: cleanOptional(body.serviceArea, 180), hoursJson: sanitizeHours(body.hours), pickupOptions: sanitizePickupOptions(body.pickupOptions)
   };
   const publicChanged = values.name !== existing.name || category !== existing.primary_category || values.city !== existing.city ||
     (values.neighborhood || null) !== (existing.neighborhood || null) || values.description !== existing.description ||
-    (values.address || null) !== (existing.address || null) || (values.websiteUrl || null) !== (existing.website_url || null);
+    (values.address || null) !== (existing.address || null);
   const status = user.role === "admin" || !publicChanged ? existing.status : "pending";
   const verified = status === "approved" ? existing.verified : 0;
   const now = new Date().toISOString();
   await env.DB.batch([
     env.DB.prepare(`UPDATE organizations SET name = ?, primary_category = ?, city = ?, neighborhood = ?, description = ?,address=?,website_url=?,service_area=?,hours_json=?,pickup_options=?,last_active_at=?,
       status = ?, verified = ?, updated_at = ? WHERE id = ?`)
-      .bind(values.name, category, values.city, values.neighborhood, values.description,values.address,values.websiteUrl,values.serviceArea,values.hoursJson,values.pickupOptions,now,status, verified, now, id),
+      .bind(values.name, category, values.city, values.neighborhood, values.description,values.address,null,values.serviceArea,values.hoursJson,values.pickupOptions,now,status, verified, now, id),
     env.DB.prepare("UPDATE organization_contacts SET contact_phone = ? WHERE organization_id = ?").bind(values.phone, id)
   ]);
   return json({ organization: { id, ...values, primaryCategory: category, status, verified: Boolean(verified), hidden: Boolean(existing.is_hidden) } });
@@ -558,6 +598,10 @@ async function createItem(request, env) {
   if (!CONDITIONS.has(condition)) throw new HttpError(400, "נא לבחור מצב פריט תקין");
   const quantity = Number(body.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw new HttpError(400, "כמות הפריטים אינה תקינה");
+  const title = cleanText(body.title, 2, 120, "שם הפריט");
+  const duplicate = await env.DB.prepare("SELECT id FROM items WHERE organization_id = ? AND lower(trim(title)) = lower(trim(?)) AND category = ? AND status != 'archived' LIMIT 1")
+    .bind(organizationId, title, category).first();
+  if (duplicate) throw new HttpError(409, "כבר קיים בגמ״ח פריט פעיל בשם הזה ובאותה קטגוריה");
   const id = crypto.randomUUID();
   await env.DB.prepare(`
     INSERT INTO items (id,organization_id,title,category,description,condition,quantity,loan_conditions,city,neighborhood,item_type,subcategory,tags_json,pickup_method,inventory_updated_at,status,availability_status,is_free,icon,cover_color)
@@ -565,7 +609,7 @@ async function createItem(request, env) {
   `).bind(
     id,
     organizationId,
-    cleanText(body.title, 2, 120, "שם הפריט"),
+    title,
     category,
     cleanText(body.description, 10, 1200, "תיאור"),
     condition,
@@ -1284,6 +1328,22 @@ async function sendVerificationEmail(env, email, fullName, code) {
       subject: "קוד האימות שלך לגמ״ח ברגע",
       text: `שלום ${fullName}, קוד האימות שלך הוא ${code}. הקוד תקף ל-10 דקות. אם לא ביקשת להירשם, אפשר להתעלם מהמייל.`,
       html: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#15313a"><h1 style="color:#243f75">גמ״ח ברגע</h1><p>שלום ${escapeHtmlEmail(fullName)},</p><p>קוד האימות שלך:</p><p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#243f75" dir="ltr">${code}</p><p>הקוד תקף ל־10 דקות. אם לא ביקשת להירשם, אפשר להתעלם מהמייל.</p></div>`,
+      reply_to: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL)
+    })
+  });
+  if (!response.ok) throw new Error(`Resend returned ${response.status}`);
+}
+
+async function sendPasswordResetEmail(env, email, fullName, code) {
+  assertEmailDeliveryConfigured(env);
+  const deliver = env.RESEND_SERVICE?.fetch ? env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE) : fetch;
+  const response = await deliver("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${env.RESEND_API_KEY}` },
+    body: JSON.stringify({
+      from: String(env.RESEND_FROM_EMAIL || DEFAULT_FROM_EMAIL), to: [email], subject: "איפוס סיסמה בגמ״ח ברגע",
+      text: `שלום ${fullName}, קוד איפוס הסיסמה שלך הוא ${code}. הקוד תקף ל-10 דקות. אם לא ביקשת זאת, אפשר להתעלם מהמייל.`,
+      html: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#15313a"><h1 style="color:#243f75">גמ״ח ברגע</h1><p>שלום ${escapeHtmlEmail(fullName)},</p><p>קוד איפוס הסיסמה שלך:</p><p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#243f75" dir="ltr">${code}</p><p>הקוד תקף ל־10 דקות. אם לא ביקשת זאת, אפשר להתעלם מהמייל.</p></div>`,
       reply_to: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL)
     })
   });
