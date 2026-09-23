@@ -291,3 +291,54 @@ html.a11y-stop-motion .motion-reveal{opacity:1!important;transform:none!importan
   .site-header .header-logo{padding:2px!important;overflow:visible!important}
   .site-footer .footer-logo{width:70px!important;height:70px!important;flex-basis:70px!important}
 }
+
+/* Final mobile-led polish: full supplied logo, cleaner hero and legible story objects. */
+.audience-paths{display:none!important}
+.category-motion-scene{transform:translateY(-44px);margin-bottom:-108px}
+
+.site-header .full-brand-logo{width:166px!important;height:96px!important;flex:0 0 166px!important;padding:0!important;overflow:hidden!important}
+.site-header .full-brand-logo img,.site-footer .full-brand-logo img{position:static!important;width:100%!important;height:100%!important;max-width:100%!important;object-fit:contain!important;object-position:center!important;transform:none!important;display:block!important}
+.site-header .brand>.brand-copy,.brand-footer>.brand-copy{display:none!important}
+.header-inner,.site-header.is-compact .header-inner{min-height:104px!important}
+.site-header.is-compact .header-logo{transform:scale(.97)}
+.site-footer .footer-logo{width:205px!important;height:132px!important;flex:0 0 205px!important;overflow:hidden!important}
+.brand-footer{width:max-content;max-width:100%}
+
+.motion-continuous-cta{animation:motionCtaGentle 3s ease-in-out infinite}
+@keyframes motionCtaGentle{0%,62%,100%{transform:none;box-shadow:0 8px 22px rgba(8,35,47,.12)}78%{transform:translateY(-1px) scale(1.008);box-shadow:0 0 0 4px rgba(244,189,77,.08),0 10px 24px rgba(8,35,47,.13)}}
+
+.help-search-visual>span{width:78px;height:78px;display:grid;place-items:center;border:1px solid #dce8e4;border-radius:22px 7px 22px 22px;opacity:calc(.3 + var(--scene-p)*.7);transform:translate(calc(var(--dir)*var(--scene-p)*24px),calc(var(--lift)*var(--scene-p)*-12px)) rotate(calc(var(--turn)*var(--scene-p)*1deg))}
+.help-search-visual>span svg{width:46px;height:46px;fill:none;stroke:#a97832;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.help-search-visual>span:nth-child(1){--dir:1;--lift:1;--turn:3;right:10%;top:12%}
+.help-search-visual>span:nth-child(2){--dir:-1;--lift:-1;--turn:-4;left:8%;top:38%}
+.help-search-visual>span:nth-child(3){--dir:1;--lift:1;--turn:4;right:20%;bottom:10%}
+
+.cycle-step.c1::after{content:"";position:absolute;right:-14px;top:50%;width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 5px rgba(215,165,68,.18);transform:translateY(-50%)}
+
+@media(max-width:590px){
+  .header-inner,.site-header.is-compact .header-inner{min-height:104px!important;padding-block:4px}
+  .site-header .full-brand-logo{width:138px!important;height:90px!important;flex-basis:138px!important}
+  .site-header .brand{gap:0!important}
+  .category-motion-scene{display:none!important}
+  .site-footer .footer-logo{width:170px!important;height:110px!important;flex-basis:170px!important}
+  .footer-brand{align-items:center;text-align:center}
+  .brand-footer{margin-inline:auto}
+  .help-search-visual{min-height:245px}
+  .help-search-visual>span{width:64px;height:64px;border-radius:18px 6px 18px 18px}
+  .help-search-visual>span svg{width:38px;height:38px}
+  .help-search-visual>span:nth-child(1){right:5%;top:10%}
+  .help-search-visual>span:nth-child(2){left:4%;top:38%}
+  .help-search-visual>span:nth-child(3){right:13%;bottom:8%}
+
+  .community-cycle{height:520px;margin-top:12px}
+  .community-cycle>svg{display:none}
+  .community-cycle::before{content:"";position:absolute;top:42px;bottom:54px;left:50%;width:4px;border-radius:999px;background:linear-gradient(var(--accent),#d7e3df);transform:translateX(-50%) scaleY(var(--scene-p));transform-origin:top;opacity:.8}
+  .cycle-heart{width:68px;height:68px;font-size:2.2rem;z-index:2}
+  .cycle-step{z-index:3;min-width:174px;justify-content:center}
+  .cycle-step.c1{right:auto;left:50%;top:0;transform:translateX(-50%)}
+  .cycle-step.c2{right:2%;top:20%}
+  .cycle-step.c3{left:2%;top:40%}
+  .cycle-step.c4{left:auto;right:2%;top:61%;bottom:auto;transform:none}
+  .cycle-step.c5{left:2%;bottom:0;transform:none;max-width:none}
+  .cycle-step.c1::after{right:50%;top:auto;bottom:-17px;transform:translateX(50%)}
+}
