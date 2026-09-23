@@ -25,7 +25,7 @@
       ['.trust-section','--scene-p'],
       ['.gmach-callout','--publish-p'],
       ['.help-broadcast','--scene-p'],
-      ['.community-story','--scene-p'],
+      ['.community-story','--scene-p','fast'],
       ['.faq-section','--faq-p']
     ];
     state.scenes=mappings.map(([selector,property,speed])=>({element:document.querySelector(selector),property,speed})).filter(scene=>scene.element);
@@ -49,7 +49,7 @@
     state.scenes.forEach(({element,property,journey,speed})=>{
       const rect=element.getBoundingClientRect();
       if(rect.bottom<-120||rect.top>innerHeight+120)return;
-      const progress=sceneProgress(element,journey||speed==='fast' ? .98 : .82,journey||speed==='fast' ? .45 : .18);
+      const progress=sceneProgress(element,journey||speed==='fast' ? 1.02 : .82,journey||speed==='fast' ? .62 : .18);
       element.style.setProperty(property,progress.toFixed(4));
       if(journey){
         element.style.setProperty('--journey-request',clamp((progress-.2)*4).toFixed(4));

@@ -258,3 +258,36 @@ html.a11y-stop-motion .motion-reveal{opacity:1!important;transform:none!importan
   .cycle-step{opacity:1!important;transform:none!important}
   .cycle-step.c5{transform:translateX(-50%)!important}
 }
+
+/* Direction, identity and logo corrections from the final-state screenshots. */
+.audience-paths{justify-content:center!important}
+#path-manager{margin-inline:auto!important;transform:none!important;position:relative!important;inset:auto!important}
+
+.journey-item{left:calc(78% - 64% * var(--journey-p))}
+.shared-object{left:calc(22% + 56% * var(--scene-p))}
+.journey-flow circle{transform:translateX(calc(600px * (1 - var(--journey-p))))}
+
+.journey-person .gmach-building,.soft-person .gmach-building{width:92px;height:92px;border-radius:18px 6px 18px 18px;background:linear-gradient(145deg,#f5c25d,#c88c22);display:grid;place-items:center;box-shadow:0 16px 34px rgba(91,60,13,.18)}
+.journey-person .gmach-building::before,.soft-person .gmach-building::before{display:none}
+.gmach-building svg{width:62px;height:62px;fill:none;stroke:#fff7e6;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.connection-canvas .person-give .gmach-building{background:linear-gradient(145deg,#e7b548,#a96f17)}
+
+.community-cycle>svg .cycle-progress{stroke-dasharray:1470;stroke-dashoffset:calc(1470 * (1 - var(--scene-p)))}
+.cycle-step.c5{--at:.44}
+
+.site-header .brand-logo-crop,.site-footer .brand-logo-crop{background:#fff!important;overflow:visible!important}
+.site-header .header-logo{padding:3px!important}
+.brand-footer{align-items:center!important;gap:14px!important}
+.site-footer .footer-logo{width:82px!important;height:82px!important;flex:0 0 82px!important;border-radius:0!important;box-shadow:none!important;position:relative!important}
+.site-footer .footer-logo img{position:static!important;width:100%!important;height:100%!important;max-width:100%!important;object-fit:contain!important;transform:none!important;display:block!important}
+
+@media(max-width:590px){
+  .journey-item{left:50%!important;top:calc(27% + 46% * var(--journey-p))}
+  .shared-object{left:50%!important;top:calc(74% - 48% * var(--scene-p))}
+  .loan-journey .journey-manager .gmach-building{width:62px;height:62px}
+  .loan-journey .journey-manager .gmach-building svg{width:44px;height:44px}
+  .connection-canvas .person-give .gmach-building{width:74px;height:74px}
+  .connection-canvas .person-give .gmach-building svg{width:52px;height:52px}
+  .site-header .header-logo{padding:2px!important;overflow:visible!important}
+  .site-footer .footer-logo{width:70px!important;height:70px!important;flex-basis:70px!important}
+}
