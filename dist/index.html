@@ -60,6 +60,11 @@
   <main id="main-content">
     <section class="home-view" id="home-view">
       <section class="search-hero" aria-labelledby="hero-title" style="position:relative;overflow:hidden">
+        <div class="giving-hero-motion" aria-hidden="true" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0">
+          <span data-hero-float="box" style="position:absolute;right:7%;top:18%;font-size:44px;opacity:.12">📦</span>
+          <span data-hero-float="tools" style="position:absolute;left:8%;top:38%;font-size:38px;opacity:.11">🧰</span>
+          <span data-hero-float="community" style="position:absolute;right:24%;bottom:12%;font-size:40px;opacity:.10">🤲</span>
+        </div>
         <div class="hero-copy">
           <span class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span> הכול בהשאלה חינם</span>
           <h1 id="hero-title">מה תרצו<br><span>לשאול היום?</span></h1>
@@ -98,28 +103,7 @@
           <button type="button" id="path-borrower" hidden><strong>אני מחפש/ת עזרה או ציוד</strong><span>חיפוש מהיר לפי צורך ואזור</span></button>
           <button type="button" id="path-manager" style="transform:translateY(-12px)"><strong>אני מנהל/ת גמ״ח</strong><span>הצטרפות, מלאי ובקשות במקום אחד</span></button>
         </div>
-        <div id="scroll-connect-scene" aria-hidden="true" style="height:190px;position:relative;margin:0 auto 2px;width:min(650px,96%);overflow:hidden">
-          <svg viewBox="0 0 650 190" width="100%" height="100%" style="display:block;overflow:visible">
-            <g id="connect-left" style="transform-origin:155px 82px;will-change:transform">
-              <circle cx="155" cy="82" r="47" fill="rgba(255,255,255,.10)" stroke="#f4bd4d" stroke-width="3"/>
-              <path id="gear-left" d="M155 42v12M155 110v12M115 82h12M183 82h12M127 54l9 9M174 101l9 9M183 54l-9 9M136 101l-9 9" stroke="#f4bd4d" stroke-width="8" stroke-linecap="round"/>
-              <circle cx="155" cy="82" r="22" fill="none" stroke="#fff" stroke-width="5"/>
-              <circle cx="155" cy="82" r="7" fill="#f4bd4d"/>
-            </g>
-            <g id="connect-right" style="transform-origin:495px 82px;will-change:transform">
-              <circle cx="495" cy="82" r="47" fill="rgba(255,255,255,.10)" stroke="#f4bd4d" stroke-width="3"/>
-              <path id="gear-right" d="M495 42v12M495 110v12M455 82h12M523 82h12M467 54l9 9M514 101l9 9M523 54l-9 9M476 101l-9 9" stroke="#f4bd4d" stroke-width="8" stroke-linecap="round"/>
-              <circle cx="495" cy="82" r="22" fill="none" stroke="#fff" stroke-width="5"/>
-              <circle cx="495" cy="82" r="7" fill="#f4bd4d"/>
-            </g>
-            <line id="connect-line-left" x1="202" y1="82" x2="325" y2="82" stroke="#f4bd4d" stroke-width="5" stroke-linecap="round" stroke-dasharray="123" stroke-dashoffset="123"/>
-            <line id="connect-line-right" x1="448" y1="82" x2="325" y2="82" stroke="#f4bd4d" stroke-width="5" stroke-linecap="round" stroke-dasharray="123" stroke-dashoffset="123"/>
-            <circle id="connect-pulse" cx="325" cy="82" r="31" fill="rgba(244,189,77,.10)" stroke="#f4bd4d" stroke-width="2" opacity="0"/>
-            <text id="connect-handshake" x="325" y="102" text-anchor="middle" font-size="58" opacity="0">🤝</text>
-            <path id="connect-check" d="M309 83l11 11 24-27" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0"/>
-          </svg>
-          <div id="scroll-connect-label" style="position:absolute;inset:auto 0 6px;text-align:center;font-weight:800;color:#fff;opacity:.68">מחברים בין מי שיש לו למי שצריך</div>
-        </div>
+
       </section>
 
       <section class="category-section section-shell" aria-labelledby="category-title">
@@ -129,12 +113,12 @@
         </div>
         <div class="category-rail" id="category-rail" role="list">
           <button class="category-card is-active" type="button" data-category="" role="listitem"><span class="category-icon category-all" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></span><strong>הכול</strong><small>כל מה שזמין</small></button>
-          <button class="category-card" type="button" data-category="אירועים" role="listitem"><span class="category-icon category-events" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20V10l7-6 7 6v10M8 20v-6h8v6"/><path d="M4 20h16M12 4V1M8 6 6 3M16 6l2-3"/></svg></span><strong>אירועים</strong><small>עיצוב, שולחנות וציוד</small></button>
-          <button class="category-card" type="button" data-category="כלי עבודה" role="listitem"><span class="category-icon category-tools" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m14 6 4-4 4 4-4 4M14 6 3 17l4 4L18 10M6 16l2 2"/></svg></span><strong>כלי עבודה</strong><small>לבית ולתיקונים</small></button>
-          <button class="category-card" type="button" data-category="תינוקות" role="listitem"><span class="category-icon category-baby" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h2l2 11h10l2-7H7M9 19a2 2 0 1 0 0 .1M17 19a2 2 0 1 0 0 .1"/></svg></span><strong>תינוקות</strong><small>עגלות, מיטות וכיסאות</small></button>
-          <button class="category-card" type="button" data-category="רפואה" role="listitem"><span class="category-icon category-medical" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s-8-5-8-12a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 9c0 7-8 12-8 12Z"/><path d="M9 12h6M12 9v6"/></svg></span><strong>ציוד רפואי</strong><small>שיקום וסיוע</small></button>
-          <button class="category-card" type="button" data-category="טיולים" role="listitem"><span class="category-icon category-outdoors" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 20 9-16 9 16M7 20l5-8 5 8M3 20h18"/></svg></span><strong>טיולים</strong><small>קמפינג ונסיעות</small></button>
-          <button class="category-card" type="button" data-category="בית ואירוח" role="listitem"><span class="category-icon category-home" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 11 9-8 9 8v10H3Z"/><path d="M9 21v-7h6v7"/></svg></span><strong>בית ואירוח</strong><small>כלים, מזרנים ואביזרים</small></button>
+          <button class="category-card" data-equipment-motion type="button" data-category="אירועים" role="listitem"><span class="category-icon category-events" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20V10l7-6 7 6v10M8 20v-6h8v6"/><path d="M4 20h16M12 4V1M8 6 6 3M16 6l2-3"/></svg></span><strong>אירועים</strong><small>עיצוב, שולחנות וציוד</small></button>
+          <button class="category-card" data-equipment-motion type="button" data-category="כלי עבודה" role="listitem"><span class="category-icon category-tools" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m14 6 4-4 4 4-4 4M14 6 3 17l4 4L18 10M6 16l2 2"/></svg></span><strong>כלי עבודה</strong><small>לבית ולתיקונים</small></button>
+          <button class="category-card" data-equipment-motion type="button" data-category="תינוקות" role="listitem"><span class="category-icon category-baby" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h2l2 11h10l2-7H7M9 19a2 2 0 1 0 0 .1M17 19a2 2 0 1 0 0 .1"/></svg></span><strong>תינוקות</strong><small>עגלות, מיטות וכיסאות</small></button>
+          <button class="category-card" data-equipment-motion type="button" data-category="רפואה" role="listitem"><span class="category-icon category-medical" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s-8-5-8-12a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 9c0 7-8 12-8 12Z"/><path d="M9 12h6M12 9v6"/></svg></span><strong>ציוד רפואי</strong><small>שיקום וסיוע</small></button>
+          <button class="category-card" data-equipment-motion type="button" data-category="טיולים" role="listitem"><span class="category-icon category-outdoors" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 20 9-16 9 16M7 20l5-8 5 8M3 20h18"/></svg></span><strong>טיולים</strong><small>קמפינג ונסיעות</small></button>
+          <button class="category-card" data-equipment-motion type="button" data-category="בית ואירוח" role="listitem"><span class="category-icon category-home" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 11 9-8 9 8v10H3Z"/><path d="M9 21v-7h6v7"/></svg></span><strong>בית ואירוח</strong><small>כלים, מזרנים ואביזרים</small></button>
         </div>
       </section>
 
