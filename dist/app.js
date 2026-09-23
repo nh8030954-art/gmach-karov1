@@ -497,8 +497,7 @@
  };
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
-
-// Accessibility controls and in-site support
+// In-site support form
 (()=>{
  const ready=()=>{
   const show=d=>{if(d&&!d.open&&typeof d.showModal==='function')d.showModal()};
@@ -515,23 +514,6 @@
     supportForm.reset();status.textContent='הפנייה נשלחה בהצלחה.';
    }catch(err){status.textContent=err.message||'לא הצלחנו לשלוח כרגע. נסו שוב בעוד רגע.'}finally{submit.disabled=false}
   });
-  const menu=document.getElementById('accessibility-dialog'),statement=document.getElementById('accessibility-statement-dialog');
-  document.getElementById('accessibility-button')?.addEventListener('click',()=>show(menu));
-  document.getElementById('accessibility-statement-button')?.addEventListener('click',()=>show(statement));
-  document.getElementById('accessibility-from-menu')?.addEventListener('click',()=>{menu?.close();show(statement)});
-  document.querySelectorAll('[data-a11y-action]').forEach(b=>b.addEventListener('click',()=>{
-   const a=b.dataset.a11yAction,root=document.documentElement;
-   if(a==='font-up')root.classList.add('a11y-large-text');
-   if(a==='font-reset')root.classList.remove('a11y-large-text');
-   if(a==='contrast')root.classList.toggle('a11y-high-contrast');
-   if(a==='links')root.classList.toggle('a11y-highlight-links');
-   if(a==='motion')root.classList.toggle('a11y-stop-motion');
-   if(a==='grayscale')root.classList.toggle('a11y-grayscale');
-   if(a==='font')root.classList.toggle('a11y-readable-font');
-   if(a==='spacing')root.classList.toggle('a11y-line-space');
-   if(a==='cursor')root.classList.toggle('a11y-big-cursor');
-   if(a==='reset')root.classList.remove('a11y-large-text','a11y-high-contrast','a11y-highlight-links','a11y-stop-motion','a11y-grayscale','a11y-readable-font','a11y-line-space','a11y-big-cursor');
-  }));
  };
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
 })();
