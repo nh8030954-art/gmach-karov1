@@ -466,37 +466,6 @@
   init().catch(error => { document.documentElement.classList.remove("app-booting"); console.error("App initialization failed", error); toast("אירעה תקלה בטעינת האתר. נסו לרענן את הדף.", "error"); });
 })();
 
-// Requested motion v1
-(()=>{
- const init=()=>{
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-  const search=document.querySelector('.search-panel');
-  if(search){search.classList.add('fx-search');requestAnimationFrame(()=>requestAnimationFrame(()=>search.classList.add('fx-in')));}
-  const titles=[...document.querySelectorAll('.section-heading')];
-  const steps=[...document.querySelectorAll('.steps-grid > *, .how-grid > *, .process-grid > *, [class*="steps"] > article')];
-  const faqs=[...document.querySelectorAll('.faq-item, .faq-list > *, [class*="faq"] details')];
-  titles.forEach(x=>x.classList.add('fx-title'));
-  steps.forEach(x=>x.classList.add('fx-step'));
-  faqs.forEach(x=>x.classList.add('fx-faq'));
-  const io=new IntersectionObserver(entries=>entries.forEach(en=>{
-    if(!en.isIntersecting)return;
-    const group=en.target.classList.contains('fx-step')?steps:en.target.classList.contains('fx-faq')?faqs:titles;
-    const i=group.indexOf(en.target);
-    setTimeout(()=>en.target.classList.add('fx-visible'),Math.min(i%6,5)*(en.target.classList.contains('fx-step')?150:en.target.classList.contains('fx-faq')?110:60));
-    io.unobserve(en.target);
-  }),{threshold:.16,rootMargin:'0px 0px -4% 0px'});
-  [...titles,...steps,...faqs].forEach(x=>io.observe(x));
-  const trust=[...document.querySelectorAll('.trust-grid article')];
-  trust.forEach(x=>x.classList.add('fx-trust'));
-  let trustRaf=0;
-  const drawTrust=()=>{const vh=innerHeight||800;trust.forEach((el,i)=>{const r=el.getBoundingClientRect();const p=Math.max(0,Math.min(1,(vh*.88-r.top)/(vh*.38)));const q=Math.max(0,Math.min(1,(p-i*.10)/(1-i*.10)));el.style.opacity=String(.62+q*.38);el.style.transform='translate3d(0,'+((1-q)*30).toFixed(1)+'px,0) scale('+(0.90+q*.13).toFixed(3)+')';el.style.borderColor='rgba(244,189,77,'+(.18+q*.82).toFixed(2)+')';el.style.borderWidth=(2+q*2).toFixed(1)+'px';el.style.boxShadow='0 '+(10+q*14).toFixed(0)+'px '+(22+q*26).toFixed(0)+'px rgba(18,60,70,'+(.10+q*.18).toFixed(2)+'),0 0 0 '+(q*4).toFixed(1)+'px rgba(244,189,77,'+(q*.30).toFixed(2)+')';});trustRaf=0};
-  const trustTick=()=>{if(!trustRaf)trustRaf=requestAnimationFrame(drawTrust)};
-  addEventListener('scroll',trustTick,{passive:true});addEventListener('resize',trustTick,{passive:true});drawTrust();
-  const cta=document.getElementById('callout-add-gmach');
-  if(cta){cta.classList.add('fx-cta');const ctaIo=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('fx-cta-visible');ctaIo.unobserve(e.target)}}),{threshold:.65});ctaIo.observe(cta);}
- };
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
-})();
 // In-site support form
 (()=>{
  const ready=()=>{
