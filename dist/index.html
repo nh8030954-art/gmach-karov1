@@ -235,8 +235,23 @@
       <label id="auth-name-field" hidden><span>שם מלא</span><input id="auth-name" autocomplete="name" maxlength="80" placeholder="איך לפנות אליכם?"></label>
       <label><span>כתובת אימייל</span><input id="auth-email" type="email" autocomplete="email" placeholder="name@example.com" required dir="ltr"></label>
       <label><span>סיסמה</span><input id="auth-password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required dir="ltr"><small>לפחות 10 תווים</small></label>
+      <label class="consent-row" id="auth-consent-row" hidden><input id="auth-consent" type="checkbox"><span>קראתי ואני מסכים/ה ל<button type="button" data-open-info="terms">תנאי השימוש</button> ול<button type="button" data-open-info="privacy">מדיניות הפרטיות</button>.</span></label>
       <button class="button button-primary button-full" id="auth-submit" type="submit">כניסה</button>
-      <p class="form-note">בהמשך הפעולה אתם מאשרים את <button type="button" data-open-info="terms">תנאי השימוש</button> ואת <button type="button" data-open-info="privacy">מדיניות הפרטיות</button>.</p>
+      <button class="link-button" id="forgot-password-button" type="button">שכחתי סיסמה</button>
+    </form>
+  </dialog>
+
+  <dialog class="modal modal-narrow" id="reset-password-dialog" aria-labelledby="reset-password-title">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת החלון">×</button>
+    <div class="dialog-heading"><h2 id="reset-password-title">איפוס סיסמה</h2><p>נשלח קוד חד־פעמי לכתובת המייל הרשומה.</p></div>
+    <form id="forgot-password-form" class="stack-form">
+      <label><span>כתובת אימייל</span><input id="reset-email" type="email" autocomplete="email" required dir="ltr"></label>
+      <button class="button button-primary button-full" type="submit">שליחת קוד</button>
+    </form>
+    <form id="reset-password-form" class="stack-form" hidden>
+      <label><span>קוד מהמייל</span><input id="reset-code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required dir="ltr"></label>
+      <label><span>סיסמה חדשה</span><input id="reset-new-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required dir="ltr"></label>
+      <button class="button button-primary button-full" type="submit">שמירת סיסמה חדשה</button>
     </form>
   </dialog>
 
@@ -270,12 +285,12 @@
     <form id="gmach-form" class="stack-form">
       <div class="two-columns"><label><span>שם הגמ״ח</span><input id="gmach-name" required maxlength="90" placeholder="למשל: גמ״ח אירועים משפחת לוי"></label><label><span>תחום מרכזי</span><select id="gmach-category" required><option value="">בחירה</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option><option>כללי</option></select></label></div>
       <div class="two-columns"><label><span>עיר</span><input id="gmach-city" list="israel-cities" required autocomplete="address-level2"></label><label><span>שכונה <small>(רשות)</small></span><input id="gmach-neighborhood"></label></div>
-      <div class="two-columns"><label><span>כתובת איסוף <small>(לא תוצג עד אישור)</small></span><input id="gmach-address" autocomplete="street-address"></label><label><span>אתר <small>(רשות)</small></span><input id="gmach-website" type="url" placeholder="https://"></label></div>
+      <label><span>כתובת איסוף <small>(לא תוצג בקטלוג הפתוח)</small></span><input id="gmach-address" autocomplete="street-address"></label>
       <label><span>אזור שירות</span><input id="gmach-service-area" maxlength="180" placeholder="למשל: פתח תקווה והסביבה"></label>
       <div class="two-columns"><label><span>שעות פעילות</span><input id="gmach-hours" maxlength="60" placeholder="א׳–ה׳ 16:00–20:00"></label><fieldset class="inline-options"><legend>אפשרויות מסירה</legend><label><input type="checkbox" name="gmach-pickup" value="pickup" checked> איסוף עצמי</label><label><input type="checkbox" name="gmach-pickup" value="delivery"> משלוח</label><label><input type="checkbox" name="gmach-pickup" value="coordination"> בתיאום</label></fieldset></div>
       <label><span>תיאור קצר</span><textarea id="gmach-description" rows="3" maxlength="600" required placeholder="מה אפשר להשאיל, למי מיועד ואיך מתאמים"></textarea></label>
       <label><span>טלפון לתיאום <small>(לא יוצג ללא אישורכם)</small></span><input id="gmach-phone" type="tel" inputmode="tel" dir="ltr" required></label>
-      <label class="consent-row"><input id="gmach-consent" type="checkbox" required><span>אני מאשר/ת שכל הפריטים בגמ״ח מוצעים להשאלה ללא תשלום.</span></label>
+      <label class="consent-row"><input id="gmach-consent" type="checkbox" required><span>אני מאשר/ת שהפעילות, הפריטים, הבקשות והתיאום ינוהלו בתוך גמ״ח ברגע; שהפריטים יוצעו ללא תשלום; ושקראתי את <button type="button" data-open-info="terms">תנאי השימוש</button> ואת <button type="button" data-open-info="privacy">מדיניות הפרטיות</button>.</span></label>
       <button class="button button-primary button-full" id="gmach-submit" type="submit">שליחה לבדיקה</button>
     </form>
   </dialog>
