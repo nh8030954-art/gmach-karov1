@@ -43,6 +43,29 @@ export default {
   }
 };
 
+
+async function createSupportRequest(request, env) {
+  const body = await readJson(request);
+  const name = cleanText(body.name, 2, 80, "שם");
+  const email = cleanText(body.email, 5, 160, "אימייל").toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, "נא להזין כתובת אימייל תקינה");
+  const subject = cleanText(body.subject, 2, 120, "נושא");
+  const message = cleanText(body.message, 10, 2000, "הודעה");
+  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS support_requests (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'new',
+    created_at TEXT NOT NULL
+  )`).run();
+  const id = crypto.randomUUID();
+  await env.DB.prepare("INSERT INTO support_requests (id,name,email,subject,message,status,created_at) VALUES (?,?,?,?,?,'new',?)")
+    .bind(id, name, email, subject, message, new Date().toISOString()).run();
+  return json({ ok: true, id }, 201);
+}
+
 async function routeApi(request, env, ctx, url) {
   const method = request.method.toUpperCase();
   const path = url.pathname;
@@ -77,6 +100,7 @@ async function routeApi(request, env, ctx, url) {
     return json({ user: user ? publicUser(user) : null });
   }
   if (method === "GET" && path === "/api/public-config") return json({ supportEmail: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL) });
+  if (method === "POST" && path === "/api/support") return createSupportRequest(request, env);
 
   if (method === "GET" && path === "/api/items") return listItems(env, url);
   if (method === "GET" && path === "/api/discovery") return discovery(env, url);
