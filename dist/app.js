@@ -466,35 +466,43 @@
   init().catch(error => { document.documentElement.classList.remove("app-booting"); console.error("App initialization failed", error); toast("אירעה תקלה בטעינת האתר. נסו לרענן את הדף.", "error"); });
 })();
 
-
-
-
-// Scroll connection scene
+// Scroll-driven giving experience
 (() => {
   const init=()=>{
     if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-    const scene=document.getElementById('scroll-connect-scene');
-    const gl=document.getElementById('connect-left'), gr=document.getElementById('connect-right');
-    const l1=document.getElementById('connect-line-left'), l2=document.getElementById('connect-line-right');
-    const hand=document.getElementById('connect-handshake'), pulse=document.getElementById('connect-pulse');
-    const check=document.getElementById('connect-check'), label=document.getElementById('scroll-connect-label');
-    if(!scene||!gl||!gr)return;
+    const hero=document.querySelector('.search-hero');
+    const heroBits=[...document.querySelectorAll('[data-hero-float]')];
+    const steps=[...document.querySelectorAll('[data-process-motion], #how-it-works .step, #how-it-works article')];
+    const equipment=[...document.querySelectorAll('[data-equipment-motion], #gmachim .category-card, #gmachim .item-card')];
     let raf=0;
     const clamp=v=>Math.max(0,Math.min(1,v));
     const draw=()=>{
-      const r=scene.getBoundingClientRect(), vh=innerHeight||800;
-      const p=clamp((vh*.94-r.top)/(vh*.34));
-      const approach=clamp(p/.48), link=clamp((p-.22)/.34), meet=clamp((p-.48)/.16), finish=clamp((p-.66)/.18);
-      const shift=approach*48, spin=p*300;
-      gl.style.transform='translate3d('+shift+'px,0,0) rotate('+spin+'deg)';
-      gr.style.transform='translate3d('+(-shift)+'px,0,0) rotate('+(-spin)+'deg)';
-      l1.style.strokeDashoffset=String(123*(1-link)); l2.style.strokeDashoffset=String(123*(1-link));
-      hand.style.opacity=String(meet*(1-finish));
-      const shake=meet>0&&finish<1?Math.sin(p*55)*4*(1-finish):0;
-      hand.setAttribute('transform','translate(0 '+shake.toFixed(1)+') scale('+(0.82+meet*.18)+') translate('+(325*(1/(0.82+meet*.18)-1)).toFixed(1)+' '+(82*(1/(0.82+meet*.18)-1)).toFixed(1)+')');
-      pulse.style.opacity=String(Math.max(meet*.75,finish*.35)); pulse.setAttribute('r',String(31+finish*18));
-      check.style.opacity=String(finish);
-      if(label)label.style.opacity=String(.62+p*.38);
+      const vh=innerHeight||800;
+      if(hero){
+        const r=hero.getBoundingClientRect();
+        const progress=clamp((-r.top)/(Math.max(1,r.height)));
+        hero.style.backgroundPosition='center '+(50+progress*18)+'%';
+        heroBits.forEach((el,i)=>{
+          const speeds=[.20,-.14,.28], x=[18,-14,10][i%3]*progress, y=(speeds[i%3]*r.height)*progress;
+          el.style.transform='translate3d('+x.toFixed(1)+'px,'+y.toFixed(1)+'px,0) rotate('+((i%2? -1:1)*progress*8).toFixed(1)+'deg)';
+        });
+      }
+      steps.forEach((el,i)=>{
+        const r=el.getBoundingClientRect();
+        const q=clamp((vh*.86-r.top)/(vh*.42));
+        const icon=el.querySelector('svg,.icon,.step-icon,[class*="icon"]')||el.firstElementChild;
+        if(!icon)return;
+        if(i%3===0){icon.style.transform='scale('+(0.84+q*.16)+') translateY('+((1-q)*10).toFixed(1)+'px)';}
+        else if(i%3===1){const x=(1-q)*22;icon.style.transform='translate3d('+((i%2?1:-1)*x).toFixed(1)+'px,0,0) scale('+(0.94+q*.06)+')';}
+        else{icon.style.transform='translate3d('+((1-q)*34).toFixed(1)+'px,0,0) rotate('+((1-q)*-4).toFixed(1)+'deg)';}
+      });
+      equipment.forEach((el,i)=>{
+        const r=el.getBoundingClientRect();
+        const q=clamp((vh*.92-r.top)/(vh*.5));
+        const dir=i%2?1:-1;
+        const x=dir*(1-q)*20 + Math.sin(q*Math.PI*2+i)*3*q;
+        el.style.transform='translate3d('+x.toFixed(1)+'px,0,0) rotate('+(Math.sin(q*Math.PI*2+i)*1.2*q).toFixed(1)+'deg)';
+      });
       raf=0;
     };
     const tick=()=>{if(!raf)raf=requestAnimationFrame(draw)};
