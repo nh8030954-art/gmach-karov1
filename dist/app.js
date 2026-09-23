@@ -466,16 +466,17 @@
   init().catch(error => { document.documentElement.classList.remove("app-booting"); console.error("App initialization failed", error); toast("אירעה תקלה בטעינת האתר. נסו לרענן את הדף.", "error"); });
 })();
 
-// Character story v4
+// Card motion v1
 (() => {
  const init=()=>{
   if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-  const scene=document.getElementById('hero-character-story'),a=document.getElementById('char-borrower'),b=document.getElementById('char-manager'),box=document.getElementById('char-equipment'),glow=document.getElementById('char-glow'),cap=document.getElementById('char-caption');
-  if(!scene||!a||!b||!box)return;let raf=0;const cl=v=>Math.max(0,Math.min(1,v));
-  const draw=()=>{const r=scene.getBoundingClientRect(),vh=innerHeight||800,p=cl((vh*.92-r.top)/(vh*.42));
-   const enter=cl(p/.22),meet=cl((p-.18)/.38),give=cl((p-.50)/.28),done=cl((p-.76)/.24);const travel=Math.min(180,(scene.clientWidth||760)*.24)*meet;
-   a.style.opacity=b.style.opacity=String(enter);a.style.transform='translate3d('+travel.toFixed(1)+'px,'+(-Math.sin(meet*Math.PI*2)*3).toFixed(1)+'px,0)';b.style.transform='translate3d('+(-travel).toFixed(1)+'px,'+(-Math.sin(meet*Math.PI*2+1)*3).toFixed(1)+'px,0)';
-   box.style.opacity=String(cl((p-.32)*3));box.style.transform='translate3d('+(give*62).toFixed(1)+'px,'+(-give*13).toFixed(1)+'px,0) scale('+(0.88+give*.12)+')';glow.style.opacity=String((1-done)*give*.18);glow.setAttribute('r',String(35+give*18));if(cap)cap.style.opacity=String(cl((p-.2)*2.1));raf=0;};
-  const tick=()=>{if(!raf)raf=requestAnimationFrame(draw)};addEventListener('scroll',tick,{passive:true});addEventListener('resize',tick,{passive:true});draw();
- };if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+  const search=document.querySelector('.search-panel');
+  if(search){search.classList.add('motion-enter');requestAnimationFrame(()=>requestAnimationFrame(()=>search.classList.add('motion-ready')));}
+  const rail=document.querySelector('.category-rail');
+  if(rail){rail.classList.add('motion-carousel');let dir=1,last=0;const step=t=>{if(document.visibilityState==='visible'&&t-last>45){rail.scrollLeft+=dir*.45;if(Math.abs(rail.scrollLeft)>=Math.max(0,rail.scrollWidth-rail.clientWidth-2)||Math.abs(rail.scrollLeft)<=2)dir*=-1;last=t;}requestAnimationFrame(step)};requestAnimationFrame(step);}
+  const candidates=[...document.querySelectorAll('.steps-grid > *, .how-grid > *, .process-grid > *, [class*="steps"] > article')];
+  candidates.forEach((el,i)=>{el.classList.add('scroll-reveal-card');el.style.transitionDelay=Math.min(i*110,440)+'ms';});
+  if(candidates.length){const io=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('is-visible');io.unobserve(e.target);}}),{threshold:.18,rootMargin:'0px 0px -8% 0px'});candidates.forEach(el=>io.observe(el));}
+ };
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
