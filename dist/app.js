@@ -518,45 +518,39 @@
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
 })();
 
-
-// Category carousel continuous autoplay v2
+// Category carousel continuous autoplay v3
 (()=>{
   const ready=()=>{
     const rail=document.getElementById('category-rail');
-    if(!rail)return;
-    rail.classList.add('carousel-ready');
-    let timer=null;
-    let resumeTimer=null;
-    const gap=()=>parseFloat(getComputedStyle(rail).gap||0);
-    const amount=()=>{
-      const first=rail.querySelector('.category-card');
-      return first?first.getBoundingClientRect().width+gap():180;
-    };
-    const max=()=>Math.max(0,rail.scrollWidth-rail.clientWidth);
+    if(!rail || rail.dataset.continuousCarousel==='1') return;
+    rail.dataset.continuousCarousel='1';
+    rail.classList.add('carousel-ready','carousel-continuous');
+    const originals=[...rail.children];
+    if(originals.length<2) return;
+    originals.forEach(el=>{ const clone=el.cloneNode(true); clone.setAttribute('aria-hidden','true'); clone.tabIndex=-1; rail.appendChild(clone); });
+    let paused=false, last=performance.now(), raf=0;
+    const speed=window.innerWidth<=760 ? 62 : 48;
     const rtl=document.documentElement.dir==='rtl';
-    const pos=()=>Math.abs(rail.scrollLeft);
-    const step=()=>{
-      const m=max();
-      if(m<4)return;
-      const a=amount();
-      if(pos()>=m-a*.55){
-        rail.scrollTo({left:0,behavior:'smooth'});
-      }else{
-        rail.scrollBy({left:(rtl?-1:1)*a,behavior:'smooth'});
+    const half=()=>rail.scrollWidth/2;
+    const tick=(now)=>{
+      const dt=Math.min(40,now-last); last=now;
+      if(!paused && !document.hidden){
+        const delta=speed*dt/1000;
+        rail.scrollLeft += rtl ? -delta : delta;
+        const h=half();
+        if(Math.abs(rail.scrollLeft)>=h-2) rail.scrollLeft=0;
       }
+      raf=requestAnimationFrame(tick);
     };
-    const start=()=>{
-      if(timer)clearInterval(timer);
-      timer=setInterval(step,2600);
-    };
-    const pauseBriefly=()=>{
-      if(timer){clearInterval(timer);timer=null;}
-      if(resumeTimer)clearTimeout(resumeTimer);
-      resumeTimer=setTimeout(start,1400);
-    };
-    ['pointerdown','touchstart','wheel'].forEach(ev=>rail.addEventListener(ev,pauseBriefly,{passive:true}));
-    document.addEventListener('visibilitychange',()=>{ if(document.hidden){ if(timer)clearInterval(timer); } else start(); });
-    start();
+    let resume;
+    const pause=()=>{ paused=true; clearTimeout(resume); };
+    const restart=()=>{ clearTimeout(resume); resume=setTimeout(()=>paused=false,450); };
+    rail.addEventListener('pointerdown',pause,{passive:true});
+    rail.addEventListener('pointerup',restart,{passive:true});
+    rail.addEventListener('pointercancel',restart,{passive:true});
+    rail.addEventListener('touchend',restart,{passive:true});
+    rail.addEventListener('wheel',()=>{pause();restart();},{passive:true});
+    raf=requestAnimationFrame(tick);
   };
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',ready,{once:true}); else ready();
 })();

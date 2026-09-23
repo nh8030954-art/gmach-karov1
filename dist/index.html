@@ -45,26 +45,13 @@
   </style>
 
   <style id="category-carousel-v1">
-    .category-rail.carousel-ready{
-      display:flex!important;
-      gap:14px;
-      overflow-x:auto!important;
-      overflow-y:hidden;
-      scroll-snap-type:x proximity;
-      -webkit-overflow-scrolling:touch;
-      scrollbar-width:none;
-      overscroll-behavior-inline:contain;
-    }
-    .category-rail.carousel-ready::-webkit-scrollbar{display:none}
-    .category-rail.carousel-ready .category-card{
-      flex:0 0 auto;
-      scroll-snap-align:start;
-    }
-    @media(max-width:760px){
-      .category-rail.carousel-ready{gap:12px;padding-bottom:4px}
-      .category-rail.carousel-ready .category-card{min-width:168px}
-    }
-  </style>
+  .category-rail.carousel-ready{display:flex!important;gap:12px;overflow-x:auto!important;overflow-y:hidden;scroll-snap-type:none!important;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior-inline:contain}
+  .category-rail.carousel-ready::-webkit-scrollbar{display:none}
+  .category-rail.carousel-ready .category-card{flex:0 0 158px!important;width:158px!important;min-width:158px!important;min-height:155px!important;scroll-snap-align:none!important}
+  .category-rail.carousel-ready .category-icon{width:54px!important;height:54px!important}
+  .category-rail.carousel-ready .category-icon svg{width:28px!important;height:28px!important}
+  @media(max-width:760px){.category-rail.carousel-ready{gap:12px;padding-bottom:4px}.category-rail.carousel-ready .category-card{flex-basis:168px!important;width:168px!important;min-width:168px!important}}
+</style>
 </head>
 <body>
   <a class="skip-link" href="#main-content">דלגו לתוכן הראשי</a>
