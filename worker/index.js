@@ -1,6 +1,9 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
 const SESSION_COOKIE = "gmach_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
-const PASSWORD_ITERATIONS = 210000;
+// Keep PBKDF2 within the Cloudflare Workers CPU budget. Existing production
+// accounts and the seeded administrator already use this compatible cost.
+const PASSWORD_ITERATIONS = 100000;
 const DEFAULT_FROM_EMAIL = "Gmach Berega <onboarding@resend.dev>";
 const DEFAULT_SUPPORT_EMAIL = "netanelhirsh@gmail.com";
 const MAX_JSON_BYTES = 32 * 1024;
