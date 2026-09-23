@@ -16,26 +16,14 @@
 
 
   <style id="card-motion-v1">
-    @media (prefers-reduced-motion: no-preference) {
-      .hero-copy.motion-enter {opacity:0;transform:translate3d(0,24px,0)}
-      .hero-copy.motion-enter.motion-ready {opacity:1;transform:none;transition:transform .75s cubic-bezier(.2,.8,.2,1),opacity .6s ease}
-      .search-panel.motion-enter {opacity:0;transform:translate3d(46px,0,0) scale(.99)}
-      .search-panel.motion-enter.motion-ready {opacity:1;transform:none;transition:transform .72s cubic-bezier(.16,1,.3,1),opacity .45s ease}
-      .hero-trust.motion-enter {opacity:0;transform:translate3d(0,16px,0)}
-      .hero-trust.motion-enter.motion-ready {opacity:1;transform:none;transition:transform .7s .28s ease,opacity .6s .28s ease}
-      .audience-paths.motion-enter {opacity:0;transform:translate3d(0,18px,0)}
-      .audience-paths.motion-enter.motion-ready {opacity:1;transform:none;transition:transform .7s .4s ease,opacity .6s .4s ease}
-      .category-rail.motion-carousel{scroll-behavior:auto}
-      .category-card{transition:transform .35s ease,box-shadow .35s ease}
-      .category-card.motion-focus{transform:translate3d(0,-7px,0) scale(1.025)}
-      .scroll-reveal-card{opacity:0;transform:translate3d(0,20px,0) scale(.99);transition:transform .52s cubic-bezier(.16,1,.3,1),opacity .34s ease}
-      .scroll-reveal-card.is-visible{opacity:1;transform:none}
-      .motion-section-title{opacity:1;transform:none}
-      .motion-section-title.is-visible{opacity:1;transform:none}
-      .item-card.motion-item{opacity:0;transform:translate3d(0,16px,0);transition:transform .46s cubic-bezier(.2,.8,.2,1),opacity .3s ease}
-      .item-card.motion-item.is-visible{opacity:1;transform:none}
-    }
-  </style>
+@media (prefers-reduced-motion:no-preference){
+ .search-panel.motion-enter{opacity:0;transform:translate3d(28px,0,0)}
+ .search-panel.motion-enter.motion-ready{opacity:1;transform:none;transition:transform .62s cubic-bezier(.2,.8,.2,1),opacity .35s ease}
+ .category-rail.motion-carousel{scroll-behavior:auto}
+ .scroll-reveal-card{opacity:0;transform:translate3d(0,14px,0);transition:transform .42s cubic-bezier(.2,.8,.2,1),opacity .28s ease}
+ .scroll-reveal-card.is-visible{opacity:1;transform:none}
+}
+</style>
 </head>
 <body>
   <a class="skip-link" href="#main-content">דלגו לתוכן הראשי</a>
@@ -47,7 +35,7 @@
   <header class="site-header" style="background:#fff">
     <div class="header-inner">
       <a class="brand" href="#/" aria-label="גמ״ח ברגע — דף הבית">
-        <span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:hidden;box-shadow:none;width:68px;height:62px;flex:0 0 68px;position:relative"><img src="./gmach-berega-logo.jpg" alt="" style="position:absolute;width:286px;height:auto;max-width:none;left:-116px;top:-27px;transform:none"></span>
+        <span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:visible;box-shadow:none;width:82px;height:82px;flex:0 0 82px"><img src="./gmach-berega-logo.jpg" alt="" style="transform:none;width:82px;height:82px;max-width:none;object-fit:contain;margin:0"></span>
         <span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span>
       </a>
 
