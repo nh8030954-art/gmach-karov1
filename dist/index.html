@@ -55,6 +55,16 @@
     </nav>
   </header>
 
+  
+  <div aria-hidden="true" style="position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:-1">
+    <span style="position:absolute;width:260px;height:260px;border-radius:42% 58% 63% 37% / 45% 38% 62% 55%;background:rgba(22,125,118,.10);top:18%;right:-90px;animation:gmachBlobFloat 12s ease-in-out infinite alternate"></span>
+    <span style="position:absolute;width:220px;height:220px;border-radius:61% 39% 43% 57% / 38% 58% 42% 62%;background:rgba(244,189,77,.12);top:52%;left:-80px;animation:gmachBlobFloat 15s ease-in-out -4s infinite alternate-reverse"></span>
+    <span style="position:absolute;width:170px;height:170px;border-radius:37% 63% 55% 45% / 59% 42% 58% 41%;background:rgba(18,60,70,.07);bottom:5%;right:8%;animation:gmachBlobFloat 10s ease-in-out -2s infinite alternate"></span>
+  </div>
+  <style>
+    @keyframes gmachBlobFloat { from { transform:translate3d(0,-10px,0) rotate(-3deg) scale(.98); } to { transform:translate3d(18px,22px,0) rotate(7deg) scale(1.06); } }
+    @media (prefers-reduced-motion: reduce) { [aria-hidden="true"] > span[style*="gmachBlobFloat"] { animation:none !important; } }
+  </style>
   <main id="main-content">
     <section class="home-view" id="home-view">
       <section class="search-hero" aria-labelledby="hero-title">
@@ -378,29 +388,5 @@
   <script src="./vendor/qrcode.js" defer></script>
   <script src="./app.js" defer></script>
 
-  <script>
-    (() => {
-      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      const layers = [...document.querySelectorAll('main > section, .audience-paths, .organizations-section, .how-it-works')];
-      let ticking = false;
-      const move = () => {
-        const vh = innerHeight || 800;
-        layers.forEach((el, i) => {
-          const r = el.getBoundingClientRect();
-          const center = r.top + r.height / 2;
-          const delta = (center - vh / 2) / vh;
-          const amount = Math.max(-22, Math.min(22, -delta * (10 + (i % 3) * 4)));
-          el.style.transform = 'translate3d(0,' + amount.toFixed(1) + 'px,0)';
-          el.style.transition = 'transform .12s linear';
-          el.style.willChange = 'transform';
-        });
-        ticking = false;
-      };
-      const requestMove = () => { if (!ticking) { requestAnimationFrame(move); ticking = true; } };
-      addEventListener('scroll', requestMove, { passive: true });
-      addEventListener('resize', requestMove, { passive: true });
-      requestMove();
-    })();
-  </script>
 </body>
 </html>
