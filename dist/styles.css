@@ -470,8 +470,14 @@ img { max-width: 100%; }
 .stack-form textarea { min-height: 100px; }
 .stack-form input:focus, .stack-form select:focus, .stack-form textarea:focus { border-color: var(--teal); background: #fff; outline-color: var(--accent); }
 .two-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.consent-row { display: flex; align-items: flex-start; gap: 10px; color: var(--ink-soft); font-size: .82rem; }
-.consent-row input { flex: 0 0 auto; margin-top: 3px; }
+.consent-row { width:100%; display:grid; grid-template-columns:22px minmax(0,1fr); align-items:start; gap:10px; color:var(--ink-soft); font-size:.82rem; line-height:1.65; cursor:pointer; }
+.consent-row input { width:19px !important; min-height:19px !important; height:19px; margin:4px 0 0; padding:0; justify-self:start; accent-color:var(--teal); }
+.consent-row span { min-width:0; overflow-wrap:anywhere; }
+.consent-row button { border:0; padding:0; background:transparent; color:var(--teal); font:inherit; font-weight:800; text-decoration:underline; cursor:pointer; }
+.legal-copy { max-width:820px; color:var(--ink); line-height:1.85; }
+.legal-copy h2,.legal-copy h3 { color:var(--navy); }
+.legal-copy h3 { margin-top:1.45em; }
+.legal-copy li { margin:.45em 0; }
 .form-note { margin: -3px 0 0; color: #718389; font-size: .72rem; text-align: center; }
 .form-note button { border: 0; background: transparent; color: var(--teal); text-decoration: underline; }
 .auth-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 0 0 18px; padding: 5px; border-radius: 14px; background: #edf2ef; }
