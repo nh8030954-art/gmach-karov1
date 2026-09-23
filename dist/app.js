@@ -472,32 +472,6 @@
   if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   const search=document.querySelector('.search-panel');
   if(search){search.classList.add('fx-search');requestAnimationFrame(()=>requestAnimationFrame(()=>search.classList.add('fx-in')));}
-  const rail=document.querySelector('.category-rail');
-  if(rail){
-    rail.classList.add('fx-carousel');
-    let offset=0,last=0,paused=false,dir=-1;
-    const cards=[...rail.children];
-    const frame=t=>{
-      if(!last)last=t;
-      const dt=Math.min(32,t-last);last=t;
-      if(!paused){
-        const overflow=Math.max(0,rail.scrollWidth-rail.parentElement.clientWidth);
-        if(overflow>2){
-          offset+=dir*dt*.012;
-          if(offset<=-overflow){offset=-overflow;dir=1}
-          else if(offset>=0){offset=0;dir=-1}
-          rail.style.transform='translate3d('+offset.toFixed(2)+'px,0,0)';
-        }
-      }
-      requestAnimationFrame(frame);
-    };
-    rail.style.willChange='transform';
-    rail.addEventListener('pointerenter',()=>paused=true);
-    rail.addEventListener('pointerleave',()=>paused=false);
-    rail.addEventListener('touchstart',()=>paused=true,{passive:true});
-    rail.addEventListener('touchend',()=>{paused=false},{passive:true});
-    requestAnimationFrame(frame);
-  }
   const titles=[...document.querySelectorAll('.section-heading')];
   const steps=[...document.querySelectorAll('.steps-grid > *, .how-grid > *, .process-grid > *, [class*="steps"] > article')];
   const faqs=[...document.querySelectorAll('.faq-item, .faq-list > *, [class*="faq"] details')];
