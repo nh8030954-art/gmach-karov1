@@ -13,6 +13,43 @@
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='17' fill='%23123c46'/%3E%3Cpath d='M18 35c7-8 21-8 28 0M23 27a9 9 0 0 1 18 0M32 20v25' fill='none' stroke='%23f7bf4f' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='46' r='3' fill='%23f7bf4f'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="./styles.css">
 
+
+  <style id="scroll-motion-v2">
+    @media (prefers-reduced-motion: no-preference) and (min-width: 591px) {
+      @supports (animation-timeline: view()) {
+        #how-it-works .step,
+        #how-it-works article {
+          opacity: 0;
+          transform: translate3d(0,30px,0);
+          animation: processSlideUp linear both;
+          animation-timeline: view();
+          animation-range: entry 0% cover 40%;
+          will-change: transform, opacity;
+        }
+      }
+      @supports (animation-timeline: scroll()) {
+        .search-hero::before {
+          animation: heroParallax linear both;
+          animation-timeline: scroll(root);
+          animation-range: 0% 38%;
+          will-change: transform;
+        }
+      }
+    }
+    @keyframes processSlideUp {
+      from { opacity:0; transform:translate3d(0,30px,0); }
+      to { opacity:1; transform:translate3d(0,0,0); }
+    }
+    @keyframes heroParallax {
+      from { transform:translate3d(0,0,0); }
+      to { transform:translate3d(0,90px,0); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #how-it-works .step,#how-it-works article,.search-hero::before {
+        animation:none !important; transform:none !important; opacity:1 !important;
+      }
+    }
+  </style>
 </head>
 <body>
   <a class="skip-link" href="#main-content">דלגו לתוכן הראשי</a>
@@ -60,11 +97,6 @@
   <main id="main-content">
     <section class="home-view" id="home-view">
       <section class="search-hero" aria-labelledby="hero-title" style="position:relative;overflow:hidden">
-        <div class="giving-hero-motion" aria-hidden="true" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0">
-          <span data-hero-float="box" style="position:absolute;right:7%;top:18%;font-size:44px;opacity:.12">📦</span>
-          <span data-hero-float="tools" style="position:absolute;left:8%;top:38%;font-size:38px;opacity:.11">🧰</span>
-          <span data-hero-float="community" style="position:absolute;right:24%;bottom:12%;font-size:40px;opacity:.10">🤲</span>
-        </div>
         <div class="hero-copy">
           <span class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span> הכול בהשאלה חינם</span>
           <h1 id="hero-title">מה תרצו<br><span>לשאול היום?</span></h1>
@@ -113,12 +145,12 @@
         </div>
         <div class="category-rail" id="category-rail" role="list">
           <button class="category-card is-active" type="button" data-category="" role="listitem"><span class="category-icon category-all" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></span><strong>הכול</strong><small>כל מה שזמין</small></button>
-          <button class="category-card" data-equipment-motion type="button" data-category="אירועים" role="listitem"><span class="category-icon category-events" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20V10l7-6 7 6v10M8 20v-6h8v6"/><path d="M4 20h16M12 4V1M8 6 6 3M16 6l2-3"/></svg></span><strong>אירועים</strong><small>עיצוב, שולחנות וציוד</small></button>
-          <button class="category-card" data-equipment-motion type="button" data-category="כלי עבודה" role="listitem"><span class="category-icon category-tools" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m14 6 4-4 4 4-4 4M14 6 3 17l4 4L18 10M6 16l2 2"/></svg></span><strong>כלי עבודה</strong><small>לבית ולתיקונים</small></button>
-          <button class="category-card" data-equipment-motion type="button" data-category="תינוקות" role="listitem"><span class="category-icon category-baby" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h2l2 11h10l2-7H7M9 19a2 2 0 1 0 0 .1M17 19a2 2 0 1 0 0 .1"/></svg></span><strong>תינוקות</strong><small>עגלות, מיטות וכיסאות</small></button>
-          <button class="category-card" data-equipment-motion type="button" data-category="רפואה" role="listitem"><span class="category-icon category-medical" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s-8-5-8-12a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 9c0 7-8 12-8 12Z"/><path d="M9 12h6M12 9v6"/></svg></span><strong>ציוד רפואי</strong><small>שיקום וסיוע</small></button>
-          <button class="category-card" data-equipment-motion type="button" data-category="טיולים" role="listitem"><span class="category-icon category-outdoors" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 20 9-16 9 16M7 20l5-8 5 8M3 20h18"/></svg></span><strong>טיולים</strong><small>קמפינג ונסיעות</small></button>
-          <button class="category-card" data-equipment-motion type="button" data-category="בית ואירוח" role="listitem"><span class="category-icon category-home" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 11 9-8 9 8v10H3Z"/><path d="M9 21v-7h6v7"/></svg></span><strong>בית ואירוח</strong><small>כלים, מזרנים ואביזרים</small></button>
+          <button class="category-card" type="button" data-category="אירועים" role="listitem"><span class="category-icon category-events" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 20V10l7-6 7 6v10M8 20v-6h8v6"/><path d="M4 20h16M12 4V1M8 6 6 3M16 6l2-3"/></svg></span><strong>אירועים</strong><small>עיצוב, שולחנות וציוד</small></button>
+          <button class="category-card" type="button" data-category="כלי עבודה" role="listitem"><span class="category-icon category-tools" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m14 6 4-4 4 4-4 4M14 6 3 17l4 4L18 10M6 16l2 2"/></svg></span><strong>כלי עבודה</strong><small>לבית ולתיקונים</small></button>
+          <button class="category-card" type="button" data-category="תינוקות" role="listitem"><span class="category-icon category-baby" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h2l2 11h10l2-7H7M9 19a2 2 0 1 0 0 .1M17 19a2 2 0 1 0 0 .1"/></svg></span><strong>תינוקות</strong><small>עגלות, מיטות וכיסאות</small></button>
+          <button class="category-card" type="button" data-category="רפואה" role="listitem"><span class="category-icon category-medical" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s-8-5-8-12a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 9c0 7-8 12-8 12Z"/><path d="M9 12h6M12 9v6"/></svg></span><strong>ציוד רפואי</strong><small>שיקום וסיוע</small></button>
+          <button class="category-card" type="button" data-category="טיולים" role="listitem"><span class="category-icon category-outdoors" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 20 9-16 9 16M7 20l5-8 5 8M3 20h18"/></svg></span><strong>טיולים</strong><small>קמפינג ונסיעות</small></button>
+          <button class="category-card" type="button" data-category="בית ואירוח" role="listitem"><span class="category-icon category-home" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m3 11 9-8 9 8v10H3Z"/><path d="M9 21v-7h6v7"/></svg></span><strong>בית ואירוח</strong><small>כלים, מזרנים ואביזרים</small></button>
         </div>
       </section>
 
