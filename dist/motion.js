@@ -21,14 +21,14 @@
       ['.search-hero','--motion-p'],
       ['.category-section','--scene-p'],
       ['.nearby-motion-scene','--scene-p'],
-      ['.connection-story','--scene-p'],
+      ['.connection-story','--scene-p','fast'],
       ['.trust-section','--scene-p'],
       ['.gmach-callout','--publish-p'],
       ['.help-broadcast','--scene-p'],
       ['.community-story','--scene-p'],
       ['.faq-section','--faq-p']
     ];
-    state.scenes=mappings.map(([selector,property])=>({element:document.querySelector(selector),property})).filter(scene=>scene.element);
+    state.scenes=mappings.map(([selector,property,speed])=>({element:document.querySelector(selector),property,speed})).filter(scene=>scene.element);
     const steps=document.getElementById('how-it-works');
     if(steps){
       steps.classList.add('motion-sticky');
@@ -46,10 +46,10 @@
       return;
     }
     document.querySelector('.site-header')?.classList.toggle('is-compact',scrollY>48);
-    state.scenes.forEach(({element,property,journey})=>{
+    state.scenes.forEach(({element,property,journey,speed})=>{
       const rect=element.getBoundingClientRect();
       if(rect.bottom<-120||rect.top>innerHeight+120)return;
-      const progress=sceneProgress(element,journey ? .88 : .82,journey ? .12 : .18);
+      const progress=sceneProgress(element,journey||speed==='fast' ? .98 : .82,journey||speed==='fast' ? .45 : .18);
       element.style.setProperty(property,progress.toFixed(4));
       if(journey){
         element.style.setProperty('--journey-request',clamp((progress-.2)*4).toFixed(4));

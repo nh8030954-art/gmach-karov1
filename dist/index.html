@@ -249,8 +249,12 @@
       <section class="community-story motion-story" aria-labelledby="community-story-title">
         <div class="section-shell">
           <div class="section-heading centered-heading"><div><span class="section-kicker">עזרה שממשיכה הלאה</span><h2 id="community-story-title">קהילה שמשאילה, קהילה שצומחת</h2></div></div>
-          <div class="community-network" aria-hidden="true"><svg viewBox="0 0 1000 360" preserveAspectRatio="none"><path d="M110 180 300 70 500 180 710 75 890 180M110 180 300 290 500 180 710 285 890 180M300 70 300 290M710 75 710 285"/></svg><span class="node n1">צריך ציוד</span><span class="node n2">גמ״ח מקומי</span><span class="node n3">פריט זמין</span><span class="node n4">גמ״ח נוסף</span><span class="node n5">מקבל עזרה</span><span class="node n6">עוד משפחה</span><span class="node n7">פריט חוזר</span></div>
-          <p class="network-caption">כל קו מציג חיבור אמיתי: פריט יוצא מגמ״ח למי שצריך אותו, חוזר, וממשיך לעזור לאדם הבא.</p>
+          <div class="community-cycle" aria-label="מחזור ההשאלה בקהילה">
+            <svg viewBox="0 0 760 300" aria-hidden="true"><path d="M145 150C145 60 250 28 380 28S615 60 615 150 510 272 380 272 145 240 145 150Z"/><path class="cycle-progress" d="M145 150C145 60 250 28 380 28S615 60 615 150 510 272 380 272 145 240 145 150Z"/></svg>
+            <span class="cycle-heart" aria-hidden="true">♡</span>
+            <span class="cycle-step c1"><b>1</b>מוצאים פריט</span><span class="cycle-step c2"><b>2</b>שולחים בקשה</span><span class="cycle-step c3"><b>3</b>מקבלים בחינם</span><span class="cycle-step c4"><b>4</b>מחזירים בזמן</span><span class="cycle-step c5"><b>5</b>עוזר למשפחה הבאה</span>
+          </div>
+          <p class="network-caption">כל פריט חוזר למעגל וממשיך לעזור לעוד אנשים בקהילה.</p>
           <div class="community-actions"><button class="button button-primary" type="button" id="motion-search-item">חיפוש פריט</button><button class="button button-secondary" type="button" id="motion-open-gmach">פתיחת גמ״ח</button></div>
         </div>
       </section>
