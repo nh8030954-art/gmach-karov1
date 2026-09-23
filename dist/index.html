@@ -34,7 +34,7 @@
   <header class="site-header" style="background:#fff">
     <div class="header-inner">
       <a class="brand" href="#/" aria-label="גמ״ח ברגע — דף הבית">
-        <span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:visible;box-shadow:none"><img src="./gmach-berega-logo.jpg" alt="" style="transform:none;width:116px;height:116px;max-width:none;object-fit:contain;margin:-36px"></span>
+        <span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:visible;box-shadow:none"><img src="./gmach-berega-logo.jpg" alt="" style="transform:none;width:136px;height:136px;max-width:none;object-fit:contain;margin:-46px"></span>
         <span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span>
       </a>
 
@@ -67,6 +67,12 @@
   </header>
 
     
+  <div id="page-parallax-decor" aria-hidden="true" style="position:fixed;inset:0;overflow:hidden;pointer-events:none;z-index:-1">
+    <span data-page-parallax=".055" style="position:absolute;width:420px;height:420px;border:1px solid rgba(22,125,118,.12);border-radius:50%;top:35vh;right:-230px"></span>
+    <span data-page-parallax="-.04" style="position:absolute;width:300px;height:300px;border-radius:50%;background:rgba(244,189,77,.075);top:95vh;left:-170px"></span>
+    <span data-page-parallax=".075" style="position:absolute;width:220px;height:220px;border:2px solid rgba(18,60,70,.07);transform:rotate(28deg);top:165vh;right:4%"></span>
+    <span data-page-parallax="-.06" style="position:absolute;width:360px;height:180px;border-radius:50%;background:rgba(22,125,118,.055);top:235vh;left:-120px"></span>
+  </div>
   <main id="main-content">
     <section class="home-view" id="home-view">
       <section class="search-hero" aria-labelledby="hero-title" style="position:relative;overflow:hidden">
@@ -227,7 +233,7 @@
 
   <footer class="site-footer">
     <div class="footer-inner">
-      <div class="footer-brand"><a class="brand brand-footer" href="#/"><span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:visible;box-shadow:none"><img src="./gmach-berega-logo.jpg" alt="" style="transform:none;width:116px;height:116px;max-width:none;object-fit:contain;margin:-36px"></span><span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span></a><p>מחברים בין מי שיש לו לבין מי שצריך — בחינם, בפשטות ובאחריות.</p></div>
+      <div class="footer-brand"><a class="brand brand-footer" href="#/"><span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:visible;box-shadow:none"><img src="./gmach-berega-logo.jpg" alt="" style="transform:none;width:136px;height:136px;max-width:none;object-fit:contain;margin:-46px"></span><span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span></a><p>מחברים בין מי שיש לו לבין מי שצריך — בחינם, בפשטות ובאחריות.</p></div>
       <div class="footer-links"><div><strong>למצוא</strong><a href="#/catalog">כל הפריטים</a><a href="#how-it-works">איך זה עובד</a></div><div><strong>לשתף</strong><button type="button" data-footer-add-gmach>פרסום גמ״ח</button><button type="button" data-footer-add-item>הוספת פריט</button></div><div><strong>חשוב לדעת</strong><button type="button" data-open-info="safety">כללי השאלה בטוחה</button><button type="button" data-open-info="terms">תנאי שימוש</button><button type="button" data-open-info="privacy">פרטיות</button><a id="support-email-link" hidden>יצירת קשר ותמיכה</a></div></div>
     </div>
     <div class="footer-bottom"><span>© <span id="current-year"></span> גמ״ח ברגע</span><span>קהילה שמשאילה, קהילה שצומחת</span></div>
@@ -404,6 +410,16 @@
       if(!a||!b)return;
       let raf=0;
       const draw=()=>{const y=window.scrollY||0;a.style.transform='translate3d(0,'+(y*.38-90)+'px,0) scale(1.06)';b.style.transform='translate3d(0,'+(80-y*.30)+'px,0)';raf=0};
+      addEventListener('scroll',()=>{if(!raf)raf=requestAnimationFrame(draw)},{passive:true});draw();
+    })();
+  </script>
+
+  <script>
+    (() => {
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      const els=[...document.querySelectorAll('[data-page-parallax]')];
+      let raf=0;
+      const draw=()=>{const y=scrollY||0;els.forEach(el=>{const s=Number(el.dataset.pageParallax||0);el.style.translate='0 '+(y*s).toFixed(1)+'px'});raf=0};
       addEventListener('scroll',()=>{if(!raf)raf=requestAnimationFrame(draw)},{passive:true});draw();
     })();
   </script>
