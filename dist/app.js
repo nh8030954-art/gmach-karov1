@@ -465,3 +465,29 @@
   }
   init().catch(error => { document.documentElement.classList.remove("app-booting"); console.error("App initialization failed", error); toast("אירעה תקלה בטעינת האתר. נסו לרענן את הדף.", "error"); });
 })();
+
+// Scroll storytelling v3
+(() => {
+  const init=()=>{
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    const hero=document.querySelector('.search-hero');
+    const heroContent=hero?.querySelector('.hero-copy, .hero-content, .search-panel')||null;
+    const story=document.getElementById('human-story'), pa=document.getElementById('story-person-a'), pb=document.getElementById('story-person-b'), box=document.getElementById('story-box');
+    const equip=document.getElementById('equipment-story'), chair=document.getElementById('equip-chair'), ebox=document.getElementById('equip-box'), table=document.getElementById('equip-table'), person=document.getElementById('equip-person');
+    const cards=[...document.querySelectorAll('#how-it-works .step,#how-it-works article,#how-it-works .card')];
+    let raf=0; const clamp=v=>Math.max(0,Math.min(1,v));
+    const progress=(el,start=.9,span=.55)=>{if(!el)return 0;const r=el.getBoundingClientRect(),vh=innerHeight||800;return clamp((vh*start-r.top)/(vh*span));};
+    const draw=()=>{
+      if(hero){const r=hero.getBoundingClientRect(),p=clamp(-r.top/Math.max(1,r.height));hero.style.transform='translate3d(0,'+(p*42).toFixed(1)+'px,0)';if(heroContent){heroContent.style.transform='translate3d(0,'+(-p*34).toFixed(1)+'px,0)';heroContent.style.opacity=String(1-p*.82);}}
+      const sp=progress(story,.9,.5);
+      if(pa&&pb){const travel=(story?.clientWidth||760)*.28*sp;pa.style.opacity=pb.style.opacity=String(clamp(sp*2.2));pa.style.transform='translate3d('+travel.toFixed(1)+'px,0,0)';pb.style.transform='translate3d('+(-travel).toFixed(1)+'px,0,0)';}
+      if(box){const q=clamp((sp-.42)/.28);box.style.opacity=String(q);box.style.transform='translate3d(0,'+((1-q)*18).toFixed(1)+'px,0) scale('+(0.82+q*.18)+')';}
+      cards.forEach((el,i)=>{const q=progress(el,.92,.34);el.style.opacity=String(q);el.style.transform='translate3d(0,'+((1-q)*(22+i*5)).toFixed(1)+'px,0)';});
+      const ep=progress(equip,.92,.48);[chair,ebox,table].forEach((el,i)=>{if(!el)return;const q=clamp((ep-i*.08)/.72);const dir=i===2?-1:1;el.style.opacity=String(q);el.style.transform='translate3d('+(dir*(1-q)*55).toFixed(1)+'px,0,0)';});
+      if(person){const q=clamp((ep-.2)/.7);person.style.opacity=String(q);person.style.transform='translate3d('+((q-.5)*75).toFixed(1)+','+(-Math.sin(q*Math.PI)*8).toFixed(1)+'px,0)';}
+      raf=0;
+    };
+    const tick=()=>{if(!raf)raf=requestAnimationFrame(draw)};addEventListener('scroll',tick,{passive:true});addEventListener('resize',tick,{passive:true});draw();
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+})();
