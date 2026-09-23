@@ -14,42 +14,6 @@
   <link rel="stylesheet" href="./styles.css">
 
 
-  <style id="scroll-motion-v2">
-    @media (prefers-reduced-motion: no-preference) and (min-width: 591px) {
-      @supports (animation-timeline: view()) {
-        #how-it-works .step,
-        #how-it-works article {
-          opacity: 0;
-          transform: translate3d(0,30px,0);
-          animation: processSlideUp linear both;
-          animation-timeline: view();
-          animation-range: entry 0% cover 40%;
-          will-change: transform, opacity;
-        }
-      }
-      @supports (animation-timeline: scroll()) {
-        .search-hero::before {
-          animation: heroParallax linear both;
-          animation-timeline: scroll(root);
-          animation-range: 0% 38%;
-          will-change: transform;
-        }
-      }
-    }
-    @keyframes processSlideUp {
-      from { opacity:0; transform:translate3d(0,30px,0); }
-      to { opacity:1; transform:translate3d(0,0,0); }
-    }
-    @keyframes heroParallax {
-      from { transform:translate3d(0,0,0); }
-      to { transform:translate3d(0,90px,0); }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      #how-it-works .step,#how-it-works article,.search-hero::before {
-        animation:none !important; transform:none !important; opacity:1 !important;
-      }
-    }
-  </style>
 </head>
 <body>
   <a class="skip-link" href="#main-content">דלגו לתוכן הראשי</a>
@@ -249,6 +213,13 @@
     <option value="אום אל-פחם"><option value="אופקים"><option value="אור יהודה"><option value="אור עקיבא"><option value="אילת"><option value="אלעד"><option value="אריאל"><option value="אשדוד"><option value="אשקלון"><option value="באקה אל-גרבייה"><option value="באר שבע"><option value="בית שאן"><option value="בית שמש"><option value="בני ברק"><option value="בת ים"><option value="גבעת שמואל"><option value="גבעתיים"><option value="דימונה"><option value="הוד השרון"><option value="הרצליה"><option value="חדרה"><option value="חולון"><option value="חיפה"><option value="חריש"><option value="טבריה"><option value="טייבה"><option value="טירה"><option value="טירת כרמל"><option value="טמרה"><option value="יבנה"><option value="יהוד-מונוסון"><option value="יקנעם עילית"><option value="ירושלים"><option value="כפר יונה"><option value="כפר סבא"><option value="כפר קאסם"><option value="כרמיאל"><option value="לוד"><option value="מגדל העמק"><option value="מג'אר"><option value="מודיעין-מכבים-רעות"><option value="מודיעין עילית"><option value="מעלה אדומים"><option value="מעלות-תרשיחא"><option value="נהריה"><option value="נוף הגליל"><option value="נס ציונה"><option value="נצרת"><option value="נשר"><option value="נתיבות"><option value="נתניה"><option value="סח'נין"><option value="עכו"><option value="עפולה"><option value="עראבה"><option value="ערד"><option value="פתח תקווה"><option value="צפת"><option value="קלנסווה"><option value="קריית אונו"><option value="קריית אתא"><option value="קריית ביאליק"><option value="קריית גת"><option value="קריית ים"><option value="קריית מוצקין"><option value="קריית מלאכי"><option value="קריית שמונה"><option value="ראש העין"><option value="ראשון לציון"><option value="רהט"><option value="רחובות"><option value="רמלה"><option value="רמת גן"><option value="רמת השרון"><option value="רעננה"><option value="שדרות"><option value="שפרעם"><option value="תל אביב-יפו">
   </datalist>
 
+  
+  <div id="equipment-story" aria-hidden="true" style="height:150px;position:relative;width:min(820px,94%);margin:12px auto 24px;overflow:hidden;pointer-events:none">
+    <div id="equip-chair" style="position:absolute;left:9%;top:35px;font-size:54px;opacity:0;will-change:transform,opacity">🪑</div>
+    <div id="equip-box" style="position:absolute;left:38%;top:38px;font-size:52px;opacity:0;will-change:transform,opacity">📦</div>
+    <div id="equip-table" style="position:absolute;right:10%;top:35px;font-size:54px;opacity:0;will-change:transform,opacity">🪑</div>
+    <div id="equip-person" style="position:absolute;left:50%;top:18px;font-size:66px;opacity:0;will-change:transform,opacity">🚶</div>
+  </div>
   <footer class="site-footer">
     <div class="footer-inner">
       <div class="footer-brand"><a class="brand brand-footer" href="#/"><span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:hidden;box-shadow:none;width:78px;height:78px;flex:0 0 78px;position:relative"><img src="./gmach-berega-logo.jpg" alt="" style="position:absolute;width:348px;height:auto;max-width:none;left:-142px;top:-36px;transform:none"></span><span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span></a><p>מחברים בין מי שיש לו לבין מי שצריך — בחינם, בפשטות ובאחריות.</p></div>
