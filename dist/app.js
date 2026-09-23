@@ -517,3 +517,46 @@
  };
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
 })();
+
+
+// Category carousel continuous autoplay v2
+(()=>{
+  const ready=()=>{
+    const rail=document.getElementById('category-rail');
+    if(!rail)return;
+    rail.classList.add('carousel-ready');
+    let timer=null;
+    let resumeTimer=null;
+    const gap=()=>parseFloat(getComputedStyle(rail).gap||0);
+    const amount=()=>{
+      const first=rail.querySelector('.category-card');
+      return first?first.getBoundingClientRect().width+gap():180;
+    };
+    const max=()=>Math.max(0,rail.scrollWidth-rail.clientWidth);
+    const rtl=document.documentElement.dir==='rtl';
+    const pos=()=>Math.abs(rail.scrollLeft);
+    const step=()=>{
+      const m=max();
+      if(m<4)return;
+      const a=amount();
+      if(pos()>=m-a*.55){
+        rail.scrollTo({left:0,behavior:'smooth'});
+      }else{
+        rail.scrollBy({left:(rtl?-1:1)*a,behavior:'smooth'});
+      }
+    };
+    const start=()=>{
+      if(timer)clearInterval(timer);
+      timer=setInterval(step,2600);
+    };
+    const pauseBriefly=()=>{
+      if(timer){clearInterval(timer);timer=null;}
+      if(resumeTimer)clearTimeout(resumeTimer);
+      resumeTimer=setTimeout(start,1400);
+    };
+    ['pointerdown','touchstart','wheel'].forEach(ev=>rail.addEventListener(ev,pauseBriefly,{passive:true}));
+    document.addEventListener('visibilitychange',()=>{ if(document.hidden){ if(timer)clearInterval(timer); } else start(); });
+    start();
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
+})();
