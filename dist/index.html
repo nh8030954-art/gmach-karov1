@@ -402,7 +402,7 @@
       let raf=0;
       const draw=()=>{
         const r=scene.getBoundingClientRect(), vh=innerHeight||800;
-        const p=Math.max(0,Math.min(1,(vh-r.top)/(vh+r.height)));
+        const p=Math.max(0,Math.min(1,(vh-r.top)/(vh*.42)));
         const travel=Math.min(150,scene.clientWidth*.28);
         left.style.transform='translateX('+(p*travel)+'px) rotate('+(p*8)+'deg)';
         right.style.transform='scaleX(-1) translateX('+(p*travel)+'px) rotate('+(p*8)+'deg)';
