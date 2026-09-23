@@ -666,7 +666,6 @@ img { max-width: 100%; }
 
 .nav-button { border: 0; background: none; color: inherit; font: inherit; cursor: pointer; padding: 0; }
 .audience-paths { width: min(780px, 100%); margin: -28px auto 24px; display: grid; grid-template-columns: repeat(2,1fr); gap: 12px; position: relative; z-index: 2; }
-.audience-path-placeholder { min-width:0; }
 .audience-paths button { text-align:right; border:1px solid rgba(255,255,255,.28); border-radius:18px 6px 18px 18px; background:linear-gradient(135deg,rgba(255,255,255,.14),rgba(255,255,255,.06)); box-shadow:0 14px 34px rgba(5,35,42,.2); backdrop-filter:blur(10px); padding:17px 20px; cursor:pointer; color:#fff; }
 .audience-paths button:last-child { border-color:color-mix(in srgb,var(--accent) 65%,transparent); background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 28%,transparent),rgba(255,255,255,.06)); }
 .audience-paths button:hover { transform:translateY(-2px); border-color:var(--accent); }
