@@ -24,7 +24,7 @@
   <header class="site-header" style="background:#fff">
     <div class="header-inner">
       <a class="brand" href="#/" aria-label="גמ״ח ברגע — דף הבית">
-        <span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:hidden;box-shadow:none;width:92px;height:68px;flex:0 0 92px;position:relative"><img src="./gmach-berega-logo.jpg" alt="" style="position:absolute;width:300px;height:auto;max-width:none;object-fit:initial;left:50%;top:50%;transform:translate(-50%,-50%) scale(1.12)"></span>
+        <span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:hidden;box-shadow:none;width:78px;height:78px;flex:0 0 78px;position:relative"><img src="./gmach-berega-logo.jpg" alt="" style="position:absolute;width:348px;height:auto;max-width:none;left:-142px;top:-36px;transform:none"></span>
         <span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span>
       </a>
 
@@ -98,10 +98,27 @@
           <button type="button" id="path-borrower" hidden><strong>אני מחפש/ת עזרה או ציוד</strong><span>חיפוש מהיר לפי צורך ואזור</span></button>
           <button type="button" id="path-manager" style="transform:translateY(-12px)"><strong>אני מנהל/ת גמ״ח</strong><span>הצטרפות, מלאי ובקשות במקום אחד</span></button>
         </div>
-        <div id="scroll-connect-scene" aria-hidden="true" style="height:168px;position:relative;margin:0 auto 4px;width:min(620px,94%);overflow:hidden">
-          <div id="scroll-hand-left" style="position:absolute;left:5%;top:20px;font-size:68px;line-height:1;will-change:transform,opacity">🫱</div>
-          <div id="scroll-hand-right" style="position:absolute;right:5%;top:20px;font-size:68px;line-height:1;will-change:transform,opacity">🫲</div><div id="scroll-handshake" style="position:absolute;left:50%;top:12px;font-size:82px;line-height:1;transform:translateX(-50%) scale(.82);opacity:0;will-change:transform,opacity">🤝</div>
-          <div id="scroll-connect-label" style="position:absolute;inset:auto 0 18px;text-align:center;font-weight:800;color:#fff;opacity:.72">מחברים בין מי שיש לו למי שצריך</div>
+        <div id="scroll-connect-scene" aria-hidden="true" style="height:190px;position:relative;margin:0 auto 2px;width:min(650px,96%);overflow:hidden">
+          <svg viewBox="0 0 650 190" width="100%" height="100%" style="display:block;overflow:visible">
+            <g id="connect-left" style="transform-origin:155px 82px;will-change:transform">
+              <circle cx="155" cy="82" r="47" fill="rgba(255,255,255,.10)" stroke="#f4bd4d" stroke-width="3"/>
+              <path id="gear-left" d="M155 42v12M155 110v12M115 82h12M183 82h12M127 54l9 9M174 101l9 9M183 54l-9 9M136 101l-9 9" stroke="#f4bd4d" stroke-width="8" stroke-linecap="round"/>
+              <circle cx="155" cy="82" r="22" fill="none" stroke="#fff" stroke-width="5"/>
+              <circle cx="155" cy="82" r="7" fill="#f4bd4d"/>
+            </g>
+            <g id="connect-right" style="transform-origin:495px 82px;will-change:transform">
+              <circle cx="495" cy="82" r="47" fill="rgba(255,255,255,.10)" stroke="#f4bd4d" stroke-width="3"/>
+              <path id="gear-right" d="M495 42v12M495 110v12M455 82h12M523 82h12M467 54l9 9M514 101l9 9M523 54l-9 9M476 101l-9 9" stroke="#f4bd4d" stroke-width="8" stroke-linecap="round"/>
+              <circle cx="495" cy="82" r="22" fill="none" stroke="#fff" stroke-width="5"/>
+              <circle cx="495" cy="82" r="7" fill="#f4bd4d"/>
+            </g>
+            <line id="connect-line-left" x1="202" y1="82" x2="325" y2="82" stroke="#f4bd4d" stroke-width="5" stroke-linecap="round" stroke-dasharray="123" stroke-dashoffset="123"/>
+            <line id="connect-line-right" x1="448" y1="82" x2="325" y2="82" stroke="#f4bd4d" stroke-width="5" stroke-linecap="round" stroke-dasharray="123" stroke-dashoffset="123"/>
+            <circle id="connect-pulse" cx="325" cy="82" r="31" fill="rgba(244,189,77,.10)" stroke="#f4bd4d" stroke-width="2" opacity="0"/>
+            <text id="connect-handshake" x="325" y="102" text-anchor="middle" font-size="58" opacity="0">🤝</text>
+            <path id="connect-check" d="M309 83l11 11 24-27" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" opacity="0"/>
+          </svg>
+          <div id="scroll-connect-label" style="position:absolute;inset:auto 0 6px;text-align:center;font-weight:800;color:#fff;opacity:.68">מחברים בין מי שיש לו למי שצריך</div>
         </div>
       </section>
 
@@ -218,7 +235,7 @@
 
   <footer class="site-footer">
     <div class="footer-inner">
-      <div class="footer-brand"><a class="brand brand-footer" href="#/"><span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:hidden;box-shadow:none;width:92px;height:68px;flex:0 0 92px;position:relative"><img src="./gmach-berega-logo.jpg" alt="" style="position:absolute;width:300px;height:auto;max-width:none;object-fit:initial;left:50%;top:50%;transform:translate(-50%,-50%) scale(1.12)"></span><span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span></a><p>מחברים בין מי שיש לו לבין מי שצריך — בחינם, בפשטות ובאחריות.</p></div>
+      <div class="footer-brand"><a class="brand brand-footer" href="#/"><span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:hidden;box-shadow:none;width:78px;height:78px;flex:0 0 78px;position:relative"><img src="./gmach-berega-logo.jpg" alt="" style="position:absolute;width:348px;height:auto;max-width:none;left:-142px;top:-36px;transform:none"></span><span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span></a><p>מחברים בין מי שיש לו לבין מי שצריך — בחינם, בפשטות ובאחריות.</p></div>
       <div class="footer-links"><div><strong>למצוא</strong><a href="#/catalog">כל הפריטים</a><a href="#how-it-works">איך זה עובד</a></div><div><strong>לשתף</strong><button type="button" data-footer-add-gmach>פרסום גמ״ח</button><button type="button" data-footer-add-item>הוספת פריט</button></div><div><strong>חשוב לדעת</strong><button type="button" data-open-info="safety">כללי השאלה בטוחה</button><button type="button" data-open-info="terms">תנאי שימוש</button><button type="button" data-open-info="privacy">פרטיות</button><a id="support-email-link" hidden>יצירת קשר ותמיכה</a></div></div>
     </div>
     <div class="footer-bottom"><span>© <span id="current-year"></span> גמ״ח ברגע</span><span>קהילה שמשאילה, קהילה שצומחת</span></div>
