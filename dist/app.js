@@ -30,7 +30,15 @@
     discovery: { categories: [], cities: [], suggestions: [], organizations: [] }, viewMode: "list"
   };
 
-  const SEARCH_ALIASES = Object.freeze({ "כיסא גלגלים": ["כיסא נכים","כסא גלגלים","נגישות"], "עגלה": ["עגלת תינוק","טיולון"], "מיטה": ["עריסה","לול"], "מקדחה": ["מברגה","כלי עבודה"], "קישוט": ["עיצוב","דקורציה","אירועים"], "הליכון": ["רולטור","ציוד שיקומי"] });
+  const SEARCH_ALIASES = Object.freeze({
+    "אירועים": ["אירוע","שמחה","חתונה","בר מצווה","בת מצווה","ברית","קישוט","קישוטים","עיצוב","דקורציה","שולחן","כיסאות","קשת פרחים","תאורה","הגברה"],
+    "כלי עבודה": ["כלים","תיקון","שיפוץ","מקדחה","מברגה","פטישון","סולם","מסור","ארגז כלים"],
+    "תינוקות": ["תינוק","ילדים","עגלה","עגלת תינוק","טיולון","עריסה","לול","מיטת תינוק","כיסא אוכל","כסא אוכל","סלקל"],
+    "רפואה": ["רפואי","שיקום","נגישות","כיסא גלגלים","כסא גלגלים","כיסא נכים","הליכון","רולטור","קביים","מיטה סיעודית"],
+    "טיולים": ["טיול","קמפינג","מחנאות","אוהל","צידנית","תרמיל","מזרן שטח","שק שינה"],
+    "בית ואירוח": ["בית","אירוח","אורחים","מזרן","מזרנים","שולחן מתקפל","כיסא מתקפל","כלי אוכל","פלטה","מיחם"],
+    "תחפושות": ["תחפושת","פורים","בגד"], "ספרים": ["ספר","לימוד","קודש"]
+  });
 
   const STATUS_LABELS = Object.freeze({ pending: "ממתינה לאישור", approved: "אושרה", declined: "נדחתה", cancelled: "בוטלה", collected: "נאסף", returned: "הוחזר", active: "פעיל", rejected: "נדחה", archived: "בארכיון", available: "זמין", unavailable: "לא זמין", reserved: "בתיאום" });
 
@@ -96,7 +104,7 @@
   function applyFilters({ resetVisible = true } = {}) {
     if (resetVisible) state.visibleCount = 8;
     const query = normalize($("#search-input").value), city = $("#city-filter").value, category = state.activeCategory || $("#category-filter").value, condition = $("#condition-filter").value, availableOnly = $("#available-only").checked, type = $("#type-filter").value, pickup = $("#pickup-filter").value, verifiedOnly = $("#verified-only").checked;
-    const queryTerms = [query, ...Object.entries(SEARCH_ALIASES).flatMap(([key, values]) => query.includes(normalize(key)) || values.some(value => query.includes(normalize(value))) ? [key, ...values] : [])].map(normalize).filter(Boolean);
+    const queryTerms = [query, ...Object.entries(SEARCH_ALIASES).flatMap(([key, values]) => query.includes(normalize(key)) || normalize(key).includes(query) || values.some(value => query.includes(normalize(value)) || normalize(value).includes(query)) ? [key, ...values] : [])].map(normalize).filter(Boolean);
     state.filteredItems = state.items.filter(item => { const haystack = normalize([item.title, item.description, item.category, item.subcategory, ...(item.tags || []), item.city, item.neighborhood, item.organizations?.name].join(" ")); return (!query || queryTerms.some(term => haystack.includes(term))) && (!city || item.city === city) && (!category || item.category === category) && (!condition || item.condition === condition) && (!type || item.item_type === type) && (!pickup || item.pickup_method === pickup) && (!verifiedOnly || item.organizations?.verified) && (!availableOnly || item.availability_status === "available"); });
     const sort = $("#sort-select").value;
     state.filteredItems.sort((a, b) => sort === "newest" ? new Date(b.created_at) - new Date(a.created_at) : sort === "city" ? String(a.city).localeCompare(String(b.city), "he") : Number(b.availability_status === "available") - Number(a.availability_status === "available") || Number(Boolean(b.organizations?.verified)) - Number(Boolean(a.organizations?.verified)));
@@ -292,7 +300,7 @@
     try {
       const { settings: s } = await api("/api/site-settings"); if (!s) return;
       document.documentElement.style.setProperty("--navy", s.primary_color); document.documentElement.style.setProperty("--teal", s.secondary_color); document.documentElement.style.setProperty("--accent", s.accent_color); document.documentElement.style.setProperty("--site-font", s.font_family); document.documentElement.style.fontSize = `${s.base_font_size}px`;
-      $$(".brand-copy strong").forEach(el => el.textContent = s.site_name); $$(".brand-copy small").forEach(el => el.textContent = s.tagline); $("#hero-title").textContent = s.hero_title; $("#hero-title").nextElementSibling.textContent = s.hero_description; $$(".brand-logo-crop img").forEach(img => img.src = s.logo_url); document.title = `${s.site_name} — ${s.tagline}`;
+      const siteName=s.site_name||"גמ״ח ברגע", tagline=s.tagline||"גדולה גמילות חסדים יותר מן הצדקה", logo=s.logo_url==="/gmach-berega-logo.jpg"?"/gmach-berega-mark.jpg":(s.logo_url||"/gmach-berega-mark.jpg"); $$(".brand-copy strong").forEach(el => el.textContent = siteName); $$(".brand-copy small").forEach(el => el.textContent = tagline); $("#hero-title").textContent = s.hero_title||"מה תרצו לשאול היום?"; $("#hero-title").nextElementSibling.textContent = s.hero_description||"מוצאים ציוד להשאלה בחינם מגמ״חים ואנשים טובים קרוב לבית."; $$(".brand-logo-crop img").forEach(img => img.src = logo); document.title = `${siteName} — ${tagline}`;
     } catch (error) { console.warn("Site settings unavailable", error); }
   }
   async function loadPageCustomizations() {
