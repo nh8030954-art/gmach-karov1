@@ -465,3 +465,34 @@
   }
   init().catch(error => { document.documentElement.classList.remove("app-booting"); console.error("App initialization failed", error); toast("אירעה תקלה בטעינת האתר. נסו לרענן את הדף.", "error"); });
 })();
+
+// Requested motion v1
+(()=>{
+ const init=()=>{
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  const search=document.querySelector('.search-panel');
+  if(search){search.classList.add('fx-search');requestAnimationFrame(()=>requestAnimationFrame(()=>search.classList.add('fx-in')));}
+  const rail=document.querySelector('.category-rail');
+  if(rail){rail.classList.add('fx-carousel');let dir=1,last=0,paused=false;
+   const pause=()=>paused=true,resume=()=>setTimeout(()=>paused=false,1200);
+   rail.addEventListener('touchstart',pause,{passive:true});rail.addEventListener('touchend',resume,{passive:true});
+   rail.addEventListener('pointerenter',pause);rail.addEventListener('pointerleave',()=>paused=false);
+   const run=t=>{if(!paused&&t-last>35){const max=Math.max(0,rail.scrollWidth-rail.clientWidth);rail.scrollLeft+=dir*.28;if(Math.abs(rail.scrollLeft)>=max-2||Math.abs(rail.scrollLeft)<=2)dir*=-1;last=t}requestAnimationFrame(run)};requestAnimationFrame(run);
+  }
+  const titles=[...document.querySelectorAll('.section-heading')];
+  const steps=[...document.querySelectorAll('.steps-grid > *, .how-grid > *, .process-grid > *, [class*="steps"] > article')];
+  const faqs=[...document.querySelectorAll('.faq-item, .faq-list > *, [class*="faq"] details')];
+  titles.forEach(x=>x.classList.add('fx-title'));
+  steps.forEach(x=>x.classList.add('fx-step'));
+  faqs.forEach(x=>x.classList.add('fx-faq'));
+  const io=new IntersectionObserver(entries=>entries.forEach(en=>{
+    if(!en.isIntersecting)return;
+    const group=en.target.classList.contains('fx-step')?steps:en.target.classList.contains('fx-faq')?faqs:titles;
+    const i=group.indexOf(en.target);
+    setTimeout(()=>en.target.classList.add('fx-visible'),Math.min(i%6,5)*(en.target.classList.contains('fx-step')?150:en.target.classList.contains('fx-faq')?110:60));
+    io.unobserve(en.target);
+  }),{threshold:.16,rootMargin:'0px 0px -4% 0px'});
+  [...titles,...steps,...faqs].forEach(x=>io.observe(x));
+ };
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+})();
