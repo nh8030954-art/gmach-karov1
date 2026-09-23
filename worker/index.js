@@ -144,24 +144,26 @@ async function register(request, env, ctx, url) {
   const email = normalizeEmail(body.email);
   const fullName = cleanText(body.fullName, 2, 80, "שם מלא");
   const password = validatePassword(body.password);
-  await enforceAuthRateLimit(env, email, "register", ctx);
+  try { await enforceAuthRateLimit(env,email,"register",ctx); }
+  catch(error) { if(error instanceof HttpError) throw error; console.error("Registration rate limit failed",error); throw new HttpError(503,"לא הצלחנו לבדוק את ההרשמה (שלב אבטחה)"); }
   assertEmailDeliveryConfigured(env);
 
-  const existing = await env.DB.prepare("SELECT id FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
+  let existing;
+  try { existing=await env.DB.prepare("SELECT id FROM users WHERE email = ? COLLATE NOCASE").bind(email).first(); }
+  catch(error) { console.error("Registration lookup failed",error); throw new HttpError(503,"לא הצלחנו לבדוק את החשבון (שלב משתמש)"); }
   if (existing) throw new HttpError(409, "כבר קיים חשבון עם כתובת האימייל הזו");
 
   const id = crypto.randomUUID();
   const salt = randomToken(16);
   const passwordHash = await derivePassword(password, salt, PASSWORD_ITERATIONS);
   const admins = String(env.ADMIN_EMAILS || "").split(",").map(normalizeEmailLoose).filter(Boolean);
-  const [userCount, existingAdmin] = await Promise.all([
-    env.DB.prepare("SELECT COUNT(*) AS count FROM users").first(),
-    env.DB.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").first()
-  ]);
+  let userCount,existingAdmin;
+  try { [userCount,existingAdmin]=await Promise.all([env.DB.prepare("SELECT COUNT(*) AS count FROM users").first(),env.DB.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").first()]); }
+  catch(error) { console.error("Registration role lookup failed",error); throw new HttpError(503,"לא הצלחנו לבדוק את החשבון (שלב הרשאות)"); }
   const isFirstAccount = Number(userCount?.count || 0) === 0;
-  const role = admins.includes(email) || (!existingAdmin && isFirstAccount)
-    ? "admin"
-    : await compatibleMemberRole(env);
+  let role;
+  try { role=admins.includes(email)||(!existingAdmin&&isFirstAccount)?"admin":await compatibleMemberRole(env); }
+  catch(error) { console.error("Registration role compatibility failed",error); role="member"; }
   const code = verificationCode();
   const challengeHash = await sha256(`${id}:${code}`);
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
