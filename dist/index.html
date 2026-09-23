@@ -20,10 +20,10 @@
     <span>החיבור לשירות אינו זמין כרגע — אפשר לעיין באתר, ופעולות החשבון יחזרו עם חידוש החיבור.</span>
   </div>
 
-  <header class="site-header" style="background:#fffaf0">
+  <header class="site-header" style="background:#fff">
     <div class="header-inner">
       <a class="brand" href="#/" aria-label="גמ״ח ברגע — דף הבית">
-        <span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:visible;box-shadow:none"><img src="./gmach-berega-logo.jpg" alt="" style="transform:none;width:78px;height:78px;max-width:none;object-fit:contain;margin:-17px"></span>
+        <span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:visible;box-shadow:none"><img src="./gmach-berega-logo.jpg" alt="" style="transform:none;width:96px;height:96px;max-width:none;object-fit:contain;margin:-26px"></span>
         <span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span>
       </a>
 
@@ -211,7 +211,7 @@
 
   <footer class="site-footer">
     <div class="footer-inner">
-      <div class="footer-brand"><a class="brand brand-footer" href="#/"><span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:visible;box-shadow:none"><img src="./gmach-berega-logo.jpg" alt="" style="transform:none;width:78px;height:78px;max-width:none;object-fit:contain;margin:-17px"></span><span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span></a><p>מחברים בין מי שיש לו לבין מי שצריך — בחינם, בפשטות ובאחריות.</p></div>
+      <div class="footer-brand"><a class="brand brand-footer" href="#/"><span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:visible;box-shadow:none"><img src="./gmach-berega-logo.jpg" alt="" style="transform:none;width:96px;height:96px;max-width:none;object-fit:contain;margin:-26px"></span><span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span></a><p>מחברים בין מי שיש לו לבין מי שצריך — בחינם, בפשטות ובאחריות.</p></div>
       <div class="footer-links"><div><strong>למצוא</strong><a href="#/catalog">כל הפריטים</a><a href="#how-it-works">איך זה עובד</a></div><div><strong>לשתף</strong><button type="button" data-footer-add-gmach>פרסום גמ״ח</button><button type="button" data-footer-add-item>הוספת פריט</button></div><div><strong>חשוב לדעת</strong><button type="button" data-open-info="safety">כללי השאלה בטוחה</button><button type="button" data-open-info="terms">תנאי שימוש</button><button type="button" data-open-info="privacy">פרטיות</button><a id="support-email-link" hidden>יצירת קשר ותמיכה</a></div></div>
     </div>
     <div class="footer-bottom"><span>© <span id="current-year"></span> גמ״ח ברגע</span><span>קהילה שמשאילה, קהילה שצומחת</span></div>
@@ -381,27 +381,25 @@
   <script>
     (() => {
       if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      const items = [...document.querySelectorAll('main section, main article, .audience-paths')];
-      items.forEach((el, i) => {
-        el.style.transition = 'opacity .65s ease, transform .65s cubic-bezier(.2,.7,.2,1)';
-        el.style.willChange = 'transform, opacity';
-        el.style.opacity = '0';
-        el.style.transform = 'translateY(24px)';
-      });
-      const io = new IntersectionObserver(entries => entries.forEach(e => {
-        if (e.isIntersecting) {
-          e.target.style.opacity = '1';
-          e.target.style.transform = 'translateY(0)';
-          io.unobserve(e.target);
-        }
-      }), { threshold: .08, rootMargin: '0px 0px -5% 0px' });
-      items.forEach(el => io.observe(el));
-      const hero = document.querySelector('.hero-copy');
-      addEventListener('scroll', () => {
-        if (!hero) return;
-        const y = Math.min(scrollY, 420);
-        hero.style.transform = 'translateY(' + (y * .08) + 'px)';
-      }, { passive: true });
+      const layers = [...document.querySelectorAll('main > section, .audience-paths, .organizations-section, .how-it-works')];
+      let ticking = false;
+      const move = () => {
+        const vh = innerHeight || 800;
+        layers.forEach((el, i) => {
+          const r = el.getBoundingClientRect();
+          const center = r.top + r.height / 2;
+          const delta = (center - vh / 2) / vh;
+          const amount = Math.max(-22, Math.min(22, -delta * (10 + (i % 3) * 4)));
+          el.style.transform = 'translate3d(0,' + amount.toFixed(1) + 'px,0)';
+          el.style.transition = 'transform .12s linear';
+          el.style.willChange = 'transform';
+        });
+        ticking = false;
+      };
+      const requestMove = () => { if (!ticking) { requestAnimationFrame(move); ticking = true; } };
+      addEventListener('scroll', requestMove, { passive: true });
+      addEventListener('resize', requestMove, { passive: true });
+      requestMove();
     })();
   </script>
 </body>
