@@ -49,7 +49,12 @@ async function routeApi(request, env, ctx, url) {
 
   if (method === "GET" && path === "/api/health") {
     await env.DB.prepare("SELECT 1 AS ok").first();
-    return json({ ok: true, release: "platform-2026-09-22.1", database: "D1", storage: "R2", email: Boolean(env.RESEND_API_KEY), timestamp: new Date().toISOString() });
+    const [usersTable,challengesTable]=await Promise.all([
+      env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").first(),
+      env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='auth_challenges'").first()
+    ]);
+    const userSql=String(usersTable?.sql||"").toLowerCase();
+    return json({ ok:true,release:"registration-fix-2026-09-23.2",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified")},timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
