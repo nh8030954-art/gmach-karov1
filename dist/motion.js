@@ -29,7 +29,7 @@
     state.scenes=mappings.map(([selector,property])=>({element:document.querySelector(selector),property})).filter(scene=>scene.element);
     const steps=document.getElementById('how-it-works');
     if(steps){
-      if(innerWidth>900&&innerHeight>=700)steps.classList.add('motion-sticky');
+      steps.classList.add('motion-sticky');
       state.scenes.push({element:steps,property:'--journey-p',journey:true});
     }
   };
@@ -47,9 +47,7 @@
     state.scenes.forEach(({element,property,journey})=>{
       const rect=element.getBoundingClientRect();
       if(rect.bottom<-120||rect.top>innerHeight+120)return;
-      const progress=journey&&element.classList.contains('motion-sticky')
-        ? clamp(-rect.top/Math.max(element.offsetHeight-innerHeight,1))
-        : sceneProgress(element);
+      const progress=sceneProgress(element,journey ? .88 : .82,journey ? .12 : .18);
       element.style.setProperty(property,progress.toFixed(4));
       if(journey){
         element.style.setProperty('--journey-request',clamp((progress-.2)*4).toFixed(4));
@@ -135,6 +133,15 @@
     observer.observe(button);
   };
 
+  const syncEmptySections=()=>{
+    const section=document.getElementById('gmachim');
+    const grid=document.getElementById('organizations-grid');
+    if(!section||!grid)return;
+    const update=()=>section.classList.toggle('is-empty',Boolean(grid.querySelector('.dashboard-empty')));
+    new MutationObserver(update).observe(grid,{childList:true,subtree:true});
+    update();
+  };
+
   const rebuild=()=>{
     setupScenes();
     state.scenes.forEach(({element})=>element.style.removeProperty('will-change'));
@@ -143,7 +150,7 @@
 
   const init=()=>{
     root.classList.add('motion-ready','motion-active');
-    setupScenes(); setupCategoryScene(); setupReveal(); setupSkeletons(); setupCounts(); setupActions(); setupOneTimeCta();
+    setupScenes(); setupCategoryScene(); setupReveal(); setupSkeletons(); setupCounts(); setupActions(); setupOneTimeCta(); syncEmptySections();
     addEventListener('scroll',requestDraw,{passive:true});
     addEventListener('resize',rebuild,{passive:true});
     reduceQuery.addEventListener?.('change',requestDraw);
