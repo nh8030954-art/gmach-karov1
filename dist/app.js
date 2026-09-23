@@ -518,6 +518,39 @@
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
 })();
 
+// Persistent accessibility preferences. Controls remain fully keyboard usable
+// and only affect presentation; they do not replace semantic accessibility.
+(()=>{
+  const storageKey='gmach-berega-accessibility-v1';
+  const options=['large-text','high-contrast','grayscale','readable-font','underline-links','stop-motion'];
+  const className=option=>`a11y-${option}`;
+  let preferences={};
+  try{preferences=JSON.parse(localStorage.getItem(storageKey)||'{}')||{};}catch{preferences={};}
+  const apply=()=>{
+    options.forEach(option=>document.documentElement.classList.toggle(className(option),Boolean(preferences[option])));
+    document.querySelectorAll('[data-a11y]').forEach(button=>button.setAttribute('aria-pressed',String(Boolean(preferences[button.dataset.a11y]))));
+  };
+  apply();
+  const ready=()=>{
+    const menu=document.getElementById('accessibility-dialog');
+    const statement=document.getElementById('accessibility-statement-dialog');
+    const show=dialog=>{if(dialog&&!dialog.open){dialog.showModal();document.body.classList.add('dialog-open');}};
+    apply();
+    document.getElementById('accessibility-button')?.addEventListener('click',()=>show(menu));
+    document.querySelectorAll('[data-a11y]').forEach(button=>button.addEventListener('click',()=>{
+      const option=button.dataset.a11y; preferences[option]=!preferences[option];
+      localStorage.setItem(storageKey,JSON.stringify(preferences)); apply();
+    }));
+    document.getElementById('accessibility-reset')?.addEventListener('click',()=>{
+      preferences={}; localStorage.removeItem(storageKey); apply();
+    });
+    document.querySelectorAll('[data-open-accessibility-statement]').forEach(button=>button.addEventListener('click',()=>{
+      if(menu?.open)menu.close(); show(statement);
+    }));
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
+})();
+
 // Seamless category carousel. It deliberately uses one animation engine only;
 // a second timer-based carousel causes visible resets and uneven motion.
 (()=>{
@@ -552,7 +585,7 @@
     const speed=()=>window.innerWidth<=760 ? 82 : 46;
     const tick=(now)=>{
       const dt=Math.min(40,now-last); last=now;
-      if(!paused && !document.hidden){
+      if(!paused && !document.hidden && !document.documentElement.classList.contains('a11y-stop-motion')){
         const delta=speed()*dt/1000;
         rail.scrollLeft += rtl ? -delta : delta;
         if(Math.abs(rail.scrollLeft)>=cycleWidth) rail.scrollLeft+=rtl ? cycleWidth : -cycleWidth;

@@ -36,14 +36,6 @@
       @keyframes ctaEmphasis{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(244,189,77,0)}50%{transform:scale(1.055);box-shadow:0 0 0 9px rgba(244,189,77,.18)}}
 </style>
 
-  <style id="header-logo-size">
-    .header-inner{min-height:104px}
-    .site-header .header-logo{width:170px!important;height:94px!important;flex:0 0 170px!important;overflow:hidden!important;background:transparent!important;border-radius:0!important;box-shadow:none!important;display:grid!important;place-items:center!important}
-    .site-header .header-logo img{position:static!important;display:block!important;width:166px!important;height:90px!important;max-width:166px!important;object-fit:contain!important;transform:none!important;margin:0!important}
-    @media(max-width:760px){.header-inner{min-height:88px}.site-header .header-logo{width:150px!important;height:80px!important;flex-basis:150px!important}.site-header .header-logo img{width:146px!important;height:76px!important;max-width:146px!important}}
-    @media(max-width:420px){.header-inner{min-height:76px}.site-header .header-logo{width:180px!important;height:72px!important;flex-basis:180px!important;display:grid!important;place-items:center!important;overflow:visible!important;transform:translateX(18px)!important}.site-header .header-logo img{width:176px!important;height:70px!important;max-width:176px!important;object-fit:contain!important;object-position:center!important}}
-  </style>
-
   <style id="category-carousel-v1">
   .category-rail.carousel-ready{display:flex!important;gap:12px;overflow-x:auto!important;overflow-y:hidden;scroll-snap-type:none!important;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior-inline:contain}
   .category-rail.carousel-ready::-webkit-scrollbar{display:none}
@@ -94,6 +86,11 @@
       <button type="button" data-requires-auth>האזור שלי</button>
     </nav>
   </header>
+
+  <button class="accessibility-fab" id="accessibility-button" type="button" aria-label="פתיחת תפריט נגישות" aria-haspopup="dialog" aria-controls="accessibility-dialog">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="4" r="2"/><path d="M4 7h16M12 7v5M8 21l4-9 4 9M6 11l6 1 6-1"/></svg>
+    <span>נגישות</span>
+  </button>
 
     
   <main id="main-content">
@@ -258,12 +255,43 @@
   <footer class="site-footer">
     <div class="footer-inner">
       <div class="footer-brand"><a class="brand brand-footer" href="#/"><span class="brand-mark brand-logo-crop" aria-hidden="true" style="background:transparent;border-radius:0;overflow:hidden;box-shadow:none;width:78px;height:78px;flex:0 0 78px;position:relative"><img src="./gmach-berega-logo.jpg" alt="" style="position:absolute;width:348px;height:auto;max-width:none;left:-142px;top:-36px;transform:none"></span><span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span></a><p>מחברים בין מי שיש לו לבין מי שצריך — בחינם, בפשטות ובאחריות.</p></div>
-      <div class="footer-links"><div><strong>למצוא</strong><a href="#/catalog">כל הפריטים</a><a href="#how-it-works">איך זה עובד</a></div><div><strong>לשתף</strong><button type="button" data-footer-add-gmach>פרסום גמ״ח</button><button type="button" data-footer-add-item>הוספת פריט</button></div><div><strong>חשוב לדעת</strong><button type="button" data-open-info="safety">כללי השאלה בטוחה</button><button type="button" data-open-info="terms">תנאי שימוש</button><button type="button" data-open-info="privacy">פרטיות</button><button type="button" id="support-form-button">יצירת קשר ותמיכה</button></div></div>
+      <div class="footer-links"><div><strong>למצוא</strong><a href="#/catalog">כל הפריטים</a><a href="#how-it-works">איך זה עובד</a></div><div><strong>לשתף</strong><button type="button" data-footer-add-gmach>פרסום גמ״ח</button><button type="button" data-footer-add-item>הוספת פריט</button></div><div><strong>חשוב לדעת</strong><button type="button" data-open-info="safety">כללי השאלה בטוחה</button><button type="button" data-open-info="terms">תנאי שימוש</button><button type="button" data-open-info="privacy">פרטיות</button><button type="button" data-open-accessibility-statement>הצהרת נגישות</button><button type="button" id="support-form-button">יצירת קשר ותמיכה</button></div></div>
     </div>
     <div class="footer-bottom"><span>© <span id="current-year"></span> גמ״ח ברגע</span><span>קהילה שמשאילה, קהילה שצומחת</span></div>
   </footer>
 
   <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
+
+  <dialog class="accessibility-dialog modal modal-narrow" id="accessibility-dialog" aria-labelledby="accessibility-title">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת תפריט הנגישות">×</button>
+    <div class="dialog-heading align-start"><span class="section-kicker">התאמה אישית</span><h2 id="accessibility-title">כלי נגישות</h2><p>בחרו את ההתאמות הנוחות לכם. ההעדפות נשמרות במכשיר הזה.</p></div>
+    <div class="accessibility-controls" role="group" aria-label="התאמות תצוגה">
+      <button type="button" data-a11y="large-text" aria-pressed="false"><strong>א+</strong><span>טקסט מוגדל</span></button>
+      <button type="button" data-a11y="high-contrast" aria-pressed="false"><strong>◐</strong><span>ניגודיות גבוהה</span></button>
+      <button type="button" data-a11y="grayscale" aria-pressed="false"><strong>◉</strong><span>גווני אפור</span></button>
+      <button type="button" data-a11y="readable-font" aria-pressed="false"><strong>אא</strong><span>גופן קריא</span></button>
+      <button type="button" data-a11y="underline-links" aria-pressed="false"><strong>קישור</strong><span>הדגשת קישורים</span></button>
+      <button type="button" data-a11y="stop-motion" aria-pressed="false"><strong>Ⅱ</strong><span>עצירת תנועה</span></button>
+    </div>
+    <div class="accessibility-actions">
+      <button class="button button-secondary" id="accessibility-reset" type="button">איפוס התאמות</button>
+      <button class="link-button" type="button" data-open-accessibility-statement>הצהרת נגישות מלאה</button>
+    </div>
+  </dialog>
+
+  <dialog class="modal modal-medium" id="accessibility-statement-dialog" aria-labelledby="accessibility-statement-title">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת הצהרת הנגישות">×</button>
+    <article class="legal-copy accessibility-statement">
+      <h2 id="accessibility-statement-title">הצהרת נגישות</h2>
+      <p><strong>עודכנה לאחרונה: 23 בספטמבר 2026.</strong></p>
+      <p>גמ״ח ברגע פועל כדי לאפשר לכל אדם, לרבות אנשים עם מוגבלות, להשתמש באתר באופן עצמאי, שוויוני, מכבד ונוח. בתכנון האתר אנו שואפים ליישם את עקרונות תקן WCAG 2.2 ברמה AA ככל האפשר.</p>
+      <h3>התאמות שבוצעו באתר</h3>
+      <ul><li>מבנה סמנטי, כותרות ואזורים ברורים לקוראי מסך.</li><li>ניווט מלא באמצעות מקלדת, קישור דילוג לתוכן ומיקוד חזותי בולט.</li><li>שמות נגישים לכפתורים, שדות, חלונות ותמונות משמעותיות.</li><li>ניגודיות צבעים, הגדלת טקסט והתאמה למסכים ולתצוגה מוגדלת.</li><li>כיבוד הגדרת המכשיר להפחתת תנועה ואפשרות לעצור תנועה דרך תפריט הנגישות.</li><li>הודעות מצב ושגיאה שניתנות לזיהוי גם בטכנולוגיות מסייעות.</li></ul>
+      <h3>שימוש בכלי הנגישות</h3><p>הכפתור הצף מאפשר להגדיל טקסט, להפעיל ניגודיות גבוהה או גווני אפור, לבחור גופן קריא, להדגיש קישורים ולעצור אנימציות. ניתן לאפס את כל ההתאמות בכל עת.</p>
+      <h3>מגבלות ידועות</h3><p>האתר מתעדכן באופן שוטף וחלק מהתכנים מוזנים בידי משתמשים. ייתכן שתוכן חדש, תמונה שהועלתה או רכיב של שירות חיצוני עדיין לא הותאמו במלואם. אין בכך כדי לגרוע מהמחויבות שלנו לתקן ליקויים במהירות האפשרית.</p>
+      <h3>פנייה בנושא נגישות</h3><p>אם נתקלתם בקושי, ספרו לנו מה ניסיתם לעשות, באיזה עמוד, באיזה מכשיר ובאיזו טכנולוגיה מסייעת השתמשתם. ניתן לפנות באמצעות טופס "יצירת קשר ותמיכה" באתר. נעשה מאמץ להשיב בהקדם ולספק חלופה נגישה.</p>
+    </article>
+  </dialog>
 
   <dialog class="modal modal-narrow" id="support-dialog" aria-labelledby="support-dialog-title" aria-describedby="support-dialog-description">
     <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת טופס יצירת קשר">×</button>
