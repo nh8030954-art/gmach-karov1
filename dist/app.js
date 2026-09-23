@@ -480,15 +480,15 @@
     let raf=0;
     const draw=()=>{
       const r=scene.getBoundingClientRect(), vh=innerHeight||800;
-      const raw=(vh*.86-r.top)/(vh*.34);
+      const raw=(vh*.94-r.top)/(vh*.24);
       const p=Math.max(0,Math.min(1,raw));
       const travel=Math.max(0,(scene.clientWidth-150)/2-32);
       left.style.transform='translate3d('+(p*travel)+'px,0,0)';
       right.style.transform='translate3d('+(-p*travel)+'px,0,0)';
-      const meet=Math.max(0,Math.min(1,(p-.72)/.18));
+      const meet=Math.max(0,Math.min(1,(p-.48)/.16));
       left.style.opacity=String(1-meet);
       right.style.opacity=String(1-meet);
-      if(handshake){handshake.style.opacity=String(meet);handshake.style.transform='translateX(-50%) scale('+(0.7+meet*0.3)+')';}
+      if(handshake){const shake=meet>.92?Math.sin((p-.92)*95)*7*meet:0;handshake.style.opacity=String(meet);handshake.style.transform='translateX(calc(-50% + '+shake.toFixed(1)+'px)) rotate('+(shake*.45).toFixed(1)+'deg) scale('+(0.78+meet*.28)+')';}
       if(label) label.style.opacity=String(.55+p*.45);
       raf=0;
     };
