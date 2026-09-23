@@ -467,35 +467,38 @@
 })();
 
 
+
+
 // Scroll connection scene
 (() => {
-  const init = () => {
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const init=()=>{
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
     const scene=document.getElementById('scroll-connect-scene');
-    const left=document.getElementById('scroll-hand-left');
-    const right=document.getElementById('scroll-hand-right');
-    const label=document.getElementById('scroll-connect-label');
-    const handshake=document.getElementById('scroll-handshake');
-    if(!scene||!left||!right)return;
+    const gl=document.getElementById('connect-left'), gr=document.getElementById('connect-right');
+    const l1=document.getElementById('connect-line-left'), l2=document.getElementById('connect-line-right');
+    const hand=document.getElementById('connect-handshake'), pulse=document.getElementById('connect-pulse');
+    const check=document.getElementById('connect-check'), label=document.getElementById('scroll-connect-label');
+    if(!scene||!gl||!gr)return;
     let raf=0;
+    const clamp=v=>Math.max(0,Math.min(1,v));
     const draw=()=>{
       const r=scene.getBoundingClientRect(), vh=innerHeight||800;
-      const raw=(vh*.97-r.top)/(vh*.20);
-      const p=Math.max(0,Math.min(1,raw));
-      const travel=Math.max(0,(scene.clientWidth-138)/2-26);
-      left.style.transform='translate3d('+(p*travel)+'px,0,0)';
-      right.style.transform='translate3d('+(-p*travel)+'px,0,0)';
-      const meet=Math.max(0,Math.min(1,(p-.40)/.14));
-      left.style.opacity=String(1-meet);
-      right.style.opacity=String(1-meet);
-      if(handshake){const phase=Math.max(0,(p-.54)/.46);const shake=phase>0?Math.sin(phase*Math.PI*6)*8:0;handshake.style.opacity=String(meet);handshake.style.transform='translate3d(-50%,'+shake.toFixed(1)+'px,0) rotate('+(shake*.35).toFixed(1)+'deg) scale('+(0.82+meet*.22)+')';}
-      if(label) label.style.opacity=String(.55+p*.45);
+      const p=clamp((vh*.94-r.top)/(vh*.34));
+      const approach=clamp(p/.48), link=clamp((p-.22)/.34), meet=clamp((p-.48)/.16), finish=clamp((p-.66)/.18);
+      const shift=approach*48, spin=p*300;
+      gl.style.transform='translate3d('+shift+'px,0,0) rotate('+spin+'deg)';
+      gr.style.transform='translate3d('+(-shift)+'px,0,0) rotate('+(-spin)+'deg)';
+      l1.style.strokeDashoffset=String(123*(1-link)); l2.style.strokeDashoffset=String(123*(1-link));
+      hand.style.opacity=String(meet*(1-finish));
+      const shake=meet>0&&finish<1?Math.sin(p*55)*4*(1-finish):0;
+      hand.setAttribute('transform','translate(0 '+shake.toFixed(1)+') scale('+(0.82+meet*.18)+') translate('+(325*(1/(0.82+meet*.18)-1)).toFixed(1)+' '+(82*(1/(0.82+meet*.18)-1)).toFixed(1)+')');
+      pulse.style.opacity=String(Math.max(meet*.75,finish*.35)); pulse.setAttribute('r',String(31+finish*18));
+      check.style.opacity=String(finish);
+      if(label)label.style.opacity=String(.62+p*.38);
       raf=0;
     };
     const tick=()=>{if(!raf)raf=requestAnimationFrame(draw)};
-    addEventListener('scroll',tick,{passive:true});
-    addEventListener('resize',tick,{passive:true});
-    draw();
+    addEventListener('scroll',tick,{passive:true});addEventListener('resize',tick,{passive:true});draw();
   };
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init,{once:true}); else init();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
