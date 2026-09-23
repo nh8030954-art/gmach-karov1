@@ -56,12 +56,7 @@
   </header>
 
     
-  <div id="parallax-bg" aria-hidden="true" style="position:absolute;inset:84px 0 auto 0;height:620px;overflow:hidden;pointer-events:none;z-index:0">
-    <span data-parallax=".10" style="position:absolute;width:420px;height:420px;border-radius:50%;background:rgba(255,255,255,.055);top:-150px;right:-100px"></span>
-    <span data-parallax=".18" style="position:absolute;width:260px;height:260px;border-radius:50%;background:rgba(244,189,77,.08);top:190px;left:-90px"></span>
-    <span data-parallax=".26" style="position:absolute;width:150px;height:150px;border-radius:50%;border:1px solid rgba(255,255,255,.12);top:330px;right:12%"></span>
-  </div>
-  <main id="main-content" style="position:relative;z-index:1">
+  <main id="main-content">
     <section class="home-view" id="home-view">
       <section class="search-hero" aria-labelledby="hero-title">
         <div class="hero-copy">
@@ -385,23 +380,29 @@
   <script src="./app.js" defer></script>
 
 
+
   <script>
     (() => {
       if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-      const layers = [...document.querySelectorAll('[data-parallax]')];
-      let scheduled = false;
-      const render = () => {
-        const y = window.scrollY || 0;
-        layers.forEach(el => {
-          const speed = Number(el.dataset.parallax || 0);
-          el.style.transform = 'translate3d(0,' + (y * speed).toFixed(1) + 'px,0)';
+      const targets = [...document.querySelectorAll('.hero-copy, .search-panel, .audience-paths, #how-it-works, #gmachim')];
+      targets.forEach((el,i) => { el.dataset.scrollParallax = String(i % 2 ? -1 : 1); el.style.willChange='transform'; });
+      let raf = 0;
+      const draw = () => {
+        const vh = innerHeight || 800;
+        targets.forEach((el,i) => {
+          const r=el.getBoundingClientRect();
+          const progress=(r.top + r.height/2 - vh/2)/vh;
+          const dir=Number(el.dataset.scrollParallax);
+          const strength=i<2 ? 42 : 28;
+          const y=Math.max(-strength,Math.min(strength,progress*strength*dir));
+          el.style.transform='translate3d(0,'+y.toFixed(1)+'px,0)';
         });
-        scheduled = false;
+        raf=0;
       };
-      addEventListener('scroll', () => {
-        if (!scheduled) { scheduled = true; requestAnimationFrame(render); }
-      }, { passive:true });
-      render();
+      const onScroll=()=>{ if(!raf) raf=requestAnimationFrame(draw); };
+      addEventListener('scroll',onScroll,{passive:true});
+      addEventListener('resize',onScroll,{passive:true});
+      draw();
     })();
   </script>
 </body>
