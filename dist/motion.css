@@ -260,8 +260,8 @@ html.a11y-stop-motion .motion-reveal{opacity:1!important;transform:none!importan
 }
 
 /* Direction, identity and logo corrections from the final-state screenshots. */
-.audience-paths{justify-content:center!important}
-#path-manager{margin-inline:auto!important;transform:none!important;position:relative!important;inset:auto!important}
+.audience-paths{grid-template-columns:minmax(0,420px)!important;justify-content:center!important;justify-items:stretch!important}
+#path-manager{width:100%!important;margin-inline:auto!important;transform:none!important;position:relative!important;inset:auto!important;grid-column:1!important}
 
 .journey-item{left:calc(78% - 64% * var(--journey-p))}
 .shared-object{left:calc(22% + 56% * var(--scene-p))}
