@@ -480,15 +480,15 @@
     let raf=0;
     const draw=()=>{
       const r=scene.getBoundingClientRect(), vh=innerHeight||800;
-      const raw=(vh*.94-r.top)/(vh*.24);
+      const raw=(vh*.97-r.top)/(vh*.20);
       const p=Math.max(0,Math.min(1,raw));
-      const travel=Math.max(0,(scene.clientWidth-150)/2-32);
+      const travel=Math.max(0,(scene.clientWidth-138)/2-26);
       left.style.transform='translate3d('+(p*travel)+'px,0,0)';
       right.style.transform='translate3d('+(-p*travel)+'px,0,0)';
-      const meet=Math.max(0,Math.min(1,(p-.48)/.16));
+      const meet=Math.max(0,Math.min(1,(p-.40)/.14));
       left.style.opacity=String(1-meet);
       right.style.opacity=String(1-meet);
-      if(handshake){const shake=meet>.92?Math.sin((p-.92)*95)*7*meet:0;handshake.style.opacity=String(meet);handshake.style.transform='translateX(calc(-50% + '+shake.toFixed(1)+'px)) rotate('+(shake*.45).toFixed(1)+'deg) scale('+(0.78+meet*.28)+')';}
+      if(handshake){const phase=Math.max(0,(p-.54)/.46);const shake=phase>0?Math.sin(phase*Math.PI*6)*8:0;handshake.style.opacity=String(meet);handshake.style.transform='translate3d(-50%,'+shake.toFixed(1)+'px,0) rotate('+(shake*.35).toFixed(1)+'deg) scale('+(0.82+meet*.22)+')';}
       if(label) label.style.opacity=String(.55+p*.45);
       raf=0;
     };
