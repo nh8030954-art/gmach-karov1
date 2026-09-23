@@ -465,14 +465,3 @@
   }
   init().catch(error => { document.documentElement.classList.remove("app-booting"); console.error("App initialization failed", error); toast("אירעה תקלה בטעינת האתר. נסו לרענן את הדף.", "error"); });
 })();
-
-// Card motion v1
-(()=>{
- const init=()=>{
-  if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;
-  const search=document.querySelector('.search-panel');if(search){search.classList.add('motion-enter');requestAnimationFrame(()=>requestAnimationFrame(()=>search.classList.add('motion-ready')))}
-  const rail=document.querySelector('.category-rail');if(rail){rail.classList.add('motion-carousel');let dir=1,last=0,paused=false;const pause=()=>paused=true,resume=()=>setTimeout(()=>paused=false,1200);rail.addEventListener('touchstart',pause,{passive:true});rail.addEventListener('touchend',resume,{passive:true});rail.addEventListener('pointerenter',pause);rail.addEventListener('pointerleave',()=>paused=false);const run=t=>{if(!paused&&t-last>40){const max=Math.max(0,rail.scrollWidth-rail.clientWidth);rail.scrollLeft+=dir*.26;if(Math.abs(rail.scrollLeft)>=max-2||Math.abs(rail.scrollLeft)<=2)dir*=-1;last=t}requestAnimationFrame(run)};requestAnimationFrame(run)}
-  const steps=[...document.querySelectorAll('.steps-grid > *, .how-grid > *, .process-grid > *, [class*="steps"] > article')];steps.forEach((el,i)=>{el.classList.add('scroll-reveal-card');el.style.transitionDelay=(i%3)*70+'ms'});if(steps.length){const io=new IntersectionObserver(es=>es.forEach(x=>{if(x.isIntersecting){x.target.classList.add('is-visible');io.unobserve(x.target)}}),{threshold:.08,rootMargin:'0px 0px 8% 0px'});steps.forEach(el=>io.observe(el))}
- };
- if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
-})();
