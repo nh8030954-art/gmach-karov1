@@ -175,7 +175,8 @@ async function register(request, env, ctx, url) {
     ]);
   } catch (error) {
     if (String(error).toLowerCase().includes("unique")) throw new HttpError(409, "כבר קיים חשבון עם כתובת האימייל הזו");
-    throw error;
+    console.error("Registration database write failed", error);
+    throw new HttpError(503, "לא הצלחנו ליצור את החשבון במסד הנתונים");
   }
 
   try {
