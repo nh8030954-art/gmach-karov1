@@ -23,8 +23,10 @@
       ['.nearby-motion-scene','--scene-p'],
       ['.connection-story','--scene-p'],
       ['.trust-section','--scene-p'],
+      ['.gmach-callout','--publish-p'],
       ['.help-broadcast','--scene-p'],
-      ['.community-story','--scene-p']
+      ['.community-story','--scene-p'],
+      ['.faq-section','--faq-p']
     ];
     state.scenes=mappings.map(([selector,property])=>({element:document.querySelector(selector),property})).filter(scene=>scene.element);
     const steps=document.getElementById('how-it-works');
@@ -58,7 +60,7 @@
   const requestDraw=()=>{if(!state.raf)state.raf=requestAnimationFrame(draw)};
 
   const setupReveal=()=>{
-    const elements=[...document.querySelectorAll('.section-heading,.organizations-grid,.steps-grid>li,.trust-grid article,.gmach-callout,.faq-list details')];
+    const elements=[...document.querySelectorAll('.section-heading,.organizations-grid,.trust-grid article,.gmach-callout')];
     if(stopped()){elements.forEach(el=>el.classList.add('is-visible'));return;}
     elements.forEach((el,index)=>{el.classList.add('motion-reveal');el.style.setProperty('--reveal-delay',`${Math.min(index%4,3)*55}ms`);});
     const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{
@@ -125,12 +127,7 @@
   const setupOneTimeCta=()=>{
     const button=document.getElementById('callout-add-gmach');
     if(!button||stopped())return;
-    const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{
-      if(!entry.isIntersecting)return;
-      entry.target.classList.add('motion-once-cta');
-      observer.unobserve(entry.target);
-    }),{threshold:.7});
-    observer.observe(button);
+    button.classList.add('motion-continuous-cta');
   };
 
   const syncEmptySections=()=>{

@@ -129,3 +129,80 @@ html.a11y-stop-motion .motion-reveal{opacity:1!important;transform:none!importan
   .help-search-visual{min-height:180px}
   .community-network{height:300px}
 }
+
+/* Scroll-story correction after full desktop + mobile recording review. */
+.site-header,.site-header.is-compact,.header-inner{background:#fff!important}
+.site-header{backdrop-filter:none!important}
+.site-header.is-compact{box-shadow:0 8px 26px rgba(17,43,66,.09)}
+.site-header .header-logo{width:76px!important;height:76px!important;flex:0 0 76px!important;border-radius:0!important;background:#fff!important;overflow:hidden!important;box-shadow:none!important}
+.site-header .header-logo img{width:100%!important;height:100%!important;max-width:100%!important;object-fit:contain!important;transform:none!important;display:block!important}
+.site-header .brand{gap:12px!important}
+
+/* The three steps are deliberately revealed by scroll progress, not page-load timing. */
+.steps-section.motion-sticky{height:190vh!important}
+.steps-section.motion-sticky>.section-shell{position:sticky!important;top:92px!important;min-height:calc(100vh - 108px)!important;display:flex!important;flex-direction:column!important;justify-content:center!important}
+.steps-section.motion-sticky .steps-grid{position:relative!important;inset:auto!important;opacity:1!important;transform:none!important;pointer-events:auto!important}
+.steps-section .steps-grid>li{transition:opacity .18s linear,transform .28s var(--motion-ease),border-color .3s ease,box-shadow .3s ease}
+.steps-section .steps-grid>li:nth-child(1){opacity:clamp(.16,calc((var(--journey-p) - .02)*8),1);transform:translateY(calc((1 - clamp(0,calc((var(--journey-p) - .02)*8),1))*18px))}
+.steps-section .steps-grid>li:nth-child(2){opacity:clamp(.16,calc((var(--journey-p) - .27)*8),1);transform:translateY(calc((1 - clamp(0,calc((var(--journey-p) - .27)*8),1))*18px))}
+.steps-section .steps-grid>li:nth-child(3){opacity:clamp(.16,calc((var(--journey-p) - .52)*8),1);transform:translateY(calc((1 - clamp(0,calc((var(--journey-p) - .52)*8),1))*18px))}
+.steps-section .loan-journey{margin-top:22px!important}
+
+/* Keep both people and the destination visible until the transfer completes. */
+.connection-story{min-height:150vh;position:relative}
+.connection-story .connection-canvas{position:sticky;top:170px;min-height:min(430px,calc(100vh - 210px))}
+
+/* Restore the gold trust emphasis that communicates verification. */
+.trust-grid article.is-visible{animation:trustGoldFrame 1.45s var(--motion-ease) both}
+.trust-grid article:nth-child(2).is-visible{animation-delay:.12s}
+.trust-grid article:nth-child(3).is-visible{animation-delay:.24s}
+@keyframes trustGoldFrame{0%{border-color:var(--line);box-shadow:var(--shadow-sm)}48%{border-color:#d7a544;box-shadow:0 0 0 5px rgba(215,165,68,.18),0 18px 38px rgba(55,42,18,.12)}100%{border-color:#d7a544;box-shadow:0 10px 28px rgba(55,42,18,.1)}}
+
+/* This is a real three-stage publishing explanation, animated in sequence. */
+.publish-sequence>span{display:grid;gap:4px;min-width:190px;transition:opacity .2s linear,transform .28s var(--motion-ease),border-color .25s ease}
+.publish-sequence>span b{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--accent);color:var(--navy);font-size:.78rem;margin-inline:auto}
+.publish-sequence>span small{display:block;color:#dbe7e9;font-size:.72rem}
+.publish-object{opacity:clamp(.15,calc(var(--publish-p)*7),1);transform:translateY(calc((1 - clamp(0,calc(var(--publish-p)*7),1))*14px))}
+.publish-card{opacity:clamp(.15,calc((var(--publish-p) - .25)*7),1);transform:translateY(calc((1 - clamp(0,calc((var(--publish-p) - .25)*7),1))*14px))}
+.publish-result{opacity:clamp(.15,calc((var(--publish-p) - .5)*7),1);transform:translateY(calc((1 - clamp(0,calc((var(--publish-p) - .5)*7),1))*14px))}
+.publish-sequence>i{opacity:clamp(.15,calc((var(--publish-p) - .18)*7),1)}
+.motion-continuous-cta{animation:motionCtaContinuous 1.8s var(--motion-ease) infinite}
+@keyframes motionCtaContinuous{0%,56%,100%{transform:none;box-shadow:none}72%{transform:translateY(-2px) scale(1.025);box-shadow:0 0 0 8px rgba(244,189,77,.16)}}
+
+.network-caption{max-width:720px;margin:4px auto 18px;text-align:center;color:var(--ink-soft);line-height:1.75}
+
+/* FAQ entries arrive one by one as the user advances through the section. */
+.faq-section{min-height:135vh;position:relative}
+.faq-section .faq-list{position:sticky;top:128px}
+.faq-list details{transition:opacity .18s linear,transform .25s var(--motion-ease),border-color .25s ease}
+.faq-list details:nth-child(1){opacity:clamp(.12,calc(var(--faq-p)*9),1);transform:translateY(calc((1 - clamp(0,calc(var(--faq-p)*9),1))*14px))}
+.faq-list details:nth-child(2){opacity:clamp(.12,calc((var(--faq-p) - .2)*9),1);transform:translateY(calc((1 - clamp(0,calc((var(--faq-p) - .2)*9),1))*14px))}
+.faq-list details:nth-child(3){opacity:clamp(.12,calc((var(--faq-p) - .4)*9),1);transform:translateY(calc((1 - clamp(0,calc((var(--faq-p) - .4)*9),1))*14px))}
+.faq-list details:nth-child(4){opacity:clamp(.12,calc((var(--faq-p) - .6)*9),1);transform:translateY(calc((1 - clamp(0,calc((var(--faq-p) - .6)*9),1))*14px))}
+
+@media(max-width:590px){
+  .site-header,.site-header.is-compact{background:#fff!important;backdrop-filter:none!important}
+  .header-inner,.site-header.is-compact .header-inner{min-height:74px!important}
+  .site-header .header-logo{width:58px!important;height:58px!important;flex-basis:58px!important}
+  .site-header .brand-copy{display:grid!important;line-height:1.1}
+  .site-header .brand-copy strong{font-size:1rem}
+  .site-header .brand-copy small{display:none}
+  .steps-section.motion-sticky{height:165vh!important;padding-block:24px}
+  .steps-section.motion-sticky>.section-shell{top:78px!important;min-height:calc(100vh - 86px)!important;justify-content:flex-start!important;padding-top:18px}
+  .steps-section .steps-grid>li{display:grid!important}
+  .connection-story{min-height:145vh;padding-top:42px!important}
+  .connection-story .connection-canvas{top:96px;min-height:calc(100vh - 126px);max-height:560px}
+  .trust-grid article.is-visible{animation-duration:1.2s}
+  .publish-sequence>span{min-width:0;width:100%}
+  .publish-sequence>span small{font-size:.76rem}
+  .network-caption{font-size:.9rem;padding-inline:12px}
+  .faq-section{min-height:145vh!important;padding-top:34px!important}
+  .faq-section .faq-list{top:92px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .steps-section.motion-sticky,.connection-story,.faq-section{height:auto!important;min-height:0!important}
+  .steps-section.motion-sticky>.section-shell,.connection-story .connection-canvas,.faq-section .faq-list{position:relative!important;top:auto!important;min-height:0!important}
+  .steps-grid>li,.publish-sequence>span,.faq-list details{opacity:1!important;transform:none!important}
+  .motion-continuous-cta,.trust-grid article.is-visible{animation:none!important}
+}
