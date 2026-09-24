@@ -1,7 +1,7 @@
-sha=7333162d6787c0237cc81fccde56f8b55d43e433
+sha=067772e1f403c3a56267e35db3d6ca7f5a932e62
 install=success
 syntax=success
 smoke=success
-live=failure
+live=success
 Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
-{"ok":true,"release":"advanced-booking-2026-09-24.2","database":"D1","storage":"R2","email":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"timestamp":"2026-09-24T17:59:24.911Z"}
+{"ok":true,"release":"open-gmach-dual-ratings-2026-09-24.3","database":"D1","storage":"R2","email":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"timestamp":"2026-09-24T18:01:39.171Z"}
