@@ -418,7 +418,10 @@
     <div class="dialog-heading"><span class="section-kicker">בקשת השאלה חינמית</span><h2 id="request-title">מתי תרצו את הפריט?</h2><p id="request-item-name"></p></div>
     <form id="request-form" class="stack-form">
       <input id="request-item-id" type="hidden">
-      <div class="two-columns"><label><span>מתאריך</span><input id="request-start" type="date" required></label><label><span>עד תאריך</span><input id="request-end" type="date" required></label></div>
+      <div class="two-columns"><label><span>מתאריך ושעה</span><input id="request-start" type="datetime-local" required></label><label><span>עד תאריך ושעה</span><input id="request-end" type="datetime-local" required></label></div>
+      <label><span>כמות</span><input id="request-quantity" type="number" min="1" max="999" value="1" required></label>
+      <p id="request-availability" role="status" aria-live="polite">בחרו תאריך ושעה כדי לבדוק זמינות.</p>
+      <div id="request-deposit-box" hidden><p><strong>פיקדון:</strong> <span id="request-deposit-amount"></span> ₪. הפיקדון נועד להבטיח את החזרת המוצר כפי שנלקח ואינו תשלום עבור ההשאלה.</p><label class="consent-row"><input id="request-deposit-consent" type="checkbox"><span>קראתי ואני מאשר/ת את תנאי הפיקדון.</span></label></div>
       <label><span>טלפון לתיאום</span><input id="request-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="05X-XXXXXXX" dir="ltr" required></label>
       <label><span>כמה מילים למנהל הגמ״ח <small>(רשות)</small></span><textarea id="request-note" rows="3" maxlength="500" placeholder="למה אתם צריכים את הפריט ומתי נוח לאסוף"></textarea></label>
       <label class="consent-row"><input id="request-consent" type="checkbox" required><span>אני מתחייב/ת לשמור על הפריט ולהחזיר אותו בזמן ובמצב שבו התקבל.</span></label>
@@ -454,7 +457,13 @@
       <div class="two-columns"><label><span>קטגוריית משנה</span><input id="item-subcategory" maxlength="80" placeholder="למשל: עגלות"></label><label><span>תגיות</span><input id="item-tags" maxlength="250" placeholder="תינוק, עגלה, נסיעות"></label></div>
       <label><span>תיאור והוראות שימוש</span><textarea id="item-description" rows="4" maxlength="1200" required></textarea></label>
       <label><span>תנאי השאלה <small>(רשות)</small></span><input id="item-conditions" maxlength="300" placeholder="למשל: איסוף עצמי, החזרה תוך 3 ימים"></label>
-      <label><span>תמונות <small>(עד 4, כל תמונה עד 5MB)</small></span><input id="item-images" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
+      <div class="two-columns"><label><span>משך מינימלי (דקות)</span><input id="item-min-loan" type="number" min="1" max="525600" value="60" required></label><label><span>משך מקסימלי (דקות)</span><input id="item-max-loan" type="number" min="1" max="525600" value="10080" required></label></div>
+      <div class="two-columns"><label><span>כמה זמן מראש להזמין (דקות)</span><input id="item-booking-notice" type="number" min="0" max="525600" value="0" required></label><label><span>זמן התארגנות בין השאלות (דקות)</span><input id="item-turnaround" type="number" min="0" max="10080" value="0" required></label></div>
+      <div class="two-columns"><label><span>עד כמה ימים מראש ניתן להזמין</span><input id="item-booking-horizon" type="number" min="1" max="1095" value="365" required></label><label><span>אישור הזמנה</span><select id="item-approval-mode"><option value="manual">אישור מנהל הגמ״ח</option><option value="automatic">אישור אוטומטי אם יש מלאי</option></select></label></div>
+      <label class="consent-row"><input id="item-deposit-required" type="checkbox"><span>נדרש פיקדון להבטחת החזרת המוצר כפי שנלקח (לא כתשלום עבור ההשאלה).</span></label>
+      <label id="item-deposit-amount-row" hidden><span>סכום הפיקדון (₪)</span><input id="item-deposit-amount" type="number" min="0" max="1000000" step="0.01" value="0"></label>
+      <p>לא ניתן לקבוע איסוף או החזרה מיום שישי בשעה 17:00 ועד שבת בשעה 21:00.</p>
+      <label><span>תמונת הפריט <small>(אפשר עד 4 תמונות, כל תמונה עד 5MB)</small></span><input id="item-images" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
       <label class="consent-row"><input id="item-free" type="checkbox" checked required><span>הפריט מוצע להשאלה חינמית בלבד.</span></label>
       <button class="button button-primary button-full" id="item-submit" type="submit">פרסום הפריט</button>
     </form>
