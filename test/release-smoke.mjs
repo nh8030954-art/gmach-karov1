@@ -26,6 +26,18 @@ source = source.replace(
   'const migration = (await readFile(\`migrations/\${filename}\`, "utf8")).replace(/^\\s*--.*$/gm, "");'
 );
 
+source = source.replace(
+  'const requestId = result.data.request.id;',
+  `const requestId = result.data.request.id;
+  result = await request(\`/api/items/\${itemId}/availability-check?from=2026-10-02T18%3A00&until=2026-10-04T10%3A00\`);
+  assert.equal(result.response.status, 400);
+  result = await request(\`/api/items/\${itemId}/availability-check?from=2026-10-03T20%3A00&until=2026-10-04T10%3A00\`);
+  assert.equal(result.response.status, 400);
+  result = await request(\`/api/items/\${itemId}/availability-check?from=2026-10-03T21%3A00&until=2026-10-04T10%3A00\`);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.available, true);`
+);
+
 if (!source.includes("0008_advanced_inventory_and_booking.sql")) {
   throw new Error("Release smoke did not inject migration 0008");
 }
