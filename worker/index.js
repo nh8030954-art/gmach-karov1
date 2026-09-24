@@ -122,7 +122,7 @@ async function routeApi(request, env, ctx, url) {
   if (method === "DELETE" && inventoryBlock) return deleteInventoryBlock(request, env, decodeURIComponent(inventoryBlock[1]));
   const waitlist = path.match(/^\/api\/items\/([^/]+)\/waitlist$/);
   if (method === "POST" && waitlist) return joinWaitlist(request, env, decodeURIComponent(waitlist[1]));
-  if (method === "GET" && waitlist) return listWaitlist(request, env, decodeURIComponent(waitlist[1]));
+
 
   const favorite = path.match(/^\/api\/favorites\/([^/]+)$/);
   if (favorite && method === "POST") return addFavorite(request, env, decodeURIComponent(favorite[1]));
@@ -821,7 +821,10 @@ async function deleteInventoryBlock(request,env,id){
   const user=await requireUser(request,env);
   const row=await env.DB.prepare(`SELECT b.id,o.owner_id FROM inventory_blocks b JOIN items i ON i.id=b.item_id JOIN organizations o ON o.id=i.organization_id WHERE b.id=?`).bind(id).first();
   if(!row||(row.owner_id!==user.id&&user.role!=="admin")) throw new HttpError(403,"אין הרשאה למחוק חסימה זו");
-  await env.DB.prepare("DELETE FROM inventory_blocks WHERE id=?").bind(id).run(); return json({ok:true});
+  const itemRow=await env.DB.prepare("SELECT item_id FROM inventory_blocks WHERE id=?").bind(id).first();
+  await env.DB.prepare("DELETE FROM inventory_blocks WHERE id=?").bind(id).run();
+  if(itemRow) await advanceWaitlist(env,itemRow.item_id);
+  return json({ok:true});
 }
 async function joinWaitlist(request,env,itemId){
   const user=await requireUser(request,env); const body=await readJson(request);
@@ -837,11 +840,17 @@ async function joinWaitlist(request,env,itemId){
   const id=crypto.randomUUID(); await env.DB.prepare("INSERT INTO waitlist_entries(id,item_id,user_id,requested_from,requested_until,quantity) VALUES(?,?,?,?,?,?)").bind(id,itemId,user.id,from,until,quantity).run();
   return json({entry:{id,status:"waiting"}},201);
 }
-async function listWaitlist(request,env,itemId){
-  await ownedItem(request,env,itemId);
-  const rows=await env.DB.prepare(`SELECT w.id,w.requested_from,w.requested_until,w.quantity,w.status,w.created_at,u.full_name
-    FROM waitlist_entries w JOIN users u ON u.id=w.user_id WHERE w.item_id=? AND w.status IN ('waiting','notified') ORDER BY w.created_at`).bind(itemId).all();
-  return json({entries:rows.results||[]});
+async function advanceWaitlist(env,itemId){
+  const item=await env.DB.prepare("SELECT turnaround_minutes FROM items WHERE id=?").bind(itemId).first(); if(!item) return;
+  const entries=await env.DB.prepare("SELECT id,user_id,requested_from,requested_until,quantity FROM waitlist_entries WHERE item_id=? AND status='waiting' ORDER BY created_at ASC").bind(itemId).all();
+  for(const entry of entries.results||[]){
+    const available=await availableQuantityForRange(env,itemId,entry.requested_from,entry.requested_until,Number(item.turnaround_minutes||0),null);
+    if(available>=Number(entry.quantity)){
+      const changed=await env.DB.prepare("UPDATE waitlist_entries SET status='notified' WHERE id=? AND status='waiting'").bind(entry.id).run();
+      if(changed.meta.changes) await notificationStatement(env,entry.user_id,"waitlist","הפריט שביקשתם זמין","התפנה מלאי לטווח שביקשתם. ניתן להיכנס לפריט ולבצע הזמנה.",null).run();
+      break;
+    }
+  }
 }
 
 async function checkItemAvailability(env,itemId,url) {
@@ -1034,6 +1043,7 @@ async function updateRequestStatus(request, env, id) {
     env.DB.prepare("INSERT INTO loan_request_events(id,request_id,actor_id,event_type,details_json) VALUES (?,?,?,?,?)")
       .bind(crypto.randomUUID(),id,user.id,target,JSON.stringify({managerNote:managerNote||null}))
   ]);
+  if(["declined","cancelled","returned"].includes(target)) await advanceWaitlist(env,row.item_id);
   return json({ id, status: target, managerNote });
 }
 
