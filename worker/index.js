@@ -776,8 +776,13 @@ function validateLoanDateTime(value, label) {
 }
 function loanMinutes(from, until) { return Math.round((Date.parse(until) - Date.parse(from)) / 60000); }
 function assertAllowedPickupReturnTime(value, label) {
-  const d = new Date(value);
-  const day = d.getUTCDay(), minutes = d.getUTCHours()*60+d.getUTCMinutes();
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+  if (!match) throw new HttpError(400, `${label} אינו תקין`);
+  const [,year,month,dayOfMonth,hour,minute]=match;
+  // datetime-local values are Israel wall-clock appointments. Derive only the
+  // weekday in UTC so DST/host timezone can never shift the stated local hour.
+  const day = new Date(Date.UTC(Number(year),Number(month)-1,Number(dayOfMonth))).getUTCDay();
+  const minutes = Number(hour)*60+Number(minute);
   if ((day === 5 && minutes >= 17*60) || (day === 6 && minutes < 21*60)) {
     throw new HttpError(400, `לא ניתן לקבוע ${label} מיום שישי בשעה 17:00 ועד שבת בשעה 21:00`);
   }
