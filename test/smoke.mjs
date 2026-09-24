@@ -45,8 +45,8 @@ async function verifyLatestEmail(email) {
 
 try {
   const db = await mf.getD1Database("DB");
-  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql", "0007_platform_expansion.sql"]) {
-    const migration = await readFile(`migrations/${filename}`, "utf8");
+  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql", "0007_platform_expansion.sql", "0008_advanced_inventory_and_booking.sql", "0009_production_hardening.sql"]) {
+    const migration = (await readFile(`migrations/${filename}`, "utf8")).replace(/^\s*--.*$/gm, "");
     const statements = migration.split(/;\s*(?:\r?\n|$)/).map(statement => statement.trim()).filter(Boolean);
     await db.batch(statements.map(statement => db.prepare(statement)));
   }
@@ -55,6 +55,13 @@ try {
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(result.data.database, "D1");
   assert.equal(result.data.email, true);
+
+  for (let attempt = 1; attempt <= 5; attempt += 1) {
+    result = await request("/api/support", { method: "POST", body: { name: "בדיקת תמיכה", email: "supporter@example.com", subject: `פנייה ${attempt}`, message: "זוהי פנייה תקינה לבדיקת מנגנון התמיכה והגבלת השימוש." } });
+    assert.equal(result.response.status, 201, JSON.stringify(result.data));
+  }
+  result = await request("/api/support", { method: "POST", body: { name: "בדיקת תמיכה", email: "supporter@example.com", subject: "פנייה נוספת", message: "פנייה זו אמורה להיחסם לאחר חריגה מהמכסה המותרת." } });
+  assert.equal(result.response.status, 429);
 
   result = await request("/api/items");
   assert.equal(result.response.status, 200);
@@ -89,7 +96,7 @@ try {
   assert.equal(result.response.status, 201);
   const organizationId = result.data.organization.id;
 
-  result = await request("/api/items", { method: "POST", cookie: adminCookie, body: { organizationId, title: "ערכת קישוטים לבדיקה", category: "אירועים", condition: "מצוין", quantity: 1, description: "ערכת קישוטים מלאה שנועדה לבדוק את תהליך הפרסום באתר.", loanConditions: "איסוף עצמי" } });
+  result = await request("/api/items", { method: "POST", cookie: adminCookie, body: { organizationId, title: "ערכת קישוטים לבדיקה", category: "אירועים", condition: "מצוין", quantity: 1, description: "ערכת קישוטים מלאה שנועדה לבדוק את תהליך הפרסום באתר.", loanConditions: "איסוף עצמי", depositRequired: true, depositAmount: "100" } });
   assert.equal(result.response.status, 201);
   const itemId = result.data.item.id;
 
@@ -117,9 +124,16 @@ try {
 
   result = await request(`/api/favorites/${itemId}`, { method: "POST", cookie: borrowerCookie });
   assert.equal(result.response.status, 200);
-  result = await request("/api/loan-requests", { method: "POST", cookie: borrowerCookie, body: { itemId, requestedFrom: "2026-10-01", requestedUntil: "2026-10-03", phone: "052-7654321", note: "לאירוע משפחתי" } });
+  result = await request("/api/loan-requests", { method: "POST", cookie: borrowerCookie, body: { itemId, requestedFrom: "2026-10-01T10:00", requestedUntil: "2026-10-02T12:00", quantity: 1, depositAccepted: true, phone: "052-7654321", note: "לאירוע משפחתי" } });
   assert.equal(result.response.status, 201);
   const requestId = result.data.request.id;
+  result = await request(`/api/items/${itemId}/availability-check?from=2026-10-02T18%3A00&until=2026-10-04T10%3A00`);
+  assert.equal(result.response.status, 400);
+  result = await request(`/api/items/${itemId}/availability-check?from=2026-10-03T20%3A00&until=2026-10-04T10%3A00`);
+  assert.equal(result.response.status, 400);
+  result = await request(`/api/items/${itemId}/availability-check?from=2026-10-03T21%3A00&until=2026-10-04T10%3A00`);
+  assert.equal(result.response.status, 200);
+  assert.equal(result.data.available, true);
 
   result = await request("/api/notifications", { cookie: adminCookie });
   assert.equal(result.response.status, 200);
@@ -159,13 +173,8 @@ try {
   const secondCookie = await verifyLatestEmail("second@example.com");
   result = await request(`/api/loan-requests/${requestId}/messages`, { cookie: secondCookie });
   assert.equal(result.response.status, 403);
-  result = await request("/api/loan-requests", { method: "POST", cookie: secondCookie, body: { itemId, requestedFrom: "2026-10-02", requestedUntil: "2026-10-04", phone: "054-1112233", note: "צריך לאירוע נוסף" } });
-  assert.equal(result.response.status, 201);
-  const overlappingRequestId = result.data.request.id;
-  result = await request(`/api/loan-requests/${overlappingRequestId}/status`, { method: "PATCH", cookie: adminCookie, body: { status: "approved", managerNote: "נבדוק זמינות" } });
+  result = await request("/api/loan-requests", { method: "POST", cookie: secondCookie, body: { itemId, requestedFrom: "2026-10-02T10:00", requestedUntil: "2026-10-04T10:00", quantity: 1, depositAccepted: true, phone: "054-1112233", note: "צריך לאירוע נוסף" } });
   assert.equal(result.response.status, 409);
-  result = await request(`/api/loan-requests/${overlappingRequestId}/status`, { method: "PATCH", cookie: adminCookie, body: { status: "declined", managerNote: "הפריט כבר תפוס בתאריכים שביקשת" } });
-  assert.equal(result.response.status, 200);
 
   result = await request("/api/reports", { method: "POST", cookie: borrowerCookie, body: { itemId, reason: "incorrect", details: "בדיקת זרימת הדיווח" } });
   assert.equal(result.response.status, 201);

@@ -47,6 +47,9 @@ export default {
       if (status >= 500) console.error(error);
       return withSecurityHeaders(json({ error: error instanceof HttpError ? error.message : "אירעה תקלה זמנית בשרת" }, status));
     }
+  },
+  async scheduled(_event, env, ctx) {
+    ctx.waitUntil(runScheduledMaintenance(env));
   }
 };
 
@@ -124,22 +127,15 @@ function shabbatClosedPage(state){
   return new Response(html,{status:503,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
 }
 
-async function createSupportRequest(request, env) {
+async function createSupportRequest(request, env, ctx) {
+  await ensureProductionHardeningSchema(env);
   const body = await readJson(request);
   const name = cleanText(body.name, 2, 80, "שם");
   const email = cleanText(body.email, 5, 160, "אימייל").toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, "נא להזין כתובת אימייל תקינה");
   const subject = cleanText(body.subject, 2, 120, "נושא");
   const message = cleanText(body.message, 10, 2000, "הודעה");
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS support_requests (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    subject TEXT NOT NULL,
-    message TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'new',
-    created_at TEXT NOT NULL
-  )`).run();
+  await enforcePublicRateLimit(env, email, "support", ctx, 5);
   const id = crypto.randomUUID();
   await env.DB.prepare("INSERT INTO support_requests (id,name,email,subject,message,status,created_at) VALUES (?,?,?,?,?,'new',?)")
     .bind(id, name, email, subject, message, new Date().toISOString()).run();
@@ -185,6 +181,22 @@ async function ensureAdvancedBookingSchema(env) {
   ]);
 }
 
+async function ensureProductionHardeningSchema(env) {
+  const ready = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='operational_state'").first();
+  if (ready) return;
+  await env.DB.batch([
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS support_requests (id TEXT PRIMARY KEY,name TEXT NOT NULL,email TEXT NOT NULL,subject TEXT NOT NULL,message TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'new',created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS support_requests_status_created_idx ON support_requests(status,created_at DESC)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS operational_state (key TEXT PRIMARY KEY,value TEXT NOT NULL,updated_at TEXT NOT NULL)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS abuse_events (identity_hash TEXT NOT NULL,action TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS abuse_events_identity_action_created_idx ON abuse_events(identity_hash,action,created_at DESC)"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS sessions_expiry_idx ON sessions(expires_at)"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS auth_events_identity_action_created_idx ON auth_events(identity_hash,action,created_at DESC)"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS notifications_read_created_idx ON notifications(read_at,created_at)"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS analytics_events_created_idx ON analytics_events(created_at)")
+  ]);
+}
+
 async function routeApi(request, env, ctx, url) {
   const method = request.method.toUpperCase();
   const path = url.pathname;
@@ -194,6 +206,7 @@ async function routeApi(request, env, ctx, url) {
   if (method === "GET" && path === "/api/health") {
     await env.DB.prepare("SELECT 1 AS ok").first();
     await ensureAdvancedBookingSchema(env);
+    await ensureProductionHardeningSchema(env);
     const [usersTable,challengesTable,itemsTable,waitlistTable,blocksTable]=await Promise.all([
       env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").first(),
       env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='auth_challenges'").first(),
@@ -211,8 +224,8 @@ async function routeApi(request, env, ctx, url) {
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
   if (method === "POST" && path === "/api/auth/verify-email") return verifyEmail(request, env, url);
   if (method === "POST" && path === "/api/auth/resend-verification") return resendVerification(request, env, ctx);
-  if (method === "POST" && path === "/api/auth/forgot-password") return forgotPassword(request, env);
-  if (method === "POST" && path === "/api/auth/reset-password") return resetPassword(request, env);
+  if (method === "POST" && path === "/api/auth/forgot-password") return forgotPassword(request, env, ctx);
+  if (method === "POST" && path === "/api/auth/reset-password") return resetPassword(request, env, ctx);
   if (method === "POST" && path === "/api/auth/login") return login(request, env, ctx, url);
   if (method === "POST" && path === "/api/auth/2fa/verify-login") return verifyTwoFactorLogin(request, env, url);
   if (method === "POST" && path === "/api/auth/logout") return logout(request, env, url);
@@ -226,7 +239,7 @@ async function routeApi(request, env, ctx, url) {
     return json({ user: user ? publicUser(user) : null });
   }
   if (method === "GET" && path === "/api/public-config") return json({ supportEmail: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL) });
-  if (method === "POST" && path === "/api/support") return createSupportRequest(request, env);
+  if (method === "POST" && path === "/api/support") return createSupportRequest(request, env, ctx);
 
   if (method === "GET" && path === "/api/items") return listItems(env, url);
   if (method === "GET" && path === "/api/discovery") return discovery(env, url);
@@ -403,9 +416,10 @@ async function resendVerification(request, env, ctx) {
   return json({ ok: true });
 }
 
-async function forgotPassword(request, env) {
+async function forgotPassword(request, env, ctx) {
   const body = await readJson(request);
   const email = normalizeEmail(body.email);
+  await enforcePublicRateLimit(env, email, "password_reset", ctx, 5);
   assertEmailDeliveryConfigured(env);
   const user = await env.DB.prepare("SELECT id,email,full_name,email_verified FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
   if (!user || Number(user.email_verified || 0) !== 1) return json({ ok: true });
@@ -419,9 +433,10 @@ async function forgotPassword(request, env) {
   return json({ ok: true });
 }
 
-async function resetPassword(request, env) {
+async function resetPassword(request, env, ctx) {
   const body = await readJson(request);
   const email = normalizeEmail(body.email);
+  await enforcePublicRateLimit(env, email, "password_reset_verify", ctx, 10);
   const code = cleanText(body.code, 6, 6, "קוד איפוס");
   const newPassword = validatePassword(body.newPassword);
   if (!/^\d{6}$/.test(code)) throw new HttpError(400, "קוד האיפוס חייב להכיל 6 ספרות");
@@ -1551,13 +1566,37 @@ function notificationStatement(env, userId, type, title, body, requestId = null)
     .bind(crypto.randomUUID(), userId, type, title, body, requestId);
 }
 
-async function enforceAuthRateLimit(env, email, action, ctx) {
+async function enforceAuthRateLimit(env, email, action, ctx, limit = 10) {
   const identity = await sha256(email);
   const row = await env.DB.prepare(`SELECT COUNT(*) AS count FROM auth_events
     WHERE identity_hash = ? AND action = ? AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-15 minutes')`).bind(identity, action).first();
-  if (Number(row?.count || 0) >= 10) throw new HttpError(429, "יותר מדי ניסיונות. נסו שוב בעוד 15 דקות");
+  if (Number(row?.count || 0) >= limit) throw new HttpError(429, "יותר מדי ניסיונות. נסו שוב בעוד 15 דקות");
   await env.DB.prepare("INSERT INTO auth_events (identity_hash,action) VALUES (?,?)").bind(identity, action).run();
-  ctx.waitUntil(env.DB.prepare("DELETE FROM auth_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')").run());
+  ctx?.waitUntil(env.DB.prepare("DELETE FROM auth_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')").run());
+}
+
+async function enforcePublicRateLimit(env, identityValue, action, ctx, limit = 10) {
+  const identity = await sha256(identityValue);
+  const row = await env.DB.prepare(`SELECT COUNT(*) AS count FROM abuse_events
+    WHERE identity_hash = ? AND action = ? AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-15 minutes')`).bind(identity, action).first();
+  if (Number(row?.count || 0) >= limit) throw new HttpError(429, "יותר מדי ניסיונות. נסו שוב בעוד 15 דקות");
+  await env.DB.prepare("INSERT INTO abuse_events(identity_hash,action) VALUES (?,?)").bind(identity, action).run();
+  ctx?.waitUntil(env.DB.prepare("DELETE FROM abuse_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')").run());
+}
+
+async function runScheduledMaintenance(env) {
+  await ensureProductionHardeningSchema(env);
+  const now = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now),
+    env.DB.prepare("DELETE FROM auth_challenges WHERE expires_at <= ?").bind(now),
+    env.DB.prepare("DELETE FROM auth_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')"),
+    env.DB.prepare("DELETE FROM abuse_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')"),
+    env.DB.prepare("UPDATE waitlist_entries SET status='expired' WHERE status IN ('waiting','notified') AND requested_until < ?").bind(now.slice(0,16)),
+    env.DB.prepare("DELETE FROM notifications WHERE read_at IS NOT NULL AND created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-180 days')"),
+    env.DB.prepare("DELETE FROM analytics_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-395 days')"),
+    env.DB.prepare("INSERT INTO operational_state(key,value,updated_at) VALUES ('last_maintenance_at',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(now,now)
+  ]);
 }
 
 async function compatibleMemberRole(env) {
