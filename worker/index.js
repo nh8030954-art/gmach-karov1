@@ -74,12 +74,16 @@ async function routeApi(request, env, ctx, url) {
 
   if (method === "GET" && path === "/api/health") {
     await env.DB.prepare("SELECT 1 AS ok").first();
-    const [usersTable,challengesTable]=await Promise.all([
+    const [usersTable,challengesTable,itemsTable,waitlistTable,blocksTable]=await Promise.all([
       env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").first(),
-      env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='auth_challenges'").first()
+      env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='auth_challenges'").first(),
+      env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='items'").first(),
+      env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='waitlist_entries'").first(),
+      env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='inventory_blocks'").first()
     ]);
-    const userSql=String(usersTable?.sql||"").toLowerCase();
-    return json({ ok:true,release:"registration-fix-2026-09-23.4",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified")},timestamp:new Date().toISOString() });
+    const userSql=String(usersTable?.sql||"").toLowerCase(),itemSql=String(itemsTable?.sql||"").toLowerCase();
+    const bookingReady=itemSql.includes("min_loan_minutes")&&itemSql.includes("deposit_required")&&Boolean(waitlistTable)&&Boolean(blocksTable);
+    return json({ ok:true,release:"advanced-booking-2026-09-24.1",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified")},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
