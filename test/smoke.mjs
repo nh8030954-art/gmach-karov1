@@ -45,7 +45,7 @@ async function verifyLatestEmail(email) {
 
 try {
   const db = await mf.getD1Database("DB");
-  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql", "0007_platform_expansion.sql", "0008_advanced_inventory_and_booking.sql", "0009_production_hardening.sql"]) {
+  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql", "0007_platform_expansion.sql", "0008_advanced_inventory_and_booking.sql", "0009_production_hardening.sql", "0010_open_gmach_and_dual_ratings.sql"]) {
     const migration = (await readFile(`migrations/${filename}`, "utf8")).replace(/^\s*--.*$/gm, "");
     const statements = migration.split(/;\s*(?:\r?\n|$)/).map(statement => statement.trim()).filter(Boolean);
     await db.batch(statements.map(statement => db.prepare(statement)));
@@ -111,9 +111,8 @@ try {
   assert.equal(result.response.headers.get("content-type"), "image/png");
 
   result = await request("/api/admin/pending", { cookie: adminCookie });
-  assert.equal(result.data.organizations.length, 1);
+  assert.equal(result.data.organizations.length, 0);
   assert.equal(result.data.items.length, 1);
-  await request(`/api/admin/organizations/${organizationId}`, { method: "PATCH", cookie: adminCookie, body: { status: "approved", verified: true } });
   result = await request(`/api/admin/items/${itemId}`, { method: "PATCH", cookie: adminCookie, body: { status: "active" } });
   assert.equal(result.response.status, 200);
 
@@ -212,8 +211,13 @@ try {
   assert.equal(result.response.status, 200);
   result = await request(`/api/loan-requests/${requestId}/status`, { method: "PATCH", cookie: adminCookie, body: { status: "returned" } });
   assert.equal(result.response.status, 200);
-  result = await request("/api/reviews", { method: "POST", cookie: borrowerCookie, body: { requestId, rating: 5, comment: "שירות מצוין" } });
+  result = await request("/api/reviews", { method: "POST", cookie: borrowerCookie, body: { requestId, organizationRating: 5, itemRating: 4, comment: "שירות מצוין והפריט במצב טוב" } });
   assert.equal(result.response.status, 201);
+  assert.equal(result.data.review.organizationRating, 5);
+  assert.equal(result.data.review.itemRating, 4);
+  result = await request(`/api/items/${itemId}`);
+  assert.equal(result.data.item.rating, 4);
+  assert.equal(result.data.item.organizations.rating, 5);
 
   result = await request("/api/auth/logout", { method: "POST", cookie: borrowerCookie });
   assert.equal(result.response.status, 200);

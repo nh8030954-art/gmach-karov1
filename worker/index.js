@@ -218,7 +218,7 @@ async function routeApi(request, env, ctx, url) {
     const bookingReady=itemSql.includes("min_loan_minutes")&&itemSql.includes("deposit_required")&&Boolean(waitlistTable)&&Boolean(blocksTable);
     const seededAdmin=await env.DB.prepare("SELECT password_hash FROM users WHERE id='admin-netanel-hirsh'").first();
     const adminCredentialRotated=!seededAdmin||seededAdmin.password_hash!=="5cSI6TEtFyH-uPzoGKFhS2ioqI9z-0NlihqSNTPgT5U";
-    return json({ ok:true,release:"advanced-booking-2026-09-24.2",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},timestamp:new Date().toISOString() });
+    return json({ ok:true,release:"open-gmach-dual-ratings-2026-09-24.3",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
@@ -589,10 +589,12 @@ async function listItems(env, url) {
     params.push(date, date);
   }
   const result = await env.DB.prepare(`
-    SELECT i.*, o.id AS org_id, o.name AS org_name, o.verified AS org_verified,
+    SELECT i.*, o.id AS org_id, o.name AS org_name,
       o.last_active_at AS org_last_active_at,
       (SELECT ROUND(AVG(r.rating),1) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_rating,
       (SELECT COUNT(*) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_review_count,
+      (SELECT ROUND(AVG(r.item_rating),1) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_rating,
+      (SELECT COUNT(*) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_review_count,
       MAX(0, i.quantity - (SELECT COALESCE(SUM(lr.quantity),0) FROM loan_requests lr WHERE lr.item_id=i.id AND lr.status IN ('pending','approved','collected'))) AS available_count
     FROM items i JOIN organizations o ON o.id = i.organization_id
     WHERE ${where.join(" AND ")}
@@ -604,10 +606,12 @@ async function listItems(env, url) {
 
 async function getItem(env, id) {
   const row = await env.DB.prepare(`
-    SELECT i.*, o.id AS org_id, o.name AS org_name, o.verified AS org_verified,
+    SELECT i.*, o.id AS org_id, o.name AS org_name,
       o.last_active_at AS org_last_active_at,
       (SELECT ROUND(AVG(r.rating),1) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_rating,
       (SELECT COUNT(*) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_review_count,
+      (SELECT ROUND(AVG(r.item_rating),1) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_rating,
+      (SELECT COUNT(*) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_review_count,
       MAX(0, i.quantity - (SELECT COALESCE(SUM(lr.quantity),0) FROM loan_requests lr WHERE lr.item_id=i.id AND lr.status IN ('pending','approved','collected'))) AS available_count
     FROM items i JOIN organizations o ON o.id = i.organization_id
     WHERE i.id = ? AND i.status = 'active' AND i.is_free = 1 AND o.status = 'approved' AND o.is_hidden = 0
@@ -623,31 +627,34 @@ async function discovery(env, url) {
     env.DB.prepare(`SELECT category,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY category ORDER BY count DESC`),
     env.DB.prepare(`SELECT city,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY city ORDER BY count DESC LIMIT 80`),
     env.DB.prepare(`SELECT DISTINCT title FROM items WHERE status='active' AND (?='' OR title LIKE ?) ORDER BY updated_at DESC LIMIT 8`).bind(query || "", like),
-    env.DB.prepare(`SELECT o.id,o.name,o.city,o.description,o.verified,o.last_active_at,
+    env.DB.prepare(`SELECT o.id,o.name,o.city,o.description,o.last_active_at,
       COUNT(DISTINCT i.id) AS item_count,
       ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
       FROM organizations o LEFT JOIN items i ON i.organization_id=o.id AND i.status='active'
       LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
-      WHERE o.status='approved' AND o.is_hidden=0 GROUP BY o.id ORDER BY o.verified DESC,item_count DESC LIMIT 100`)
+      WHERE o.status='approved' AND o.is_hidden=0 GROUP BY o.id ORDER BY rating DESC,item_count DESC LIMIT 100`)
   ]);
   return json({ categories: categories.results, cities: cities.results, suggestions: suggestions.results.map(row => row.title), organizations: organizations.results });
 }
 
 async function getPublicOrganization(env, id) {
-  const organization = await env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,o.verified,
+  const organization = await env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,
     o.address,o.website_url,o.hours_json,o.service_area,o.pickup_options,o.last_active_at,o.verified_phone,o.verified_address,
     ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
     FROM organizations o LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
     WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 GROUP BY o.id`).bind(id).first();
   if (!organization) throw new HttpError(404, "הגמ״ח לא נמצא");
   const [items, reviews] = await env.DB.batch([
-    env.DB.prepare(`SELECT i.*,o.id AS org_id,o.name AS org_name,o.verified AS org_verified,o.last_active_at AS org_last_active_at,
-      NULL AS org_rating,0 AS org_review_count,i.quantity AS available_count FROM items i JOIN organizations o ON o.id=i.organization_id
+    env.DB.prepare(`SELECT i.*,o.id AS org_id,o.name AS org_name,o.last_active_at AS org_last_active_at,
+      NULL AS org_rating,0 AS org_review_count,
+      (SELECT ROUND(AVG(r.item_rating),1) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_rating,
+      (SELECT COUNT(*) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_review_count,
+      i.quantity AS available_count FROM items i JOIN organizations o ON o.id=i.organization_id
       WHERE i.organization_id=? AND i.status='active' ORDER BY i.availability_status,i.updated_at DESC`).bind(id),
-    env.DB.prepare(`SELECT r.rating,r.comment,r.created_at,u.full_name AS author_name FROM reviews r JOIN users u ON u.id=r.author_id
+    env.DB.prepare(`SELECT r.rating,r.item_rating,r.comment,r.created_at,u.full_name AS author_name FROM reviews r JOIN users u ON u.id=r.author_id
       WHERE r.organization_id=? AND r.status='published' ORDER BY r.created_at DESC LIMIT 30`).bind(id)
   ]);
-  return json({ organization: { ...organization, verified: Boolean(organization.verified), verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options) }, items: items.results.map(mapItem), reviews: reviews.results });
+  return json({ organization: { ...organization, verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options) }, items: items.results.map(mapItem), reviews: reviews.results });
 }
 
 async function toggleSavedOrganization(request, env, organizationId, save) {
@@ -681,11 +688,13 @@ async function createHelpRequest(request, env) {
 
 async function createReview(request, env) {
   const user = await requireUser(request, env); const body = await readJson(request);
-  const requestId = cleanText(body.requestId,1,100,"בקשה"); const rating = Number(body.rating);
-  if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new HttpError(400, "הדירוג חייב להיות בין 1 ל־5");
-  const row = await env.DB.prepare(`SELECT lr.borrower_id,lr.status,o.id AS organization_id FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.id=?`).bind(requestId).first();
+  const requestId = cleanText(body.requestId,1,100,"בקשה");
+  const rating = Number(body.organizationRating); const itemRating = Number(body.itemRating);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new HttpError(400, "דירוג הגמ״ח חייב להיות בין 1 ל־5");
+  if (!Number.isInteger(itemRating) || itemRating < 1 || itemRating > 5) throw new HttpError(400, "דירוג הפריט חייב להיות בין 1 ל־5");
+  const row = await env.DB.prepare(`SELECT lr.borrower_id,lr.status,i.id AS item_id,o.id AS organization_id FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.id=?`).bind(requestId).first();
   if (!row || row.borrower_id !== user.id || row.status !== "returned") throw new HttpError(403, "אפשר לדרג רק השאלה שהושלמה");
-  try { const id=crypto.randomUUID(); await env.DB.prepare("INSERT INTO reviews(id,request_id,author_id,organization_id,rating,comment) VALUES (?,?,?,?,?,?)").bind(id,requestId,user.id,row.organization_id,rating,cleanOptional(body.comment,800)).run(); return json({ review:{id,rating}},201); }
+  try { const id=crypto.randomUUID(); await env.DB.prepare("INSERT INTO reviews(id,request_id,author_id,organization_id,item_id,rating,item_rating,comment) VALUES (?,?,?,?,?,?,?,?)").bind(id,requestId,user.id,row.organization_id,row.item_id,rating,itemRating,cleanOptional(body.comment,800)).run(); return json({ review:{id,organizationRating:rating,itemRating}},201); }
   catch (error) { if (String(error).toLowerCase().includes("unique")) throw new HttpError(409,"כבר דירגתם את ההשאלה הזו"); throw error; }
 }
 
@@ -730,11 +739,11 @@ async function createOrganization(request, env) {
     pickupOptions: sanitizePickupOptions(body.pickupOptions)
   };
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO organizations (id,owner_id,name,primary_category,city,neighborhood,description,address,website_url,service_area,hours_json,pickup_options,last_active_at,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'pending')")
+    env.DB.prepare("INSERT INTO organizations (id,owner_id,name,primary_category,city,neighborhood,description,address,website_url,service_area,hours_json,pickup_options,last_active_at,status,verified) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'approved',0)")
       .bind(id, user.id, values.name, category, values.city, values.neighborhood, values.description, values.address, null, values.serviceArea, values.hoursJson, values.pickupOptions, new Date().toISOString()),
     env.DB.prepare("INSERT INTO organization_contacts (organization_id,contact_phone) VALUES (?,?)").bind(id, values.phone)
   ]);
-  return json({ organization: { id, ...values, primaryCategory: category, status: "pending", verified: false } }, 201);
+  return json({ organization: { id, ...values, primaryCategory: category, status: "approved" } }, 201);
 }
 
 async function updateOrganization(request, env, id) {
@@ -762,19 +771,15 @@ async function updateOrganization(request, env, id) {
     address: cleanOptional(body.address, 180),
     serviceArea: cleanOptional(body.serviceArea, 180), hoursJson: sanitizeHours(body.hours), pickupOptions: sanitizePickupOptions(body.pickupOptions)
   };
-  const publicChanged = values.name !== existing.name || category !== existing.primary_category || values.city !== existing.city ||
-    (values.neighborhood || null) !== (existing.neighborhood || null) || values.description !== existing.description ||
-    (values.address || null) !== (existing.address || null);
-  const status = user.role === "admin" || !publicChanged ? existing.status : "pending";
-  const verified = status === "approved" ? existing.verified : 0;
+  const status = existing.status === "rejected" && user.role !== "admin" ? "rejected" : "approved";
   const now = new Date().toISOString();
   await env.DB.batch([
     env.DB.prepare(`UPDATE organizations SET name = ?, primary_category = ?, city = ?, neighborhood = ?, description = ?,address=?,website_url=?,service_area=?,hours_json=?,pickup_options=?,last_active_at=?,
-      status = ?, verified = ?, updated_at = ? WHERE id = ?`)
-      .bind(values.name, category, values.city, values.neighborhood, values.description,values.address,null,values.serviceArea,values.hoursJson,values.pickupOptions,now,status, verified, now, id),
+      status = ?, verified = 0, updated_at = ? WHERE id = ?`)
+      .bind(values.name, category, values.city, values.neighborhood, values.description,values.address,null,values.serviceArea,values.hoursJson,values.pickupOptions,now,status, now, id),
     env.DB.prepare("UPDATE organization_contacts SET contact_phone = ? WHERE organization_id = ?").bind(values.phone, id)
   ]);
-  return json({ organization: { id, ...values, primaryCategory: category, status, verified: Boolean(verified), hidden: Boolean(existing.is_hidden) } });
+  return json({ organization: { id, ...values, primaryCategory: category, status, hidden: Boolean(existing.is_hidden) } });
 }
 
 function positiveInt(value,fallback,min,max,label){ const n=value===""||value==null?fallback:Number(value); if(!Number.isInteger(n)||n<min||n>max) throw new HttpError(400,`${label} אינו תקין`); return n; }
@@ -1282,16 +1287,14 @@ async function createReport(request, env) {
 
 async function adminPending(request, env) {
   await requireAdmin(request, env);
-  const [organizations, items, reports] = await env.DB.batch([
-    env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,o.verified,o.created_at,u.full_name AS owner_name,u.email AS owner_email
-      FROM organizations o LEFT JOIN users u ON u.id = o.owner_id WHERE o.status = 'pending' ORDER BY o.created_at ASC`),
+  const [items, reports] = await env.DB.batch([
     env.DB.prepare(`SELECT i.id,i.title,i.category,i.description,i.condition,i.quantity,i.status,i.created_at,o.name AS org_name,o.status AS org_status
       FROM items i JOIN organizations o ON o.id = i.organization_id WHERE i.status = 'pending' ORDER BY i.created_at ASC`),
     env.DB.prepare(`SELECT r.id,r.reason,r.details,r.created_at,i.title AS item_title,u.full_name AS reporter_name,u.email AS reporter_email
       FROM reports r JOIN items i ON i.id = r.item_id JOIN users u ON u.id = r.reporter_id
       WHERE r.status = 'pending' ORDER BY r.created_at ASC`)
   ]);
-  return json({ organizations: organizations.results, items: items.results, reports: reports.results });
+  return json({ organizations: [], items: items.results, reports: reports.results });
 }
 
 async function getSiteSettings(env) {
@@ -1494,11 +1497,10 @@ async function moderateOrganization(request, env, id) {
   const body = await readJson(request);
   const status = cleanText(body.status, 2, 20, "סטטוס");
   if (!["approved", "rejected"].includes(status)) throw new HttpError(400, "סטטוס האישור אינו תקין");
-  const verified = status === "approved" && body.verified === true ? 1 : 0;
-  const result = await env.DB.prepare("UPDATE organizations SET status = ?, verified = ?, updated_at = ? WHERE id = ?")
-    .bind(status, verified, new Date().toISOString(), id).run();
+  const result = await env.DB.prepare("UPDATE organizations SET status = ?, verified = 0, updated_at = ? WHERE id = ?")
+    .bind(status, new Date().toISOString(), id).run();
   if (!result.meta.changes) throw new HttpError(404, "הגמ״ח לא נמצא");
-  return json({ id, status, verified: Boolean(verified) });
+  return json({ id, status });
 }
 
 async function moderateItem(request, env, id) {
@@ -1659,7 +1661,9 @@ function mapItem(row) {
     icon: row.icon,
     cover_color: row.cover_color,
     created_at: row.created_at,
-    organizations: { id: row.org_id, name: row.org_name, verified: Boolean(row.org_verified), rating: row.org_rating ? Number(row.org_rating) : null, reviewCount: Number(row.org_review_count || 0), lastActiveAt: row.org_last_active_at || null }
+    rating: row.item_rating ? Number(row.item_rating) : null,
+    reviewCount: Number(row.item_review_count || 0),
+    organizations: { id: row.org_id, name: row.org_name, rating: row.org_rating ? Number(row.org_rating) : null, reviewCount: Number(row.org_review_count || 0), lastActiveAt: row.org_last_active_at || null }
   };
 }
 
