@@ -14,6 +14,11 @@ source = source.replace(
   'requestedFrom: "$1T10:00", requestedUntil: "$2T10:00", quantity: 1'
 );
 
+source = source.replace(
+  'const migration = await readFile(\`migrations/\${filename}\`, "utf8");',
+  'const migration = (await readFile(\`migrations/\${filename}\`, "utf8")).replace(/^\\s*--.*$/gm, "");'
+);
+
 if (!source.includes("0008_advanced_inventory_and_booking.sql")) {
   throw new Error("Release smoke did not inject migration 0008");
 }
