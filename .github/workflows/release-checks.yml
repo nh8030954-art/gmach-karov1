@@ -23,11 +23,22 @@ jobs:
       - id: smoke
         continue-on-error: true
         run: node test/release-smoke.mjs > smoke.log 2>&1
+      - id: live
+        continue-on-error: true
+        run: |
+          for i in {1..12}; do
+            body="$(curl -fsS https://gmach-karov1.nh8030954.workers.dev/api/health || true)"
+            echo "$body" > live.log
+            if echo "$body" | grep -q '"release":"advanced-booking-2026-09-24.1"' && echo "$body" | grep -q '"ready":true'; then exit 0; fi
+            sleep 10
+          done
+          exit 1
       - name: Record verification result
         if: always()
         run: |
-          printf 'sha=%s\ninstall=%s\nsyntax=%s\nsmoke=%s\n' "$GITHUB_SHA" "${{ steps.install.outcome }}" "${{ steps.syntax.outcome }}" "${{ steps.smoke.outcome }}" > .release-check-result
+          printf 'sha=%s\ninstall=%s\nsyntax=%s\nsmoke=%s\nlive=%s\n' "$GITHUB_SHA" "${{ steps.install.outcome }}" "${{ steps.syntax.outcome }}" "${{ steps.smoke.outcome }}" "${{ steps.live.outcome }}" > .release-check-result
           if [ -f smoke.log ]; then tail -n 12 smoke.log >> .release-check-result; fi
+          if [ -f live.log ]; then tail -n 3 live.log >> .release-check-result; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .release-check-result
@@ -35,4 +46,4 @@ jobs:
           git push
       - name: Enforce smoke success
         if: always()
-        run: test "${{ steps.smoke.outcome }}" = "success"
+        run: test "${{ steps.smoke.outcome }}" = "success" && test "${{ steps.live.outcome }}" = "success"
