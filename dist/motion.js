@@ -25,13 +25,15 @@
       ['.trust-section','--scene-p','complete'],
       ['.gmach-callout','--publish-p','entry'],
       ['.help-search-visual','--scene-p','complete'],
-      ['.community-cycle','--scene-p','entry'],
+      ['.community-cycle','--scene-p','cycle'],
       ['.faq-section','--faq-p','long']
     ];
     state.scenes=mappings.map(([selector,property,speed])=>({element:document.querySelector(selector),property,speed})).filter(scene=>scene.element);
     const steps=document.getElementById('how-it-works');
     if(steps){
       steps.classList.add('motion-sticky');
+      const stepsGrid=steps.querySelector('.steps-grid');
+      if(stepsGrid)state.scenes.push({element:stepsGrid,property:'--steps-p',steps:true});
       const journey=steps.querySelector('.loan-journey');
       if(journey)state.scenes.push({element:journey,property:'--journey-p',journey:true});
     }
@@ -56,12 +58,12 @@
       return;
     }
     document.querySelector('.site-header')?.classList.toggle('is-compact',scrollY>48);
-    state.scenes.forEach(({element,property,journey,speed})=>{
+    state.scenes.forEach(({element,property,journey,steps,speed})=>{
       const rect=element.getBoundingClientRect();
       if(rect.bottom<-120||rect.top>innerHeight+120)return;
       const phone=innerWidth<=590;
-      const start=journey ? .66 : speed==='complete' ? .68 : speed==='entry' ? .68 : speed==='long' ? .72 : speed==='fast' ? 1.02 : .82;
-      const end=journey ? (phone ? .52 : .46) : speed==='complete' ? (phone ? .56 : .50) : speed==='entry' ? .08 : speed==='long' ? .02 : speed==='fast' ? (phone ? .78 : .62) : .18;
+      const start=steps ? .88 : journey ? .66 : speed==='complete' ? .68 : speed==='entry' ? .68 : speed==='cycle' ? (phone ? .82 : .68) : speed==='long' ? .72 : speed==='fast' ? (phone ? .86 : 1.02) : .82;
+      const end=steps ? .16 : journey ? (phone ? .58 : .60) : speed==='complete' ? (phone ? .56 : .50) : speed==='entry' ? .08 : speed==='cycle' ? (phone ? .50 : .08) : speed==='long' ? .02 : speed==='fast' ? (phone ? .60 : .62) : .18;
       let progress=sceneProgress(element,start,end);
       if(property==='--faq-p'&&scrollY+innerHeight>=document.documentElement.scrollHeight-16)progress=1;
       element.style.setProperty(property,progress.toFixed(4));
