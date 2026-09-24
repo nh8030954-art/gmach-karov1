@@ -54,3 +54,5 @@ try {
 }
 
 // Release verification includes live deployment readiness through the workflow.
+
+// Shabbat closure release verification trigger.
