@@ -113,6 +113,8 @@ async function routeApi(request, env, ctx, url) {
   const itemDetail = path.match(/^\/api\/items\/([^/]+)$/);
   if (method === "GET" && itemDetail) return getItem(env, decodeURIComponent(itemDetail[1]));
   if (method === "PATCH" && itemDetail) return updateItem(request, env, decodeURIComponent(itemDetail[1]));
+  const itemAvailabilityCheck = path.match(/^\/api\/items\/([^/]+)\/availability-check$/);
+  if (method === "GET" && itemAvailabilityCheck) return checkItemAvailability(env, decodeURIComponent(itemAvailabilityCheck[1]), url);
 
   const favorite = path.match(/^\/api\/favorites\/([^/]+)$/);
   if (favorite && method === "POST") return addFavorite(request, env, decodeURIComponent(favorite[1]));
@@ -626,6 +628,9 @@ async function updateOrganization(request, env, id) {
   return json({ organization: { id, ...values, primaryCategory: category, status, verified: Boolean(verified), hidden: Boolean(existing.is_hidden) } });
 }
 
+function positiveInt(value,fallback,min,max,label){ const n=value===""||value==null?fallback:Number(value); if(!Number.isInteger(n)||n<min||n>max) throw new HttpError(400,`${label} אינו תקין`); return n; }
+function moneyAgorot(value){ const n=Number(value); if(!Number.isFinite(n)||n<0||n>1000000) throw new HttpError(400,"סכום הפיקדון אינו תקין"); return Math.round(n*100); }
+
 async function createItem(request, env) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
@@ -645,8 +650,10 @@ async function createItem(request, env) {
   if (duplicate) throw new HttpError(409, "כבר קיים בגמ״ח פריט פעיל בשם הזה ובאותה קטגוריה");
   const id = crypto.randomUUID();
   await env.DB.prepare(`
-    INSERT INTO items (id,organization_id,title,category,description,condition,quantity,loan_conditions,city,neighborhood,item_type,subcategory,tags_json,pickup_method,inventory_updated_at,status,availability_status,is_free,icon,cover_color)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending','available',1,'box','#e6f2ef')
+    INSERT INTO items (id,organization_id,title,category,description,condition,quantity,loan_conditions,city,neighborhood,item_type,subcategory,tags_json,pickup_method,inventory_updated_at,
+      min_loan_minutes,max_loan_minutes,booking_notice_minutes,turnaround_minutes,booking_horizon_days,approval_mode,deposit_required,deposit_amount_agorot,
+      status,availability_status,is_free,icon,cover_color)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending','available',1,'box','#e6f2ef')
   `).bind(
     id,
     organizationId,
@@ -658,7 +665,11 @@ async function createItem(request, env) {
     cleanOptional(body.loanConditions, 300),
     organization.city,
     organization.neighborhood,
-    sanitizeItemType(body.itemType), cleanOptional(body.subcategory, 80), JSON.stringify(sanitizeTags(body.tags)), sanitizePickupMethod(body.pickupMethod), new Date().toISOString()
+    sanitizeItemType(body.itemType), cleanOptional(body.subcategory, 80), JSON.stringify(sanitizeTags(body.tags)), sanitizePickupMethod(body.pickupMethod), new Date().toISOString(),
+    positiveInt(body.minLoanMinutes,60,1,525600,"משך מינימלי"), positiveInt(body.maxLoanMinutes,10080,1,525600,"משך מקסימלי"),
+    positiveInt(body.bookingNoticeMinutes,0,0,525600,"זמן התראה"), positiveInt(body.turnaroundMinutes,0,0,10080,"זמן התארגנות"),
+    positiveInt(body.bookingHorizonDays,365,1,1095,"טווח הזמנה"), body.approvalMode==="automatic"?"automatic":"manual",
+    body.depositRequired?1:0, body.depositRequired?moneyAgorot(body.depositAmount):0
   ).run();
   return json({ item: { id, status: "pending" } }, 201);
 }
@@ -737,36 +748,108 @@ async function uploadImages(request, env, itemId) {
   }
 }
 
+function validateLoanDateTime(value, label) {
+  const text = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text) || Number.isNaN(Date.parse(text))) throw new HttpError(400, `${label} אינו תקין`);
+  return text;
+}
+function loanMinutes(from, until) { return Math.round((Date.parse(until) - Date.parse(from)) / 60000); }
+function assertAllowedPickupReturnTime(value, label) {
+  const d = new Date(value);
+  const day = d.getUTCDay(), minutes = d.getUTCHours()*60+d.getUTCMinutes();
+  if ((day === 5 && minutes >= 17*60) || (day === 6 && minutes < 21*60)) {
+    throw new HttpError(400, `לא ניתן לקבוע ${label} מיום שישי בשעה 17:00 ועד שבת בשעה 21:00`);
+  }
+}
+async function availableQuantityForRange(env,itemId,from,until,turnaroundMinutes=0,excludeRequestId=null) {
+  const item = await env.DB.prepare("SELECT quantity FROM items WHERE id=?").bind(itemId).first();
+  if (!item) return 0;
+  const pad = Math.max(0,Number(turnaroundMinutes)||0);
+  const paddedFrom = new Date(Date.parse(from)-pad*60000).toISOString().slice(0,16);
+  const paddedUntil = new Date(Date.parse(until)+pad*60000).toISOString().slice(0,16);
+  const booked = await env.DB.prepare(`SELECT COALESCE(SUM(quantity),0) AS used FROM loan_requests
+    WHERE item_id=? AND status IN ('pending','approved','collected') AND id<>?
+      AND requested_from < ? AND requested_until > ?`).bind(itemId,excludeRequestId||"",paddedUntil,paddedFrom).first();
+  const blocked = await env.DB.prepare(`SELECT COALESCE(SUM(quantity),0) AS used FROM inventory_blocks
+    WHERE item_id=? AND starts_at < ? AND ends_at > ?`).bind(itemId,paddedUntil,paddedFrom).first();
+  return Math.max(0,Number(item.quantity)-Number(booked?.used||0)-Number(blocked?.used||0));
+}
+async function checkItemAvailability(env,itemId,url) {
+  const item = await env.DB.prepare(`SELECT i.id,i.quantity,i.min_loan_minutes,i.max_loan_minutes,i.turnaround_minutes,
+    i.deposit_required,i.deposit_amount_agorot,i.approval_mode,i.availability_status
+    FROM items i JOIN organizations o ON o.id=i.organization_id
+    WHERE i.id=? AND i.status='active' AND o.status='approved'`).bind(itemId).first();
+  if (!item) throw new HttpError(404,"הפריט לא נמצא");
+  const from=validateLoanDateTime(url.searchParams.get("from"),"מועד האיסוף");
+  const until=validateLoanDateTime(url.searchParams.get("until"),"מועד ההחזרה");
+  assertAllowedPickupReturnTime(from,"האיסוף"); assertAllowedPickupReturnTime(until,"ההחזרה");
+  const duration=loanMinutes(from,until);
+  if(duration<=0) throw new HttpError(400,"מועד ההחזרה חייב להיות אחרי מועד האיסוף");
+  const available=item.availability_status==="unavailable"?0:await availableQuantityForRange(env,itemId,from,until,item.turnaround_minutes,null);
+  return json({available:available>0,availableQuantity:available,totalQuantity:Number(item.quantity),
+    minLoanMinutes:Number(item.min_loan_minutes),maxLoanMinutes:Number(item.max_loan_minutes),
+    depositRequired:Boolean(item.deposit_required),depositAmountAgorot:Number(item.deposit_amount_agorot),approvalMode:item.approval_mode});
+}
+
 async function createLoanRequest(request, env) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
   const itemId = cleanText(body.itemId, 1, 100, "פריט");
   const item = await env.DB.prepare(`
-    SELECT i.id, i.title, i.availability_status, o.owner_id
-    FROM items i JOIN organizations o ON o.id = i.organization_id
-    WHERE i.id = ? AND i.status = 'active' AND i.is_free = 1 AND o.status = 'approved'
+    SELECT i.id,i.title,i.quantity,i.availability_status,i.min_loan_minutes,i.max_loan_minutes,
+      i.booking_notice_minutes,i.booking_horizon_days,i.turnaround_minutes,i.approval_mode,
+      i.deposit_required,i.deposit_amount_agorot,o.owner_id
+    FROM items i JOIN organizations o ON o.id=i.organization_id
+    WHERE i.id=? AND i.status='active' AND i.is_free=1 AND o.status='approved'
   `).bind(itemId).first();
   if (!item) throw new HttpError(404, "הפריט לא נמצא");
-  if (item.owner_id === user.id) throw new HttpError(400, "אי אפשר לבקש פריט מהגמ״ח שלכם");
+  if (item.owner_id === user.id) throw new HttpError(400, "אי אפשר להזמין פריט מהגמ״ח שלכם");
   if (item.availability_status === "unavailable") throw new HttpError(409, "הפריט אינו זמין כרגע");
-  const from = validateDate(body.requestedFrom, "תאריך האיסוף");
-  const until = validateDate(body.requestedUntil, "תאריך ההחזרה");
-  const today = new Date().toISOString().slice(0, 10);
-  if (from < today) throw new HttpError(400, "תאריך האיסוף כבר עבר");
-  if (until < from) throw new HttpError(400, "תאריך ההחזרה חייב להיות אחרי תאריך האיסוף");
-  const maxUntil = new Date(`${from}T00:00:00Z`);
-  maxUntil.setUTCDate(maxUntil.getUTCDate() + 180);
-  if (until > maxUntil.toISOString().slice(0, 10)) throw new HttpError(400, "אפשר לבקש השאלה לתקופה של עד 180 יום");
-  const duplicate = await env.DB.prepare("SELECT id FROM loan_requests WHERE item_id = ? AND borrower_id = ? AND status IN ('pending','approved','collected')")
-    .bind(itemId, user.id).first();
-  if (duplicate) throw new HttpError(409, "כבר קיימת בקשה פעילה שלכם לפריט הזה");
+
+  const from = validateLoanDateTime(body.requestedFrom, "מועד האיסוף");
+  const until = validateLoanDateTime(body.requestedUntil, "מועד ההחזרה");
+  assertAllowedPickupReturnTime(from, "האיסוף");
+  assertAllowedPickupReturnTime(until, "ההחזרה");
+  const duration = loanMinutes(from, until);
+  if (duration <= 0) throw new HttpError(400, "מועד ההחזרה חייב להיות אחרי מועד האיסוף");
+  if (duration < Number(item.min_loan_minutes)) throw new HttpError(400, `משך ההשאלה המינימלי הוא ${item.min_loan_minutes} דקות`);
+  if (duration > Number(item.max_loan_minutes)) throw new HttpError(400, `משך ההשאלה המקסימלי הוא ${item.max_loan_minutes} דקות`);
+  const now = Date.now();
+  const fromMs = Date.parse(from);
+  if (fromMs < now + Number(item.booking_notice_minutes) * 60000) throw new HttpError(400, "מועד האיסוף מוקדם מדי לפי תנאי הגמ״ח");
+  if (fromMs > now + Number(item.booking_horizon_days) * 86400000) throw new HttpError(400, "מועד האיסוף רחוק מדי לפי תנאי הגמ״ח");
+
+  const quantity = Number(body.quantity || 1);
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > Number(item.quantity)) throw new HttpError(400, "הכמות המבוקשת אינה תקינה");
+  if (Number(item.deposit_required) && body.depositAccepted !== true) throw new HttpError(400, "יש לאשר את תנאי הפיקדון לפני שליחת ההזמנה");
+
+  const available = await availableQuantityForRange(env,itemId,from,until,Number(item.turnaround_minutes),null);
+  if (available < quantity) throw new HttpError(409, available > 0 ? `נותרו רק ${available} יחידות בטווח שבחרתם` : "הפריט אינו זמין בטווח שבחרתם");
+
   const id = crypto.randomUUID();
+  const status = item.approval_mode === "automatic" ? "approved" : "pending";
+  const acceptedAt = Number(item.deposit_required) ? new Date().toISOString() : null;
+  const result = await env.DB.prepare(`
+    INSERT INTO loan_requests
+      (id,item_id,borrower_id,requested_from,requested_until,phone,note,status,quantity,
+       deposit_required_snapshot,deposit_amount_agorot_snapshot,deposit_terms_accepted_at)
+    SELECT ?,?,?,?,?,?,?,?,?,?,?,?
+    WHERE (
+      SELECT COALESCE(SUM(lr.quantity),0) FROM loan_requests lr
+      WHERE lr.item_id=? AND lr.status IN ('pending','approved','collected')
+        AND lr.requested_from < ? AND lr.requested_until > ?
+    ) + ? <= ?
+  `).bind(id,itemId,user.id,from,until,validatePhone(body.phone),cleanOptional(body.note,500),status,quantity,
+    Number(item.deposit_required),Number(item.deposit_amount_agorot),acceptedAt,
+    itemId,until,from,quantity,Number(item.quantity)).run();
+  if (!result.meta.changes) throw new HttpError(409, "המלאי נתפס הרגע על ידי הזמנה אחרת. בחרו מועד אחר");
+
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO loan_requests (id,item_id,borrower_id,requested_from,requested_until,phone,note,status) VALUES (?,?,?,?,?,?,?,'pending')")
-      .bind(id, itemId, user.id, from, until, validatePhone(body.phone), cleanOptional(body.note, 500)),
-    notificationStatement(env, item.owner_id, "request", "בקשת השאלה חדשה", `${user.full_name} ביקש/ה לשאול את ${item.title}`, id)
+    env.DB.prepare("INSERT INTO loan_request_events(id,request_id,actor_id,event_type,details_json) VALUES (?,?,?,?,?)")
+      .bind(crypto.randomUUID(),id,user.id,"created",JSON.stringify({from,until,quantity,status})),
+    notificationStatement(env,item.owner_id,"request","בקשת השאלה חדשה",`${user.full_name} ביקש/ה ${quantity} יחידות של ${item.title}`,id)
   ]);
-  return json({ request: { id, status: "pending" } }, 201);
+  return json({ request:{id,status}, availability:{remaining:Math.max(0,available-quantity)} },201);
 }
 
 async function dashboard(request, env) {
@@ -775,9 +858,10 @@ async function dashboard(request, env) {
     env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,o.verified,o.is_hidden,o.created_at,c.contact_phone,o.address,o.website_url,o.service_area,o.hours_json,o.pickup_options
       FROM organizations o LEFT JOIN organization_contacts c ON c.organization_id = o.id WHERE o.owner_id = ? ORDER BY o.created_at DESC`).bind(user.id),
     env.DB.prepare(`SELECT i.id,i.organization_id,i.title,i.category,i.description,i.condition,i.quantity,i.loan_conditions,i.image_urls,
-      i.status,i.availability_status,i.created_at,o.name AS org_name,i.item_type,i.subcategory,i.tags_json,i.pickup_method,i.inventory_updated_at
+      i.status,i.availability_status,i.created_at,o.name AS org_name,i.item_type,i.subcategory,i.tags_json,i.pickup_method,i.inventory_updated_at,
+      i.min_loan_minutes,i.max_loan_minutes,i.booking_notice_minutes,i.turnaround_minutes,i.booking_horizon_days,i.approval_mode,i.deposit_required,i.deposit_amount_agorot
       FROM items i JOIN organizations o ON o.id = i.organization_id WHERE o.owner_id = ? ORDER BY i.created_at DESC`).bind(user.id),
-    env.DB.prepare(`SELECT lr.id,lr.item_id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,lr.manager_note,lr.created_at,
+    env.DB.prepare(`SELECT lr.id,lr.item_id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,lr.manager_note,lr.created_at,lr.quantity,lr.deposit_required_snapshot,lr.deposit_amount_agorot_snapshot,
       i.title AS item_title,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,
       CASE WHEN o.owner_id = ? THEN 'incoming' ELSE 'outgoing' END AS direction,
       CASE WHEN lr.borrower_id = ? AND lr.status IN ('approved','collected') THEN c.contact_phone ELSE NULL END AS contact_phone
@@ -797,6 +881,9 @@ async function dashboard(request, env) {
     requested_until: row.requested_until,
     note: row.note,
     manager_note: row.manager_note,
+    quantity: Number(row.quantity || 1),
+    deposit_required: Boolean(row.deposit_required_snapshot),
+    deposit_amount_agorot: Number(row.deposit_amount_agorot_snapshot || 0),
     direction: row.direction,
     borrower_name: row.direction === "incoming" ? row.borrower_name : undefined,
     borrower_phone: row.direction === "incoming" ? row.phone : undefined,
@@ -823,8 +910,8 @@ async function updateRequestStatus(request, env, id) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
   const target = cleanText(body.status, 2, 20, "סטטוס");
-  const row = await env.DB.prepare(`SELECT lr.status,lr.borrower_id,lr.item_id,lr.requested_from,lr.requested_until,lr.manager_note,
-    i.title AS item_title,i.quantity,o.owner_id FROM loan_requests lr
+  const row = await env.DB.prepare(`SELECT lr.status,lr.borrower_id,lr.item_id,lr.requested_from,lr.requested_until,lr.manager_note,lr.quantity AS requested_quantity,
+    i.title AS item_title,i.quantity,i.turnaround_minutes,o.owner_id FROM loan_requests lr
     JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id WHERE lr.id = ?`).bind(id).first();
   if (!row) throw new HttpError(404, "הבקשה לא נמצאה");
   let allowed = false;
@@ -843,21 +930,23 @@ async function updateRequestStatus(request, env, id) {
   if (target === "approved") {
     result = await env.DB.prepare(`UPDATE loan_requests SET status = 'approved', manager_note = ?, updated_at = ?
       WHERE id = ? AND status = 'pending' AND (
-        SELECT COUNT(*) FROM loan_requests other
-        WHERE other.item_id = ? AND other.id <> ? AND other.status IN ('approved','collected')
-          AND other.requested_from <= ? AND other.requested_until >= ?
-      ) < ?`).bind(managerNote, now, id, row.item_id, id, row.requested_until, row.requested_from, Number(row.quantity)).run();
+        SELECT COALESCE(SUM(other.quantity),0) FROM loan_requests other
+        WHERE other.item_id = ? AND other.id <> ? AND other.status IN ('pending','approved','collected')
+          AND other.requested_from < ? AND other.requested_until > ?
+      ) + ? <= ?`).bind(managerNote, now, id, row.item_id, id, row.requested_until, row.requested_from, Number(row.requested_quantity||1), Number(row.quantity)).run();
     if (!result.meta.changes) throw new HttpError(409, "כל היחידות תפוסות בתאריכים האלה. אפשר לדחות את הבקשה או לתאם תאריכים אחרים בצ׳אט");
   } else {
-    result = await env.DB.prepare("UPDATE loan_requests SET status = ?, manager_note = ?, updated_at = ? WHERE id = ? AND status = ?")
-      .bind(target, managerNote, now, id, row.status).run();
+    result = await env.DB.prepare("UPDATE loan_requests SET status = ?, manager_note = ?, collected_at = CASE WHEN ?='collected' THEN ? ELSE collected_at END, returned_at = CASE WHEN ?='returned' THEN ? ELSE returned_at END, cancelled_at = CASE WHEN ?='cancelled' THEN ? ELSE cancelled_at END, updated_at = ? WHERE id = ? AND status = ?")
+      .bind(target, managerNote, target, now, target, now, target, now, now, id, row.status).run();
     if (!result.meta.changes) throw new HttpError(409, "הבקשה כבר עודכנה. רעננו את האזור האישי");
   }
 
   const statusText = { approved: "אושרה", declined: "נדחתה", cancelled: "בוטלה", collected: "סומנה כנאספה", returned: "סומנה כהוחזרה" }[target] || "עודכנה";
   const recipientId = row.borrower_id === user.id ? row.owner_id : row.borrower_id;
   await env.DB.batch([
-    notificationStatement(env, recipientId, "status", `הבקשה ${statusText}`, `הבקשה עבור ${row.item_title} ${statusText}.`, id)
+    notificationStatement(env, recipientId, "status", `הבקשה ${statusText}`, `הבקשה עבור ${row.item_title} ${statusText}.`, id),
+    env.DB.prepare("INSERT INTO loan_request_events(id,request_id,actor_id,event_type,details_json) VALUES (?,?,?,?,?)")
+      .bind(crypto.randomUUID(),id,user.id,target,JSON.stringify({managerNote:managerNote||null}))
   ]);
   return json({ id, status: target, managerNote });
 }
