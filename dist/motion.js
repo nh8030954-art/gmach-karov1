@@ -22,9 +22,9 @@
       ['.category-section','--scene-p'],
       ['.nearby-motion-scene','--scene-p'],
       ['.connection-story','--scene-p','fast'],
-      ['.trust-section','--scene-p','entry'],
+      ['.trust-section','--scene-p','complete'],
       ['.gmach-callout','--publish-p','entry'],
-      ['.help-search-visual','--scene-p','entry'],
+      ['.help-search-visual','--scene-p','complete'],
       ['.community-cycle','--scene-p','entry'],
       ['.faq-section','--faq-p','long']
     ];
@@ -58,9 +58,10 @@
     state.scenes.forEach(({element,property,journey,speed})=>{
       const rect=element.getBoundingClientRect();
       if(rect.bottom<-120||rect.top>innerHeight+120)return;
-      const start=journey ? .66 : speed==='entry' ? .68 : speed==='long' ? .72 : speed==='fast' ? 1.02 : .82;
-      const end=journey ? .08 : speed==='entry' ? .08 : speed==='long' ? .02 : speed==='fast' ? .62 : .18;
-      const progress=sceneProgress(element,start,end);
+      const start=journey ? .66 : speed==='complete' ? .68 : speed==='entry' ? .68 : speed==='long' ? .72 : speed==='fast' ? 1.02 : .82;
+      const end=journey ? .30 : speed==='complete' ? .32 : speed==='entry' ? .08 : speed==='long' ? .02 : speed==='fast' ? .62 : .18;
+      let progress=sceneProgress(element,start,end);
+      if(property==='--faq-p'&&scrollY+innerHeight>=document.documentElement.scrollHeight-16)progress=1;
       element.style.setProperty(property,progress.toFixed(4));
       if(journey){
         element.style.setProperty('--journey-request',clamp((progress-.2)*4).toFixed(4));
@@ -76,7 +77,7 @@
   const requestDraw=()=>{if(!state.raf)state.raf=requestAnimationFrame(draw)};
 
   const setupReveal=()=>{
-    const elements=[...document.querySelectorAll('.section-heading,.organizations-grid,.gmach-callout')];
+    const elements=[...document.querySelectorAll('.section-heading,.organizations-grid,.steps-grid,.gmach-callout')];
     if(stopped()){elements.forEach(el=>el.classList.add('is-visible'));return;}
     elements.forEach((el,index)=>{el.classList.add('motion-reveal');el.style.setProperty('--reveal-delay',`${Math.min(index%4,3)*55}ms`);});
     const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{

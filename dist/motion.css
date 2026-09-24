@@ -534,3 +534,18 @@ html.a11y-stop-motion .motion-reveal{opacity:1!important;transform:none!importan
 .faq-list details:nth-child(4){opacity:clamp(.03,calc((var(--faq-p) - .76)*7),1)!important;transform:translateY(calc((1 - clamp(0,calc((var(--faq-p) - .76)*7),1))*18px))!important}
 
 @media(prefers-reduced-motion:reduce){.steps-section .steps-grid>li,.trust-grid article,.faq-list details{opacity:1!important;transform:none!important}}
+
+/* Focused final-state corrections: keep every completed animation visible. */
+.steps-grid.motion-reveal{opacity:1!important;transform:none!important}
+.steps-section .steps-grid.motion-reveal>li{opacity:0!important;transform:translateY(22px) scale(.985)!important}
+.steps-section .steps-grid.motion-reveal.is-visible>li{opacity:1!important;transform:none!important;transition:opacity .46s ease,transform .58s var(--motion-ease)!important}
+.steps-grid.motion-reveal.is-visible>li:nth-child(1){transition-delay:.05s!important}
+.steps-grid.motion-reveal.is-visible>li:nth-child(2){transition-delay:.5s!important}
+.steps-grid.motion-reveal.is-visible>li:nth-child(3){transition-delay:.95s!important}
+
+@media(min-width:591px){
+  .header-inner,.site-header.is-compact .header-inner{min-height:126px!important}
+  .site-header .full-brand-logo{width:184px!important;height:116px!important;flex-basis:184px!important;padding:4px 8px!important;overflow:visible!important}
+}
+
+@media(prefers-reduced-motion:reduce){.steps-section .steps-grid.motion-reveal>li{opacity:1!important;transform:none!important;transition:none!important}}
