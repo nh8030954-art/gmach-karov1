@@ -1,4 +1,16 @@
-sha=06489f4450bee7001dff73844e8d41538a7e3df9
+sha=d6f83a15862c257ce2ce7349ea47da760a35ad72
 install=success
 syntax=success
 smoke=failure
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async file:///home/runner/work/gmach-karov1/gmach-karov1/test/.release-smoke.generated.mjs?release=1790250059065:51:5 {
+  [cause]: Error: SQL code did not contain a statement.
+      at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:189:24)
+      at async cloudflare-internal:d1-api:137:19
+      at async #fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/workers/core/entry.worker.js:4923:18)
+      at async ProxyServer.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/workers/core/entry.worker.js:4823:14) {
+    [cause]: undefined
+  }
+}
+
+Node.js v20.20.2
