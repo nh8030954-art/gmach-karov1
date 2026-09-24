@@ -66,6 +66,45 @@ async function createSupportRequest(request, env) {
   return json({ ok: true, id }, 201);
 }
 
+async function ensureAdvancedBookingSchema(env) {
+  const itemInfo=await env.DB.prepare("PRAGMA table_info(items)").all();
+  const itemColumns=new Set((itemInfo.results||[]).map(row=>row.name));
+  const itemAdds=[
+    ["min_loan_minutes","INTEGER NOT NULL DEFAULT 60 CHECK (min_loan_minutes >= 1)"],
+    ["max_loan_minutes","INTEGER NOT NULL DEFAULT 10080 CHECK (max_loan_minutes >= 1)"],
+    ["booking_notice_minutes","INTEGER NOT NULL DEFAULT 0 CHECK (booking_notice_minutes >= 0)"],
+    ["turnaround_minutes","INTEGER NOT NULL DEFAULT 0 CHECK (turnaround_minutes >= 0)"],
+    ["booking_horizon_days","INTEGER NOT NULL DEFAULT 365 CHECK (booking_horizon_days BETWEEN 1 AND 1095)"],
+    ["approval_mode","TEXT NOT NULL DEFAULT 'manual' CHECK (approval_mode IN ('manual','automatic'))"],
+    ["deposit_required","INTEGER NOT NULL DEFAULT 0 CHECK (deposit_required IN (0,1))"],
+    ["deposit_amount_agorot","INTEGER NOT NULL DEFAULT 0 CHECK (deposit_amount_agorot >= 0)"]
+  ];
+  for(const [name,definition] of itemAdds) if(!itemColumns.has(name)) await env.DB.prepare(`ALTER TABLE items ADD COLUMN ${name} ${definition}`).run();
+
+  const requestInfo=await env.DB.prepare("PRAGMA table_info(loan_requests)").all();
+  const requestColumns=new Set((requestInfo.results||[]).map(row=>row.name));
+  const requestAdds=[
+    ["quantity","INTEGER NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 999)"],
+    ["deposit_required_snapshot","INTEGER NOT NULL DEFAULT 0 CHECK (deposit_required_snapshot IN (0,1))"],
+    ["deposit_amount_agorot_snapshot","INTEGER NOT NULL DEFAULT 0 CHECK (deposit_amount_agorot_snapshot >= 0)"],
+    ["deposit_terms_accepted_at","TEXT"],["collected_at","TEXT"],["returned_at","TEXT"],["cancelled_at","TEXT"]
+  ];
+  for(const [name,definition] of requestAdds) if(!requestColumns.has(name)) await env.DB.prepare(`ALTER TABLE loan_requests ADD COLUMN ${name} ${definition}`).run();
+
+  await env.DB.batch([
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS inventory_units (id TEXT PRIMARY KEY,item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,unit_code TEXT,status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','maintenance','blocked','retired')),note TEXT,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS inventory_blocks (id TEXT PRIMARY KEY,item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,inventory_unit_id TEXT REFERENCES inventory_units(id) ON DELETE CASCADE,starts_at TEXT NOT NULL,ends_at TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 999),reason TEXT,created_by TEXT REFERENCES users(id) ON DELETE SET NULL,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),CHECK (ends_at > starts_at))"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS loan_request_units (request_id TEXT NOT NULL REFERENCES loan_requests(id) ON DELETE CASCADE,inventory_unit_id TEXT NOT NULL REFERENCES inventory_units(id) ON DELETE CASCADE,PRIMARY KEY (request_id,inventory_unit_id))"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS loan_request_events (id TEXT PRIMARY KEY,request_id TEXT NOT NULL REFERENCES loan_requests(id) ON DELETE CASCADE,actor_id TEXT REFERENCES users(id) ON DELETE SET NULL,event_type TEXT NOT NULL,details_json TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS waitlist_entries (id TEXT PRIMARY KEY,item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,requested_from TEXT NOT NULL,requested_until TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 999),status TEXT NOT NULL DEFAULT 'waiting' CHECK (status IN ('waiting','notified','converted','cancelled','expired')),created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),CHECK (requested_until > requested_from))"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS inventory_units_item_status_idx ON inventory_units(item_id,status)"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS inventory_blocks_item_time_idx ON inventory_blocks(item_id,starts_at,ends_at)"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS loan_requests_item_time_status_idx ON loan_requests(item_id,requested_from,requested_until,status)"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS loan_request_events_request_idx ON loan_request_events(request_id,created_at DESC)"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS waitlist_item_time_idx ON waitlist_entries(item_id,status,requested_from,requested_until)")
+  ]);
+}
+
 async function routeApi(request, env, ctx, url) {
   const method = request.method.toUpperCase();
   const path = url.pathname;
@@ -74,6 +113,7 @@ async function routeApi(request, env, ctx, url) {
 
   if (method === "GET" && path === "/api/health") {
     await env.DB.prepare("SELECT 1 AS ok").first();
+    await ensureAdvancedBookingSchema(env);
     const [usersTable,challengesTable,itemsTable,waitlistTable,blocksTable]=await Promise.all([
       env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").first(),
       env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='auth_challenges'").first(),
