@@ -51,3 +51,5 @@ try {
 } finally {
   await rm(tempPath, { force: true });
 }
+
+// Release verification includes live deployment readiness through the workflow.
