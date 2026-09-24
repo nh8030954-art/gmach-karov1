@@ -11,9 +11,10 @@ source = source.replace(
 
 source = source.replace(
   /requestedFrom: "(\d{4}-\d{2}-\d{2})", requestedUntil: "(\d{4}-\d{2}-\d{2})"/g,
-  'requestedFrom: "$1T10:00", requestedUntil: "$2T10:00", quantity: 1'
+  'requestedFrom: "$1T10:00", requestedUntil: "$2T10:00", quantity: 1, depositAccepted: true'
 );
 
+source = source.replace('loanConditions: "איסוף עצמי" }', 'loanConditions: "איסוף עצמי", depositRequired: true, depositAmount: "100" }');
 source = source.replace('"2026-10-03T10:00"', '"2026-10-02T12:00"');
 source = source.replace(
   /assert\.equal\(result\.response\.status, 201\);\n  const overlappingRequestId[\s\S]*?assert\.equal\(result\.response\.status, 200\);/,
