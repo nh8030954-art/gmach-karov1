@@ -848,13 +848,12 @@ async function joinWaitlist(request,env,itemId){
 async function advanceWaitlist(env,itemId){
   const item=await env.DB.prepare("SELECT turnaround_minutes FROM items WHERE id=?").bind(itemId).first(); if(!item) return;
   const entries=await env.DB.prepare("SELECT id,user_id,requested_from,requested_until,quantity FROM waitlist_entries WHERE item_id=? AND status='waiting' ORDER BY created_at ASC").bind(itemId).all();
-  for(const entry of entries.results||[]){
-    const available=await availableQuantityForRange(env,itemId,entry.requested_from,entry.requested_until,Number(item.turnaround_minutes||0),null);
-    if(available>=Number(entry.quantity)){
-      const changed=await env.DB.prepare("UPDATE waitlist_entries SET status='notified' WHERE id=? AND status='waiting'").bind(entry.id).run();
-      if(changed.meta.changes) await notificationStatement(env,entry.user_id,"waitlist","הפריט שביקשתם זמין","התפנה מלאי לטווח שביקשתם. ניתן להיכנס לפריט ולבצע הזמנה.",null).run();
-      break;
-    }
+  const entry=(entries.results||[])[0];
+  if(!entry) return;
+  const available=await availableQuantityForRange(env,itemId,entry.requested_from,entry.requested_until,Number(item.turnaround_minutes||0),null);
+  if(available>=Number(entry.quantity)){
+    const changed=await env.DB.prepare("UPDATE waitlist_entries SET status='notified' WHERE id=? AND status='waiting'").bind(entry.id).run();
+    if(changed.meta.changes) await notificationStatement(env,entry.user_id,"waitlist","הפריט שביקשתם זמין","התפנה מלאי לטווח שביקשתם. אתם ראשונים בתור לטווח הזה; ניתן להיכנס לפריט ולבצע הזמנה.",null).run();
   }
 }
 
