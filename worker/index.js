@@ -444,7 +444,7 @@ async function listItems(env, url) {
       o.last_active_at AS org_last_active_at,
       (SELECT ROUND(AVG(r.rating),1) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_rating,
       (SELECT COUNT(*) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_review_count,
-      MAX(0, i.quantity - (SELECT COUNT(*) FROM loan_requests lr WHERE lr.item_id=i.id AND lr.status IN ('approved','collected'))) AS available_count
+      MAX(0, i.quantity - (SELECT COALESCE(SUM(lr.quantity),0) FROM loan_requests lr WHERE lr.item_id=i.id AND lr.status IN ('pending','approved','collected'))) AS available_count
     FROM items i JOIN organizations o ON o.id = i.organization_id
     WHERE ${where.join(" AND ")}
     ORDER BY CASE i.availability_status WHEN 'available' THEN 0 ELSE 1 END, i.created_at DESC
@@ -459,7 +459,7 @@ async function getItem(env, id) {
       o.last_active_at AS org_last_active_at,
       (SELECT ROUND(AVG(r.rating),1) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_rating,
       (SELECT COUNT(*) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_review_count,
-      MAX(0, i.quantity - (SELECT COUNT(*) FROM loan_requests lr WHERE lr.item_id=i.id AND lr.status IN ('approved','collected'))) AS available_count
+      MAX(0, i.quantity - (SELECT COALESCE(SUM(lr.quantity),0) FROM loan_requests lr WHERE lr.item_id=i.id AND lr.status IN ('pending','approved','collected'))) AS available_count
     FROM items i JOIN organizations o ON o.id = i.organization_id
     WHERE i.id = ? AND i.status = 'active' AND i.is_free = 1 AND o.status = 'approved' AND o.is_hidden = 0
   `).bind(id).first();
@@ -648,6 +648,9 @@ async function createItem(request, env) {
   const duplicate = await env.DB.prepare("SELECT id FROM items WHERE organization_id = ? AND lower(trim(title)) = lower(trim(?)) AND category = ? AND status != 'archived' LIMIT 1")
     .bind(organizationId, title, category).first();
   if (duplicate) throw new HttpError(409, "כבר קיים בגמ״ח פריט פעיל בשם הזה ובאותה קטגוריה");
+  const minLoanMinutes=positiveInt(body.minLoanMinutes,60,1,525600,"משך מינימלי");
+  const maxLoanMinutes=positiveInt(body.maxLoanMinutes,10080,1,525600,"משך מקסימלי");
+  if(maxLoanMinutes<minLoanMinutes) throw new HttpError(400,"משך ההשאלה המקסימלי חייב להיות גדול או שווה למינימלי");
   const id = crypto.randomUUID();
   await env.DB.prepare(`
     INSERT INTO items (id,organization_id,title,category,description,condition,quantity,loan_conditions,city,neighborhood,item_type,subcategory,tags_json,pickup_method,inventory_updated_at,
@@ -666,7 +669,7 @@ async function createItem(request, env) {
     organization.city,
     organization.neighborhood,
     sanitizeItemType(body.itemType), cleanOptional(body.subcategory, 80), JSON.stringify(sanitizeTags(body.tags)), sanitizePickupMethod(body.pickupMethod), new Date().toISOString(),
-    positiveInt(body.minLoanMinutes,60,1,525600,"משך מינימלי"), positiveInt(body.maxLoanMinutes,10080,1,525600,"משך מקסימלי"),
+    minLoanMinutes, maxLoanMinutes,
     positiveInt(body.bookingNoticeMinutes,0,0,525600,"זמן התראה"), positiveInt(body.turnaroundMinutes,0,0,10080,"זמן התארגנות"),
     positiveInt(body.bookingHorizonDays,365,1,1095,"טווח הזמנה"), body.approvalMode==="automatic"?"automatic":"manual",
     body.depositRequired?1:0, body.depositRequired?moneyAgorot(body.depositAmount):0
