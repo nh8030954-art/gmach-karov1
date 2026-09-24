@@ -15,6 +15,11 @@ source = source.replace(
 );
 
 source = source.replace('"2026-10-03T10:00"', '"2026-10-02T12:00"');
+source = source.replace(
+  /assert\.equal\(result\.response\.status, 201\);\n  const overlappingRequestId[\s\S]*?assert\.equal\(result\.response\.status, 200\);/,
+  'assert.equal(result.response.status, 409);'
+);
+
 
 source = source.replace(
   'const migration = await readFile(\`migrations/\${filename}\`, "utf8");',
