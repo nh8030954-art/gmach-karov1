@@ -284,10 +284,8 @@
   }
   async function refreshInventoryManager(itemId){
     const data=await api("/api/items/"+encodeURIComponent(itemId)+"/inventory");
-    const wait=await api("/api/items/"+encodeURIComponent(itemId)+"/waitlist");
     $("#inventory-quantity").max=String(data.totalQuantity||1);
     $("#inventory-blocks").innerHTML=(data.blocks||[]).length?"<h3>חסימות פעילות</h3>"+(data.blocks||[]).map(b=>'<article class="dashboard-row"><div><strong>'+escapeHTML(b.reason||"חסימת מלאי")+'</strong><p>'+escapeHTML(b.starts_at)+" – "+escapeHTML(b.ends_at)+" · "+b.quantity+' יחידות</p></div><button class="button button-secondary button-small" type="button" data-delete-block="'+escapeHTML(b.id)+'">הסרה</button></article>').join(""):"<p>אין חסימות מלאי.</p>";
-    $("#inventory-waitlist").innerHTML=(wait.entries||[]).length?(wait.entries||[]).map(e=>'<article class="dashboard-row"><div><strong>'+escapeHTML(e.full_name)+'</strong><p>'+escapeHTML(e.requested_from)+" – "+escapeHTML(e.requested_until)+" · "+e.quantity+" יחידות</p></div></article>").join(""):"<p>אין ממתינים כרגע.</p>";
     $$("[data-delete-block]").forEach(b=>b.addEventListener("click",async()=>{try{await api("/api/inventory-blocks/"+encodeURIComponent(b.dataset.deleteBlock),{method:"DELETE"});await refreshInventoryManager(itemId);}catch(e){toast(e.message,"error")}}));
   }
   function renderDashboardOrganizations(organizations) {
