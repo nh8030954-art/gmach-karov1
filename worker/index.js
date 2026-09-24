@@ -115,6 +115,14 @@ async function routeApi(request, env, ctx, url) {
   if (method === "PATCH" && itemDetail) return updateItem(request, env, decodeURIComponent(itemDetail[1]));
   const itemAvailabilityCheck = path.match(/^\/api\/items\/([^/]+)\/availability-check$/);
   if (method === "GET" && itemAvailabilityCheck) return checkItemAvailability(env, decodeURIComponent(itemAvailabilityCheck[1]), url);
+  const inventoryManage = path.match(/^\/api\/items\/([^/]+)\/inventory$/);
+  if (method === "GET" && inventoryManage) return getInventoryManagement(request, env, decodeURIComponent(inventoryManage[1]));
+  if (method === "POST" && inventoryManage) return addInventoryBlock(request, env, decodeURIComponent(inventoryManage[1]));
+  const inventoryBlock = path.match(/^\/api\/inventory-blocks\/([^/]+)$/);
+  if (method === "DELETE" && inventoryBlock) return deleteInventoryBlock(request, env, decodeURIComponent(inventoryBlock[1]));
+  const waitlist = path.match(/^\/api\/items\/([^/]+)\/waitlist$/);
+  if (method === "POST" && waitlist) return joinWaitlist(request, env, decodeURIComponent(waitlist[1]));
+  if (method === "GET" && waitlist) return listWaitlist(request, env, decodeURIComponent(waitlist[1]));
 
   const favorite = path.match(/^\/api\/favorites\/([^/]+)$/);
   if (favorite && method === "POST") return addFavorite(request, env, decodeURIComponent(favorite[1]));
@@ -787,6 +795,55 @@ async function availableQuantityForRange(env,itemId,from,until,turnaroundMinutes
     WHERE item_id=? AND starts_at < ? AND ends_at > ?`).bind(itemId,paddedUntil,paddedFrom).first();
   return Math.max(0,Number(item.quantity)-Number(booked?.used||0)-Number(blocked?.used||0));
 }
+async function ownedItem(request,env,itemId){
+  const user=await requireUser(request,env);
+  const item=await env.DB.prepare(`SELECT i.*,o.owner_id FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.id=?`).bind(itemId).first();
+  if(!item||(item.owner_id!==user.id&&user.role!=="admin")) throw new HttpError(403,"אין הרשאה לנהל את המלאי הזה");
+  return {user,item};
+}
+async function getInventoryManagement(request,env,itemId){
+  const {item}=await ownedItem(request,env,itemId);
+  const blocks=await env.DB.prepare("SELECT id,starts_at,ends_at,quantity,reason,created_at FROM inventory_blocks WHERE item_id=? ORDER BY starts_at").bind(itemId).all();
+  const units=await env.DB.prepare("SELECT id,unit_code,status,note,created_at,updated_at FROM inventory_units WHERE item_id=? ORDER BY created_at").bind(itemId).all();
+  return json({totalQuantity:Number(item.quantity),blocks:blocks.results||[],units:units.results||[]});
+}
+async function addInventoryBlock(request,env,itemId){
+  const {user,item}=await ownedItem(request,env,itemId); const body=await readJson(request);
+  const from=validateLoanDateTime(body.startsAt,"תחילת החסימה"),until=validateLoanDateTime(body.endsAt,"סיום החסימה");
+  if(Date.parse(until)<=Date.parse(from)) throw new HttpError(400,"סיום החסימה חייב להיות אחרי תחילתה");
+  const quantity=positiveInt(body.quantity,1,1,Number(item.quantity),"כמות חסומה");
+  const id=crypto.randomUUID();
+  await env.DB.prepare("INSERT INTO inventory_blocks(id,item_id,starts_at,ends_at,quantity,reason,created_by) VALUES(?,?,?,?,?,?,?)")
+    .bind(id,itemId,from,until,quantity,cleanOptional(body.reason,300),user.id).run();
+  return json({block:{id,starts_at:from,ends_at:until,quantity}},201);
+}
+async function deleteInventoryBlock(request,env,id){
+  const user=await requireUser(request,env);
+  const row=await env.DB.prepare(`SELECT b.id,o.owner_id FROM inventory_blocks b JOIN items i ON i.id=b.item_id JOIN organizations o ON o.id=i.organization_id WHERE b.id=?`).bind(id).first();
+  if(!row||(row.owner_id!==user.id&&user.role!=="admin")) throw new HttpError(403,"אין הרשאה למחוק חסימה זו");
+  await env.DB.prepare("DELETE FROM inventory_blocks WHERE id=?").bind(id).run(); return json({ok:true});
+}
+async function joinWaitlist(request,env,itemId){
+  const user=await requireUser(request,env); const body=await readJson(request);
+  const from=validateLoanDateTime(body.requestedFrom,"מועד האיסוף"),until=validateLoanDateTime(body.requestedUntil,"מועד ההחזרה");
+  assertAllowedPickupReturnTime(from,"האיסוף"); assertAllowedPickupReturnTime(until,"ההחזרה");
+  if(Date.parse(until)<=Date.parse(from)) throw new HttpError(400,"מועד ההחזרה חייב להיות אחרי מועד האיסוף");
+  const item=await env.DB.prepare("SELECT quantity FROM items WHERE id=? AND status='active'").bind(itemId).first(); if(!item) throw new HttpError(404,"הפריט לא נמצא");
+  const quantity=positiveInt(body.quantity,1,1,Number(item.quantity),"כמות");
+  const available=await availableQuantityForRange(env,itemId,from,until,0,null);
+  if(available>=quantity) throw new HttpError(409,"הפריט זמין כרגע; אפשר לבצע הזמנה במקום להצטרף לרשימת המתנה");
+  const existing=await env.DB.prepare("SELECT id FROM waitlist_entries WHERE item_id=? AND user_id=? AND requested_from=? AND requested_until=? AND status='waiting'").bind(itemId,user.id,from,until).first();
+  if(existing) return json({entry:{id:existing.id,status:"waiting"}});
+  const id=crypto.randomUUID(); await env.DB.prepare("INSERT INTO waitlist_entries(id,item_id,user_id,requested_from,requested_until,quantity) VALUES(?,?,?,?,?,?)").bind(id,itemId,user.id,from,until,quantity).run();
+  return json({entry:{id,status:"waiting"}},201);
+}
+async function listWaitlist(request,env,itemId){
+  await ownedItem(request,env,itemId);
+  const rows=await env.DB.prepare(`SELECT w.id,w.requested_from,w.requested_until,w.quantity,w.status,w.created_at,u.full_name
+    FROM waitlist_entries w JOIN users u ON u.id=w.user_id WHERE w.item_id=? AND w.status IN ('waiting','notified') ORDER BY w.created_at`).bind(itemId).all();
+  return json({entries:rows.results||[]});
+}
+
 async function checkItemAvailability(env,itemId,url) {
   const item = await env.DB.prepare(`SELECT i.id,i.quantity,i.min_loan_minutes,i.max_loan_minutes,i.turnaround_minutes,
     i.deposit_required,i.deposit_amount_agorot,i.approval_mode,i.availability_status
