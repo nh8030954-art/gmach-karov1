@@ -43,6 +43,7 @@
       state.scenes.forEach(({element,property,journey})=>{
         element.style.setProperty(property,'1');
         if(journey){
+          element.closest('.steps-section')?.style.setProperty('--journey-p','1');
           element.style.setProperty('--journey-request','1');
           element.style.setProperty('--journey-request-move','1');
           element.style.setProperty('--journey-approved','1');
@@ -58,12 +59,14 @@
     state.scenes.forEach(({element,property,journey,speed})=>{
       const rect=element.getBoundingClientRect();
       if(rect.bottom<-120||rect.top>innerHeight+120)return;
+      const phone=innerWidth<=590;
       const start=journey ? .66 : speed==='complete' ? .68 : speed==='entry' ? .68 : speed==='long' ? .72 : speed==='fast' ? 1.02 : .82;
-      const end=journey ? .30 : speed==='complete' ? .32 : speed==='entry' ? .08 : speed==='long' ? .02 : speed==='fast' ? .62 : .18;
+      const end=journey ? (phone ? .52 : .46) : speed==='complete' ? (phone ? .56 : .50) : speed==='entry' ? .08 : speed==='long' ? .02 : speed==='fast' ? (phone ? .78 : .62) : .18;
       let progress=sceneProgress(element,start,end);
       if(property==='--faq-p'&&scrollY+innerHeight>=document.documentElement.scrollHeight-16)progress=1;
       element.style.setProperty(property,progress.toFixed(4));
       if(journey){
+        element.closest('.steps-section')?.style.setProperty('--journey-p',progress.toFixed(4));
         element.style.setProperty('--journey-request',clamp((progress-.2)*4).toFixed(4));
         element.style.setProperty('--journey-request-move',clamp(progress/.3).toFixed(4));
         element.style.setProperty('--journey-approved',clamp((progress-.26)*8).toFixed(4));

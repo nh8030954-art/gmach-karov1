@@ -549,3 +549,21 @@ html.a11y-stop-motion .motion-reveal{opacity:1!important;transform:none!importan
 }
 
 @media(prefers-reduced-motion:reduce){.steps-section .steps-grid.motion-reveal>li{opacity:1!important;transform:none!important;transition:none!important}}
+
+/* Separate phone corrections; desktop timing above stays intact. */
+@media(max-width:590px){
+  .steps-section .steps-grid.motion-reveal>li:nth-child(1){opacity:clamp(.08,calc(var(--journey-p)*6),1)!important;transform:translateY(calc((1 - clamp(0,calc(var(--journey-p)*6),1))*16px))!important;transition:none!important}
+  .steps-section .steps-grid.motion-reveal>li:nth-child(2){opacity:clamp(.05,calc((var(--journey-p) - .32)*6),1)!important;transform:translateY(calc((1 - clamp(0,calc((var(--journey-p) - .32)*6),1))*16px))!important;transition:none!important}
+  .steps-section .steps-grid.motion-reveal>li:nth-child(3){opacity:clamp(.04,calc((var(--journey-p) - .64)*6),1)!important;transform:translateY(calc((1 - clamp(0,calc((var(--journey-p) - .64)*6),1))*16px))!important;transition:none!important}
+
+  .loan-journey .journey-track{display:block!important;background:#c8d8d4!important;box-shadow:0 0 0 1px rgba(28,83,94,.12)!important;opacity:1!important}
+  .loan-journey .journey-track i{display:block!important;background:linear-gradient(180deg,#efc565,#d59d32)!important;box-shadow:0 0 12px rgba(213,157,50,.24)!important}
+
+  .connection-story .found-label{bottom:43%!important;left:50%!important;transform:translateX(-50%)!important}
+
+  .publish-object{opacity:clamp(.06,calc((var(--publish-p) - .04)*5),1)!important;transform:translateY(calc((1 - clamp(0,calc((var(--publish-p) - .04)*5),1))*16px))!important}
+  .publish-card{opacity:clamp(.05,calc((var(--publish-p) - .36)*5),1)!important;transform:translateY(calc((1 - clamp(0,calc((var(--publish-p) - .36)*5),1))*16px))!important}
+  .publish-result{opacity:clamp(.04,calc((var(--publish-p) - .68)*5),1)!important;transform:translateY(calc((1 - clamp(0,calc((var(--publish-p) - .68)*5),1))*16px))!important}
+
+  .community-cycle .cycle-step.c5{bottom:32px!important}
+}
