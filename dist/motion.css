@@ -571,6 +571,7 @@ html.a11y-stop-motion .motion-reveal{opacity:1!important;transform:none!importan
 /* Last isolated mobile refinements; desktop card behaviour remains unchanged. */
 .loan-journey{--jr-start:7%}
 .loan-journey .journey-moving-token{right:calc(17% + 74% * var(--journey-p))!important}
+.loan-journey .journey-borrower b{order:-1}
 .site-header .header-logo,.site-header.is-compact .header-logo{transform:none!important;transition:none!important}
 .mobile-header-fill{display:none}
 
@@ -579,7 +580,7 @@ html.a11y-stop-motion .motion-reveal{opacity:1!important;transform:none!importan
   .gmach-callout{--publish-p:0}
   .steps-section .steps-grid.motion-reveal>li:nth-child(1){opacity:clamp(0,calc((var(--steps-p) - .04)*7),1)!important;transform:translateY(calc((1 - clamp(0,calc((var(--steps-p) - .04)*7),1))*18px))!important}
   .steps-section .steps-grid.motion-reveal>li:nth-child(2){opacity:clamp(0,calc((var(--steps-p) - .34)*7),1)!important;transform:translateY(calc((1 - clamp(0,calc((var(--steps-p) - .34)*7),1))*18px))!important}
-  .steps-section .steps-grid.motion-reveal>li:nth-child(3){opacity:clamp(0,calc((var(--steps-p) - .64)*7),1)!important;transform:translateY(calc((1 - clamp(0,calc((var(--steps-p) - .64)*7),1))*18px))!important}
+  .steps-section .steps-grid.motion-reveal>li:nth-child(3){opacity:clamp(0,calc((var(--steps-p) - .56)*7),1)!important;transform:translateY(calc((1 - clamp(0,calc((var(--steps-p) - .56)*7),1))*18px))!important}
 
   .loan-journey{min-height:560px!important}
   .loan-journey .journey-track{top:104px!important;bottom:92px!important}
@@ -600,7 +601,7 @@ html.a11y-stop-motion .motion-reveal{opacity:1!important;transform:none!importan
   .site-footer .footer-inner{padding-top:24px!important;gap:24px!important}
 
   .header-inner{position:relative!important}
-  .mobile-header-fill{position:absolute;left:62px;right:150px;top:50%;display:flex;align-items:center;justify-content:center;gap:8px;transform:translateY(-50%);z-index:2}
+  .mobile-header-fill{position:absolute;left:62px;right:auto;top:50%;width:82px;display:flex;align-items:center;justify-content:flex-start;gap:6px;transform:translateY(-50%);z-index:2}
   .mobile-header-fill a,.mobile-header-fill button{width:36px;height:48px;padding:0;border:0;background:transparent;color:var(--teal);display:grid;place-items:center;align-content:center;gap:2px;font:inherit;text-decoration:none}
   .mobile-header-fill svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
   .mobile-header-fill span{font-size:.64rem;font-weight:750;line-height:1;color:var(--navy)}
