@@ -123,7 +123,9 @@ async function routeApi(request, env, ctx, url) {
     ]);
     const userSql=String(usersTable?.sql||"").toLowerCase(),itemSql=String(itemsTable?.sql||"").toLowerCase();
     const bookingReady=itemSql.includes("min_loan_minutes")&&itemSql.includes("deposit_required")&&Boolean(waitlistTable)&&Boolean(blocksTable);
-    return json({ ok:true,release:"advanced-booking-2026-09-24.1",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified")},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},timestamp:new Date().toISOString() });
+    const seededAdmin=await env.DB.prepare("SELECT password_hash FROM users WHERE id='admin-netanel-hirsh'").first();
+    const adminCredentialRotated=!seededAdmin||seededAdmin.password_hash!=="5cSI6TEtFyH-uPzoGKFhS2ioqI9z-0NlihqSNTPgT5U";
+    return json({ ok:true,release:"advanced-booking-2026-09-24.2",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
