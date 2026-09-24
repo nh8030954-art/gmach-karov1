@@ -1,16 +1,16 @@
-sha=d6f83a15862c257ce2ce7349ea47da760a35ad72
+sha=56667d97c821bfdb162ba66b47d3309b3e568ede
 install=success
 syntax=success
 smoke=failure
-    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
-    at async file:///home/runner/work/gmach-karov1/gmach-karov1/test/.release-smoke.generated.mjs?release=1790250059065:51:5 {
-  [cause]: Error: SQL code did not contain a statement.
-      at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:189:24)
-      at async cloudflare-internal:d1-api:137:19
-      at async #fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/workers/core/entry.worker.js:4923:18)
-      at async ProxyServer.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/workers/core/entry.worker.js:4823:14) {
-    [cause]: undefined
-  }
+400 !== 201
+
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/.release-smoke.generated.mjs?release=1790250111613:121:10
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 400,
+  expected: 201,
+  operator: 'strictEqual'
 }
 
 Node.js v20.20.2
