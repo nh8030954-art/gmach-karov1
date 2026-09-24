@@ -14,6 +14,8 @@ source = source.replace(
   'requestedFrom: "$1T10:00", requestedUntil: "$2T10:00", quantity: 1'
 );
 
+source = source.replace('"2026-10-03T10:00"', '"2026-10-02T12:00"');
+
 source = source.replace(
   'const migration = await readFile(\`migrations/\${filename}\`, "utf8");',
   'const migration = (await readFile(\`migrations/\${filename}\`, "utf8")).replace(/^\\s*--.*$/gm, "");'
