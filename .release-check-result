@@ -1,16 +1,5 @@
-sha=0e5cd969c2b91f0afaf07c360a828c7a983ec0ba
+sha=e57b53b6f22f11ffa2a2aafbe2e97d077f746a87
 install=success
 syntax=success
-smoke=failure
-409 !== 201
-
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/.release-smoke.generated.mjs?release=1790250158431:163:10
-    at process.processTicksAndRejections (node:internal/process/task_queues:95:5) {
-  generatedMessage: true,
-  code: 'ERR_ASSERTION',
-  actual: 409,
-  expected: 201,
-  operator: 'strictEqual'
-}
-
-Node.js v20.20.2
+smoke=success
+Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
