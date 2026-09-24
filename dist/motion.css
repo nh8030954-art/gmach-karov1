@@ -571,6 +571,8 @@ html.a11y-stop-motion .motion-reveal{opacity:1!important;transform:none!importan
 /* Last isolated mobile refinements; desktop card behaviour remains unchanged. */
 .loan-journey{--jr-start:7%}
 .loan-journey .journey-moving-token{right:calc(17% + 74% * var(--journey-p))!important}
+.site-header .header-logo,.site-header.is-compact .header-logo{transform:none!important;transition:none!important}
+.mobile-header-fill{display:none}
 
 @media(max-width:590px){
   .steps-grid{--steps-p:0}
@@ -582,10 +584,10 @@ html.a11y-stop-motion .motion-reveal{opacity:1!important;transform:none!importan
   .loan-journey{min-height:560px!important}
   .loan-journey .journey-track{top:104px!important;bottom:92px!important}
   .loan-journey .journey-stations{display:block!important;top:112px!important;bottom:102px!important}
-  .loan-journey .journey-station:nth-child(1){--stage-y:18%}
-  .loan-journey .journey-station:nth-child(2){--stage-y:37%}
-  .loan-journey .journey-station:nth-child(3){--stage-y:66%}
-  .loan-journey .journey-station:nth-child(4){--stage-y:94%}
+  .loan-journey .journey-station:nth-child(1){--stage-y:20%}
+  .loan-journey .journey-station:nth-child(2){--stage-y:40%}
+  .loan-journey .journey-station:nth-child(3){--stage-y:60%}
+  .loan-journey .journey-station:nth-child(4){--stage-y:80%}
   .loan-journey .journey-token{top:calc(128px + 324px * var(--token-y))!important}
   .loan-journey .journey-moving-token{right:auto!important}
 
@@ -596,4 +598,10 @@ html.a11y-stop-motion .motion-reveal{opacity:1!important;transform:none!importan
   .community-cycle .cycle-step.c5{bottom:32px!important}
   .faq-list details:nth-child(4){opacity:clamp(0,calc((var(--faq-p) - .62)*8),1)!important;transform:translateY(calc((1 - clamp(0,calc((var(--faq-p) - .62)*8),1))*18px))!important}
   .site-footer .footer-inner{padding-top:24px!important;gap:24px!important}
+
+  .header-inner{position:relative!important}
+  .mobile-header-fill{position:absolute;left:62px;right:150px;top:50%;display:flex;align-items:center;justify-content:center;gap:8px;transform:translateY(-50%);z-index:2}
+  .mobile-header-fill a,.mobile-header-fill button{width:36px;height:48px;padding:0;border:0;background:transparent;color:var(--teal);display:grid;place-items:center;align-content:center;gap:2px;font:inherit;text-decoration:none}
+  .mobile-header-fill svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+  .mobile-header-fill span{font-size:.64rem;font-weight:750;line-height:1;color:var(--navy)}
 }

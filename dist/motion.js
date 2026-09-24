@@ -76,7 +76,7 @@
         element.style.setProperty('--journey-return',clamp((progress-.64)/.3).toFixed(4));
         const token=element.querySelector('.journey-moving-token');
         if(token)token.dataset.stage=phone
-          ? (progress<.14?'site':progress<.37?'request':progress<.66?'approve':progress<.92?'pickup':'return')
+          ? (progress<.16?'site':progress<.38?'request':progress<.59?'approve':progress<.81?'pickup':'return')
           : (progress<.07?'site':progress<.32?'request':progress<.57?'approve':progress<.82?'pickup':'return');
       }
     });
@@ -142,6 +142,24 @@
     });
   };
 
+  const setupMobileHeaderFill=()=>{
+    const header=document.querySelector('.header-inner');
+    if(!header||header.querySelector('.mobile-header-fill'))return;
+    const shortcuts=document.createElement('div');
+    shortcuts.className='mobile-header-fill';
+    const search=document.createElement('a');
+    search.href='#/catalog';
+    search.setAttribute('aria-label','חיפוש פריט');
+    search.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></svg><span>חיפוש</span>';
+    const help=document.createElement('button');
+    help.type='button';
+    help.setAttribute('aria-label','בקשת עזרה');
+    help.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21S4 16.5 4 9.5A4.5 4.5 0 0 1 12 6a4.5 4.5 0 0 1 8 3.5C20 16.5 12 21 12 21Z"/></svg><span>עזרה</span>';
+    help.addEventListener('click',()=>document.getElementById('nav-help-request')?.click());
+    shortcuts.append(search,help);
+    header.append(shortcuts);
+  };
+
   const setupCategoryScene=()=>{
     const targets=[...document.querySelectorAll('.category-motion-scene span')];
     const sources=[...document.querySelectorAll('.category-card:not(.is-active) .category-icon svg')];
@@ -171,7 +189,7 @@
 
   const init=()=>{
     root.classList.add('motion-ready','motion-active');
-    setupScenes(); setupCategoryScene(); setupReveal(); setupSkeletons(); setupCounts(); setupActions(); setupOneTimeCta(); syncEmptySections();
+    setupScenes(); setupCategoryScene(); setupReveal(); setupSkeletons(); setupCounts(); setupActions(); setupMobileHeaderFill(); setupOneTimeCta(); syncEmptySections();
     addEventListener('scroll',requestDraw,{passive:true});
     addEventListener('resize',rebuild,{passive:true});
     reduceQuery.addEventListener?.('change',requestDraw);
