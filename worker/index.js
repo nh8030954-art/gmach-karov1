@@ -799,7 +799,23 @@ async function checkItemAvailability(env,itemId,url) {
   const duration=loanMinutes(from,until);
   if(duration<=0) throw new HttpError(400,"מועד ההחזרה חייב להיות אחרי מועד האיסוף");
   const available=item.availability_status==="unavailable"?0:await availableQuantityForRange(env,itemId,from,until,item.turnaround_minutes,null);
-  return json({available:available>0,availableQuantity:available,totalQuantity:Number(item.quantity),
+  let nextAvailableAt=null;
+  if(!available && item.availability_status!=="unavailable"){
+    const duration=Math.max(1,loanMinutes(from,until));
+    let cursor=from;
+    for(let attempt=0;attempt<24;attempt++){
+      const overlap=await env.DB.prepare(`SELECT MIN(requested_until) AS next_end FROM loan_requests
+        WHERE item_id=? AND status IN ('pending','approved','collected') AND requested_from < ? AND requested_until > ?`)
+        .bind(itemId,new Date(Date.parse(cursor)+duration*60000).toISOString().slice(0,16),cursor).first();
+      if(!overlap?.next_end) break;
+      cursor=String(overlap.next_end).slice(0,16);
+      const end=new Date(Date.parse(cursor)+duration*60000).toISOString().slice(0,16);
+      try { assertAllowedPickupReturnTime(cursor,"האיסוף"); assertAllowedPickupReturnTime(end,"ההחזרה"); }
+      catch { const d=new Date(cursor); const day=d.getUTCDay(); if(day===5){d.setUTCDate(d.getUTCDate()+1);d.setUTCHours(21,0,0,0);} else if(day===6){d.setUTCHours(21,0,0,0);} cursor=d.toISOString().slice(0,16); continue; }
+      if(await availableQuantityForRange(env,itemId,cursor,end,item.turnaround_minutes,null)>0){nextAvailableAt=cursor;break;}
+    }
+  }
+  return json({available:available>0,availableQuantity:available,totalQuantity:Number(item.quantity),nextAvailableAt,
     minLoanMinutes:Number(item.min_loan_minutes),maxLoanMinutes:Number(item.max_loan_minutes),
     depositRequired:Boolean(item.deposit_required),depositAmountAgorot:Number(item.deposit_amount_agorot),approvalMode:item.approval_mode});
 }
