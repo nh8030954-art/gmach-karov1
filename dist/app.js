@@ -176,7 +176,7 @@
       $("#request-availability").textContent="בודקים זמינות…";
       const data=await api(`/api/items/${encodeURIComponent(id)}/availability-check?from=${encodeURIComponent(from)}&until=${encodeURIComponent(until)}`);
       $("#request-quantity").max=String(Math.max(1,data.availableQuantity||1));
-      $("#request-availability").textContent=data.available?`זמין בטווח שבחרתם — ${data.availableQuantity} יחידות זמינות.`:"לא זמין בטווח שבחרתם.";
+      $("#request-availability").textContent=data.available?`זמין בטווח שבחרתם — ${data.availableQuantity} יחידות זמינות.`:(data.nextAvailableAt?`לא זמין בטווח שבחרתם. הזמינות הקרובה שמצאנו מתחילה ב־${new Date(data.nextAvailableAt).toLocaleString("he-IL")}.`:"לא זמין בטווח שבחרתם.");
       $("#request-deposit-box").hidden=!data.depositRequired; $("#request-deposit-consent").required=Boolean(data.depositRequired);
       $("#request-deposit-amount").textContent=(Number(data.depositAmountAgorot||0)/100).toFixed(2);
     }catch(error){$("#request-availability").textContent=error.message||"לא ניתן לבדוק זמינות כרגע.";}},180);
