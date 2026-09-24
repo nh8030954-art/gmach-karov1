@@ -481,3 +481,28 @@ html.a11y-stop-motion .motion-reveal{opacity:1!important;transform:none!importan
 }
 
 @media(prefers-reduced-motion:reduce){.faq-list details.motion-reveal{opacity:1!important;transform:none!important}.journey-moving-token>svg{animation:none!important}}
+
+/* Final corrections from the full desktop recording review. */
+.help-search-visual>span{transform:translate(calc((1 - var(--scene-p))*var(--cloud-x,0px)),calc((1 - var(--scene-p))*var(--cloud-y,0px))) rotate(calc((1 - var(--scene-p))*var(--cloud-r,0deg))) scale(calc(.78 + var(--scene-p)*.22))!important;transition:none!important}
+.help-search-visual>span:nth-child(1){--cloud-x:105px;--cloud-y:-42px;--cloud-r:8deg}
+.help-search-visual>span:nth-child(2){--cloud-x:-110px;--cloud-y:26px;--cloud-r:-9deg}
+.help-search-visual>span:nth-child(3){--cloud-x:96px;--cloud-y:54px;--cloud-r:7deg}
+.help-search-visual>span:nth-child(4){--cloud-x:18px;--cloud-y:-94px;--cloud-r:-6deg}
+.help-search-visual>span:nth-child(5){--cloud-x:-96px;--cloud-y:62px;--cloud-r:9deg}
+.help-search-visual>span:nth-child(6){--cloud-x:-18px;--cloud-y:88px;--cloud-r:-7deg}
+.help-search-visual>span:nth-child(7){--cloud-x:112px;--cloud-y:8px;--cloud-r:8deg}
+.help-search-visual>span:nth-child(8){--cloud-x:-72px;--cloud-y:-72px;--cloud-r:-8deg}
+.help-search-visual>span:nth-child(9){--cloud-x:60px;--cloud-y:82px;--cloud-r:7deg}
+.help-search-visual>span:nth-child(10){--cloud-x:-112px;--cloud-y:-18px;--cloud-r:-9deg}
+
+.publish-sequence>span{will-change:transform,opacity}
+.publish-object{opacity:clamp(.08,calc(var(--publish-p)*8),1);transform:translateY(calc((1 - clamp(0,calc(var(--publish-p)*8),1))*20px))}
+.publish-card{opacity:clamp(.08,calc((var(--publish-p) - .24)*8),1);transform:translateY(calc((1 - clamp(0,calc((var(--publish-p) - .24)*8),1))*20px))}
+.publish-result{opacity:clamp(.08,calc((var(--publish-p) - .48)*8),1);transform:translateY(calc((1 - clamp(0,calc((var(--publish-p) - .48)*8),1))*20px))}
+
+.steps-grid>li.motion-reveal{opacity:0!important;transform:translateY(22px) scale(.985)!important}
+.steps-grid>li.motion-reveal.is-visible{opacity:1!important;transform:none!important;transition:opacity .42s ease,transform .52s var(--motion-ease)!important}
+.steps-grid>li:nth-child(2).motion-reveal.is-visible{transition-delay:.16s!important}
+.steps-grid>li:nth-child(3).motion-reveal.is-visible{transition-delay:.32s!important}
+
+@media(prefers-reduced-motion:reduce){.help-search-visual>span,.publish-sequence>span,.steps-grid>li.motion-reveal{transform:none!important;opacity:1!important;transition:none!important}}
