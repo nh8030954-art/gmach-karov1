@@ -712,6 +712,16 @@ async function updateItem(request, env, id) {
     values.title, category, values.description, condition, quantity, values.loanConditions,values.itemType,values.pickupMethod,values.subcategory,values.tagsJson,new Date().toISOString(),
     existing.org_city, existing.org_neighborhood, status, new Date().toISOString(), id
   ).run();
+  const minLoanMinutes=positiveInt(body.minLoanMinutes,Number(existing.min_loan_minutes||60),1,525600,"משך מינימלי");
+  const maxLoanMinutes=positiveInt(body.maxLoanMinutes,Number(existing.max_loan_minutes||10080),1,525600,"משך מקסימלי");
+  if(maxLoanMinutes<minLoanMinutes) throw new HttpError(400,"משך ההשאלה המקסימלי חייב להיות גדול או שווה למינימלי");
+  await env.DB.prepare(`UPDATE items SET min_loan_minutes=?,max_loan_minutes=?,booking_notice_minutes=?,turnaround_minutes=?,
+    booking_horizon_days=?,approval_mode=?,deposit_required=?,deposit_amount_agorot=? WHERE id=?`).bind(
+    minLoanMinutes,maxLoanMinutes,
+    positiveInt(body.bookingNoticeMinutes,Number(existing.booking_notice_minutes||0),0,525600,"זמן התראה"),
+    positiveInt(body.turnaroundMinutes,Number(existing.turnaround_minutes||0),0,10080,"זמן התארגנות"),
+    positiveInt(body.bookingHorizonDays,Number(existing.booking_horizon_days||365),1,1095,"טווח הזמנה"),
+    body.approvalMode==="automatic"?"automatic":"manual",body.depositRequired?1:0,body.depositRequired?moneyAgorot(body.depositAmount):0,id).run();
   return json({ item: { id, status } });
 }
 
