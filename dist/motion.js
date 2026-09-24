@@ -63,7 +63,7 @@
       if(rect.bottom<-120||rect.top>innerHeight+120)return;
       const phone=innerWidth<=590;
       const start=steps ? .88 : journey ? .66 : speed==='complete' ? .68 : speed==='entry' ? .68 : speed==='cycle' ? (phone ? .82 : .68) : speed==='long' ? .72 : speed==='fast' ? (phone ? .86 : 1.02) : .82;
-      const end=steps ? .16 : journey ? (phone ? .58 : .60) : speed==='complete' ? (phone ? .56 : .50) : speed==='entry' ? .08 : speed==='cycle' ? (phone ? .50 : .08) : speed==='long' ? .02 : speed==='fast' ? (phone ? .60 : .62) : .18;
+      const end=steps ? .16 : journey ? (phone ? .58 : .64) : speed==='complete' ? (phone ? .56 : .50) : speed==='entry' ? .08 : speed==='cycle' ? (phone ? .50 : .08) : speed==='long' ? .02 : speed==='fast' ? (phone ? .60 : .62) : .18;
       let progress=sceneProgress(element,start,end);
       if(property==='--faq-p'&&scrollY+innerHeight>=document.documentElement.scrollHeight-16)progress=1;
       element.style.setProperty(property,progress.toFixed(4));
@@ -75,7 +75,9 @@
         element.style.setProperty('--journey-collect',clamp((progress-.34)/.27).toFixed(4));
         element.style.setProperty('--journey-return',clamp((progress-.64)/.3).toFixed(4));
         const token=element.querySelector('.journey-moving-token');
-        if(token)token.dataset.stage=progress<.16?'site':progress<.36?'request':progress<.58?'approve':progress<.8?'pickup':'return';
+        if(token)token.dataset.stage=phone
+          ? (progress<.14?'site':progress<.37?'request':progress<.66?'approve':progress<.92?'pickup':'return')
+          : (progress<.07?'site':progress<.32?'request':progress<.57?'approve':progress<.82?'pickup':'return');
       }
     });
   };
