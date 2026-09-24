@@ -25,6 +25,13 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     try {
+      if (url.pathname !== "/api/health") {
+        const shabbat = israelShabbatState(new Date());
+        if (shabbat.closed) {
+          if (url.pathname.startsWith("/api/")) return withSecurityHeaders(json({ error:"האתר סגור כעת לכבוד השבת. שבת שלום.", shabbat:true },503));
+          return withSecurityHeaders(shabbatClosedPage(shabbat));
+        }
+      }
       if (url.pathname.startsWith("/api/")) {
         const response = await routeApi(request, env, ctx, url);
         return withSecurityHeaders(response);
@@ -43,6 +50,79 @@ export default {
   }
 };
 
+
+function israelDateParts(date) {
+  const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Jerusalem",year:"numeric",month:"2-digit",day:"2-digit",weekday:"short"}).formatToParts(date);
+  return Object.fromEntries(parts.filter(p=>p.type!=="literal").map(p=>[p.type,p.value]));
+}
+function gregorianToJdn(y,m,d) {
+  const a=Math.floor((14-m)/12),yy=y+4800-a,mm=m+12*a-3;
+  return d+Math.floor((153*mm+2)/5)+365*yy+Math.floor(yy/4)-Math.floor(yy/100)+Math.floor(yy/400)-32045;
+}
+function hebrewLeap(y){ return ((7*y+1)%19)<7; }
+function hebrewYearMonths(y){ return hebrewLeap(y)?13:12; }
+function hebrewDelay1(y){ const months=Math.floor((235*y-234)/19),parts=12084+13753*months,day=months*29+Math.floor(parts/25920); return ((3*(day+1))%7)<3?day+1:day; }
+function hebrewDelay2(y){ const last=hebrewDelay1(y-1),present=hebrewDelay1(y),next=hebrewDelay1(y+1); return next-present===356?2:present-last===382?1:0; }
+function hebrewNewYear(y){ return 347995+hebrewDelay1(y)+hebrewDelay2(y); }
+function hebrewYearDays(y){ return hebrewNewYear(y+1)-hebrewNewYear(y); }
+function hebrewMonthDays(y,m){
+  if([2,4,6,10,13].includes(m)) return 29;
+  if(m===12&&!hebrewLeap(y)) return 29;
+  if(m===8&&hebrewYearDays(y)%10!==5) return 29;
+  if(m===9&&hebrewYearDays(y)%10===3) return 29;
+  return 30;
+}
+function hebrewToJdn(y,m,d){
+  let days=d;
+  if(m<7){ for(let mm=7;mm<=hebrewYearMonths(y);mm++) days+=hebrewMonthDays(y,mm); for(let mm=1;mm<m;mm++) days+=hebrewMonthDays(y,mm); }
+  else for(let mm=7;mm<m;mm++) days+=hebrewMonthDays(y,mm);
+  return hebrewNewYear(y)+days-1;
+}
+function passoverGregorianDate(gYear){
+  let hy=gYear+3760, jdn=hebrewToJdn(hy,1,15);
+  const epoch=new Date(Date.UTC(1970,0,1)), epochJdn=gregorianToJdn(1970,1,1);
+  return new Date(epoch.getTime()+(jdn-epochJdn)*86400000);
+}
+function israelUtcForLocal(y,m,d,hour,minute){
+  let guess=Date.UTC(y,m-1,d,hour,minute);
+  const fmt=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Jerusalem",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"});
+  for(let i=0;i<3;i++){
+    const p=Object.fromEntries(fmt.formatToParts(new Date(guess)).filter(x=>x.type!=="literal").map(x=>[x.type,x.value]));
+    const shown=Date.UTC(Number(p.year),Number(p.month)-1,Number(p.day),Number(p.hour),Number(p.minute));
+    guess+=Date.UTC(y,m-1,d,hour,minute)-shown;
+  }
+  return new Date(guess);
+}
+function shabbatTimesForFriday(y,m,d){
+  const date=new Date(Date.UTC(y,m-1,d)), jan1=new Date(Date.UTC(y,0,1)), n=Math.floor((date-jan1)/86400000)+1;
+  const gamma=2*Math.PI/365*(n-1),eq=229.18*(0.000075+0.001868*Math.cos(gamma)-0.032077*Math.sin(gamma)-0.014615*Math.cos(2*gamma)-0.040849*Math.sin(2*gamma));
+  const decl=0.006918-0.399912*Math.cos(gamma)+0.070257*Math.sin(gamma)-0.006758*Math.cos(2*gamma)+0.000907*Math.sin(2*gamma)-0.002697*Math.cos(3*gamma)+0.00148*Math.sin(3*gamma);
+  const lat=31.778*Math.PI/180,ha=Math.acos(Math.cos(90.833*Math.PI/180)/(Math.cos(lat)*Math.cos(decl))-Math.tan(lat)*Math.tan(decl))*180/Math.PI;
+  const sunsetMinutes=720-4*(35.235+ha)-eq;
+  const noon=israelUtcForLocal(y,m,d,12,0), noonParts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Jerusalem",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(noon);
+  const offsetMinutes=(noon.getTime()-Date.UTC(y,m-1,d,12,0))/-60000;
+  const sunsetLocal=sunsetMinutes+offsetMinutes, closeLocal=sunsetLocal-20;
+  const close=israelUtcForLocal(y,m,d,Math.floor(closeLocal/60),Math.round(closeLocal%60));
+  const sat=new Date(Date.UTC(y,m-1,d+1)), sp=israelDateParts(sat);
+  const satN=Math.floor((sat-jan1)/86400000)+1,g2=2*Math.PI/365*(satN-1),eq2=229.18*(0.000075+0.001868*Math.cos(g2)-0.032077*Math.sin(g2)-0.014615*Math.cos(2*g2)-0.040849*Math.sin(2*g2));
+  const dec2=0.006918-0.399912*Math.cos(g2)+0.070257*Math.sin(g2)-0.006758*Math.cos(2*g2)+0.000907*Math.sin(2*g2)-0.002697*Math.cos(3*g2)+0.00148*Math.sin(3*g2);
+  const ha2=Math.acos(Math.cos(98.5*Math.PI/180)/(Math.cos(lat)*Math.cos(dec2))-Math.tan(lat)*Math.tan(dec2))*180/Math.PI;
+  const nightMinutes=720-4*(35.235+ha2)-eq2+offsetMinutes;
+  const open=israelUtcForLocal(Number(sp.year),Number(sp.month),Number(sp.day),Math.floor(nightMinutes/60),Math.round(nightMinutes%60));
+  return {close,open};
+}
+function israelShabbatState(now){
+  const p=israelDateParts(now), y=Number(p.year),m=Number(p.month),d=Number(p.day);
+  const dayIndex={Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[p.weekday];
+  let friday=new Date(Date.UTC(y,m-1,d+(5-dayIndex)));
+  if(dayIndex===6) friday=new Date(Date.UTC(y,m-1,d-1));
+  const fp=israelDateParts(friday), times=shabbatTimesForFriday(Number(fp.year),Number(fp.month),Number(fp.day));
+  return {closed:now>=times.close&&now<times.open,reopensAt:times.open.toISOString()};
+}
+function shabbatClosedPage(state){
+  const html=`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>גמ״ח ברגע — שבת שלום</title></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#fff;font-family:Arial,sans-serif;color:#123c46;text-align:center"><main style="max-width:620px;padding:40px 24px"><h1 style="font-size:42px;margin:0 0 20px">שבת שלום</h1><p style="font-size:22px;line-height:1.7">גמ״ח ברגע סגור כעת לכבוד השבת.</p><p style="font-size:18px;line-height:1.7">האתר ישוב לפעילות בעזרת ה׳ בצאת השבת.</p></main></body></html>`;
+  return new Response(html,{status:503,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
+}
 
 async function createSupportRequest(request, env) {
   const body = await readJson(request);
