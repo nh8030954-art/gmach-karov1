@@ -1275,9 +1275,10 @@ async function uploadImages(request, env, itemId) {
       await env.ITEM_IMAGES.put(key, file.stream(), { httpMetadata: { contentType: file.type, cacheControl: "public, max-age=31536000, immutable" } });
       uploadedKeys.push(key);
     }
-    const urls = [...existing, ...uploadedKeys.map(key => `/media/${key}`)];
-    await env.DB.prepare("UPDATE items SET image_urls = ?, updated_at = ? WHERE id = ?")
-      .bind(JSON.stringify(urls), new Date().toISOString(), itemId).run();
+    const newUrls=uploadedKeys.map(key=>`/media/${key}`),urls=[...existing,...newUrls],now=new Date().toISOString();
+    const statements=[env.DB.prepare("UPDATE items SET image_urls=?,primary_image_url=COALESCE(primary_image_url,?),updated_at=? WHERE id=?").bind(JSON.stringify(urls),urls[0]||null,now,itemId)];
+    newUrls.forEach((url,index)=>statements.push(env.DB.prepare("INSERT OR IGNORE INTO item_images(id,item_id,storage_key,url,sort_order,is_primary,moderation_status) VALUES(?,?,?,?,?,?,?)").bind(crypto.randomUUID(),itemId,uploadedKeys[index],url,existing.length+index,existing.length===0&&index===0?1:0,"pending")));
+    await env.DB.batch(statements);
     return json({ imageUrls: urls }, 201);
   } catch (error) {
     await Promise.all(uploadedKeys.map(key => env.ITEM_IMAGES.delete(key)));
