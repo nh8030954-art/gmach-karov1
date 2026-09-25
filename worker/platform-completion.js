@@ -114,7 +114,20 @@ export async function handlePlatformCompletionApi(request,env,ctx,url){
   if(method==="GET"&&path==="/api/search/nearby") return nearbySearch(env,url);
   if(method==="GET"&&path==="/api/compare") return compareItems(env,url);
 
-  let m=path.match(/^\/api\/organizations\/([^/]+)\/lifecycle$/);
+  let m=path.match(/^\/api\/organizations\/([^/]+)\/categories$/);
+  if(m&&method==="GET") return getOrgCategories(request,env,decodeURIComponent(m[1]));
+  if(m&&method==="PUT") return setOrgCategories(request,env,decodeURIComponent(m[1]));
+  m=path.match(/^\/api\/items\/([^/]+)\/categories$/);
+  if(m&&method==="GET") return getItemCategories(request,env,decodeURIComponent(m[1]));
+  if(m&&method==="PUT") return setItemCategories(request,env,decodeURIComponent(m[1]));
+  if(method==="POST"&&path==="/api/category-suggestions") return createCategorySuggestion(request,env);
+  if(method==="GET"&&path==="/api/admin/category-suggestions") return listCategorySuggestions(request,env);
+  m=path.match(/^\/api\/admin\/category-suggestions\/([^/]+)$/);
+  if(m&&method==="PATCH") return reviewCategorySuggestion(request,env,decodeURIComponent(m[1]));
+  m=path.match(/^\/api\/admin\/categories\/([^/]+)$/);
+  if(m&&method==="PATCH") return updateAdminCategory(request,env,decodeURIComponent(m[1]));
+
+  m=path.match(/^\/api\/organizations\/([^/]+)\/lifecycle$/);
   if(m&&method==="PATCH") return orgLifecycle(request,env,decodeURIComponent(m[1]));
   m=path.match(/^\/api\/organizations\/([^/]+)\/transfer$/);
   if(m&&method==="POST") return createOrgTransfer(request,env,decodeURIComponent(m[1]));
@@ -226,6 +239,60 @@ async function nearbySearch(env,url){
 async function compareItems(env,url){
   const ids=[...new Set(String(url.searchParams.get("ids")||"").split(",").map(x=>x.trim()).filter(Boolean))].slice(0,5);if(!ids.length)return json({items:[]});
   const rows=await qall(env,`SELECT i.id,i.title,i.category,i.subcategory,i.description,i.condition,i.condition_detail,i.quantity,i.availability_status,i.city,i.pickup_method,i.min_loan_minutes,i.max_loan_minutes,i.deposit_required,i.deposit_amount_agorot,i.service_radius_km,o.name organization_name FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.id IN (${ids.map(()=>"?").join(",")}) AND i.status='active'`,ids);return json({items:rows});
+}
+
+/* ---------- categories ---------- */
+async function getOrgCategories(request,env,id){
+  await requireOrg(request,env,id,["owner","inventory","requests","reports"]);
+  return json({categories:await qall(env,`SELECT c.* FROM categories c JOIN organization_categories x ON x.category_id=c.id WHERE x.organization_id=? ORDER BY c.sort_order,c.name_he`,[id])});
+}
+async function setOrgCategories(request,env,id){
+  const {user}=await requireOrg(request,env,id,["owner"]),b=await readJson(request),ids=[...new Set(Array.isArray(b.categoryIds)?b.categoryIds.map(String):[])].slice(0,20);
+  if(!ids.length)throw new HttpError(400,"יש לבחור לפחות קטגוריה אחת");
+  const valid=await qall(env,`SELECT id FROM categories WHERE status='active' AND id IN (${ids.map(()=>"?").join(",")})`,ids);
+  if(valid.length!==ids.length)throw new HttpError(400,"אחת הקטגוריות אינה זמינה");
+  const statements=[env.DB.prepare("DELETE FROM organization_categories WHERE organization_id=?").bind(id)];
+  for(const cid of ids)statements.push(env.DB.prepare("INSERT INTO organization_categories(organization_id,category_id) VALUES(?,?)").bind(id,cid));
+  await env.DB.batch(statements);await audit(env,user.id,"organization.categories",id,{categoryIds:ids});return json({ok:true,categoryIds:ids});
+}
+async function getItemCategories(request,env,id){
+  const user=await requireUser(request,env),item=await qfirst(env,"SELECT organization_id FROM items WHERE id=?",[id]);if(!item)throw new HttpError(404,"הפריט לא נמצא");
+  await requireOrg(request,env,item.organization_id,["owner","inventory","requests","reports"]);
+  return json({categories:await qall(env,`SELECT c.* FROM categories c JOIN item_categories x ON x.category_id=c.id WHERE x.item_id=? ORDER BY c.sort_order,c.name_he`,[id])});
+}
+async function setItemCategories(request,env,id){
+  const user=await requireUser(request,env),item=await itemPermission(env,user,id);if(!item)throw new HttpError(403,"אין הרשאה");
+  const b=await readJson(request),ids=[...new Set(Array.isArray(b.categoryIds)?b.categoryIds.map(String):[])].slice(0,20);if(!ids.length)throw new HttpError(400,"יש לבחור לפחות קטגוריה אחת");
+  const valid=await qall(env,`SELECT id FROM categories WHERE status='active' AND id IN (${ids.map(()=>"?").join(",")})`,ids);if(valid.length!==ids.length)throw new HttpError(400,"אחת הקטגוריות אינה זמינה");
+  const s=[env.DB.prepare("DELETE FROM item_categories WHERE item_id=?").bind(id)];for(const cid of ids)s.push(env.DB.prepare("INSERT INTO item_categories(item_id,category_id) VALUES(?,?)").bind(id,cid));await env.DB.batch(s);return json({ok:true,categoryIds:ids});
+}
+async function createCategorySuggestion(request,env){
+  const user=await requireUser(request,env),b=await readJson(request),id=crypto.randomUUID(),orgId=optional(b.organizationId,100);
+  if(orgId)await requireOrg(request,env,orgId,["owner","inventory"]);
+  await qrun(env,"INSERT INTO category_suggestions(id,organization_id,suggested_by,parent_category_id,name,description) VALUES(?,?,?,?,?,?)",[id,orgId,user.id,optional(b.parentCategoryId,100),clean(b.name,2,80,"שם הקטגוריה"),optional(b.description,500)]);
+  return json({suggestion:{id,status:"pending"}},201);
+}
+async function listCategorySuggestions(request,env){await requireAdmin(request,env);return json({suggestions:await qall(env,`SELECT s.*,u.full_name suggested_by_name,o.name organization_name FROM category_suggestions s JOIN users u ON u.id=s.suggested_by LEFT JOIN organizations o ON o.id=s.organization_id ORDER BY CASE s.status WHEN 'pending' THEN 0 ELSE 1 END,s.created_at DESC LIMIT 300`,[])});}
+async function reviewCategorySuggestion(request,env,id){
+  const admin=await requireAdmin(request,env),b=await readJson(request),x=await qfirst(env,"SELECT * FROM category_suggestions WHERE id=?",[id]);if(!x)throw new HttpError(404,"ההצעה לא נמצאה");
+  const status=b.status==="approved"?"approved":b.status==="rejected"?"rejected":null;if(!status)throw new HttpError(400,"סטטוס אינו תקין");
+  let categoryId=null;if(status==="approved"){categoryId=optional(b.categoryId,80)||("cat-"+crypto.randomUUID().slice(0,8));await qrun(env,"INSERT OR IGNORE INTO categories(id,parent_id,name_he,name_en,icon,synonyms_json,status,sort_order) VALUES(?,?,?,?,?,'[]','active',999)",[categoryId,x.parent_category_id,x.name,optional(b.nameEn,80),optional(b.icon,50)]);}
+  await qrun(env,"UPDATE category_suggestions SET status=?,reviewed_at=? WHERE id=?",[status,new Date().toISOString(),id]);await audit(env,admin.id,"category.suggestion.review",id,{status,categoryId});return json({ok:true,status,categoryId});
+}
+async function updateAdminCategory(request,env,id){
+  const admin=await requireAdmin(request,env),b=await readJson(request),x=await qfirst(env,"SELECT * FROM categories WHERE id=?",[id]);if(!x)throw new HttpError(404,"הקטגוריה לא נמצאה");
+  const mergeInto=optional(b.mergeInto,80);if(mergeInto){
+    if(!await qfirst(env,"SELECT id FROM categories WHERE id=?",[mergeInto]))throw new HttpError(400,"קטגוריית היעד אינה קיימת");
+    await env.DB.batch([
+      env.DB.prepare("INSERT OR IGNORE INTO organization_categories(organization_id,category_id) SELECT organization_id,? FROM organization_categories WHERE category_id=?").bind(mergeInto,id),
+      env.DB.prepare("INSERT OR IGNORE INTO item_categories(item_id,category_id) SELECT item_id,? FROM item_categories WHERE category_id=?").bind(mergeInto,id),
+      env.DB.prepare("DELETE FROM organization_categories WHERE category_id=?").bind(id),
+      env.DB.prepare("DELETE FROM item_categories WHERE category_id=?").bind(id),
+      env.DB.prepare("UPDATE categories SET status='hidden',updated_at=? WHERE id=?").bind(new Date().toISOString(),id)
+    ]);await audit(env,admin.id,"category.merge",id,{mergeInto});return json({ok:true,mergedInto:mergeInto});
+  }
+  const status=["active","hidden","pending"].includes(b.status)?b.status:x.status,parent=b.parentId===undefined?x.parent_id:optional(b.parentId,80);
+  await qrun(env,"UPDATE categories SET parent_id=?,name_he=?,name_en=?,icon=?,image_url=?,synonyms_json=?,status=?,sort_order=?,updated_at=? WHERE id=?",[parent,b.nameHe===undefined?x.name_he:clean(b.nameHe,2,80,"שם"),b.nameEn===undefined?x.name_en:optional(b.nameEn,80),b.icon===undefined?x.icon:optional(b.icon,50),b.imageUrl===undefined?x.image_url:optional(b.imageUrl,500),b.synonyms===undefined?x.synonyms_json:JSON.stringify(Array.isArray(b.synonyms)?b.synonyms.slice(0,80):[]),status,b.sortOrder===undefined?x.sort_order:Math.max(0,Math.min(9999,Number(b.sortOrder)||0)),new Date().toISOString(),id]);await audit(env,admin.id,"category.update",id,{status,parent});return json({ok:true});
 }
 
 /* ---------- organizations / branches ---------- */
