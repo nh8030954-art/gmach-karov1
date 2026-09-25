@@ -14,7 +14,7 @@ const CREATE=[
 "CREATE TABLE IF NOT EXISTS restore_validations (id TEXT PRIMARY KEY,backup_run_id TEXT NOT NULL REFERENCES backup_runs(id) ON DELETE CASCADE,table_count INTEGER NOT NULL DEFAULT 0,row_count INTEGER NOT NULL DEFAULT 0,checksum TEXT,status TEXT NOT NULL CHECK(status IN ('running','success','failed')),details_json TEXT NOT NULL DEFAULT '{}',started_at TEXT NOT NULL,finished_at TEXT)",
 "CREATE TABLE IF NOT EXISTS external_service_status (service_key TEXT PRIMARY KEY,status TEXT NOT NULL CHECK(status IN ('configured','missing','degraded','healthy')),details_json TEXT NOT NULL DEFAULT '{}',checked_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))"
 ];
-async function ensureSchema(env){if(schemaPromise)return schemaPromise;schemaPromise=(async()=>{for(const s of CREATE)await env.DB.prepare(s).run();await env.DB.prepare("INSERT OR IGNORE INTO geocode_throttle(id,last_request_at) VALUES(1,NULL)").run();return true})().catch(e=>{schemaPromise=null;throw e});return schemaPromise}
+async function ensureSchema(env){if(schemaPromise)return schemaPromise;schemaPromise=(async()=>{for(const s of CREATE)await env.DB.prepare(s).run();const bi=await env.DB.prepare("PRAGMA table_info(backup_runs)").all().catch(()=>({results:[]})),bc=new Set((bi.results||[]).map(x=>x.name));for(const [name,def] of [["backup_type","TEXT NOT NULL DEFAULT 'manual'"],["started_at","TEXT"],["finished_at","TEXT"],["manifest_json","TEXT NOT NULL DEFAULT '{}'"]])if(!bc.has(name))await env.DB.prepare("ALTER TABLE backup_runs ADD COLUMN "+name+" "+def).run();await env.DB.prepare("UPDATE backup_runs SET started_at=COALESCE(started_at,created_at),finished_at=COALESCE(finished_at,completed_at)").run();await env.DB.prepare("INSERT OR IGNORE INTO geocode_throttle(id,last_request_at) VALUES(1,NULL)").run();return true})().catch(e=>{schemaPromise=null;throw e});return schemaPromise}
 function cookie(request,name){for(const p of String(request.headers.get("Cookie")||"").split(";")){const [k,...v]=p.trim().split("=");if(k===name)return decodeURIComponent(v.join("="))}return""}
 function b64(bytes){let out="";for(const b of bytes)out+=String.fromCharCode(b);return btoa(out).replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,"")}
 async function hash(v){return b64(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(String(v)))))}
@@ -99,7 +99,7 @@ async function adminPageVersions(request,env,key,url){await requireAdmin(request
 async function restorePage(request,env,id){const admin=await requireAdmin(request,env),v=await env.DB.prepare("SELECT * FROM page_versions WHERE id=?").bind(id).first();if(!v)throw new RemainingError(404,"הגרסה לא נמצאה");await env.DB.prepare(`INSERT INTO page_content(content_key,language,content,status,updated_by) VALUES(?,?,?,'published',?) ON CONFLICT(content_key,language) DO UPDATE SET content=excluded.content,status='published',publish_at=NULL,updated_by=excluded.updated_by,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`).bind(v.content_key,v.language,v.content,admin.id).run();return json({ok:true})}
 async function validateBackup(request,env,id){
  await requireAdmin(request,env);const backup=await env.DB.prepare("SELECT * FROM backup_runs WHERE id=?").bind(id).first();if(!backup)throw new RemainingError(404,"הגיבוי לא נמצא");const vid=crypto.randomUUID(),started=new Date().toISOString();await env.DB.prepare("INSERT INTO restore_validations(id,backup_run_id,status,started_at) VALUES(?,?,'running',?)").bind(vid,id,started).run();
- try{const tables=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()).results;let rows=0;for(const t of tables){const c=await env.DB.prepare(`SELECT COUNT(*) count FROM ${t.name}`).first();rows+=Number(c?.count||0)}const checksum=await hash(JSON.stringify({backup:id,tables:tables.map(x=>x.name).sort(),rows}));await env.DB.prepare("UPDATE restore_validations SET table_count=?,row_count=?,checksum=?,status='success',details_json=?,finished_at=? WHERE id=?").bind(tables.length,rows,checksum,JSON.stringify({manifest:safe(backup.manifest_json,{})}),new Date().toISOString(),vid).run();return json({validation:{id:vid,status:"success",tableCount:tables.length,rowCount:rows,checksum}})}catch(e){await env.DB.prepare("UPDATE restore_validations SET status='failed',details_json=?,finished_at=? WHERE id=?").bind(JSON.stringify({error:String(e)}),new Date().toISOString(),vid).run();throw e}
+ try{const tables=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()).results;let rows=0;for(const t of tables){const c=await env.DB.prepare(`SELECT COUNT(*) count FROM ${t.name}`).first();rows+=Number(c?.count||0)}const checksum=await hash(JSON.stringify({backup:id,tables:tables.map(x=>x.name).sort(),rows}));await env.DB.prepare("UPDATE restore_validations SET table_count=?,row_count=?,checksum=?,status='completed',details_json=?,finished_at=? WHERE id=?").bind(tables.length,rows,checksum,JSON.stringify({manifest:safe(backup.manifest_json,{})}),new Date().toISOString(),vid).run();return json({validation:{id:vid,status:"success",tableCount:tables.length,rowCount:rows,checksum}})}catch(e){await env.DB.prepare("UPDATE restore_validations SET status='failed',details_json=?,finished_at=? WHERE id=?").bind(JSON.stringify({error:String(e)}),new Date().toISOString(),vid).run();throw e}
 }
 async function externalStatus(request,env){
  await requireAdmin(request,env);const checks=[
@@ -128,7 +128,7 @@ async function automaticDailyBackup(env){
   const existing=await env.DB.prepare("SELECT id FROM backup_runs WHERE backup_type='scheduled' AND substr(started_at,1,10)=? AND status='success' LIMIT 1").bind(today).first();
   if(existing)return existing.id;
   const id=crypto.randomUUID(),started=new Date().toISOString();
-  await env.DB.prepare("INSERT INTO backup_runs(id,backup_type,status,started_at) VALUES(?,'scheduled','running',?)").bind(id,started).run();
+  await env.DB.prepare("INSERT INTO backup_runs(id,backup_type,status,started_at) VALUES(?,'scheduled','started',?)").bind(id,started).run();
   try{
     const tableRows=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('auth_events','rate_limits') ORDER BY name").all();
     const dump={version:2,createdAt:started,tables:{}},tables=[];
@@ -153,10 +153,10 @@ async function automaticDailyBackup(env){
     await env.ITEM_IMAGES.put(key,raw,{httpMetadata:{contentType:"application/json"}});
     const manifest={storageKey:key,bytes:bytes.length,checksum,tables,r2ObjectCount:objects.length};
     await env.DB.batch([
-      env.DB.prepare("UPDATE backup_runs SET status='success',finished_at=?,manifest_json=? WHERE id=?").bind(new Date().toISOString(),JSON.stringify(manifest),id),
+      env.DB.prepare("UPDATE backup_runs SET status='completed',completed_at=?,finished_at=?,manifest_json=? WHERE id=?").bind(new Date().toISOString(),JSON.stringify(manifest),id),
       env.DB.prepare("INSERT OR REPLACE INTO backup_objects(backup_run_id,storage_key,object_type,size_bytes,checksum) VALUES(?,?,?,?,?)").bind(id,key,"database+r2-manifest",bytes.length,checksum)
     ]);
-    const old=await env.DB.prepare("SELECT id,manifest_json FROM backup_runs WHERE backup_type='scheduled' AND status='success' ORDER BY started_at DESC LIMIT -1 OFFSET 14").all();
+    const old=await env.DB.prepare("SELECT id,manifest_json FROM backup_runs WHERE backup_type='scheduled' AND status='completed' ORDER BY started_at DESC LIMIT -1 OFFSET 14").all();
     for(const x of old.results){
       const m=safe(x.manifest_json,{});
       if(m.storageKey)try{await env.ITEM_IMAGES.delete(m.storageKey)}catch{}
