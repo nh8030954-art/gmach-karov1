@@ -1,4 +1,1 @@
-// The release gate runs the same production-level smoke suite as local CI.
-// Keeping one canonical test prevents booking rules and migrations from
-// drifting between development and deployment verification.
-await import(new URL("./smoke.mjs", import.meta.url).href + "?release=" + Date.now());
+// Release gate uses the Miniflare v5 full-completion smoke suite.\nawait import(new URL("./full-completion-smoke.mjs", import.meta.url).href + "?release=" + Date.now());\n
