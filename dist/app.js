@@ -182,7 +182,7 @@
       $$('[data-org-item]', $("#organization-dialog-content")).forEach(button => button.addEventListener("click", () => { closeDialog($("#organization-dialog")); openItem(button.dataset.orgItem); })); openDialog($("#organization-dialog"));
     } catch (error) {
       const content = $("#organization-dialog-content");
-      content.innerHTML = `<div class="dashboard-empty" role="alert"><h2 id="organization-title">לא הצלחנו לטעון את עמוד הגמ״ח</h2><p>${escapeHTML(error.message)}</p><button class="button button-secondary" type="button" data-retry-organization>ניסיון חוזר</button></div>`;
+      content.innerHTML = `<div class="dashboard-empty" role="alert"><h2 id="organization-title">לא הצלחנו לטעון את עמוד הגמ״ח</h2><p>${escapeHTML(error.message)}</p>${error.requestId ? `<small>מספר תקלה לתמיכה: ${escapeHTML(error.requestId)}</small>` : ""}<button class="button button-secondary" type="button" data-retry-organization>ניסיון חוזר</button></div>`;
       $("[data-retry-organization]", content).addEventListener("click", () => openOrganization(id));
       openDialog($("#organization-dialog"));
     }
