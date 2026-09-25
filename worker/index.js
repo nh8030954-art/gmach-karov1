@@ -1,4 +1,4 @@
-const SESSION_COOKIE = "gmach_session";
+import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata } from "./platform-completion.js";\nconst SESSION_COOKIE = "gmach_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
 // Keep PBKDF2 within the Cloudflare Workers CPU budget. Existing production
 // accounts and the seeded administrator already use this compatible cost.
@@ -40,6 +40,10 @@ export default {
         }
       }
       if (url.pathname.startsWith("/api/")) {
+        const preflight = await platformPreflight(request, env, url);
+        if (preflight) return withSecurityHeaders(preflight);
+        const completionResponse = await handlePlatformCompletionApi(request, env, ctx, url);
+        if (completionResponse) return withSecurityHeaders(completionResponse);
         const response = await routeApi(request, env, ctx, url);
         return withSecurityHeaders(response);
       }
@@ -56,7 +60,7 @@ export default {
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(runScheduledMaintenance(env));
+    ctx.waitUntil(Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env)]));
   }
 };
 
@@ -256,7 +260,9 @@ async function routeApi(request, env, ctx, url) {
     const adminCredentialRotated=!seededAdmin||seededAdmin.password_hash!=="5cSI6TEtFyH-uPzoGKFhS2ioqI9z-0NlihqSNTPgT5U";
     const completeReady=Boolean(securityTable)&&String(sessionsTable?.sql||"").includes("device_label")&&userSql.includes("terms_accepted_at");
     const categoriesReady=Boolean(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='categories'").first());
-    return json({ ok:true,release:"complete-platform-2026-09-25.5",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at")},timestamp:new Date().toISOString() });
+    const completionTables=await Promise.all(["inventory_holds","branch_transfers","notification_queue","backup_runs","geo_cache"].map(name=>env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").bind(name).first()));
+    const completionReady=completionTables.every(Boolean);
+    return json({ ok:true,release:"complete-platform-2026-09-25.6",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady&&completionReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at"),completionReady},timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
