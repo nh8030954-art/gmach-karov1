@@ -136,9 +136,10 @@ async function openAdvancedTools(){
     body.innerHTML=blocks.join("")||'<div class="platform-note">אין גמ״חים בניהולך.</div>';
   };
   const showInventory=async()=>{
-    body.innerHTML=items.length?items.map(i=>`<section class="platform-row"><div><strong>${esc(i.title)}</strong><p>${esc(i.organizations?.name||"")} · ${esc(i.status)} · ${Number(i.quantity||0)} יחידות</p></div><div class="platform-row-actions"><button class="platform-action secondary" data-units="${i.id}">יחידות/QR</button><button class="platform-action secondary" data-clone="${i.id}">שכפול</button><button class="platform-action danger" data-remove="${i.id}">מחיקה בטוחה</button></div></section>`).join(""):'<div class="platform-note">אין מוצרים.</div>';
+    body.innerHTML=items.length?items.map(i=>`<section class="platform-row"><div><strong>${esc(i.title)}</strong><p>${esc(i.organizations?.name||"")} · ${esc(i.status)} · ${Number(i.quantity||0)} יחידות</p></div><div class="platform-row-actions"><button class="platform-action secondary" data-units="${i.id}">יחידות/QR</button><button class="platform-action secondary" data-images="${i.id}">תמונות</button><button class="platform-action secondary" data-clone="${i.id}">שכפול</button><button class="platform-action danger" data-remove="${i.id}">מחיקה בטוחה</button></div></section>`).join(""):'<div class="platform-note">אין מוצרים.</div>';
     $$("[data-units]",body).forEach(b=>b.onclick=async()=>{const u=await api("/api/items/"+b.dataset.units+"/units");body.innerHTML=(u.units||[]).map(x=>`<div class="platform-row"><div><strong dir="ltr">${esc(x.serial_number)}</strong><p>${esc(x.status)} · ${esc(x.condition)}</p></div><button class="platform-action secondary" data-qr="${x.id}">QR</button></div>`).join("")||'<div class="platform-note">אין יחידות סידוריות.</div>';$$("[data-qr]",body).forEach(q=>q.onclick=async()=>{const qr=await api("/api/item-units/"+q.dataset.qr+"/qr");modal("QR ליחידה",`<p><strong>${esc(qr.serialNumber||qr.serial_number||"")}</strong></p><p dir="ltr">${esc(qr.target||"")}</p><p class="platform-muted">ניתן להדפיס חלון זה כתווית.</p><button class="platform-action" onclick="window.print()">הדפסה</button>`)})});
-    $$("[data-clone]",body).forEach(b=>b.onclick=async()=>{await api("/api/items/"+b.dataset.clone+"/clone",{method:"POST",body:{}});notice("המוצר שוכפל")});
+    $("[data-images]",body).forEach(b=>b.onclick=()=>manageItemImages(b.dataset.images).catch(e=>notice(e.message,true)));
+    $("[data-clone]",body).forEach(b=>b.onclick=async()=>{await api("/api/items/"+b.dataset.clone+"/clone",{method:"POST",body:{}});notice("המוצר שוכפל")});
     $$("[data-remove]",body).forEach(b=>b.onclick=async()=>{if(confirm("להסיר את המוצר לפי כללי ההיסטוריה?")){await api("/api/items/"+b.dataset.remove+"/remove",{method:"POST",body:{}});notice("המוצר טופל")}}); 
   };
   const showCommunity=async()=>{
@@ -157,6 +158,32 @@ function installAdvancedEntry(){
   const add=()=>{const dash=$("#dashboard-view");if(!dash||$("#final-advanced-button"))return;const b=document.createElement("button");b.id="final-advanced-button";b.className="button button-secondary";b.textContent="כלים מתקדמים";b.onclick=()=>openAdvancedTools().catch(e=>notice(e.message,true));const host=dash.querySelector(".dashboard-actions,.dashboard-header,.section-heading")||dash;host.prepend(b)};new MutationObserver(add).observe(document.body,{childList:true,subtree:true});add();
 }
 
+async function manageItemImages(itemId){
+  const data=await api("/api/items/"+itemId+"/images/manage"),images=data.images||[];
+  const d=modal("ניהול תמונות",`<p class="platform-muted">בחרו תמונה ראשית, שנו סדר או הסירו תמונות. עיבוד מקומי לפני העלאה זמין בטופס המוצר.</p><div class="platform-list" id="img-manage-list">${images.map((x,i)=>`<div class="platform-row" draggable="true" data-url="${esc(x.url)}"><div><img src="${esc(x.url)}" alt="" style="width:96px;height:72px;object-fit:cover;border-radius:8px"><p>${x.is_primary?"תמונה ראשית":""} · ${esc(x.moderation_status)}</p></div><div class="platform-row-actions"><label><input type="radio" name="primary-image" value="${esc(x.url)}" ${x.is_primary?"checked":""}> ראשית</label><button type="button" class="platform-action secondary" data-up>↑</button><button type="button" class="platform-action secondary" data-down>↓</button><button type="button" class="platform-action danger" data-delete>הסרה</button></div></div>`).join("")||'<div class="platform-note">אין תמונות.</div>'}</div><p><button class="platform-action" id="save-image-order">שמירת שינויים</button></p>`);
+  const list=$("#img-manage-list",d);
+  const move=(row,dir)=>{const sibling=dir<0?row.previousElementSibling:row.nextElementSibling;if(sibling)list.insertBefore(dir<0?row:sibling,dir<0?sibling:row)};
+  $("[data-up]",d).forEach(b=>b.onclick=()=>move(b.closest("[data-url]"),-1));
+  $("[data-down]",d).forEach(b=>b.onclick=()=>move(b.closest("[data-url]"),1));
+  $("[data-delete]",d).forEach(b=>b.onclick=()=>b.closest("[data-url]").remove());
+  $("#save-image-order",d).onclick=async()=>{const rows=$("[data-url]",d),orderedUrls=rows.map(r=>r.dataset.url),primaryUrl=$('input[name="primary-image"]:checked',d)?.value||orderedUrls[0]||"";await api("/api/items/"+itemId+"/images/manage",{method:"PATCH",body:{orderedUrls,primaryUrl}});d.close();notice("סדר התמונות נשמר")};
+}
+function installImageEditor(){
+  const input=$("#item-images");if(!input||input.dataset.editorInstalled)return;input.dataset.editorInstalled="1";
+  input.addEventListener("change",async()=>{
+    const files=[...input.files];if(!files.length||typeof DataTransfer==="undefined")return;
+    const first=files[0],url=URL.createObjectURL(first),img=new Image();img.src=url;await img.decode().catch(()=>{});
+    if(!img.naturalWidth)return URL.revokeObjectURL(url);
+    let rotation=0,crop=false,blur=false;
+    const d=modal("עיבוד התמונה הראשונה",`<canvas id="img-edit-canvas" style="max-width:100%;border-radius:10px;border:1px solid #ddd"></canvas><div class="platform-row-actions"><button type="button" class="platform-action secondary" id="img-rotate">סיבוב 90°</button><button type="button" class="platform-action secondary" id="img-crop">חיתוך ריבוע מרכזי</button><button type="button" class="platform-action secondary" id="img-blur">טשטוש פרטיות</button><button type="button" class="platform-action" id="img-apply">החלפה בקובץ המעובד</button><button type="button" class="platform-action secondary" id="img-keep">השארת המקור</button></div>`);
+    const canvas=$("#img-edit-canvas",d),ctx=canvas.getContext("2d");
+    const draw=()=>{let sw=img.naturalWidth,sh=img.naturalHeight,sx=0,sy=0;if(crop){const s=Math.min(sw,sh);sx=(sw-s)/2;sy=(sh-s)/2;sw=sh=s}const turn=(rotation/90)%2!==0;const max=1200,scale=Math.min(1,max/Math.max(sw,sh)),w=Math.round(sw*scale),h=Math.round(sh*scale);canvas.width=turn?h:w;canvas.height=turn?w:h;ctx.save();ctx.clearRect(0,0,canvas.width,canvas.height);ctx.filter=blur?"blur(7px)":"none";if(rotation===90){ctx.translate(canvas.width,0);ctx.rotate(Math.PI/2)}else if(rotation===180){ctx.translate(canvas.width,canvas.height);ctx.rotate(Math.PI)}else if(rotation===270){ctx.translate(0,canvas.height);ctx.rotate(-Math.PI/2)}ctx.drawImage(img,sx,sy,sw,sh,0,0,w,h);ctx.restore()};
+    draw();$("#img-rotate",d).onclick=()=>{rotation=(rotation+90)%360;draw()};$("#img-crop",d).onclick=()=>{crop=!crop;draw()};$("#img-blur",d).onclick=()=>{blur=!blur;draw()};
+    $("#img-keep",d).onclick=()=>{URL.revokeObjectURL(url);d.close()};
+    $("#img-apply",d).onclick=()=>canvas.toBlob(blob=>{if(!blob)return;const ext=first.type==="image/png"?"png":"jpg",processed=new File([blob],first.name.replace(/\.[^.]+$/,"")+"-edited."+ext,{type:blob.type||"image/jpeg"}),dt=new DataTransfer();dt.items.add(processed);files.slice(1,4).forEach(x=>dt.items.add(x));input.files=dt.files;URL.revokeObjectURL(url);d.close();notice("התמונה עובדה מקומית ותועלה בגרסה החדשה")},first.type==="image/png"?"image/png":"image/jpeg",0.9);
+  });
+}
+
 async function supportFaq(){
   const form=$("#support-form");if(!form||$("#support-faq-suggestions"))return;
   try{const data=await api("/api/faqs");const box=document.createElement("div");box.id="support-faq-suggestions";box.className="platform-note";box.innerHTML="<strong>לפני פתיחת פנייה — אולי זה יעזור:</strong>"+data.articles.slice(0,4).map(a=>`<details><summary>${esc(a.title)}</summary><p>${esc(a.body)}</p></details>`).join("");form.prepend(box)}catch{}
@@ -170,7 +197,7 @@ function reportPerformance(){
   }catch{}
 }
 document.addEventListener("DOMContentLoaded",()=>{
-  installWizardEntry();installAdvancedEntry();installPush();installQrRoute();enhanceChat();addAdminFinalPanels();supportFaq();reportPerformance();
+  installWizardEntry();installAdvancedEntry();installPush();installQrRoute();enhanceChat();installImageEditor();addAdminFinalPanels();supportFaq();reportPerformance();
   const watcher=new MutationObserver(()=>{if(!$("#dashboard-view")?.hidden)installTour()});watcher.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["hidden"]});
 });
 })();
