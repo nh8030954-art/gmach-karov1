@@ -170,6 +170,43 @@ async function automaticDailyBackup(env){
   }
 }
 
+
+async function unifiedModeration(request,env,url){
+  const admin=await requireAdmin(request,env);
+  if(request.method==="GET"){
+    const status=String(url.searchParams.get("status")||"pending"),rows=[];
+    const collect=async(type,sql,args=[])=>{try{const r=await env.DB.prepare(sql).bind(...args).all();for(const x of r.results)rows.push({...x,source:type})}catch{}};
+    await Promise.all([
+      collect("item_report","SELECT r.id,r.item_id AS entity_id,r.reason,r.details,r.status,r.created_at,u.full_name AS reporter_name,i.title AS entity_title FROM reports r LEFT JOIN users u ON u.id=r.reporter_id LEFT JOIN items i ON i.id=r.item_id WHERE r.status=?",[status]),
+      collect("content_report","SELECT r.id,r.entity_id,r.reason,NULL AS details,r.status,r.created_at,u.full_name AS reporter_name,r.entity_type AS entity_title FROM content_reports r LEFT JOIN users u ON u.id=r.reporter_id WHERE r.status=?",[status]),
+      collect("review_report","SELECT r.id,r.review_id AS entity_id,r.reason,NULL AS details,r.status,r.created_at,u.full_name AS reporter_name,'review' AS entity_title FROM review_reports r LEFT JOIN users u ON u.id=r.reporter_id WHERE r.status=?",[status]),
+      collect("message_report","SELECT r.id,r.message_id AS entity_id,r.reason,NULL AS details,r.status,r.created_at,u.full_name AS reporter_name,'message' AS entity_title FROM message_reports r LEFT JOIN users u ON u.id=r.reporter_id WHERE r.status=?",[status]),
+      collect("chat_report","SELECT r.id,r.message_id AS entity_id,r.reason,NULL AS details,r.status,r.created_at,u.full_name AS reporter_name,'chat message' AS entity_title FROM chat_reports r LEFT JOIN users u ON u.id=r.reporter_id WHERE r.status=?",[status]),
+      collect("moderation_job","SELECT id,entity_id,reason,NULL AS details,status,created_at,NULL AS reporter_name,entity_type AS entity_title FROM moderation_jobs WHERE status=?",[status])
+    ]);
+    rows.sort((a,b)=>String(a.created_at).localeCompare(String(b.created_at)));
+    return json({reports:rows.slice(0,500)});
+  }
+  const b=await body(request),source=clean(b.source,2,40,"מקור"),id=clean(b.id,1,100,"דיווח"),action=["reviewed","dismissed","removed","hidden","cleared"].includes(b.action)?b.action:"reviewed",now=new Date().toISOString();
+  const map={
+    item_report:["reports","updated_at",["reviewed","dismissed"].includes(action)?action:"reviewed"],
+    content_report:["content_reports",null,["reviewed","dismissed","removed"].includes(action)?action:"reviewed"],
+    review_report:["review_reports","reviewed_at",["reviewed","dismissed","removed"].includes(action)?action:"reviewed"],
+    message_report:["message_reports",null,["reviewed","dismissed","removed"].includes(action)?action:"reviewed"],
+    chat_report:["chat_reports",null,["reviewed","dismissed","removed"].includes(action)?action:"reviewed"],
+    moderation_job:["moderation_jobs","reviewed_at",["reviewed","hidden","cleared"].includes(action)?action:"reviewed"]
+  };
+  const cfg=map[source];if(!cfg)throw new RemainingError(400,"מקור דיווח לא תקין");
+  const [table,timeCol,statusValue]=cfg;
+  if(!/^[a-z_]+$/.test(table))throw new RemainingError(400,"מקור לא תקין");
+  if(timeCol)await env.DB.prepare("UPDATE "+table+" SET status=?,"+timeCol+"=? WHERE id=?").bind(statusValue,now,id).run();
+  else await env.DB.prepare("UPDATE "+table+" SET status=? WHERE id=?").bind(statusValue,id).run();
+  if(source==="review_report"&&statusValue==="removed"){const rr=await env.DB.prepare("SELECT review_id FROM review_reports WHERE id=?").bind(id).first();if(rr)await env.DB.prepare("UPDATE reviews SET status='hidden' WHERE id=?").bind(rr.review_id).run()}
+  if((source==="message_report"||source==="chat_report")&&statusValue==="removed"){const tableName=source==="message_report"?"message_reports":"chat_reports";const rr=await env.DB.prepare("SELECT message_id FROM "+tableName+" WHERE id=?").bind(id).first();if(rr)await env.DB.prepare("UPDATE request_messages SET body='הודעה הוסרה על ידי מנהל האתר',media_url=NULL,deleted_at=? WHERE id=?").bind(now,rr.message_id).run()}
+  await env.DB.prepare("INSERT INTO audit_log(id,actor_id,action,entity_type,entity_id,metadata_json) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),admin.id,"moderation."+statusValue,source,id,JSON.stringify({source,action:statusValue})).run().catch(()=>{});
+  return json({ok:true,status:statusValue});
+}
+
 export async function ensureRemainingFeaturesSchema(env){return ensureSchema(env)}
 export async function runRemainingMaintenance(env){await ensureSchema(env);const now=new Date().toISOString();await env.DB.prepare("UPDATE page_content SET status='published',publish_at=NULL,updated_at=? WHERE status='scheduled' AND publish_at IS NOT NULL AND publish_at<=?").bind(now,now).run();await automaticDailyBackup(env)}
 export async function handleRemainingFeatures(request,env,ctx,url){
@@ -189,6 +226,7 @@ export async function handleRemainingFeatures(request,env,ctx,url){
   m=path.match(/^\/api\/admin\/page-versions\/([^/]+)\/restore$/);if(m&&method==="POST")return restorePage(request,env,decodeURIComponent(m[1]));
   m=path.match(/^\/api\/admin\/backups\/([^/]+)\/validate$/);if(m&&method==="POST")return validateBackup(request,env,decodeURIComponent(m[1]));
   if(path==="/api/admin/external-services"&&method==="GET")return externalStatus(request,env);
+  if(path==="/api/admin/moderation-unified"&&(method==="GET"||method==="PATCH"))return unifiedModeration(request,env,url);
   if(path==="/api/maps/geocode"&&method==="GET")return explicitGeocode(request,env,url);
   return null;
  }catch(e){const status=e instanceof RemainingError?e.status:500;if(status>=500)console.error("remaining-features",e);return json({error:e instanceof RemainingError?e.message:"אירעה תקלה בשכבת ההשלמה"},status)}
