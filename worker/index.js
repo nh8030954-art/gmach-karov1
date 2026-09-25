@@ -96,6 +96,11 @@ export default {
           if (url.pathname.startsWith("/api/")) return withSecurityHeaders(json({ error:"האתר סגור כעת לכבוד השבת. שבת שלום.", shabbat:true },503));
           return withSecurityHeaders(shabbatClosedPage(shabbat));
         }
+        const holiday = israelHolidayState(new Date());
+        if (holiday.closed) {
+          if (url.pathname.startsWith("/api/")) return withSecurityHeaders(json({ error:`האתר סגור כעת לכבוד ${holiday.title}. חג שמח.`, holiday:true, reopensAt:holiday.reopensAt },503));
+          return withSecurityHeaders(platformClosedPage({message:`חג שמח — גמ״ח ברגע סגור כעת לכבוד ${holiday.title}`,endsAt:holiday.reopensAt}));
+        }
         const closure = await activePlatformClosure(env, new Date());
         if (closure) {
           if (url.pathname.startsWith("/api/")) return withSecurityHeaders(json({ error:closure.message, closure:true, reopensAt:closure.endsAt },503));
@@ -206,8 +211,40 @@ function israelShabbatState(now){
   const fp=israelDateParts(friday), times=shabbatTimesForFriday(Number(fp.year),Number(fp.month),Number(fp.day));
   return {closed:now>=times.close&&now<times.open,reopensAt:times.open.toISOString()};
 }
+const ISRAEL_HOLIDAYS=[
+  {month:"Tishri",day:1,duration:2,title:"ראש השנה"},
+  {month:"Tishri",day:10,duration:1,title:"יום הכיפורים"},
+  {month:"Tishri",day:15,duration:1,title:"חג הסוכות"},
+  {month:"Tishri",day:22,duration:1,title:"שמיני עצרת ושמחת תורה"},
+  {month:"Nisan",day:15,duration:1,title:"חג הפסח"},
+  {month:"Nisan",day:21,duration:1,title:"שביעי של פסח"},
+  {month:"Sivan",day:6,duration:1,title:"חג השבועות"}
+];
+function hebrewDateParts(date){
+  const parts=new Intl.DateTimeFormat("en-u-ca-hebrew",{timeZone:"Asia/Jerusalem",year:"numeric",month:"long",day:"numeric"}).formatToParts(date);
+  return Object.fromEntries(parts.filter(p=>p.type!=="literal").map(p=>[p.type,p.value]));
+}
+function israelHolidayState(now){
+  const today=israelDateParts(now), localNoon=israelUtcForLocal(Number(today.year),Number(today.month),Number(today.day),12,0);
+  for(let offset=-8;offset<=1;offset++){
+    const candidate=new Date(localNoon.getTime()+offset*86400000), hp=hebrewDateParts(candidate);
+    for(const holiday of ISRAEL_HOLIDAYS){
+      if(hp.month!==holiday.month||Number(hp.day)!==holiday.day)continue;
+      const startParts=israelDateParts(candidate),eve=new Date(Date.UTC(Number(startParts.year),Number(startParts.month)-1,Number(startParts.day)-1));
+      const eveParts=israelDateParts(eve),times=shabbatTimesForFriday(Number(eveParts.year),Number(eveParts.month),Number(eveParts.day));
+      let reopens=times.open;
+      if(holiday.duration>1){
+        const lastEve=new Date(eve.getTime()+(holiday.duration-1)*86400000),lp=israelDateParts(lastEve);
+        reopens=shabbatTimesForFriday(Number(lp.year),Number(lp.month),Number(lp.day)).open;
+      }
+      if(now>=times.close&&now<reopens)return {closed:true,title:holiday.title,reopensAt:reopens.toISOString()};
+    }
+  }
+  return {closed:false};
+}
 function shabbatClosedPage(state){
-  const html=`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>גמ״ח ברגע — שבת שלום</title></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#fff;font-family:Arial,sans-serif;color:#123c46;text-align:center"><main style="max-width:620px;padding:40px 24px"><h1 style="font-size:42px;margin:0 0 20px">שבת שלום</h1><p style="font-size:22px;line-height:1.7">גמ״ח ברגע סגור כעת לכבוד השבת.</p><p style="font-size:18px;line-height:1.7">האתר ישוב לפעילות בעזרת ה׳ בצאת השבת.</p></main></body></html>`;
+  const reopens=new Intl.DateTimeFormat("he-IL",{timeZone:"Asia/Jerusalem",dateStyle:"full",timeStyle:"short"}).format(new Date(state.reopensAt));
+  const html=`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>גמ״ח ברגע — שבת שלום</title></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#fff;font-family:Arial,sans-serif;color:#123c46;text-align:center"><main style="max-width:620px;padding:40px 24px"><img src="/gmach-berega-logo.jpg" alt="גמ״ח ברגע" style="max-width:260px;width:70%;height:auto"><h1 style="font-size:42px;margin:20px 0">שבת שלום</h1><p style="font-size:22px;line-height:1.7">גמ״ח ברגע סגור כעת לכבוד השבת.</p><p style="font-size:18px;line-height:1.7">האתר ישוב לפעילות בעזרת ה׳ בצאת השבת, ב־${escapeHtml(reopens)}.</p></main></body></html>`;
   return new Response(html,{status:503,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
 }
 
@@ -343,7 +380,7 @@ async function routeApi(request, env, ctx, url) {
     const completionTables=await Promise.all(["inventory_holds","branch_transfers","notification_queue","backup_runs","geo_cache"].map(name=>env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").bind(name).first()));
     const completionReady=completionTables.every(Boolean);
     const finalFeaturesReady=await ensureFinalFeaturesSchema(env).then(()=>true).catch(()=>false);
-    return json({ ok:true,release:"complete-platform-2026-09-25.8",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady&&completionReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at"),completionReady},finalFeaturesSchema:{ready:finalFeaturesReady},timestamp:new Date().toISOString() });
+    return json({ ok:true,release:"complete-platform-2026-09-25.9",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady&&completionReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at"),completionReady},finalFeaturesSchema:{ready:finalFeaturesReady},timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
@@ -1226,7 +1263,7 @@ async function createItem(request, env) {
     INSERT INTO items (id,organization_id,title,category,description,condition,condition_detail,quantity,loan_conditions,city,neighborhood,item_type,subcategory,tags_json,pickup_method,inventory_updated_at,
       min_loan_minutes,max_loan_minutes,booking_notice_minutes,turnaround_minutes,booking_horizon_days,approval_mode,deposit_required,deposit_amount_agorot,
       publish_at,max_per_user,preparation_minutes,max_loan_days,service_radius_km,status,availability_status,is_free,icon,cover_color)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active','available',1,'box','#e6f2ef')
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active','available',1,'box','#e6f2ef')
   `).bind(
     id,
     organizationId,

@@ -65,10 +65,17 @@
   function closeDialog(dialog) { if (!dialog) return; if (dialog.open) dialog.close(); if (!$("dialog[open]")) document.body.classList.remove("dialog-open"); }
 
   async function api(path, options = {}) {
-    const init = { credentials: "same-origin", ...options }; init.headers = new Headers(options.headers || {});
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), Number(options.timeoutMs || 12000));
+    const init = { credentials: "same-origin", ...options, signal: options.signal || controller.signal }; delete init.timeoutMs; init.headers = new Headers(options.headers || {});
     if (options.body && !(options.body instanceof FormData) && typeof options.body !== "string") { init.headers.set("Content-Type", "application/json"); init.body = JSON.stringify(options.body); }
-    const response = await fetch(path, init); const type = response.headers.get("content-type") || ""; const data = type.includes("application/json") ? await response.json() : null;
-    if (!response.ok) { const error = new Error(data?.error || "הפעולה לא הושלמה"); if (data && typeof data === "object") Object.assign(error, data); throw error; } return data;
+    try {
+      const response = await fetch(path, init); const type = response.headers.get("content-type") || ""; const data = type.includes("application/json") ? await response.json() : null;
+      if (!response.ok) { const error = new Error(data?.error || "הפעולה לא הושלמה"); if (data && typeof data === "object") Object.assign(error, data); throw error; } return data;
+    } catch (error) {
+      if (error?.name === "AbortError") throw new Error("השרת מתעכב. אפשר להמשיך לעיין ולנסות שוב בעוד רגע.");
+      throw error;
+    } finally { window.clearTimeout(timeout); }
   }
 
   async function detectServer() {
@@ -497,7 +504,12 @@
   }
 
   async function init() {
-    setupEvents(); setAuthMode("login"); updateAuthUI(); await detectServer(); await Promise.all([loadSiteSettings(), loadPageCustomizations(), loadPublicConfig(),loadDiscovery()]); document.documentElement.classList.remove("app-booting"); await refreshUser(); await loadItems(); const seoRoute=document.body.dataset.seoRoute||""; if(seoRoute.startsWith("item:")) await openItem(seoRoute.slice(5)); else if(seoRoute.startsWith("organization:")) await openOrganization(seoRoute.slice(13)); else if(seoRoute.startsWith("category:")) { const id=seoRoute.slice(9); const cat=(state.discovery?.categories||[]).find(x=>x.id===id); const label=cat?.name_he||id; $("#category-filter").value=label; state.activeCategory=label; applyFilters(); window.setTimeout(()=>$("#catalog").scrollIntoView(),0); } else if(seoRoute.startsWith("area:")) { const city=seoRoute.slice(5); $("#city-filter").value=city; applyFilters(); window.setTimeout(()=>$("#catalog").scrollIntoView(),0); } registerWebMCP();
+    setupEvents(); setAuthMode("login"); updateAuthUI();
+    await detectServer();
+    document.documentElement.classList.remove("app-booting");
+    await Promise.allSettled([loadSiteSettings(), loadPageCustomizations(), loadPublicConfig(), loadDiscovery()]);
+    await Promise.allSettled([refreshUser(), loadItems()]);
+    const seoRoute=document.body.dataset.seoRoute||""; if(seoRoute.startsWith("item:")) await openItem(seoRoute.slice(5)); else if(seoRoute.startsWith("organization:")) await openOrganization(seoRoute.slice(13)); else if(seoRoute.startsWith("category:")) { const id=seoRoute.slice(9); const cat=(state.discovery?.categories||[]).find(x=>x.id===id); const label=cat?.name_he||id; $("#category-filter").value=label; state.activeCategory=label; applyFilters(); window.setTimeout(()=>$("#catalog").scrollIntoView(),0); } else if(seoRoute.startsWith("area:")) { const city=seoRoute.slice(5); $("#city-filter").value=city; applyFilters(); window.setTimeout(()=>$("#catalog").scrollIntoView(),0); } registerWebMCP();
     window.setInterval(() => { if (state.user && document.visibilityState === "visible") refreshNotifications(true); }, 30000);
     if (location.hash === "#/dashboard") state.user ? showDashboard() : requireAuth(() => showDashboard()); else if (location.hash === "#/catalog") window.setTimeout(() => $("#catalog").scrollIntoView(), 0);
   }

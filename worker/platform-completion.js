@@ -104,7 +104,7 @@ export async function sessionMetadata(request,env,userId){
 export async function handlePlatformCompletionApi(request,env,ctx,url){
   const method=request.method.toUpperCase(),path=url.pathname;
   if(method==="GET"&&path==="/api/platform/features") return json({
-    release:"complete-platform-2026-09-25.6",
+    release:"complete-platform-2026-09-25.9",
     turnstileEnabled:Boolean(env.TURNSTILE_SECRET_KEY&&env.TURNSTILE_SITE_KEY),
     turnstileSiteKey:env.TURNSTILE_SITE_KEY||null,
     pushConfigured:Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY),
@@ -434,7 +434,7 @@ function safeJson(v,f){try{return JSON.parse(v)}catch{return f}}
 function normalizeCondition(v){if(/חדש/.test(v))return"כמו חדש";if(/סביר|בלאי/.test(v))return"טוב";if(/מצוין/.test(v))return"מצוין";return"טוב";}
 function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}});}
 function cookieValue(request,name){const raw=request.headers.get("Cookie")||"";for(const p of raw.split(";")){const [k,...rest]=p.trim().split("=");if(k===name)return rest.join("=");}return null;}
-async function sha256(v){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(String(v)));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");}
+async function sha256(v){const b=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(String(v))));let binary="";for(const byte of b)binary+=String.fromCharCode(byte);return btoa(binary).replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,"");}
 function labelDevice(ua){if(/android/i.test(ua))return"Android";if(/iphone|ipad/i.test(ua))return"iPhone / iPad";if(/windows/i.test(ua))return"Windows";if(/macintosh|mac os/i.test(ua))return"Mac";if(/linux/i.test(ua))return"Linux";return"דפדפן לא מזוהה";}
 async function qfirst(env,sql,args){try{return await env.DB.prepare(sql).bind(...args).first()}catch{return null}}
 async function qall(env,sql,args){try{return (await env.DB.prepare(sql).bind(...args).all()).results||[]}catch{return[]}}
@@ -446,7 +446,7 @@ async function verifyTurnstile(env,token,ip){const form=new FormData();form.set(
 async function currentSecurityBlock(request,env){const id=await sha256(request.headers.get("CF-Connecting-IP")||"unknown");return qfirst(env,"SELECT * FROM security_blocks WHERE identity_hash=? AND blocked_until>?",[id,new Date().toISOString()]);}
 async function recordSecurityFailure(request,env,type){const id=await sha256(request.headers.get("CF-Connecting-IP")||"unknown"),now=new Date().toISOString();await qrun(env,"INSERT INTO security_events(id,event_type,severity,ip_hash,details_json) VALUES(?,?,?,?,?)",[crypto.randomUUID(),type,"warning",id,"{}"]);const recent=await qfirst(env,"SELECT COUNT(*) n FROM security_events WHERE ip_hash=? AND created_at>datetime('now','-1 hour')",[id]);if(Number(recent?.n||0)>=5)await qrun(env,"INSERT INTO security_blocks(identity_hash,reason,level,blocked_until) VALUES(?,?,?,datetime('now','+1 hour')) ON CONFLICT(identity_hash) DO UPDATE SET reason=excluded.reason,level=MIN(10,security_blocks.level+1),blocked_until=datetime('now','+'||(MIN(24,security_blocks.level+1))||' hours'),updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')",[id,type,1]);}
 async function sendSecurityEmail(env,userId,subject,body){const u=await qfirst(env,"SELECT email,full_name,preferred_language FROM users WHERE id=?",[userId]);if(u)try{await sendEmail(env,u.email,subject,body,u.full_name,u.preferred_language)}catch{}}
-async function sendEmail(env,email,subject,body,name,language){if(!env.RESEND_API_KEY)return;const he=language!=="en",r=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:env.RESEND_FROM_EMAIL||"Gmach Berega <onboarding@resend.dev>",to:[email],subject,text:body,html:`<div dir="${he?"rtl":"ltr"}" style="font-family:Arial,sans-serif;max-width:600px;margin:auto"><h2>גמ״ח ברגע</h2><p>${escapeHtml(name||"")}</p><p>${escapeHtml(body)}</p></div>`,reply_to:env.SUPPORT_EMAIL||undefined})});if(!r.ok)throw new Error("Email "+r.status);}
+async function sendEmail(env,email,subject,body,name,language){if(!env.RESEND_API_KEY)return;const he=language!=="en",deliver=env.RESEND_SERVICE?.fetch?env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE):fetch,r=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:env.RESEND_FROM_EMAIL||"Gmach Berega <onboarding@resend.dev>",to:[email],subject,text:body,html:`<div dir="${he?"rtl":"ltr"}" style="font-family:Arial,sans-serif;max-width:600px;margin:auto"><h2>גמ״ח ברגע</h2><p>${escapeHtml(name||"")}</p><p>${escapeHtml(body)}</p></div>`,reply_to:env.SUPPORT_EMAIL||undefined})});if(!r.ok)throw new Error("Email "+r.status);}
 
 function b64uBytes(value){let s=String(value||"").replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";const raw=atob(s),out=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out}
 function b64uEncode(bytes){let raw="";for(const b of bytes)raw+=String.fromCharCode(b);return btoa(raw).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}
