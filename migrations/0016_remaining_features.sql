@@ -86,3 +86,17 @@ CREATE INDEX IF NOT EXISTS item_image_edits_order_idx ON item_image_edits(item_i
 CREATE INDEX IF NOT EXISTS review_reports_status_idx ON review_reports(status,created_at);
 CREATE INDEX IF NOT EXISTS org_dashboard_snapshot_idx ON organization_dashboard_snapshots(organization_id,snapshot_date DESC);
 CREATE INDEX IF NOT EXISTS page_content_publish_idx ON page_content(status,publish_at);
+
+CREATE TABLE IF NOT EXISTS geocode_cache (
+  query_key TEXT PRIMARY KEY,
+  query_text TEXT NOT NULL,
+  result_json TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  expires_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS geocode_throttle (
+  id INTEGER PRIMARY KEY CHECK(id=1),
+  last_request_at TEXT
+);
+INSERT OR IGNORE INTO geocode_throttle(id,last_request_at) VALUES(1,NULL);
