@@ -8,8 +8,6 @@ ALTER TABLE audit_log ADD COLUMN new_value_json TEXT;
 ALTER TABLE audit_log ADD COLUMN ip_hash TEXT;
 ALTER TABLE audit_log ADD COLUMN device_label TEXT;
 
-ALTER TABLE reviews ADD COLUMN branch_id TEXT REFERENCES organization_branches(id) ON DELETE SET NULL;
-ALTER TABLE reviews ADD COLUMN edited_until TEXT;
 ALTER TABLE reviews ADD COLUMN organization_response TEXT;
 ALTER TABLE reviews ADD COLUMN organization_response_at TEXT;
 
