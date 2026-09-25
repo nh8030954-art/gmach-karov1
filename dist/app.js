@@ -509,9 +509,11 @@
 
   async function init() {
     setupEvents(); setAuthMode("login"); updateAuthUI();
+    const siteCopyReady = Promise.allSettled([loadSiteSettings(), loadPageCustomizations()])
+      .finally(() => document.documentElement.classList.remove("site-copy-pending"));
     await detectServer();
     document.documentElement.classList.remove("app-booting");
-    await Promise.allSettled([loadSiteSettings(), loadPageCustomizations(), loadPublicConfig(), loadDiscovery(), refreshUser(), loadItems()]);
+    await Promise.allSettled([siteCopyReady, loadPublicConfig(), loadDiscovery(), refreshUser(), loadItems()]);
     window.setInterval(async () => {
       if (state.serverAvailable || document.visibilityState !== "visible") return;
       await detectServer();
