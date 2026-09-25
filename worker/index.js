@@ -1377,12 +1377,18 @@ async function createLoanRequest(request, env) {
     itemId,until,from,quantity,Number(item.quantity)).run();
   if (!result.meta.changes) throw new HttpError(409, "המלאי נתפס הרגע על ידי הזמנה אחרת. בחרו מועד אחר");
 
+  const holdId=crypto.randomUUID();
+  const holdExpiresAt=new Date(Date.now()+24*60*60*1000).toISOString();
   await env.DB.batch([
     env.DB.prepare("INSERT INTO loan_request_events(id,request_id,actor_id,event_type,details_json) VALUES (?,?,?,?,?)")
       .bind(crypto.randomUUID(),id,user.id,"created",JSON.stringify({from,until,quantity,status})),
+    env.DB.prepare("INSERT INTO inventory_holds(id,item_id,user_id,request_id,quantity,starts_at,ends_at,expires_at,status) VALUES(?,?,?,?,?,?,?,?,?)")
+      .bind(holdId,itemId,user.id,id,quantity,from,until,holdExpiresAt,status==="approved"?"converted":"active"),
+    env.DB.prepare("UPDATE loan_requests SET hold_expires_at=?,workflow_status=? WHERE id=?")
+      .bind(holdExpiresAt,status==="approved"?"approved_ready_for_pickup":"inventory_held",id),
     notificationStatement(env,item.owner_id,"request","בקשת השאלה חדשה",`${user.full_name} ביקש/ה ${quantity} יחידות של ${item.title}`,id)
   ]);
-  return json({ request:{id,status}, availability:{remaining:Math.max(0,available-quantity)} },201);
+  return json({ request:{id,status,holdExpiresAt}, availability:{remaining:Math.max(0,available-quantity)} },201);
 }
 
 async function dashboard(request, env) {
@@ -1448,18 +1454,26 @@ async function updateRequestStatus(request, env, id) {
     JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id WHERE lr.id = ?`).bind(id).first();
   if (!row) throw new HttpError(404, "הבקשה לא נמצאה");
   let allowed = false;
-  if (row.borrower_id === user.id && row.status === "pending" && target === "cancelled") allowed = true;
+  if (row.borrower_id === user.id && ["pending","approved"].includes(row.status) && target === "cancelled") allowed = true;
   if (row.owner_id === user.id || user.role === "admin") {
-    allowed = allowed || (row.status === "pending" && ["approved", "declined"].includes(target));
-    allowed = allowed || (row.status === "approved" && target === "collected");
+    allowed = allowed || (row.status === "pending" && ["approved", "declined", "cancelled"].includes(target));
+    allowed = allowed || (row.status === "approved" && ["collected","cancelled"].includes(target));
     allowed = allowed || (row.status === "collected" && target === "returned");
   }
   if (!allowed) throw new HttpError(403, "מעבר הסטטוס הזה אינו מורשה");
   let managerNote = row.manager_note;
   if (target === "declined") managerNote = cleanText(body.managerNote, 3, 500, "סיבת הדחייה");
+  else if (target === "cancelled" && (row.owner_id === user.id || user.role === "admin") && row.status === "approved") managerNote = cleanText(body.managerNote, 3, 500, "סיבת הביטול");
   else if (target === "approved") managerNote = cleanOptional(body.managerNote, 500);
   const now = new Date().toISOString();
   let result;
+  if(target==="collected"){
+    const serialized=await env.DB.prepare("SELECT COUNT(*) AS count FROM item_units WHERE item_id=? AND status!='retired'").bind(row.item_id).first();
+    if(Number(serialized?.count||0)>0){
+      const assigned=await env.DB.prepare("SELECT COUNT(*) AS count FROM loan_unit_assignments WHERE request_id=?").bind(id).first();
+      if(Number(assigned?.count||0)<Number(row.requested_quantity||1)) throw new HttpError(409,"יש להקצות את היחידות הסידוריות בזמן האיסוף לפני סימון כנאסף");
+    }
+  }
   if (target === "approved") {
     result = await env.DB.prepare(`UPDATE loan_requests SET status = 'approved', manager_note = ?, updated_at = ?
       WHERE id = ? AND status = 'pending' AND (
@@ -1469,19 +1483,28 @@ async function updateRequestStatus(request, env, id) {
       ) + ? <= ?`).bind(managerNote, now, id, row.item_id, id, row.requested_until, row.requested_from, Number(row.requested_quantity||1), Number(row.quantity)).run();
     if (!result.meta.changes) throw new HttpError(409, "כל היחידות תפוסות בתאריכים האלה. אפשר לדחות את הבקשה או לתאם תאריכים אחרים בצ׳אט");
   } else {
-    result = await env.DB.prepare("UPDATE loan_requests SET status = ?, manager_note = ?, collected_at = CASE WHEN ?='collected' THEN ? ELSE collected_at END, returned_at = CASE WHEN ?='returned' THEN ? ELSE returned_at END, cancelled_at = CASE WHEN ?='cancelled' THEN ? ELSE cancelled_at END, updated_at = ? WHERE id = ? AND status = ?")
-      .bind(target, managerNote, target, now, target, now, target, now, now, id, row.status).run();
+    const undoUntil=target==="cancelled"?new Date(Date.now()+15*1000).toISOString():null;
+    const workflow={cancelled:"cancelled",declined:"declined",collected:"awaiting_return",returned:"completed"}[target]||target;
+    result = await env.DB.prepare("UPDATE loan_requests SET status = ?, manager_note = ?, collected_at = CASE WHEN ?='collected' THEN ? ELSE collected_at END, returned_at = CASE WHEN ?='returned' THEN ? ELSE returned_at END, cancelled_at = CASE WHEN ?='cancelled' THEN ? ELSE cancelled_at END, cancellation_undo_until=CASE WHEN ?='cancelled' THEN ? ELSE cancellation_undo_until END, workflow_status=?, updated_at = ? WHERE id = ? AND status = ?")
+      .bind(target, managerNote, target, now, target, now, target, now, target, undoUntil, workflow, now, id, row.status).run();
     if (!result.meta.changes) throw new HttpError(409, "הבקשה כבר עודכנה. רעננו את האזור האישי");
   }
 
   const statusText = { approved: "אושרה", declined: "נדחתה", cancelled: "בוטלה", collected: "סומנה כנאספה", returned: "סומנה כהוחזרה" }[target] || "עודכנה";
   const recipientId = row.borrower_id === user.id ? row.owner_id : row.borrower_id;
-  await env.DB.batch([
+  const statusStatements=[
     notificationStatement(env, recipientId, "status", `הבקשה ${statusText}`, `הבקשה עבור ${row.item_title} ${statusText}.`, id),
     env.DB.prepare("INSERT INTO loan_request_events(id,request_id,actor_id,event_type,details_json) VALUES (?,?,?,?,?)")
       .bind(crypto.randomUUID(),id,user.id,target,JSON.stringify({managerNote:managerNote||null}))
-  ]);
-  if(["declined","cancelled","returned"].includes(target)) await advanceWaitlist(env,row.item_id);
+  ];
+  if(target==="approved") statusStatements.push(env.DB.prepare("UPDATE inventory_holds SET status='converted' WHERE request_id=? AND status='active'").bind(id));
+  if(["declined","cancelled","returned"].includes(target)) statusStatements.push(env.DB.prepare("UPDATE inventory_holds SET status='released' WHERE request_id=? AND status IN ('active','converted')").bind(id));
+  if(target==="returned"){
+    statusStatements.push(env.DB.prepare("UPDATE loan_unit_assignments SET returned_at=? WHERE request_id=? AND returned_at IS NULL").bind(now,id));
+    statusStatements.push(env.DB.prepare("UPDATE item_units SET status='available',updated_at=? WHERE id IN (SELECT unit_id FROM loan_unit_assignments WHERE request_id=?)").bind(now,id));
+  }
+  await env.DB.batch(statusStatements);
+  if(["declined","returned"].includes(target)) await advanceWaitlist(env,row.item_id);
   return json({ id, status: target, managerNote });
 }
 
