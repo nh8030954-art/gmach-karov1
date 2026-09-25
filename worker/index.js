@@ -1,3 +1,4 @@
+import { handleFinalFeatures, runFinalMaintenance, ensureFinalFeaturesSchema } from "./final-features.js";
 import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata, ensurePlatformCompletionSchema } from "./platform-completion.js";
 const SESSION_COOKIE = "gmach_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
@@ -55,6 +56,14 @@ export default {
         const response = await routeApi(request, env, ctx, url);
         return withSecurityHeaders(response);
       }
+      if (url.pathname === "/sitemap.xml") {
+        const response = await handleFinalFeatures(request, env, ctx, url);
+        return withSecurityHeaders(response || new Response("Not found",{status:404}));
+      }
+      if (url.pathname === "/robots.txt") {
+        const body="User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /#/dashboard\nDisallow: /#/admin\nSitemap: "+url.origin+"/sitemap.xml\n";
+        return withSecurityHeaders(new Response(body,{headers:{"Content-Type":"text/plain; charset=utf-8","Cache-Control":"public, max-age=3600"}}));
+      }
       if (url.pathname.startsWith("/media/")) {
         const response = await serveMedia(request, env, url);
         return withSecurityHeaders(response);
@@ -68,7 +77,7 @@ export default {
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil((async()=>{ await ensurePlatformCompletionSchema(env); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env)]); })());
+    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env)]); })());
   }
 };
 
@@ -279,7 +288,8 @@ async function routeApi(request, env, ctx, url) {
     const categoriesReady=Boolean(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='categories'").first());
     const completionTables=await Promise.all(["inventory_holds","branch_transfers","notification_queue","backup_runs","geo_cache"].map(name=>env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").bind(name).first()));
     const completionReady=completionTables.every(Boolean);
-    return json({ ok:true,release:"complete-platform-2026-09-25.6",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady&&completionReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at"),completionReady},timestamp:new Date().toISOString() });
+    const finalFeaturesReady=await ensureFinalFeaturesSchema(env).then(()=>true).catch(()=>false);
+    return json({ ok:true,release:"complete-platform-2026-09-25.7",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady&&completionReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at"),completionReady},finalFeaturesSchema:{ready:finalFeaturesReady},timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
@@ -300,7 +310,7 @@ async function routeApi(request, env, ctx, url) {
     const user = await currentUser(request, env);
     return json({ user: user ? publicUser(user) : null });
   }
-  if (method === "GET" && path === "/api/public-config") return json({ supportEmail: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL) });
+  if (method === "GET" && path === "/api/public-config") return json({ supportEmail: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL), pushPublicKey: String(env.VAPID_PUBLIC_KEY || "") });
   if (method === "GET" && path === "/api/categories") return listCategories(env, url);
   if (method === "POST" && path === "/api/support") return createSupportRequest(request, env, ctx);
   if (method === "GET" && path === "/api/me/profile") return getProfile(request, env);
@@ -431,6 +441,9 @@ async function routeApi(request, env, ctx, url) {
   if (method === "PATCH" && adminItem) return moderateItem(request, env, decodeURIComponent(adminItem[1]));
   const adminReport = path.match(/^\/api\/admin\/reports\/([^/]+)$/);
   if (method === "PATCH" && adminReport) return moderateReport(request, env, decodeURIComponent(adminReport[1]));
+
+  const finalFeaturesResponse = await handleFinalFeatures(request, env, ctx, url);
+  if (finalFeaturesResponse) return finalFeaturesResponse;
 
   throw new HttpError(404, "הכתובת לא נמצאה");
 }
