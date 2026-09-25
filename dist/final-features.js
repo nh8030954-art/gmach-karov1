@@ -144,8 +144,8 @@ function addAdminFinalPanels(){
 }
 
 async function openAdvancedTools(){
-  const data=await api("/api/me/dashboard"),orgs=data.organizations||[],items=data.items||[],helps=data.helpRequests||[];
-  const d=modal("כלים מתקדמים",`<div class="platform-row-actions" id="adv-tabs"><button class="platform-action" data-tab="orgs">גמ״חים וסניפים</button><button class="platform-action secondary" data-tab="inventory">מלאי ו־QR</button><button class="platform-action secondary" data-tab="community">קהילה</button><button class="platform-action secondary" data-tab="saved">מועדפים ומחזוריות</button><button class="platform-action secondary" data-tab="reviews">ביקורות</button></div><div id="adv-body" style="margin-top:16px"></div>`);
+  const data=await api("/api/me/dashboard"),orgs=data.organizations||[],items=data.items||[],helps=data.helpRequests||[],loans=data.requests||[];
+  const d=modal("כלים מתקדמים",`<div class="platform-row-actions" id="adv-tabs"><button class="platform-action" data-tab="orgs">גמ״חים וסניפים</button><button class="platform-action secondary" data-tab="inventory">מלאי ו־QR</button><button class="platform-action secondary" data-tab="community">קהילה</button><button class="platform-action secondary" data-tab="saved">מועדפים ומחזוריות</button><button class="platform-action secondary" data-tab="reviews">ביקורות</button><button class="platform-action secondary" data-tab="loans">תהליך השאלה</button><button class="platform-action secondary" data-tab="map">מפה וחיפוש קרוב</button></div><div id="adv-body" style="margin-top:16px"></div>`);
   const body=$("#adv-body",d);
   const showOrgs=async()=>{
     const blocks=[];
@@ -171,18 +171,48 @@ async function openAdvancedTools(){
     const [saved,recurring]=await Promise.all([api("/api/me/saved-entities"),api("/api/me/recurring-loans")]);
     body.innerHTML=`<h3>מועדפים מורחבים</h3><div class="platform-list">${(saved.saved||[]).map(x=>`<div class="platform-row"><div><strong>${esc(x.entity_type)}</strong><p>${esc(x.entity_id)}</p></div></div>`).join("")||'<div class="platform-muted">אין.</div>'}</div><h3>בקשות מחזוריות</h3><div class="platform-list">${(recurring.rules||[]).map(x=>`<div class="platform-row"><div><strong>${esc(x.title)}</strong><p>${esc(x.frequency)} · ${esc(x.status)}</p></div></div>`).join("")||'<div class="platform-muted">אין.</div>'}</div>`;
   };
+  const showLoans=async()=>{
+    body.innerHTML=loans.length?loans.map(x=>`<section class="platform-row"><div><strong>${esc(x.items?.title||"פריט")}</strong><p>${x.direction==="incoming"?"בקשה נכנסת":"בקשה שלי"} · ${esc(x.status)} · ${esc(x.requested_from||"")} — ${esc(x.requested_until||"")}</p></div><div class="platform-row-actions"><button class="platform-action secondary" data-loan-timeline="${x.id}">ציר זמן</button><a class="platform-action secondary" href="/api/loan-requests/${encodeURIComponent(x.id)}/calendar.ics">יומן</a>${x.direction==="outgoing"&&["pending","approved"].includes(x.status)?`<button class="platform-action secondary" data-loan-change="${x.id}">שינוי בקשה</button>`:""}${x.direction==="outgoing"&&["approved","collected"].includes(x.status)?`<button class="platform-action secondary" data-loan-extend="${x.id}">הארכה</button>`:""}${x.direction==="incoming"&&x.status==="approved"&&x.item_id?`<button class="platform-action secondary" data-loan-units="${x.id}" data-item="${x.item_id}">הקצאת יחידות</button>`:""}</div></section>`).join(""):'<div class="platform-note">אין השאלות.</div>';
+    $("[data-loan-timeline]",body).forEach(btn=>btn.onclick=async()=>{const t=await api("/api/loan-requests/"+btn.dataset.loanTimeline+"/timeline");modal("ציר זמן להשאלה",`<div class="platform-list">${(t.events||[]).map(e=>`<div class="platform-row"><div><strong>${esc(e.status)}</strong><p>${esc(e.created_at)}${e.note?" · "+esc(e.note):""}</p></div></div>`).join("")||'<div class="platform-note">אין אירועי סטטוס נוספים.</div>'}</div>`)});
+    $("[data-loan-change]",body).forEach(btn=>btn.onclick=()=>loanChangeDialog(btn.dataset.loanChange));
+    $("[data-loan-extend]",body).forEach(btn=>btn.onclick=()=>loanExtensionDialog(btn.dataset.loanExtend));
+    $("[data-loan-units]",body).forEach(btn=>btn.onclick=()=>loanUnitsDialog(btn.dataset.loanUnits,btn.dataset.item));
+  };
+  const showMap=async()=>{
+    body.innerHTML=`<form id="nearby-form" class="platform-form"><label class="wide"><span>כתובת לחיפוש</span><input name="address" placeholder="רחוב, עיר"></label><label><span>רדיוס בק״מ</span><input name="radius" type="number" min="1" max="200" value="20"></label><div class="platform-row-actions"><button type="button" class="platform-action secondary" id="map-current">המיקום הנוכחי</button><button class="platform-action" type="submit">חיפוש</button></div></form><iframe id="nearby-map" title="מפה אינטראקטיבית" style="width:100%;height:360px;border:1px solid #dbe3e8;border-radius:14px;margin-top:12px" loading="lazy"></iframe><div id="nearby-results" class="platform-list" style="margin-top:12px"></div>`;
+    let lat=null,lon=null;
+    const map=$("#nearby-map",body),results=$("#nearby-results",body),form=$("#nearby-form",body);
+    const setMap=(a,b)=>{const span=.08,bbox=[b-span,a-span,b+span,a+span].join(",");map.src="https://www.openstreetmap.org/export/embed.html?bbox="+encodeURIComponent(bbox)+"&layer=mapnik&marker="+encodeURIComponent(a+","+b)};
+    const run=async()=>{if(lat==null||lon==null)throw new Error("יש לבחור מיקום או להזין כתובת");setMap(lat,lon);const r=await api("/api/search/nearby?lat="+encodeURIComponent(lat)+"&lon="+encodeURIComponent(lon)+"&radius="+encodeURIComponent(form.radius.value||20));results.innerHTML=(r.results||[]).map(x=>`<div class="platform-row"><div><strong>${esc(x.title)}</strong><p>${esc(x.organization_name)} · ${esc(x.branch_name)} · ${Number(x.distanceKm).toFixed(1)} ק״מ</p></div><button class="platform-action secondary" data-map-lat="${x.latitude}" data-map-lon="${x.longitude}">הצגה במפה</button></div>`).join("")||'<div class="platform-note">לא נמצאו פריטים בטווח.</div>';$("[data-map-lat]",results).forEach(b=>b.onclick=()=>setMap(Number(b.dataset.mapLat),Number(b.dataset.mapLon)))};
+    $("#map-current",body).onclick=()=>navigator.geolocation.getCurrentPosition(p=>{lat=p.coords.latitude;lon=p.coords.longitude;run().catch(e=>notice(e.message,true))},()=>notice("לא ניתנה הרשאת מיקום",true),{timeout:10000,maximumAge:60000});
+    form.onsubmit=async e=>{e.preventDefault();try{const q=form.address.value.trim();if(q){const g=await api("/api/geocode?q="+encodeURIComponent(q));if(!g.results?.length)throw new Error("הכתובת לא נמצאה");lat=g.results[0].lat;lon=g.results[0].lon}await run()}catch(err){notice(err.message,true)}};
+  };
   const showReviews=async()=>{
     const r=await api("/api/me/reviews");
     body.innerHTML=`<h3>ביקורות שכתבתי</h3><div class="platform-list">${(r.authored||[]).map(x=>`<div class="platform-row"><div><strong>${esc(x.item_title)} · ${"★".repeat(Number(x.rating||0))}</strong><p>${esc(x.organization_name)}${x.branch_name?" · "+esc(x.branch_name):""} · ${esc(x.comment||"")}</p></div><button class="platform-action secondary" data-review-edit="${x.id}" data-rating="${x.rating}" data-comment="${esc(x.comment||"")}">עריכה</button></div>`).join("")||'<div class="platform-muted">אין ביקורות שכתבת.</div>'}</div><h3>ביקורות על הגמ״חים שלי</h3><div class="platform-list">${(r.received||[]).map(x=>`<div class="platform-row"><div><strong>${esc(x.author_first_name||"משתמש")} · ${"★".repeat(Number(x.rating||0))}</strong><p>${esc(x.item_title)}${x.branch_name?" · "+esc(x.branch_name):""} · ${esc(x.comment||"")}</p>${x.organization_response?"<p><strong>תגובה:</strong> "+esc(x.organization_response)+"</p>":""}</div><button class="platform-action secondary" data-review-response="${x.id}">תגובה</button></div>`).join("")||'<div class="platform-muted">אין ביקורות שהתקבלו.</div>'}</div>`;
     $$("[data-review-edit]",body).forEach(btn=>btn.onclick=()=>reviewEditDialog(btn.dataset.reviewEdit,Number(btn.dataset.rating),btn.dataset.comment));
     $$("[data-review-response]",body).forEach(btn=>btn.onclick=()=>reviewResponseDialog(btn.dataset.reviewResponse));
   };
-  const render={orgs:showOrgs,inventory:showInventory,community:showCommunity,saved:showSaved,reviews:showReviews};
+  const render={orgs:showOrgs,inventory:showInventory,community:showCommunity,saved:showSaved,reviews:showReviews,loans:showLoans,map:showMap};
   $$("[data-tab]",d).forEach(b=>b.onclick=async()=>{$$("[data-tab]",d).forEach(x=>x.classList.add("secondary"));b.classList.remove("secondary");await render[b.dataset.tab]()});
   await showOrgs();
 }
 function installAdvancedEntry(){
   const add=()=>{const dash=$("#dashboard-view");if(!dash||$("#final-advanced-button"))return;const b=document.createElement("button");b.id="final-advanced-button";b.className="button button-secondary";b.textContent="כלים מתקדמים";b.onclick=()=>openAdvancedTools().catch(e=>notice(e.message,true));const host=dash.querySelector(".dashboard-actions,.dashboard-header,.section-heading")||dash;host.prepend(b)};new MutationObserver(add).observe(document.body,{childList:true,subtree:true});add();
+}
+
+function loanChangeDialog(id){
+  const d=modal("שינוי בקשת השאלה",`<form id="loan-change-form" class="platform-form"><label><span>מתאריך</span><input name="from" type="datetime-local" required></label><label><span>עד תאריך</span><input name="until" type="datetime-local" required></label><label><span>כמות</span><input name="quantity" type="number" min="1" max="999" value="1" required></label><button class="platform-action" type="submit">שליחה לאישור מחדש</button></form>`);
+  $("#loan-change-form",d).onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await api("/api/loan-requests/"+id+"/change",{method:"POST",body:{requestedFrom:f.get("from"),requestedUntil:f.get("until"),quantity:Number(f.get("quantity"))}});d.close();notice("בקשת השינוי נשלחה")};
+}
+function loanExtensionDialog(id){
+  const d=modal("בקשת הארכה",`<form id="loan-extension-form" class="platform-form"><label><span>מועד החזרה חדש</span><input name="until" type="datetime-local" required></label><button class="platform-action" type="submit">שליחת בקשה</button></form>`);
+  $("#loan-extension-form",d).onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await api("/api/loan-requests/"+id+"/extension",{method:"POST",body:{requestedUntil:f.get("until")}});d.close();notice("בקשת ההארכה נשלחה")};
+}
+async function loanUnitsDialog(id,itemId){
+  const u=await api("/api/items/"+itemId+"/units");
+  const d=modal("הקצאת יחידות",`<form id="loan-units-form" class="platform-list">${(u.units||[]).filter(x=>["available","held"].includes(x.status)).map(x=>`<label class="platform-row"><span><strong dir="ltr">${esc(x.serial_number)}</strong> · ${esc(x.condition)}</span><input type="checkbox" name="unit" value="${x.id}"></label>`).join("")||'<div class="platform-note">אין יחידות זמינות.</div>'}<button class="platform-action" type="submit">הקצאה</button></form>`);
+  $("#loan-units-form",d).onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await api("/api/loan-requests/"+id+"/assign-units",{method:"POST",body:{unitIds:f.getAll("unit")}});d.close();notice("היחידות הוקצו")};
 }
 
 async function branchPolicyDialog(branchId,orgId,items){
