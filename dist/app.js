@@ -79,15 +79,14 @@
   }
 
   async function detectServer() {
-    try { const result = await api("/api/health"); state.serverAvailable = result?.ok === true; } catch { state.serverAvailable = false; }
+    try { const result = await api("/api/health", { timeoutMs: 4000 }); state.serverAvailable = result?.ok === true; } catch { state.serverAvailable = false; }
     $("#connection-banner").hidden = state.serverAvailable;
   }
   async function loadPublicConfig() {
     if (!state.serverAvailable) return; try { const data = await api("/api/public-config"); state.supportEmail = data.supportEmail || ""; } catch { /* Optional public configuration. */ }
   }
   async function loadDiscovery(query = "") {
-    if (!state.serverAvailable) return;
-    try { const data = await api(`/api/discovery${query ? `?q=${encodeURIComponent(query)}` : ""}`); state.discovery = data; renderDiscovery(); }
+    try { const data = await api(`/api/discovery${query ? `?q=${encodeURIComponent(query)}` : ""}`); state.discovery = data; renderDiscovery(); state.serverAvailable = true; $("#connection-banner").hidden = true; }
     catch (error) { console.warn("Discovery unavailable", error); }
   }
   function renderDiscovery() {
@@ -104,8 +103,7 @@
   function renderSkeletons() { $("#items-grid").innerHTML = Array.from({ length: 8 }, () => '<div class="skeleton-card" aria-hidden="true"></div>').join(""); }
   async function loadItems() {
     renderSkeletons();
-    if (!state.serverAvailable) { state.items = []; applyFilters(); return; }
-    try { const params = new URLSearchParams(); if ($("#date-filter").value) params.set("date", $("#date-filter").value); const data = await api(`/api/items${params.size ? `?${params}` : ""}`); state.items = data.items || []; applyFilters(); }
+    try { const params = new URLSearchParams(); if ($("#date-filter").value) params.set("date", $("#date-filter").value); const data = await api(`/api/items${params.size ? `?${params}` : ""}`); state.items = data.items || []; applyFilters(); state.serverAvailable = true; $("#connection-banner").hidden = true; }
     catch (error) { console.error("Unable to load items", error); $("#items-grid").innerHTML = ""; $("#empty-state").hidden = false; $("#empty-state h3").textContent = "לא הצלחנו לטעון את הפריטים"; $("#empty-state p").textContent = "כדאי לרענן את הדף בעוד רגע."; $("#results-summary").textContent = "שגיאה בטעינת הקטלוג"; }
   }
   function applyFilters({ resetVisible = true } = {}) {
@@ -509,6 +507,11 @@
     document.documentElement.classList.remove("app-booting");
     await Promise.allSettled([loadSiteSettings(), loadPageCustomizations(), loadPublicConfig(), loadDiscovery()]);
     await Promise.allSettled([refreshUser(), loadItems()]);
+    window.setInterval(async () => {
+      if (state.serverAvailable || document.visibilityState !== "visible") return;
+      await detectServer();
+      if (state.serverAvailable) await Promise.allSettled([loadPublicConfig(), loadDiscovery(), loadItems(), refreshUser()]);
+    }, 30000);
     const seoRoute=document.body.dataset.seoRoute||""; if(seoRoute.startsWith("item:")) await openItem(seoRoute.slice(5)); else if(seoRoute.startsWith("organization:")) await openOrganization(seoRoute.slice(13)); else if(seoRoute.startsWith("category:")) { const id=seoRoute.slice(9); const cat=(state.discovery?.categories||[]).find(x=>x.id===id); const label=cat?.name_he||id; $("#category-filter").value=label; state.activeCategory=label; applyFilters(); window.setTimeout(()=>$("#catalog").scrollIntoView(),0); } else if(seoRoute.startsWith("area:")) { const city=seoRoute.slice(5); $("#city-filter").value=city; applyFilters(); window.setTimeout(()=>$("#catalog").scrollIntoView(),0); } registerWebMCP();
     window.setInterval(() => { if (state.user && document.visibilityState === "visible") refreshNotifications(true); }, 30000);
     if (location.hash === "#/dashboard") state.user ? showDashboard() : requireAuth(() => showDashboard()); else if (location.hash === "#/catalog") window.setTimeout(() => $("#catalog").scrollIntoView(), 0);
