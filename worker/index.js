@@ -33,6 +33,49 @@ class HttpError extends Error {
   }
 }
 
+
+function escapeMeta(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]))}
+async function serveSeoEntityPage(request,env,url){
+  let kind,id,row,title,description,image,noindex=false;
+  let m=url.pathname.match(/^\/item\/([^/]+)$/);
+  if(m){
+    kind="item";id=decodeURIComponent(m[1]);
+    row=await env.DB.prepare("SELECT i.id,i.title,i.description,i.image_urls,i.status,i.deleted_at,o.name AS organization_name FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.id=?").bind(id).first();
+    if(!row||row.deleted_at) return null;
+    title=row.title+" | גמ״ח ברגע";description=String(row.description||("השאלת "+row.title+" בחינם דרך "+row.organization_name)).slice(0,180);
+    image=parseJsonArray(row.image_urls)[0]||null;noindex=row.status!=="active";
+  }else{
+    m=url.pathname.match(/^\/gmach\/([^/]+)$/);
+    if(!m)return null;
+    kind="organization";id=decodeURIComponent(m[1]);
+    row=await env.DB.prepare("SELECT o.id,o.name,o.description,o.logo_url,o.is_hidden,o.deleted_at,EXISTS(SELECT 1 FROM items i WHERE i.organization_id=o.id AND i.status='active' AND i.deleted_at IS NULL) AS has_items FROM organizations o WHERE o.id=?").bind(id).first();
+    if(!row||row.deleted_at)return null;
+    title=row.name+" | גמ״ח ברגע";description=String(row.description||("עמוד "+row.name+" בגמ״ח ברגע")).slice(0,180);
+    image=row.logo_url||null;noindex=Boolean(row.is_hidden||!row.has_items);
+  }
+  const assetUrl=new URL("/",url.origin);
+  const assetResponse=await env.ASSETS.fetch(new Request(assetUrl.toString(),{method:"GET",headers:request.headers}));
+  if(!assetResponse.ok)return assetResponse;
+  let html=await assetResponse.text(),canonical=url.origin+"/"+(kind==="item"?"item/":"gmach/")+encodeURIComponent(id);
+  const absoluteImage=image?new URL(image,url.origin).toString():null;
+  html=html.replace(/<title>[\s\S]*?<\/title>/i,"<title>"+escapeMeta(title)+"</title>");
+  html=html.replace(/<meta name="description"[^>]*>/i,'<meta name="description" content="'+escapeMeta(description)+'">');
+  const meta=[
+    '<base href="/">',
+    '<link rel="canonical" href="'+escapeMeta(canonical)+'">',
+    '<meta property="og:type" content="'+(kind==="item"?"product":"website")+'">',
+    '<meta property="og:title" content="'+escapeMeta(title)+'">',
+    '<meta property="og:description" content="'+escapeMeta(description)+'">',
+    '<meta property="og:url" content="'+escapeMeta(canonical)+'">',
+    absoluteImage?'<meta property="og:image" content="'+escapeMeta(absoluteImage)+'">':"",
+    '<meta name="twitter:card" content="'+(absoluteImage?"summary_large_image":"summary")+'">',
+    noindex?'<meta name="robots" content="noindex,nofollow">':""
+  ].filter(Boolean).join("\n");
+  html=html.replace("<head>","<head>\n"+meta);
+  html=html.replace("<body","<body data-seo-route=\""+kind+":"+escapeMeta(id)+"\"");
+  return new Response(html,{status:200,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"public, max-age=300, stale-while-revalidate=600"}});
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
