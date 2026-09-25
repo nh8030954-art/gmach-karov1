@@ -779,7 +779,7 @@ async function overview(request,env){
     env.DB.prepare("SELECT * FROM ownership_transfers WHERE to_user_id=? AND status='pending' AND expires_at>? ORDER BY created_at DESC").bind(user.id,new Date().toISOString()).all()
   ]);
   return json({user:{id:user.id,fullName:user.full_name,email:user.email,language:user.preferred_language||"he",navigation:user.navigation_preference||"google",tourCompleted:Boolean(user.tour_completed),quietHoursEnabled:Boolean(user.quiet_hours_enabled),quietStart:user.quiet_start,quietEnd:user.quiet_end,deletionRequestedAt:user.deletion_requested_at},
-    addresses:addresses.addresses,sessions:sessions.results.map(r=>({key:String(r.token_hash).slice(0,12),deviceLabel:r.device_label||"מכשיר לא מזוהה",lastSeenAt:r.last_seen_at||r.created_at,createdAt:r.created_at,expiresAt:r.expires_at,current:r.token_hash===user.current_session_hash})),savedSearches:searches.results.map(r=>({...r,filters:safeJson(r.filters_json,{})})),comparisons:comparisonsRows.results,ownershipTransfers:transfers.results});
+    addresses:addresses.addresses,sessions:sessions.results.map(r=>({key:r.token_hash,deviceLabel:r.device_label||"מכשיר לא מזוהה",lastSeenAt:r.last_seen_at||r.created_at,createdAt:r.created_at,expiresAt:r.expires_at,current:r.token_hash===user.current_session_hash})),savedSearches:searches.results.map(r=>({...r,filters:safeJson(r.filters_json,{})})),comparisons:comparisonsRows.results,ownershipTransfers:transfers.results});
 }
 
 export async function completionHealth(env){
