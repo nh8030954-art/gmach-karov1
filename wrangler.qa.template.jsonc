@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gmach-karov1-qa",
+  "main": "worker/index.js",
+  "compatibility_date": "2026-09-20",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/media/*"]
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "gmach-karov-db-qa",
+    "database_id": "__QA_D1_DATABASE_ID__",
+    "migrations_dir": "migrations"
+  }],
+  "r2_buckets": [{
+    "binding": "ITEM_IMAGES",
+    "bucket_name": "__QA_R2_BUCKET__"
+  }],
+  "observability": {"enabled": true},
+  "triggers": {"crons": ["23 3 * * *"]}
+}
