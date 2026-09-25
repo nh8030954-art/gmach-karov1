@@ -582,7 +582,9 @@ async function login(request, env, ctx, url) {
   const sessionToken = randomToken(32);
   const tokenHash = await sha256(sessionToken);
   const expiresAt = new Date(Date.now() + SESSION_SECONDS * 1000).toISOString();
-  await env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)").bind(tokenHash, user.id, expiresAt).run();
+  const metadata = await sessionMetadata(request, env, user.id);
+  await env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at,device_label,ip_hash,user_agent_hash,last_seen_at) VALUES (?,?,?,?,?,?,?)")
+    .bind(tokenHash, user.id, expiresAt, metadata.deviceLabel, metadata.ipHash, metadata.userAgentHash, new Date().toISOString()).run();
   await env.DB.prepare("UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?").bind(new Date().toISOString(), new Date().toISOString(), user.id).run();
   ctx.waitUntil(env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(new Date().toISOString()).run());
   return json({ user: publicUser(user) }, 200, { "Set-Cookie": sessionCookie(sessionToken, url) });
@@ -597,10 +599,11 @@ async function verifyTwoFactorLogin(request, env, url) {
     .bind(await sha256(challenge), new Date().toISOString()).first();
   if (!row || !row.totp_secret || !(await verifyTotp(row.totp_secret, code))) throw new HttpError(401, "קוד האימות אינו נכון או שפג תוקפו");
   const sessionToken = randomToken(32);
+  const metadata = await sessionMetadata(request, env, row.user_id);
   await env.DB.batch([
     env.DB.prepare("DELETE FROM auth_challenges WHERE token_hash = ?").bind(row.token_hash),
-    env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)")
-      .bind(await sha256(sessionToken), row.user_id, new Date(Date.now() + SESSION_SECONDS * 1000).toISOString()),
+    env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at,device_label,ip_hash,user_agent_hash,last_seen_at) VALUES (?,?,?,?,?,?,?)")
+      .bind(await sha256(sessionToken), row.user_id, new Date(Date.now() + SESSION_SECONDS * 1000).toISOString(), metadata.deviceLabel, metadata.ipHash, metadata.userAgentHash, new Date().toISOString()),
     env.DB.prepare("UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?").bind(new Date().toISOString(), new Date().toISOString(), row.user_id)
   ]);
   return json({ user: publicUser(row) }, 200, { "Set-Cookie": sessionCookie(sessionToken, url) });
@@ -1943,7 +1946,6 @@ async function runScheduledMaintenance(env) {
     env.DB.prepare("UPDATE waitlist_entries SET status='expired' WHERE status IN ('waiting','notified') AND requested_until < ?").bind(now.slice(0,16)),
     env.DB.prepare("UPDATE waitlist_offers SET declined_at=? WHERE accepted_at IS NULL AND declined_at IS NULL AND expires_at<=?").bind(now,now),
     env.DB.prepare("UPDATE loan_requests SET workflow_status='overdue' WHERE status='collected' AND requested_until<? AND workflow_status!='overdue'").bind(now),
-    env.DB.prepare("UPDATE users SET deleted_at=?,email='deleted-'||id||'@invalid.local',full_name='משתמש שנמחק',phone=NULL,city=NULL,address_cipher=NULL WHERE deletion_requested_at IS NOT NULL AND deleted_at IS NULL AND deletion_requested_at<=datetime(?,'-7 days')").bind(now,now),
     env.DB.prepare("UPDATE request_messages SET body='הודעה שנמחקה בהתאם למדיניות השמירה',media_url=NULL,deleted_at=? WHERE created_at<datetime(?,'-1 year') AND deleted_at IS NULL").bind(now,now),
     env.DB.prepare("DELETE FROM notifications WHERE read_at IS NOT NULL AND created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-180 days')"),
     env.DB.prepare("DELETE FROM analytics_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-395 days')"),
