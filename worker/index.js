@@ -256,7 +256,7 @@ async function routeApi(request, env, ctx, url) {
     const adminCredentialRotated=!seededAdmin||seededAdmin.password_hash!=="5cSI6TEtFyH-uPzoGKFhS2ioqI9z-0NlihqSNTPgT5U";
     const completeReady=Boolean(securityTable)&&String(sessionsTable?.sql||"").includes("device_label")&&userSql.includes("terms_accepted_at");
     const categoriesReady=Boolean(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='categories'").first());
-    return json({ ok:true,release:"complete-platform-2026-09-25.4",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at")},timestamp:new Date().toISOString() });
+    return json({ ok:true,release:"complete-platform-2026-09-25.5",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at")},timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
@@ -287,6 +287,19 @@ async function routeApi(request, env, ctx, url) {
   if (method === "PUT" && path === "/api/me/notification-preferences") return saveNotificationPreferences(request, env);
   if (method === "GET" && path === "/api/me/saved-searches") return listSavedSearches(request, env);
   if (method === "POST" && path === "/api/me/saved-searches") return createSavedSearch(request, env);
+
+  if (method === "POST" && path === "/api/me/account/cancel-deletion") return cancelAccountDeletion(request, env);
+  const sessionRevoke = path.match(/^\/api\/me\/sessions\/([^/]+)$/);
+  if (method === "DELETE" && sessionRevoke) return revokeSession(request, env, decodeURIComponent(sessionRevoke[1]));
+  if (method === "GET" && path === "/api/me/addresses") return listAddresses(request, env);
+  if (method === "POST" && path === "/api/me/addresses") return createAddress(request, env);
+  const addressDetail = path.match(/^\/api\/me\/addresses\/([^/]+)$/);
+  if (method === "DELETE" && addressDetail) return deleteAddress(request, env, decodeURIComponent(addressDetail[1]));
+  const savedSearchDetail = path.match(/^\/api\/me\/saved-searches\/([^/]+)$/);
+  if (method === "DELETE" && savedSearchDetail) return deleteSavedSearch(request, env, decodeURIComponent(savedSearchDetail[1]));
+  if (method === "GET" && path === "/api/me/support-tickets") return listMySupportTickets(request, env);
+  const supportTicketMessages = path.match(/^\/api\/me\/support-tickets\/([^/]+)\/messages$/);
+  if (method === "POST" && supportTicketMessages) return addSupportTicketMessage(request, env, decodeURIComponent(supportTicketMessages[1]));
 
   if (method === "GET" && path === "/api/items") return listItems(env, url);
   if (method === "GET" && path === "/api/discovery") return discovery(env, url);
@@ -375,6 +388,11 @@ async function routeApi(request, env, ctx, url) {
   if (method === "GET" && path === "/api/admin/users") return adminUsers(request, env);
   if (method === "GET" && path === "/api/admin/content") return adminContent(request, env);
   if (method === "GET" && path === "/api/admin/analytics") return adminAnalytics(request, env);
+  if (method === "GET" && path === "/api/admin/categories") return adminCategories(request, env);
+  if (method === "POST" && path === "/api/admin/categories") return createAdminCategory(request, env);
+  if (method === "GET" && path === "/api/admin/closures") return adminClosures(request, env);
+  if (method === "POST" && path === "/api/admin/closures") return createAdminClosure(request, env);
+  if (method === "GET" && path === "/api/admin/security-events") return adminSecurityEvents(request, env);
   if (method === "PUT" && path === "/api/admin/page-customizations") return savePageCustomization(request, env);
   if (method === "DELETE" && path === "/api/admin/page-customizations") return resetPageCustomizations(request, env);
   const restorePageVersion = path.match(/^\/api\/admin\/page-customizations\/versions\/([^/]+)\/restore$/);
@@ -670,7 +688,125 @@ async function updateProfile(request, env) {
 async function listSessions(request, env) {
   const user=await requireUser(request,env), token=cookieValue(request,SESSION_COOKIE), tokenHash=token?await sha256(token):"";
   const rows=await env.DB.prepare("SELECT token_hash,device_label,last_seen_at,created_at,expires_at FROM sessions WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all();
-  return json({sessions:rows.results.map(row=>({deviceLabel:row.device_label||"מכשיר לא מזוהה",lastSeenAt:row.last_seen_at||row.created_at,createdAt:row.created_at,expiresAt:row.expires_at,current:row.token_hash===tokenHash}))});
+  return json({sessions:rows.results.map(row=>({id:row.token_hash,deviceLabel:row.device_label||"מכשיר לא מזוהה",lastSeenAt:row.last_seen_at||row.created_at,createdAt:row.created_at,expiresAt:row.expires_at,current:row.token_hash===tokenHash}))});
+}
+
+
+async function cancelAccountDeletion(request, env) {
+  const user=await requireUser(request,env);
+  if(!user.deletion_requested_at) return json({ok:true,alreadyActive:true});
+  await env.DB.prepare("UPDATE users SET deletion_requested_at=NULL,account_status='active',updated_at=? WHERE id=?")
+    .bind(new Date().toISOString(),user.id).run();
+  await env.DB.prepare("INSERT INTO security_events(id,user_id,event_type,severity,details_json) VALUES(?,?,?,?,?)")
+    .bind(crypto.randomUUID(),user.id,"account_deletion_cancelled","info","{}").run();
+  return json({ok:true});
+}
+
+async function revokeSession(request,env,sessionId){
+  const user=await requireUser(request,env),token=cookieValue(request,SESSION_COOKIE),currentHash=token?await sha256(token):"";
+  if(!/^[A-Za-z0-9_-]{20,100}$/.test(sessionId)) throw new HttpError(400,"מזהה המכשיר אינו תקין");
+  if(sessionId===currentHash) throw new HttpError(400,"לניתוק המכשיר הנוכחי יש להשתמש ביציאה מהחשבון");
+  const result=await env.DB.prepare("DELETE FROM sessions WHERE user_id=? AND token_hash=?").bind(user.id,sessionId).run();
+  if(!result.meta.changes) throw new HttpError(404,"המכשיר אינו מחובר עוד");
+  return json({ok:true});
+}
+
+async function listAddresses(request,env){
+  const user=await requireUser(request,env);
+  const rows=await env.DB.prepare("SELECT id,label,city,latitude,longitude,is_default,created_at,updated_at FROM user_addresses WHERE user_id=? ORDER BY is_default DESC,updated_at DESC").bind(user.id).all();
+  return json({addresses:rows.results.map(row=>({...row,isDefault:Boolean(row.is_default)}))});
+}
+
+async function createAddress(request,env){
+  const user=await requireUser(request,env),body=await readJson(request),id=crypto.randomUUID();
+  const label=cleanText(body.label,1,50,"שם הכתובת"),city=cleanText(body.city,2,80,"עיר או יישוב"),address=cleanText(body.address,5,180,"כתובת מלאה");
+  const cipher=await encryptPrivateValue(address,env),isDefault=body.isDefault===true?1:0;
+  const statements=[];
+  if(isDefault) statements.push(env.DB.prepare("UPDATE user_addresses SET is_default=0,updated_at=? WHERE user_id=?").bind(new Date().toISOString(),user.id));
+  statements.push(env.DB.prepare("INSERT INTO user_addresses(id,user_id,label,address_cipher,city,latitude,longitude,is_default) VALUES(?,?,?,?,?,?,?,?)")
+    .bind(id,user.id,label,cipher,city,Number.isFinite(Number(body.latitude))?Number(body.latitude):null,Number.isFinite(Number(body.longitude))?Number(body.longitude):null,isDefault));
+  await env.DB.batch(statements);
+  return json({address:{id,label,city,isDefault:Boolean(isDefault)}},201);
+}
+
+async function deleteAddress(request,env,id){
+  const user=await requireUser(request,env);
+  const row=await env.DB.prepare("SELECT is_default FROM user_addresses WHERE id=? AND user_id=?").bind(id,user.id).first();
+  if(!row) throw new HttpError(404,"הכתובת לא נמצאה");
+  await env.DB.prepare("DELETE FROM user_addresses WHERE id=? AND user_id=?").bind(id,user.id).run();
+  if(Number(row.is_default)===1){
+    const next=await env.DB.prepare("SELECT id FROM user_addresses WHERE user_id=? ORDER BY updated_at DESC LIMIT 1").bind(user.id).first();
+    if(next) await env.DB.prepare("UPDATE user_addresses SET is_default=1,updated_at=? WHERE id=?").bind(new Date().toISOString(),next.id).run();
+  }
+  return json({ok:true});
+}
+
+async function deleteSavedSearch(request,env,id){
+  const user=await requireUser(request,env);
+  const result=await env.DB.prepare("DELETE FROM saved_searches WHERE id=? AND user_id=?").bind(id,user.id).run();
+  if(!result.meta.changes) throw new HttpError(404,"החיפוש השמור לא נמצא");
+  return json({ok:true});
+}
+
+async function listMySupportTickets(request,env){
+  const user=await requireUser(request,env);
+  const rows=await env.DB.prepare("SELECT id,ticket_number,subject,status,created_at,updated_at FROM support_tickets WHERE user_id=? OR email=? COLLATE NOCASE ORDER BY updated_at DESC LIMIT 100").bind(user.id,user.email).all();
+  return json({tickets:rows.results});
+}
+
+async function addSupportTicketMessage(request,env,ticketId){
+  const user=await requireUser(request,env),body=await readJson(request);
+  const ticket=await env.DB.prepare("SELECT id,status FROM support_tickets WHERE id=? AND (user_id=? OR email=? COLLATE NOCASE)").bind(ticketId,user.id,user.email).first();
+  if(!ticket) throw new HttpError(404,"הפנייה לא נמצאה");
+  const message=cleanText(body.message,1,1500,"הודעה"),id=crypto.randomUUID(),now=new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO support_ticket_messages(id,ticket_id,sender_id,body) VALUES(?,?,?,?)").bind(id,ticketId,user.id,message),
+    env.DB.prepare("UPDATE support_tickets SET status=CASE WHEN status='closed' THEN 'reopened' ELSE status END,updated_at=? WHERE id=?").bind(now,ticketId)
+  ]);
+  return json({message:{id,createdAt:now}},201);
+}
+
+async function adminCategories(request,env){
+  await requireAdmin(request,env);
+  const rows=await env.DB.prepare("SELECT id,parent_id,name_he,name_en,icon,image_url,synonyms_json,status,sort_order,created_at,updated_at FROM categories ORDER BY sort_order,name_he").all();
+  return json({categories:rows.results.map(row=>({...row,synonyms:parseJsonArray(row.synonyms_json)}))});
+}
+
+async function createAdminCategory(request,env){
+  const user=await requireAdmin(request,env),body=await readJson(request);
+  const id=cleanOptional(body.id,80)||("cat-"+crypto.randomUUID().slice(0,8)),nameHe=cleanText(body.nameHe,2,80,"שם הקטגוריה"),nameEn=cleanOptional(body.nameEn,80),parentId=cleanOptional(body.parentId,80);
+  if(parentId){const parent=await env.DB.prepare("SELECT id FROM categories WHERE id=?").bind(parentId).first();if(!parent)throw new HttpError(400,"קטגוריית האב אינה קיימת");}
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO categories(id,parent_id,name_he,name_en,icon,image_url,synonyms_json,status,sort_order) VALUES(?,?,?,?,?,?,?,?,?)")
+      .bind(id,parentId,nameHe,nameEn,cleanOptional(body.icon,50),validateAssetUrl(body.imageUrl),JSON.stringify(Array.isArray(body.synonyms)?body.synonyms.slice(0,50):[]),"active",Math.max(0,Math.min(9999,Number(body.sortOrder)||0))),
+    auditStatement(env,user.id,"category.create","category",id,{nameHe,parentId})
+  ]);
+  return json({category:{id,nameHe,nameEn,parentId}},201);
+}
+
+async function adminClosures(request,env){
+  await requireAdmin(request,env);
+  const rows=await env.DB.prepare("SELECT id,closure_type,title_he,title_en,starts_at,ends_at,active,created_at FROM platform_closures ORDER BY starts_at DESC LIMIT 200").all();
+  return json({closures:rows.results.map(row=>({...row,active:Boolean(row.active)}))});
+}
+
+async function createAdminClosure(request,env){
+  const user=await requireAdmin(request,env),body=await readJson(request),id=crypto.randomUUID();
+  const type=["manual","holiday","maintenance"].includes(body.closureType)?body.closureType:"manual";
+  const start=validateDateTime(body.startsAt,"מועד התחלה"),end=validateDateTime(body.endsAt,"מועד סיום");
+  if(end<=start) throw new HttpError(400,"מועד הסיום חייב להיות אחרי מועד ההתחלה");
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO platform_closures(id,closure_type,title_he,title_en,starts_at,ends_at,active,created_by) VALUES(?,?,?,?,?,?,1,?)")
+      .bind(id,type,cleanText(body.titleHe,2,120,"כותרת"),cleanOptional(body.titleEn,120),start,end,user.id),
+    auditStatement(env,user.id,"platform.closure.create","platform_closure",id,{type,start,end})
+  ]);
+  return json({closure:{id,type,startsAt:start,endsAt:end}},201);
+}
+
+async function adminSecurityEvents(request,env){
+  await requireAdmin(request,env);
+  const rows=await env.DB.prepare("SELECT id,user_id,event_type,severity,device_label,details_json,created_at FROM security_events ORDER BY created_at DESC LIMIT 250").all();
+  return json({events:rows.results.map(row=>({...row,details:safeJsonObject(row.details_json)}))});
 }
 
 async function listCategories(env,url) {
