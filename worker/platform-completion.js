@@ -440,10 +440,11 @@ async function importItems(request,env){
     const row=body.items[index];
     try{
       const title=clean(row.title,2,120,"שם פריט"),category=clean(row.category||"כללי",2,80,"קטגוריה"),description=clean(row.description||title,2,1500,"תיאור");
-      const condition=["חדש","כמו חדש","מצוין","טוב","מצב טוב","מצב סביר","בלאי נראה לעין"].includes(row.condition)?row.condition:"טוב";
+      const conditionDetail=String(row.condition||"טוב").trim();
+      const condition=conditionDetail==="חדש"||conditionDetail==="כמו חדש"?"כמו חדש":conditionDetail==="מצוין"?"מצוין":"טוב";
       const quantity=Math.min(999,Math.max(1,Number(row.quantity)||1)),org=await env.DB.prepare("SELECT city,neighborhood FROM organizations WHERE id=?").bind(orgId).first(),id=crypto.randomUUID(),now=new Date().toISOString();
-      await env.DB.prepare(`INSERT INTO items(id,organization_id,title,category,description,condition,quantity,city,neighborhood,status,availability_status,is_free,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,'pending','available',1,?,?)`)
-        .bind(id,orgId,title,category,description,condition,quantity,org.city,org.neighborhood,now,now).run();
+      await env.DB.prepare(`INSERT INTO items(id,organization_id,title,category,description,condition,quantity,city,neighborhood,status,availability_status,is_free,created_at,updated_at,condition_detail) VALUES(?,?,?,?,?,?,?,?,?,'pending','available',1,?,?,?)`)
+        .bind(id,orgId,title,category,description,condition,quantity,org.city,org.neighborhood,now,now,conditionDetail).run();
       created.push({row:index+1,id,title});
     }catch(error){errors.push({row:index+1,error:error.message||"שגיאה"});}
   }
@@ -783,7 +784,7 @@ export async function runCompletionMaintenance(env){
     env.DB.prepare("UPDATE ownership_transfers SET status='expired' WHERE status='pending' AND expires_at<=?").bind(now),
     env.DB.prepare("UPDATE scheduled_jobs SET status='failed',last_error='stale running job',finished_at=? WHERE status='running' AND run_at<datetime(?,'-2 hours')").bind(now,now),
     env.DB.prepare("UPDATE support_tickets SET status='closed',updated_at=? WHERE status='waiting' AND updated_at<datetime(?,'-30 days')").bind(now,now),
-    env.DB.prepare("UPDATE request_messages SET body='הצ׳אט נסגר בהתאם למדיניות השמירה',media_url=NULL,deleted_at=COALESCE(deleted_at,?) WHERE request_id IN (SELECT id FROM loan_requests WHERE status='returned' AND returned_at<datetime(?,'-14 days')) AND deleted_at IS NULL").bind(now,now)
+    env.DB.prepare("DELETE FROM chat_attachments WHERE message_id IN (SELECT rm.id FROM request_messages rm JOIN loan_requests lr ON lr.id=rm.request_id WHERE lr.returned_at IS NOT NULL AND lr.returned_at<datetime(?,'-1 year'))").bind(now)
   ]);
   const orgs=await env.DB.prepare(`SELECT id FROM organizations WHERE deletion_requested_at IS NOT NULL AND deleted_at IS NULL AND deletion_requested_at<=datetime(?,'-7 days')`).bind(now).all();
   for(const org of orgs.results){
