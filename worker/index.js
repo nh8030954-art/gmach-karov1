@@ -101,7 +101,9 @@ function shabbatTimesForFriday(y,m,d){
   const gamma=2*Math.PI/365*(n-1),eq=229.18*(0.000075+0.001868*Math.cos(gamma)-0.032077*Math.sin(gamma)-0.014615*Math.cos(2*gamma)-0.040849*Math.sin(2*gamma));
   const decl=0.006918-0.399912*Math.cos(gamma)+0.070257*Math.sin(gamma)-0.006758*Math.cos(2*gamma)+0.000907*Math.sin(2*gamma)-0.002697*Math.cos(3*gamma)+0.00148*Math.sin(3*gamma);
   const lat=31.778*Math.PI/180,ha=Math.acos(Math.cos(90.833*Math.PI/180)/(Math.cos(lat)*Math.cos(decl))-Math.tan(lat)*Math.tan(decl))*180/Math.PI;
-  const sunsetMinutes=720-4*(35.235+ha)-eq;
+  // NOAA solar-noon formula: sunset uses longitude minus the positive hour
+  // angle. Using longitude plus the angle closes the site early Friday.
+  const sunsetMinutes=720-4*(35.235-ha)-eq;
   const noon=israelUtcForLocal(y,m,d,12,0), noonParts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Jerusalem",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(noon);
   const offsetMinutes=(noon.getTime()-Date.UTC(y,m-1,d,12,0))/-60000;
   const sunsetLocal=sunsetMinutes+offsetMinutes, closeLocal=sunsetLocal-20;
@@ -110,7 +112,7 @@ function shabbatTimesForFriday(y,m,d){
   const satN=Math.floor((sat-jan1)/86400000)+1,g2=2*Math.PI/365*(satN-1),eq2=229.18*(0.000075+0.001868*Math.cos(g2)-0.032077*Math.sin(g2)-0.014615*Math.cos(2*g2)-0.040849*Math.sin(2*g2));
   const dec2=0.006918-0.399912*Math.cos(g2)+0.070257*Math.sin(g2)-0.006758*Math.cos(2*g2)+0.000907*Math.sin(2*g2)-0.002697*Math.cos(3*g2)+0.00148*Math.sin(3*g2);
   const ha2=Math.acos(Math.cos(98.5*Math.PI/180)/(Math.cos(lat)*Math.cos(dec2))-Math.tan(lat)*Math.tan(dec2))*180/Math.PI;
-  const nightMinutes=720-4*(35.235+ha2)-eq2+offsetMinutes;
+  const nightMinutes=720-4*(35.235-ha2)-eq2+offsetMinutes;
   const open=israelUtcForLocal(Number(sp.year),Number(sp.month),Number(sp.day),Math.floor(nightMinutes/60),Math.round(nightMinutes%60));
   return {close,open};
 }
