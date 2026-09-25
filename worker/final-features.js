@@ -327,7 +327,7 @@ async function sitemap(env,url){
 }
 async function logicalBackup(request,env){
   const a=await requireAdmin(request,env),id=crypto.randomUUID(),started=new Date().toISOString();
-  await env.DB.prepare("INSERT INTO backup_runs(id,backup_type,status,started_at) VALUES(?,'manual','running',?)").bind(id,started).run();
+  await env.DB.prepare("INSERT INTO backup_runs(id,backup_type,status,started_at) VALUES(?,'manual','started',?)").bind(id,started).run();
   try{
     const tables=["users","organizations","organization_branches","items","item_units","loan_requests","notifications","reviews","help_requests","support_tickets","categories","site_settings"];
     const dump={version:1,createdAt:started,tables:{}};
@@ -336,14 +336,14 @@ async function logicalBackup(request,env){
     if(!env.ITEM_IMAGES?.put)throw new Error("R2 unavailable");
     await env.ITEM_IMAGES.put(key,raw,{httpMetadata:{contentType:"application/json"}});
     await env.DB.batch([
-      env.DB.prepare("UPDATE backup_runs SET status='success',finished_at=?,manifest_json=? WHERE id=?").bind(new Date().toISOString(),JSON.stringify({storageKey:key,bytes:new TextEncoder().encode(raw).length,tables}),id),
+      env.DB.prepare("UPDATE backup_runs SET status='completed',completed_at=?,finished_at=?,manifest_json=? WHERE id=?").bind(new Date().toISOString(),JSON.stringify({storageKey:key,bytes:new TextEncoder().encode(raw).length,tables}),id),
       env.DB.prepare("INSERT INTO backup_objects(backup_run_id,storage_key,object_type,size_bytes) VALUES(?,?,?,?)").bind(id,key,"database-json",new TextEncoder().encode(raw).length)
     ]);
     await audit(env,a,"backup.manual","backup_run",id,{storageKey:key},null,null,null,request);
-    return json({backup:{id,status:"success",storageKey:key}});
+    return json({backup:{id,status:"completed",storageKey:key}});
   }catch(e){await env.DB.prepare("UPDATE backup_runs SET status='failed',finished_at=?,error=? WHERE id=?").bind(new Date().toISOString(),String(e.message||e).slice(0,1000),id).run();throw e}
 }
-async function backupList(request,env){await requireAdmin(request,env);const rows=await env.DB.prepare("SELECT * FROM backup_runs ORDER BY started_at DESC LIMIT 100").all();return json({backups:rows.results})}
+async function backupList(request,env){await requireAdmin(request,env);const rows=await env.DB.prepare("SELECT * FROM backup_runs ORDER BY COALESCE(started_at,created_at) DESC LIMIT 100").all();return json({backups:rows.results})}
 
 export async function ensureFinalFeaturesSchema(env){return ensureFinalSchema(env)}
 
