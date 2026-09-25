@@ -1,7 +1,7 @@
-sha=98af6a9c43ffde7e3ea87f9182203adf98d89b55
+sha=33d4a9d2f2807420467904c5665f29dbae2d5a8c
 install=success
 syntax=success
 smoke=success
-live=failure
+live=success
 Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
-{"ok":true,"release":"complete-platform-2026-09-25.3","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":false,"securityEvents":false,"sessionDevices":false,"registrationConsents":false},"timestamp":"2026-09-25T05:04:58.227Z"}
+{"ok":true,"release":"complete-platform-2026-09-25.3","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true},"timestamp":"2026-09-25T05:06:11.846Z"}
