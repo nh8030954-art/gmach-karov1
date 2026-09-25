@@ -3,6 +3,8 @@ class RemainingError extends Error{constructor(status,message){super(message);th
 const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store",...headers}});
 let schemaPromise=null;
 const CREATE=[
+"CREATE TABLE IF NOT EXISTS geocode_cache (query_key TEXT PRIMARY KEY,query_text TEXT NOT NULL,result_json TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),expires_at TEXT NOT NULL)",
+"CREATE TABLE IF NOT EXISTS geocode_throttle (id INTEGER PRIMARY KEY CHECK(id=1),last_request_at TEXT)",
 "CREATE TABLE IF NOT EXISTS item_image_edits (item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,image_url TEXT NOT NULL,sort_order INTEGER NOT NULL DEFAULT 0,is_primary INTEGER NOT NULL DEFAULT 0 CHECK(is_primary IN (0,1)),crop_json TEXT,rotation INTEGER NOT NULL DEFAULT 0 CHECK(rotation IN (0,90,180,270)),blur_regions_json TEXT NOT NULL DEFAULT '[]',updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),PRIMARY KEY(item_id,image_url))",
 "CREATE TABLE IF NOT EXISTS review_reports (id TEXT PRIMARY KEY,review_id TEXT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,reporter_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,reason TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','reviewed','dismissed','removed')),created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),reviewed_at TEXT,UNIQUE(review_id,reporter_id))",
 "CREATE TABLE IF NOT EXISTS review_helpful_votes (review_id TEXT NOT NULL REFERENCES reviews(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),PRIMARY KEY(review_id,user_id))",
@@ -12,7 +14,7 @@ const CREATE=[
 "CREATE TABLE IF NOT EXISTS restore_validations (id TEXT PRIMARY KEY,backup_run_id TEXT NOT NULL REFERENCES backup_runs(id) ON DELETE CASCADE,table_count INTEGER NOT NULL DEFAULT 0,row_count INTEGER NOT NULL DEFAULT 0,checksum TEXT,status TEXT NOT NULL CHECK(status IN ('running','success','failed')),details_json TEXT NOT NULL DEFAULT '{}',started_at TEXT NOT NULL,finished_at TEXT)",
 "CREATE TABLE IF NOT EXISTS external_service_status (service_key TEXT PRIMARY KEY,status TEXT NOT NULL CHECK(status IN ('configured','missing','degraded','healthy')),details_json TEXT NOT NULL DEFAULT '{}',checked_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))"
 ];
-async function ensureSchema(env){if(schemaPromise)return schemaPromise;schemaPromise=(async()=>{for(const s of CREATE)await env.DB.prepare(s).run();return true})().catch(e=>{schemaPromise=null;throw e});return schemaPromise}
+async function ensureSchema(env){if(schemaPromise)return schemaPromise;schemaPromise=(async()=>{for(const s of CREATE)await env.DB.prepare(s).run();await env.DB.prepare("INSERT OR IGNORE INTO geocode_throttle(id,last_request_at) VALUES(1,NULL)").run();return true})().catch(e=>{schemaPromise=null;throw e});return schemaPromise}
 function cookie(request,name){for(const p of String(request.headers.get("Cookie")||"").split(";")){const [k,...v]=p.trim().split("=");if(k===name)return decodeURIComponent(v.join("="))}return""}
 function b64(bytes){let out="";for(const b of bytes)out+=String.fromCharCode(b);return btoa(out).replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,"")}
 async function hash(v){return b64(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(String(v)))))}
@@ -104,6 +106,22 @@ async function externalStatus(request,env){
   ["email",Boolean(env.RESEND_API_KEY)],["turnstile",Boolean(env.TURNSTILE_SECRET_KEY&&env.TURNSTILE_SITE_KEY)],["push",Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY)],["encryption",Boolean(env.DATA_ENCRYPTION_KEY)]
  ];for(const [k,ok] of checks)await env.DB.prepare("INSERT INTO external_service_status(service_key,status,details_json,checked_at) VALUES(?,?,?,?) ON CONFLICT(service_key) DO UPDATE SET status=excluded.status,details_json=excluded.details_json,checked_at=excluded.checked_at").bind(k,ok?"configured":"missing","{}",new Date().toISOString()).run();return json({services:Object.fromEntries(checks)});
 }
+
+async function explicitGeocode(request,env,url){
+  const q=clean(url.searchParams.get("q"),3,180,"כתובת"),key=(await hash(q.toLowerCase())).slice(0,40),now=new Date();
+  const cached=await env.DB.prepare("SELECT result_json FROM geocode_cache WHERE query_key=? AND expires_at>?").bind(key,now.toISOString()).first();
+  if(cached)return json({results:safe(cached.result_json,[]),cached:true,attribution:"© OpenStreetMap contributors"});
+  const throttle=await env.DB.prepare("SELECT last_request_at FROM geocode_throttle WHERE id=1").first();
+  if(throttle?.last_request_at&&now-new Date(throttle.last_request_at)<1100)throw new RemainingError(429,"נא להמתין שנייה לפני חיפוש כתובת נוסף");
+  await env.DB.prepare("UPDATE geocode_throttle SET last_request_at=? WHERE id=1").bind(now.toISOString()).run();
+  const target=new URL("https://nominatim.openstreetmap.org/search");
+  target.searchParams.set("format","jsonv2");target.searchParams.set("limit","5");target.searchParams.set("countrycodes","il");target.searchParams.set("addressdetails","1");target.searchParams.set("q",q);
+  const response=await fetch(target.toString(),{headers:{"User-Agent":"GmachBerega/1.0 (+https://gmach-karov1.nh8030954.workers.dev; contact: support@example.org)","Accept-Language":"he,en"}});
+  if(!response.ok)throw new RemainingError(503,"שירות חיפוש הכתובות אינו זמין כרגע");
+  const raw=await response.json(),results=(Array.isArray(raw)?raw:[]).map(x=>({displayName:x.display_name,lat:Number(x.lat),lon:Number(x.lon),type:x.type,importance:Number(x.importance||0)})).filter(x=>Number.isFinite(x.lat)&&Number.isFinite(x.lon));
+  await env.DB.prepare("INSERT OR REPLACE INTO geocode_cache(query_key,query_text,result_json,expires_at) VALUES(?,?,?,?)").bind(key,q,JSON.stringify(results),new Date(Date.now()+30*86400000).toISOString()).run();
+  return json({results,cached:false,attribution:"© OpenStreetMap contributors"});
+}
 export async function ensureRemainingFeaturesSchema(env){return ensureSchema(env)}
 export async function runRemainingMaintenance(env){await ensureSchema(env);await env.DB.prepare("UPDATE page_content SET status='published',publish_at=NULL,updated_at=? WHERE status='scheduled' AND publish_at IS NOT NULL AND publish_at<=?").bind(new Date().toISOString(),new Date().toISOString()).run()}
 export async function handleRemainingFeatures(request,env,ctx,url){
@@ -123,6 +141,7 @@ export async function handleRemainingFeatures(request,env,ctx,url){
   m=path.match(/^\/api\/admin\/page-versions\/([^/]+)\/restore$/);if(m&&method==="POST")return restorePage(request,env,decodeURIComponent(m[1]));
   m=path.match(/^\/api\/admin\/backups\/([^/]+)\/validate$/);if(m&&method==="POST")return validateBackup(request,env,decodeURIComponent(m[1]));
   if(path==="/api/admin/external-services"&&method==="GET")return externalStatus(request,env);
+  if(path==="/api/maps/geocode"&&method==="GET")return explicitGeocode(request,env,url);
   return null;
  }catch(e){const status=e instanceof RemainingError?e.status:500;if(status>=500)console.error("remaining-features",e);return json({error:e instanceof RemainingError?e.message:"אירעה תקלה בשכבת ההשלמה"},status)}
 }
