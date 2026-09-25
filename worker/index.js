@@ -1111,7 +1111,8 @@ async function createItem(request, env) {
   const category = cleanText(body.category, 2, 40, "קטגוריה");
   const conditionInfo = normalizeProductCondition(cleanText(body.condition, 2, 30, "מצב הפריט"));
   const condition = conditionInfo.base;
-  if (!CATEGORIES.has(category) || category === "כללי") throw new HttpError(400, "נא לבחור קטגוריה תקינה");
+  const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
+  if (!categoryRow && !CATEGORIES.has(category)) throw new HttpError(400, "נא לבחור קטגוריה תקינה");
   const quantity = Number(body.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw new HttpError(400, "כמות הפריטים אינה תקינה");
   const title = cleanText(body.title, 2, 120, "שם הפריט");
@@ -1150,8 +1151,11 @@ async function createItem(request, env) {
     body.maxLoanDays?positiveInt(body.maxLoanDays,1,1,3650,"ימי השאלה מרביים"):null,
     body.serviceRadiusKm?Math.max(0.1,Math.min(500,Number(body.serviceRadiusKm))):null
   ).run();
-  await env.DB.prepare("UPDATE organizations SET is_hidden=0,updated_at=? WHERE id=?").bind(new Date().toISOString(),organizationId).run();
-  return json({ item: { id, status: "active" } }, 201);
+  const publishAt=body.publishAt?validateDateTime(body.publishAt,"מועד פרסום"):null;
+  const publishStatus=publishAt&&Date.parse(publishAt)>Date.now()?"pending":"active";
+  if(publishStatus!=="active") await env.DB.prepare("UPDATE items SET status='pending' WHERE id=?").bind(id).run();
+  else await env.DB.prepare("UPDATE organizations SET is_hidden=0,updated_at=? WHERE id=?").bind(new Date().toISOString(),organizationId).run();
+  return json({ item: { id, status: publishStatus,publishAt } }, 201);
 }
 
 async function updateItem(request, env, id) {
@@ -1175,7 +1179,8 @@ async function updateItem(request, env, id) {
   const category = cleanText(body.category, 2, 40, "קטגוריה");
   const conditionInfo = normalizeProductCondition(cleanText(body.condition, 2, 30, "מצב הפריט"));
   const condition = conditionInfo.base;
-  if (!CATEGORIES.has(category) || category === "כללי") throw new HttpError(400, "נא לבחור קטגוריה תקינה");
+  const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
+  if (!categoryRow && !CATEGORIES.has(category)) throw new HttpError(400, "נא לבחור קטגוריה תקינה");
   const quantity = Number(body.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw new HttpError(400, "כמות הפריטים אינה תקינה");
   const values = {
@@ -1257,6 +1262,11 @@ function validateLoanDateTime(value, label) {
   return text;
 }
 function loanMinutes(from, until) { return Math.round((Date.parse(until) - Date.parse(from)) / 60000); }
+function haversineKm(lat1,lon1,lat2,lon2){
+  const R=6371,rad=v=>v*Math.PI/180,dLat=rad(lat2-lat1),dLon=rad(lon2-lon1);
+  const a=Math.sin(dLat/2)**2+Math.cos(rad(lat1))*Math.cos(rad(lat2))*Math.sin(dLon/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
 function assertAllowedPickupReturnTime(value, label) {
   const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
   if (!match) throw new HttpError(400, `${label} אינו תקין`);
@@ -1379,7 +1389,7 @@ async function createLoanRequest(request, env) {
   const item = await env.DB.prepare(`
     SELECT i.id,i.title,i.quantity,i.availability_status,i.min_loan_minutes,i.max_loan_minutes,
       i.booking_notice_minutes,i.booking_horizon_days,i.turnaround_minutes,i.approval_mode,
-      i.deposit_required,i.deposit_amount_agorot,o.owner_id
+      i.deposit_required,i.deposit_amount_agorot,i.max_per_user,i.service_radius_km,o.owner_id,o.id AS organization_id
     FROM items i JOIN organizations o ON o.id=i.organization_id
     WHERE i.id=? AND i.status='active' AND i.is_free=1 AND o.status='approved'
   `).bind(itemId).first();
@@ -1402,6 +1412,19 @@ async function createLoanRequest(request, env) {
 
   const quantity = Number(body.quantity || 1);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > Number(item.quantity)) throw new HttpError(400, "הכמות המבוקשת אינה תקינה");
+  if(Number(item.max_per_user||0)>0){
+    const activeForUser=await env.DB.prepare("SELECT COALESCE(SUM(quantity),0) AS qty FROM loan_requests WHERE item_id=? AND borrower_id=? AND status IN ('pending','approved','collected')").bind(itemId,user.id).first();
+    if(Number(activeForUser?.qty||0)+quantity>Number(item.max_per_user)) throw new HttpError(409,`המגבלה למשתמש עבור מוצר זה היא ${item.max_per_user} יחידות`);
+  }
+  if(Number(item.service_radius_km||0)>0){
+    const home=await env.DB.prepare("SELECT latitude,longitude FROM user_addresses WHERE user_id=? ORDER BY is_default DESC,updated_at DESC LIMIT 1").bind(user.id).first();
+    const branch=await env.DB.prepare("SELECT latitude,longitude FROM organization_branches WHERE organization_id=? AND status='active' AND latitude IS NOT NULL AND longitude IS NOT NULL ORDER BY created_at LIMIT 1").bind(item.organization_id).first();
+    if(!home?.latitude||!home?.longitude) throw new HttpError(400,"כדי להזמין מוצר עם מגבלת מרחק יש לשמור כתובת מאומתת עם מיקום באזור האישי");
+    if(branch?.latitude&&branch?.longitude){
+      const distance=haversineKm(Number(home.latitude),Number(home.longitude),Number(branch.latitude),Number(branch.longitude));
+      if(distance>Number(item.service_radius_km)) throw new HttpError(409,`המוצר זמין עד ${item.service_radius_km} ק״מ מהסניף. הכתובת השמורה נמצאת במרחק של כ־${distance.toFixed(1)} ק״מ`);
+    }
+  }
   if (Number(item.deposit_required) && body.depositAccepted !== true) throw new HttpError(400, "יש לאשר את תנאי הפיקדון לפני שליחת ההזמנה");
 
   const available = await availableQuantityForRange(env,itemId,from,until,Number(item.turnaround_minutes),null);
