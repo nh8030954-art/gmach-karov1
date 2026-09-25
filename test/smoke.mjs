@@ -45,7 +45,7 @@ async function verifyLatestEmail(email) {
 
 try {
   const db = await mf.getD1Database("DB");
-  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql", "0007_platform_expansion.sql", "0008_advanced_inventory_and_booking.sql", "0009_production_hardening.sql", "0010_open_gmach_and_dual_ratings.sql"]) {
+  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql", "0007_platform_expansion.sql", "0008_advanced_inventory_and_booking.sql", "0009_production_hardening.sql", "0010_open_gmach_and_dual_ratings.sql", "0011_production_platform.sql", "0012_complete_platform.sql", "0013_full_completion.sql"]) {
     const migration = (await readFile(`migrations/${filename}`, "utf8")).replace(/^\s*--.*$/gm, "");
     const statements = migration.split(/;\s*(?:\r?\n|$)/).map(statement => statement.trim()).filter(Boolean);
     await db.batch(statements.map(statement => db.prepare(statement)));
@@ -55,6 +55,8 @@ try {
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(result.data.database, "D1");
   assert.equal(result.data.email, true);
+  assert.equal(result.data.release, "full-completion-2026-09-25.1");
+  assert.equal(result.data.completionSchema.ready, true);
   result = await request("/api/categories");
   assert.equal(result.response.status, 200);
   assert.ok(result.data.categories.length > 20);
