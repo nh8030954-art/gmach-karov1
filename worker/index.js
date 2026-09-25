@@ -1027,7 +1027,11 @@ async function listHelpRequests(env, url) {
 
 async function createHelpRequest(request, env) {
   const user = await requireUser(request, env); const body = await readJson(request);
-  const category = cleanOptional(body.category, 40); if (category && !CATEGORIES.has(category)) throw new HttpError(400, "קטגוריה אינה תקינה");
+  const category = cleanOptional(body.category, 80);
+  if (category) {
+    const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
+    if(!categoryRow && !CATEGORIES.has(category)) throw new HttpError(400,"קטגוריה אינה תקינה");
+  }
   const urgency = body.urgency === "urgent" ? "urgent" : "normal"; const id = crypto.randomUUID();
   const values = [id,user.id,cleanText(body.title,2,120,"מה צריך"),cleanText(body.description,10,800,"תיאור"),category,cleanText(body.city,2,80,"עיר"),urgency];
   await env.DB.prepare("INSERT INTO help_requests(id,requester_id,title,description,category,city,urgency) VALUES (?,?,?,?,?,?,?)").bind(...values).run();
@@ -1074,7 +1078,8 @@ async function createOrganization(request, env) {
   const body = await readJson(request);
   const id = crypto.randomUUID();
   const category = cleanText(body.primaryCategory, 2, 40, "תחום");
-  if (!CATEGORIES.has(category)) throw new HttpError(400, "נא לבחור תחום תקין");
+  const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
+  if (!categoryRow && !CATEGORIES.has(category)) throw new HttpError(400, "נא לבחור תחום תקין");
   const values = {
     name: cleanText(body.name, 2, 90, "שם הגמ״ח"),
     city: cleanText(body.city, 2, 80, "עיר"),
@@ -1109,7 +1114,8 @@ async function updateOrganization(request, env, id) {
   }
 
   const category = cleanText(body.primaryCategory, 2, 40, "תחום");
-  if (!CATEGORIES.has(category)) throw new HttpError(400, "נא לבחור תחום תקין");
+  const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
+  if (!categoryRow && !CATEGORIES.has(category)) throw new HttpError(400, "נא לבחור תחום תקין");
   const values = {
     name: cleanText(body.name, 2, 90, "שם הגמ״ח"),
     city: cleanText(body.city, 2, 80, "עיר"),
