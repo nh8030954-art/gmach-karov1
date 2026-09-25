@@ -1738,7 +1738,17 @@ async function createReport(request, env) {
     const id = crypto.randomUUID();
     await env.DB.prepare("INSERT INTO reports (id,reporter_id,item_id,reason,details) VALUES (?,?,?,?,?)")
       .bind(id, user.id, itemId, reason, cleanOptional(body.details, 800)).run();
-    return json({ report: { id, status: "pending" } }, 201);
+    const reportCount=await env.DB.prepare("SELECT COUNT(DISTINCT reporter_id) AS count FROM reports WHERE item_id=? AND status='pending'").bind(itemId).first();
+    const shouldHide=reason==="unsafe" || Number(reportCount?.count||0)>=3;
+    if(shouldHide){
+      const owner=await env.DB.prepare("SELECT o.owner_id,i.title FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.id=?").bind(itemId).first();
+      await env.DB.batch([
+        env.DB.prepare("UPDATE items SET status='pending',updated_at=? WHERE id=? AND status='active'").bind(new Date().toISOString(),itemId),
+        env.DB.prepare("INSERT INTO content_reports(id,entity_type,entity_id,reporter_id,reason,severity,status) VALUES(?,?,?,?,?,'critical','pending')").bind(crypto.randomUUID(),"item",itemId,user.id,reason),
+        owner?.owner_id ? env.DB.prepare("INSERT INTO notifications(id,user_id,type,title,body) VALUES(?,?,'system',?,?)").bind(crypto.randomUUID(),owner.owner_id,"הפריט הוסתר לבדיקה",`הפריט ${owner.title||""} הוסתר זמנית בעקבות דיווח בטיחות/מספר דיווחים וייבדק על ידי מנהל האתר.`) : env.DB.prepare("SELECT 1")
+      ]);
+    }
+    return json({ report: { id, status: "pending", temporarilyHidden:shouldHide } }, 201);
   } catch (error) {
     if (String(error).toLowerCase().includes("unique")) throw new HttpError(409, "כבר שלחתם דיווח פתוח על הפריט הזה");
     throw error;
