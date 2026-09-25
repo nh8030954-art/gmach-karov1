@@ -1,3 +1,4 @@
+import { handleFinalFeatures, runFinalMaintenance, ensureFinalFeaturesSchema } from "./final-features.js";
 import { handlePlatformApi, runCompletionMaintenance, completionHealth } from "./platform-completion.js";
 const SESSION_COOKIE = "gmach_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
@@ -57,7 +58,7 @@ export default {
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(Promise.all([runScheduledMaintenance(env), runCompletionMaintenance(env)]));
+    ctx.waitUntil(Promise.all([runScheduledMaintenance(env), runCompletionMaintenance(env), runFinalMaintenance(env)]));
   }
 };
 
@@ -265,7 +266,8 @@ async function routeApi(request, env, ctx, url) {
     const completeReady=Boolean(securityTable)&&String(sessionsTable?.sql||"").includes("device_label")&&userSql.includes("terms_accepted_at");
     const categoriesReady=Boolean(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='categories'").first());
     const completionSchema=await completionHealth(env);
-    return json({ ok:true,release:"complete-platform-2026-09-25.6",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at")},completionSchema,timestamp:new Date().toISOString() });
+    const finalFeaturesSchema=await ensureFinalFeaturesSchema(env).then(()=>({ready:true})).catch(()=>({ready:false}));
+    return json({ ok:true,release:"complete-platform-2026-09-25.6",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at")},completionSchema,finalFeaturesSchema,timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
@@ -417,6 +419,9 @@ async function routeApi(request, env, ctx, url) {
 
   const completionResponse = await handlePlatformApi(request, env, ctx, url);
   if (completionResponse) return completionResponse;
+
+  const finalFeaturesResponse = await handleFinalFeatures(request, env, ctx, url);
+  if (finalFeaturesResponse) return finalFeaturesResponse;
 
   throw new HttpError(404, "הכתובת לא נמצאה");
 }
