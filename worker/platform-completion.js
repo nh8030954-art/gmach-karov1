@@ -261,15 +261,19 @@ async function closeOrganization(request,env,orgId){
 
 async function requestOrganizationDeletion(request,env,orgId){
   await orgAccess(request,env,orgId,["owner"]);
+  const body=await bodyJson(request),org=await env.DB.prepare("SELECT name FROM organizations WHERE id=?").bind(orgId).first();
+  if(!org) throw new PlatformError(404,"הגמ״ח לא נמצא");
+  if(String(body.confirmName||"").trim()!==org.name || String(body.confirmText||"").trim()!=="מחיקה") throw new PlatformError(400,"אישור המחיקה אינו תואם");
   const active=await env.DB.prepare(`SELECT COUNT(*) AS count FROM loan_requests lr JOIN items i ON i.id=lr.item_id WHERE i.organization_id=? AND lr.status='collected'`).bind(orgId).first();
   const now=new Date().toISOString();
-  await env.DB.prepare("UPDATE organizations SET deletion_requested_at=?,updated_at=? WHERE id=?").bind(now,now,orgId).run();
-  return json({ok:true,deletionRequestedAt:now,waitingForReturns:Number(active?.count||0)>0});
+  await env.DB.prepare("UPDATE organizations SET deletion_requested_at=?,is_hidden=1,updated_at=? WHERE id=?").bind(now,now,orgId).run();
+  await env.DB.prepare("UPDATE organization_invitations SET cancelled_at=COALESCE(cancelled_at,?) WHERE organization_id=? AND accepted_at IS NULL").bind(now,orgId).run();
+  return json({ok:true,deletionRequestedAt:now,hidden:true,waitingForReturns:Number(active?.count||0)>0});
 }
 
 async function cancelOrganizationDeletion(request,env,orgId){
   await orgAccess(request,env,orgId,["owner"]);
-  await env.DB.prepare("UPDATE organizations SET deletion_requested_at=NULL,updated_at=? WHERE id=?").bind(new Date().toISOString(),orgId).run();
+  await env.DB.prepare("UPDATE organizations SET deletion_requested_at=NULL,is_hidden=0,updated_at=? WHERE id=?").bind(new Date().toISOString(),orgId).run();
   return json({ok:true});
 }
 
@@ -701,6 +705,16 @@ async function loanCalendar(request,env,id){
   return new Response(body,{headers:{"Content-Type":"text/calendar; charset=utf-8","Content-Disposition":`attachment; filename="gmach-${id}.ics"`,"Cache-Control":"no-store"}});
 }
 
+async function createSupportTicket(request,env){
+  const user=await requireUser(request,env),body=await bodyJson(request),subject=clean(body.subject,2,120,"נושא"),message=clean(body.message,10,3000,"הודעה");
+  const row=await env.DB.prepare("SELECT COALESCE(MAX(ticket_number),1000)+1 AS next FROM support_tickets").first(),id=crypto.randomUUID(),number=Number(row?.next||1001),now=new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO support_tickets(id,ticket_number,user_id,name,email,subject,message,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'open',?,?)").bind(id,number,user.id,user.full_name,user.email,subject,message,now,now),
+    env.DB.prepare("INSERT INTO support_ticket_messages(id,ticket_id,sender_id,body) VALUES(?,?,?,?)").bind(crypto.randomUUID(),id,user.id,message)
+  ]);
+  return json({ticket:{id,ticketNumber:number,status:"open"}},201);
+}
+
 async function supportTickets(request,env){
   const user=await requireUser(request,env);const rows=await env.DB.prepare("SELECT * FROM support_tickets WHERE user_id=? ORDER BY updated_at DESC").bind(user.id).all();return json({tickets:rows.results});
 }
@@ -857,6 +871,7 @@ export async function handlePlatformApi(request,env,ctx,url){
     m=path.match(/^\/api\/loan-requests\/([^/]+)\/calendar\.ics$/);if(m&&method==="GET")return loanCalendar(request,env,decodeURIComponent(m[1]));
 
     if(method==="GET"&&path==="/api/me/support-tickets")return supportTickets(request,env);
+    if(method==="POST"&&path==="/api/support-tickets")return createSupportTicket(request,env);
     m=path.match(/^\/api\/support-tickets\/([^/]+)\/messages$/);if(m&&method==="POST")return supportTicketMessage(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/support-tickets\/([^/]+)\/status$/);if(m&&method==="PATCH")return supportTicketStatus(request,env,decodeURIComponent(m[1]));
 
