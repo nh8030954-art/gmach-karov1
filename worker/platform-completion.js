@@ -14,7 +14,8 @@ export async function ensurePlatformCompletionSchema(env){
     request_messages:[["metadata_json","TEXT NOT NULL DEFAULT '{}'"]],
     reviews:[["branch_id","TEXT"],["edited_until","TEXT"]],
     saved_searches:[["last_checked_at","TEXT"],["last_result_signature","TEXT"]],
-    push_subscriptions:[["user_agent","TEXT"]]
+    push_subscriptions:[["user_agent","TEXT"]],
+    organization_invitations:[["invitee_email","TEXT"]]
   };
   for(const [table,defs] of Object.entries(alters)){
     const info=await env.DB.prepare(`PRAGMA table_info(${table})`).all().catch(()=>({results:[]}));
@@ -145,7 +146,13 @@ export async function handlePlatformCompletionApi(request,env,ctx,url){
   if(method==="GET"&&path==="/api/search/nearby") return nearbySearch(env,url);
   if(method==="GET"&&path==="/api/compare") return compareItems(env,url);
 
-  let m=path.match(/^\/api\/organizations\/([^/]+)\/categories$/);
+  let m=path.match(/^\/api\/organizations\/([^/]+)\/manager-invitations$/);
+  if(m&&method==="POST") return createManagerInvitation(request,env,decodeURIComponent(m[1]));
+  if(m&&method==="GET") return listManagerInvitations(request,env,decodeURIComponent(m[1]));
+  m=path.match(/^\/api\/manager-invitations\/([^/]+)$/);
+  if(m&&method==="DELETE") return cancelManagerInvitation(request,env,decodeURIComponent(m[1]));
+  if(method==="POST"&&path==="/api/manager-invitations/accept") return acceptManagerInvitation(request,env);
+  m=path.match(/^\/api\/organizations\/([^/]+)\/categories$/);
   if(m&&method==="GET") return getOrgCategories(request,env,decodeURIComponent(m[1]));
   if(m&&method==="PUT") return setOrgCategories(request,env,decodeURIComponent(m[1]));
   m=path.match(/^\/api\/items\/([^/]+)\/categories$/);
