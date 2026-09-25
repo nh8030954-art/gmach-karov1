@@ -7,6 +7,7 @@ const sentEmails = [];
 const mf = new Miniflare(convertV4MiniflareOptions({
   modules: true,
   scriptPath: "worker/index.js",
+  modulesRules: [{ type: "ESModule", include: ["**/*.js"], fallthrough: true }],
   compatibilityDate: "2026-09-20",
   d1Databases: { DB: "smoke-db" },
   r2Buckets: ["ITEM_IMAGES"],
