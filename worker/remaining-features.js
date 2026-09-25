@@ -125,7 +125,7 @@ async function explicitGeocode(request,env,url){
 
 async function automaticDailyBackup(env){
   const today=new Date().toISOString().slice(0,10);
-  const existing=await env.DB.prepare("SELECT id FROM backup_runs WHERE backup_type='scheduled' AND substr(started_at,1,10)=? AND status='success' LIMIT 1").bind(today).first();
+  const existing=await env.DB.prepare("SELECT id FROM backup_runs WHERE backup_type='scheduled' AND substr(started_at,1,10)=? AND status='completed' LIMIT 1").bind(today).first();
   if(existing)return existing.id;
   const id=crypto.randomUUID(),started=new Date().toISOString();
   await env.DB.prepare("INSERT INTO backup_runs(id,backup_type,status,started_at) VALUES(?,'scheduled','started',?)").bind(id,started).run();
@@ -153,7 +153,7 @@ async function automaticDailyBackup(env){
     await env.ITEM_IMAGES.put(key,raw,{httpMetadata:{contentType:"application/json"}});
     const manifest={storageKey:key,bytes:bytes.length,checksum,tables,r2ObjectCount:objects.length};
     await env.DB.batch([
-      env.DB.prepare("UPDATE backup_runs SET status='completed',completed_at=?,finished_at=?,manifest_json=? WHERE id=?").bind(new Date().toISOString(),JSON.stringify(manifest),id),
+      env.DB.prepare("UPDATE backup_runs SET status='completed',completed_at=?,finished_at=?,manifest_json=? WHERE id=?").bind(new Date().toISOString(),new Date().toISOString(),JSON.stringify(manifest),id),
       env.DB.prepare("INSERT OR REPLACE INTO backup_objects(backup_run_id,storage_key,object_type,size_bytes,checksum) VALUES(?,?,?,?,?)").bind(id,key,"database+r2-manifest",bytes.length,checksum)
     ]);
     const old=await env.DB.prepare("SELECT id,manifest_json FROM backup_runs WHERE backup_type='scheduled' AND status='completed' ORDER BY started_at DESC LIMIT -1 OFFSET 14").all();
@@ -164,7 +164,7 @@ async function automaticDailyBackup(env){
     }
     return id;
   }catch(e){
-    await env.DB.prepare("UPDATE backup_runs SET status='failed',finished_at=?,error=? WHERE id=?").bind(new Date().toISOString(),String(e?.message||e).slice(0,1000),id).run();
+    await env.DB.prepare("UPDATE backup_runs SET status='failed',completed_at=?,finished_at=?,error=? WHERE id=?").bind(new Date().toISOString(),new Date().toISOString(),String(e?.message||e).slice(0,1000),id).run();
     try{await env.DB.prepare("INSERT INTO operational_alerts(id,alert_type,severity,details_json) VALUES(?,'backup_failed','critical',?)").bind(crypto.randomUUID(),JSON.stringify({error:String(e?.message||e)})).run()}catch{}
     throw e;
   }
