@@ -1,3 +1,4 @@
+import { handlePlatformApi, runCompletionMaintenance, completionHealth } from "./platform-completion.js";
 const SESSION_COOKIE = "gmach_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
 // Keep PBKDF2 within the Cloudflare Workers CPU budget. Existing production
@@ -56,7 +57,7 @@ export default {
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(runScheduledMaintenance(env));
+    ctx.waitUntil(Promise.all([runScheduledMaintenance(env), runCompletionMaintenance(env)]));
   }
 };
 
@@ -256,7 +257,8 @@ async function routeApi(request, env, ctx, url) {
     const adminCredentialRotated=!seededAdmin||seededAdmin.password_hash!=="5cSI6TEtFyH-uPzoGKFhS2ioqI9z-0NlihqSNTPgT5U";
     const completeReady=Boolean(securityTable)&&String(sessionsTable?.sql||"").includes("device_label")&&userSql.includes("terms_accepted_at");
     const categoriesReady=Boolean(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='categories'").first());
-    return json({ ok:true,release:"complete-platform-2026-09-25.5",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at")},timestamp:new Date().toISOString() });
+    const completionSchema=await completionHealth(env);
+    return json({ ok:true,release:"complete-platform-2026-09-25.6",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at")},completionSchema,timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
@@ -405,6 +407,9 @@ async function routeApi(request, env, ctx, url) {
   if (method === "PATCH" && adminItem) return moderateItem(request, env, decodeURIComponent(adminItem[1]));
   const adminReport = path.match(/^\/api\/admin\/reports\/([^/]+)$/);
   if (method === "PATCH" && adminReport) return moderateReport(request, env, decodeURIComponent(adminReport[1]));
+
+  const completionResponse = await handlePlatformApi(request, env, ctx, url);
+  if (completionResponse) return completionResponse;
 
   throw new HttpError(404, "הכתובת לא נמצאה");
 }
@@ -2290,7 +2295,7 @@ function withSecurityHeaders(response) {
   const headers = new Headers(response.headers);
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  headers.set("Permissions-Policy", "camera=(self), microphone=(self), geolocation=(self), payment=()");
   headers.set("X-Frame-Options", "DENY");
   headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
   headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
