@@ -1523,7 +1523,7 @@ async function updateAvailability(request, env, id) {
 
 async function getRequestParticipant(request, env, requestId, { allowAdmin = true } = {}) {
   const user = await requireUser(request, env);
-  const row = await env.DB.prepare(`SELECT lr.id,lr.borrower_id,lr.status,i.title AS item_title,o.owner_id,o.name AS org_name
+  const row = await env.DB.prepare(`SELECT lr.id,lr.borrower_id,lr.status,lr.returned_at,i.id AS item_id,i.title AS item_title,o.owner_id,o.name AS org_name
     FROM loan_requests lr JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id
     WHERE lr.id = ?`).bind(requestId).first();
   if (!row) throw new HttpError(404, "בקשת ההשאלה לא נמצאה");
@@ -1534,30 +1534,62 @@ async function getRequestParticipant(request, env, requestId, { allowAdmin = tru
 
 async function listRequestMessages(request, env, requestId) {
   const { user, row } = await getRequestParticipant(request, env, requestId);
-  const result = await env.DB.prepare(`SELECT m.id,m.body,m.created_at,m.sender_id,u.full_name AS sender_name
+  const result = await env.DB.prepare(`SELECT m.id,m.body,m.created_at,m.sender_id,m.message_type,m.media_url,m.metadata_json,m.deleted_at,m.read_at,u.full_name AS sender_name
     FROM request_messages m JOIN users u ON u.id = m.sender_id
     WHERE m.request_id = ? ORDER BY m.created_at ASC LIMIT 300`).bind(requestId).all();
+  await env.DB.prepare("UPDATE request_messages SET read_at=? WHERE request_id=? AND sender_id<>? AND read_at IS NULL")
+    .bind(new Date().toISOString(),requestId,user.id).run();
   return json({
-    request: { id: row.id, status: row.status, itemTitle: row.item_title, organizationName: row.org_name },
-    messages: result.results.map(message => ({ ...message, isMine: message.sender_id === user.id }))
+    request: { id: row.id, status: row.status, itemTitle: row.item_title, organizationName: row.org_name, chatWritable: !(row.returned_at && Date.now()-Date.parse(row.returned_at)>14*86400000) },
+    messages: result.results.map(message => ({ ...message, metadata:safeJsonObject(message.metadata_json),isMine: message.sender_id === user.id }))
   });
 }
 
 async function createRequestMessage(request, env, requestId) {
   const { user, row, participant } = await getRequestParticipant(request, env, requestId, { allowAdmin: false });
   if (!participant) throw new HttpError(403, "רק השואל ומנהל הגמ״ח יכולים לשלוח הודעות");
+  if(row.returned_at && Date.now()-Date.parse(row.returned_at)>14*86400000) throw new HttpError(409,"השיחה נסגרה 14 ימים לאחר החזרת הפריט");
+  const recipientId = row.borrower_id === user.id ? row.owner_id : row.borrower_id;
+  const blocks=await env.DB.prepare(`SELECT blocker_id,effective_after_request_id FROM user_blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)`).bind(user.id,recipientId,recipientId,user.id).all();
+  for(const block of blocks.results||[]){
+    if(!block.effective_after_request_id || block.effective_after_request_id!==requestId || ["returned","cancelled","declined"].includes(row.status)) throw new HttpError(403,"לא ניתן לשלוח הודעות למשתמש הזה");
+  }
   const body = await readJson(request);
-  const message = cleanText(body.message, 1, 1000, "הודעה");
+  const messageType=["text","location","item_card","help_request_card"].includes(body.messageType)?body.messageType:"text";
+  let message="",metadata={};
+  if(messageType==="text"){
+    message=cleanText(body.message,1,1000,"הודעה");
+    assertSafeChatText(message);
+  } else if(messageType==="location"){
+    const lat=Number(body.latitude),lon=Number(body.longitude);
+    if(!Number.isFinite(lat)||lat<-90||lat>90||!Number.isFinite(lon)||lon<-180||lon>180) throw new HttpError(400,"המיקום אינו תקין");
+    message=cleanOptional(body.label,120)||"מיקום משותף"; metadata={latitude:lat,longitude:lon,label:message};
+  } else if(messageType==="item_card"){
+    const itemId=cleanText(body.itemId,1,100,"פריט"),item=await env.DB.prepare("SELECT id,title FROM items WHERE id=? AND status='active'").bind(itemId).first();
+    if(!item) throw new HttpError(404,"הפריט לא נמצא"); message=`פריט: ${item.title}`;metadata={itemId:item.id,title:item.title};
+  } else {
+    const helpId=cleanText(body.helpRequestId,1,100,"בקשה"),help=await env.DB.prepare("SELECT id,title FROM help_requests WHERE id=?").bind(helpId).first();
+    if(!help) throw new HttpError(404,"בקשת הקהילה לא נמצאה");message=`בקשה: ${help.title}`;metadata={helpRequestId:help.id,title:help.title};
+  }
   const recent = await env.DB.prepare(`SELECT COUNT(*) AS count FROM request_messages
     WHERE sender_id = ? AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 minute')`).bind(user.id).first();
   if (Number(recent?.count || 0) >= 10) throw new HttpError(429, "נשלחו יותר מדי הודעות. נסו שוב בעוד דקה");
-  const id = crypto.randomUUID();
-  const recipientId = row.borrower_id === user.id ? row.owner_id : row.borrower_id;
+  const id = crypto.randomUUID(),createdAt=new Date().toISOString();
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO request_messages (id,request_id,sender_id,body) VALUES (?,?,?,?)").bind(id, requestId, user.id, message),
+    env.DB.prepare("INSERT INTO request_messages (id,request_id,sender_id,body,message_type,metadata_json) VALUES (?,?,?,?,?,?)").bind(id, requestId, user.id, message,messageType,JSON.stringify(metadata)),
     notificationStatement(env, recipientId, "message", `הודעה חדשה על ${row.item_title}`, `${user.full_name}: ${message.slice(0, 120)}`, requestId)
   ]);
-  return json({ message: { id, request_id: requestId, sender_id: user.id, sender_name: user.full_name, body: message, isMine: true, created_at: new Date().toISOString() } }, 201);
+  return json({ message: { id, request_id: requestId, sender_id: user.id, sender_name: user.full_name, body: message,message_type:messageType,metadata,isMine: true, created_at: createdAt } }, 201);
+}
+
+function assertSafeChatText(message){
+  const matches=String(message).match(/(?:https?:\/\/|www\.)[^\s]+/gi)||[];
+  const blockedHosts=new Set(["bit.ly","tinyurl.com","t.co","cutt.ly","is.gd","rb.gy","shorturl.at"]);
+  for(const raw of matches){
+    let u;try{u=new URL(raw.startsWith("www.")?"https://"+raw:raw);}catch{throw new HttpError(400,"הקישור בהודעה אינו תקין");}
+    const host=u.hostname.toLowerCase();
+    if(u.protocol!=="https:"||host.startsWith("xn--")||/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)||blockedHosts.has(host)) throw new HttpError(400,"מטעמי בטיחות לא ניתן לשלוח את הקישור הזה");
+  }
 }
 
 async function listNotifications(request, env) {
