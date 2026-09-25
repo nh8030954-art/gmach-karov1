@@ -10,7 +10,7 @@ const mf = new Miniflare(convertV4MiniflareOptions({
   compatibilityDate: "2026-09-20",
   d1Databases: { DB: "smoke-db" },
   r2Buckets: ["ITEM_IMAGES"],
-  bindings: { ADMIN_EMAILS: "", RESEND_API_KEY: "re_test", RESEND_FROM_EMAIL: "Gmach Berega <verify@example.org>", SUPPORT_EMAIL: "support@example.org" },
+  bindings: { ADMIN_EMAILS: "", RESEND_API_KEY: "re_test", RESEND_FROM_EMAIL: "Gmach Berega <verify@example.org>", SUPPORT_EMAIL: "support@example.org", DATA_ENCRYPTION_KEY: "test-only-private-data-key-123456789" },
   serviceBindings: { RESEND_SERVICE: async request => { sentEmails.push(await request.json()); return Response.json({ id: crypto.randomUUID() }); } }
 }));
 
@@ -45,7 +45,7 @@ async function verifyLatestEmail(email) {
 
 try {
   const db = await mf.getD1Database("DB");
-  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql", "0007_platform_expansion.sql", "0008_advanced_inventory_and_booking.sql", "0009_production_hardening.sql", "0010_open_gmach_and_dual_ratings.sql", "0011_production_platform.sql"]) {
+  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql", "0007_platform_expansion.sql", "0008_advanced_inventory_and_booking.sql", "0009_production_hardening.sql", "0010_open_gmach_and_dual_ratings.sql", "0011_production_platform.sql", "0012_complete_platform.sql"]) {
     const migration = (await readFile(`migrations/${filename}`, "utf8")).replace(/^\s*--.*$/gm, "");
     const statements = migration.split(/;\s*(?:\r?\n|$)/).map(statement => statement.trim()).filter(Boolean);
     await db.batch(statements.map(statement => db.prepare(statement)));
@@ -55,6 +55,9 @@ try {
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(result.data.database, "D1");
   assert.equal(result.data.email, true);
+  result = await request("/api/categories");
+  assert.equal(result.response.status, 200);
+  assert.ok(result.data.categories.length > 20);
 
   for (let attempt = 1; attempt <= 5; attempt += 1) {
     result = await request("/api/support", { method: "POST", body: { name: "בדיקת תמיכה", email: "supporter@example.com", subject: `פנייה ${attempt}`, message: "זוהי פנייה תקינה לבדיקת מנגנון התמיכה והגבלת השימוש." } });
@@ -100,6 +103,12 @@ try {
   assert.equal(result.response.status, 201);
   const itemId = result.data.item.id;
 
+  result = await request(`/api/organizations/${organizationId}/branches`, { method:"POST", cookie:adminCookie, body:{ name:"סניף מרכזי",address:"רחוב הבדיקה 1",city:"ירושלים",phone:"050-1234567",inventoryMode:"separate",hours:{sun:"09:00-17:00"} } });
+  assert.equal(result.response.status,201,JSON.stringify(result.data));
+  result = await request(`/api/items/${itemId}/units`, { method:"POST",cookie:adminCookie,body:{count:2,condition:"חדש"} });
+  assert.equal(result.response.status,201,JSON.stringify(result.data));
+  assert.equal(result.data.units.length,2);
+
   const form = new WorkerFormData();
   form.append("images", new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }), "sample.png");
   result = await request(`/api/items/${itemId}/images`, { method: "POST", cookie: adminCookie, form });
@@ -116,16 +125,27 @@ try {
   result = await request(`/api/admin/items/${itemId}`, { method: "PATCH", cookie: adminCookie, body: { status: "active" } });
   assert.equal(result.response.status, 200);
 
-  result = await request("/api/auth/register", { method: "POST", body: { fullName: "שואלת ציוד", email: "borrower@example.com", password: "AnotherPass!456", termsAccepted: true } });
+  result = await request("/api/auth/register", { method: "POST", body: { fullName: "שואלת ציוד", phone:"052-7654321", city:"ירושלים", address:"רחוב הבדיקה 1, ירושלים", email: "borrower@example.com", password: "AnotherPass!456", termsAccepted: true, operationalEmailsAccepted:true } });
   assert.equal(result.response.status, 201);
   assert.equal(result.data.verificationRequired, true);
   const borrowerCookie = await verifyLatestEmail("borrower@example.com");
+  result = await request("/api/me/profile", { cookie:borrowerCookie });
+  assert.equal(result.data.profile.city,"ירושלים");
+  result = await request("/api/me/notification-preferences", { method:"PUT",cookie:borrowerCookie,body:{preferences:[{type:"loan_status",inApp:true,email:true,push:false,digest:"immediate"}]} });
+  assert.equal(result.response.status,200);
+  result = await request("/api/me/saved-searches", { method:"POST",cookie:borrowerCookie,body:{name:"עגלות בירושלים",filters:{category:"תינוקות",city:"ירושלים"},notify:true} });
+  assert.equal(result.response.status,201);
 
   result = await request(`/api/favorites/${itemId}`, { method: "POST", cookie: borrowerCookie });
   assert.equal(result.response.status, 200);
   result = await request("/api/loan-requests", { method: "POST", cookie: borrowerCookie, body: { itemId, requestedFrom: "2026-10-01T10:00", requestedUntil: "2026-10-02T12:00", quantity: 1, depositAccepted: true, phone: "052-7654321", note: "לאירוע משפחתי" } });
   assert.equal(result.response.status, 201);
   const requestId = result.data.request.id;
+  result = await request(`/api/loan-requests/${requestId}/pickup-proposals`, { method:"POST",cookie:adminCookie,body:{startsAt:"2026-10-01T18:00:00Z",endsAt:"2026-10-01T19:00:00Z"} });
+  assert.equal(result.response.status,201,JSON.stringify(result.data));
+  result = await request(`/api/loan-requests/${requestId}/timeline`, { cookie:borrowerCookie });
+  assert.equal(result.response.status,200);
+  assert.equal(result.data.proposals.length,1);
   result = await request(`/api/items/${itemId}/availability-check?from=2026-10-02T18%3A00&until=2026-10-04T10%3A00`);
   assert.equal(result.response.status, 400);
   result = await request(`/api/items/${itemId}/availability-check?from=2026-10-03T20%3A00&until=2026-10-04T10%3A00`);
@@ -161,15 +181,17 @@ try {
   assert.deepEqual(result.data.favorites, [itemId]);
 
   result = await request("/api/notifications", { cookie: borrowerCookie });
-  assert.equal(result.data.unread, 2);
+  assert.equal(result.data.unread, 3);
   result = await request("/api/notifications/read-all", { method: "POST", cookie: borrowerCookie, body: {} });
   assert.equal(result.response.status, 200);
   result = await request("/api/notifications", { cookie: borrowerCookie });
   assert.equal(result.data.unread, 0);
 
-  result = await request("/api/auth/register", { method: "POST", body: { fullName: "שואל נוסף", email: "second@example.com", password: "ThirdPass!789", termsAccepted: true } });
+  result = await request("/api/auth/register", { method: "POST", body: { fullName: "שואל נוסף", phone:"054-1112233", city:"ירושלים", address:"רחוב הבדיקה 2, ירושלים", email: "second@example.com", password: "ThirdPass!789", termsAccepted: true, operationalEmailsAccepted:true } });
   assert.equal(result.response.status, 201);
   const secondCookie = await verifyLatestEmail("second@example.com");
+  result = await request(`/api/organizations/${organizationId}/members`, { method:"POST",cookie:adminCookie,body:{email:"second@example.com",role:"inventory"} });
+  assert.equal(result.response.status,201,JSON.stringify(result.data));
   result = await request(`/api/loan-requests/${requestId}/messages`, { cookie: secondCookie });
   assert.equal(result.response.status, 403);
   result = await request("/api/loan-requests", { method: "POST", cookie: secondCookie, body: { itemId, requestedFrom: "2026-10-02T10:00", requestedUntil: "2026-10-04T10:00", quantity: 1, depositAccepted: true, phone: "054-1112233", note: "צריך לאירוע נוסף" } });
@@ -203,6 +225,9 @@ try {
   assert.equal(result.response.status, 201);
   result = await request("/api/help-requests?city=ירושלים");
   assert.equal(result.data.requests.length, 1);
+  const helpRequestId=result.data.requests[0].id;
+  result = await request(`/api/help-requests/${helpRequestId}/offers`, { method:"POST",cookie:adminCookie,body:{itemId,message:"הפריט שלנו מתאים לבקשה"} });
+  assert.equal(result.response.status,201,JSON.stringify(result.data));
   result = await request("/api/analytics/events", { method: "POST", cookie: borrowerCookie, body: { eventType: "search", query: "קישוט", city: "ירושלים", category: "אירועים" } });
   assert.equal(result.response.status, 201);
   result = await request("/api/admin/analytics", { cookie: adminCookie });
