@@ -154,13 +154,13 @@ async function openAdvancedTools(){
       blocks.push(`<section class="platform-note"><h3>${esc(org.name)}</h3><p>${ready.ready?"מוכן לפרסום":"חסרים: "+esc((ready.missing||[]).join(", "))}</p><div class="platform-list">${(branches.branches||[]).map(b=>`<div class="platform-row"><div><strong>${esc(b.name)}</strong><p>${esc(b.address||"")} · ${esc(b.city||"")}</p></div><div class="platform-row-actions"><span class="platform-chip">${esc(b.status||"active")}</span><button class="platform-action secondary" data-branch-policy="${b.id}" data-org="${org.id}">מדיניות מלאי</button></div></div>`).join("")||'<div class="platform-muted">אין סניפים.</div>'}</div></section>`);
     }
     body.innerHTML=blocks.join("")||'<div class="platform-note">אין גמ״חים בניהולך.</div>';
-    $("[data-branch-policy]",body).forEach(btn=>btn.onclick=()=>branchPolicyDialog(btn.dataset.branchPolicy,btn.dataset.org,items.filter(i=>i.organization_id===btn.dataset.org)).catch(e=>notice(e.message,true)));
+    $$("[data-branch-policy]",body).forEach(btn=>btn.onclick=()=>branchPolicyDialog(btn.dataset.branchPolicy,btn.dataset.org,items.filter(i=>i.organization_id===btn.dataset.org)).catch(e=>notice(e.message,true)));
   };
   const showInventory=async()=>{
     body.innerHTML=items.length?items.map(i=>`<section class="platform-row"><div><strong>${esc(i.title)}</strong><p>${esc(i.organizations?.name||"")} · ${esc(i.status)} · ${Number(i.quantity||0)} יחידות</p></div><div class="platform-row-actions"><button class="platform-action secondary" data-units="${i.id}">יחידות/QR</button><button class="platform-action secondary" data-images="${i.id}">תמונות</button><button class="platform-action secondary" data-clone="${i.id}">שכפול</button><button class="platform-action danger" data-remove="${i.id}">מחיקה בטוחה</button></div></section>`).join(""):'<div class="platform-note">אין מוצרים.</div>';
     $$("[data-units]",body).forEach(b=>b.onclick=async()=>{const u=await api("/api/items/"+b.dataset.units+"/units");body.innerHTML=(u.units||[]).map(x=>`<div class="platform-row"><div><strong dir="ltr">${esc(x.serial_number)}</strong><p>${esc(x.status)} · ${esc(x.condition)}</p></div><button class="platform-action secondary" data-qr="${x.id}">QR</button></div>`).join("")||'<div class="platform-note">אין יחידות סידוריות.</div>';$$("[data-qr]",body).forEach(q=>q.onclick=async()=>{const qr=await api("/api/item-units/"+q.dataset.qr+"/qr");modal("QR ליחידה",`<p><strong>${esc(qr.serialNumber||qr.serial_number||"")}</strong></p><p dir="ltr">${esc(qr.target||"")}</p><p class="platform-muted">ניתן להדפיס חלון זה כתווית.</p><button class="platform-action" onclick="window.print()">הדפסה</button>`)})});
-    $("[data-images]",body).forEach(b=>b.onclick=()=>manageItemImages(b.dataset.images).catch(e=>notice(e.message,true)));
-    $("[data-clone]",body).forEach(b=>b.onclick=async()=>{await api("/api/items/"+b.dataset.clone+"/clone",{method:"POST",body:{}});notice("המוצר שוכפל")});
+    $$("[data-images]",body).forEach(b=>b.onclick=()=>manageItemImages(b.dataset.images).catch(e=>notice(e.message,true)));
+    $$("[data-clone]",body).forEach(b=>b.onclick=async()=>{await api("/api/items/"+b.dataset.clone+"/clone",{method:"POST",body:{}});notice("המוצר שוכפל")});
     $$("[data-remove]",body).forEach(b=>b.onclick=async()=>{if(confirm("להסיר את המוצר לפי כללי ההיסטוריה?")){await api("/api/items/"+b.dataset.remove+"/remove",{method:"POST",body:{}});notice("המוצר טופל")}}); 
   };
   const showCommunity=async()=>{
@@ -174,8 +174,8 @@ async function openAdvancedTools(){
   const showReviews=async()=>{
     const r=await api("/api/me/reviews");
     body.innerHTML=`<h3>ביקורות שכתבתי</h3><div class="platform-list">${(r.authored||[]).map(x=>`<div class="platform-row"><div><strong>${esc(x.item_title)} · ${"★".repeat(Number(x.rating||0))}</strong><p>${esc(x.organization_name)}${x.branch_name?" · "+esc(x.branch_name):""} · ${esc(x.comment||"")}</p></div><button class="platform-action secondary" data-review-edit="${x.id}" data-rating="${x.rating}" data-comment="${esc(x.comment||"")}">עריכה</button></div>`).join("")||'<div class="platform-muted">אין ביקורות שכתבת.</div>'}</div><h3>ביקורות על הגמ״חים שלי</h3><div class="platform-list">${(r.received||[]).map(x=>`<div class="platform-row"><div><strong>${esc(x.author_first_name||"משתמש")} · ${"★".repeat(Number(x.rating||0))}</strong><p>${esc(x.item_title)}${x.branch_name?" · "+esc(x.branch_name):""} · ${esc(x.comment||"")}</p>${x.organization_response?"<p><strong>תגובה:</strong> "+esc(x.organization_response)+"</p>":""}</div><button class="platform-action secondary" data-review-response="${x.id}">תגובה</button></div>`).join("")||'<div class="platform-muted">אין ביקורות שהתקבלו.</div>'}</div>`;
-    $("[data-review-edit]",body).forEach(btn=>btn.onclick=()=>reviewEditDialog(btn.dataset.reviewEdit,Number(btn.dataset.rating),btn.dataset.comment));
-    $("[data-review-response]",body).forEach(btn=>btn.onclick=()=>reviewResponseDialog(btn.dataset.reviewResponse));
+    $$("[data-review-edit]",body).forEach(btn=>btn.onclick=()=>reviewEditDialog(btn.dataset.reviewEdit,Number(btn.dataset.rating),btn.dataset.comment));
+    $$("[data-review-response]",body).forEach(btn=>btn.onclick=()=>reviewResponseDialog(btn.dataset.reviewResponse));
   };
   const render={orgs:showOrgs,inventory:showInventory,community:showCommunity,saved:showSaved,reviews:showReviews};
   $$("[data-tab]",d).forEach(b=>b.onclick=async()=>{$$("[data-tab]",d).forEach(x=>x.classList.add("secondary"));b.classList.remove("secondary");await render[b.dataset.tab]()});
@@ -205,10 +205,10 @@ async function manageItemImages(itemId){
   const d=modal("ניהול תמונות",`<p class="platform-muted">בחרו תמונה ראשית, שנו סדר או הסירו תמונות. עיבוד מקומי לפני העלאה זמין בטופס המוצר.</p><div class="platform-list" id="img-manage-list">${images.map((x,i)=>`<div class="platform-row" draggable="true" data-url="${esc(x.url)}"><div><img src="${esc(x.url)}" alt="" style="width:96px;height:72px;object-fit:cover;border-radius:8px"><p>${x.is_primary?"תמונה ראשית":""} · ${esc(x.moderation_status)}</p></div><div class="platform-row-actions"><label><input type="radio" name="primary-image" value="${esc(x.url)}" ${x.is_primary?"checked":""}> ראשית</label><button type="button" class="platform-action secondary" data-up>↑</button><button type="button" class="platform-action secondary" data-down>↓</button><button type="button" class="platform-action danger" data-delete>הסרה</button></div></div>`).join("")||'<div class="platform-note">אין תמונות.</div>'}</div><p><button class="platform-action" id="save-image-order">שמירת שינויים</button></p>`);
   const list=$("#img-manage-list",d);
   const move=(row,dir)=>{const sibling=dir<0?row.previousElementSibling:row.nextElementSibling;if(sibling)list.insertBefore(dir<0?row:sibling,dir<0?sibling:row)};
-  $("[data-up]",d).forEach(b=>b.onclick=()=>move(b.closest("[data-url]"),-1));
-  $("[data-down]",d).forEach(b=>b.onclick=()=>move(b.closest("[data-url]"),1));
-  $("[data-delete]",d).forEach(b=>b.onclick=()=>b.closest("[data-url]").remove());
-  $("#save-image-order",d).onclick=async()=>{const rows=$("[data-url]",d),orderedUrls=rows.map(r=>r.dataset.url),primaryUrl=$('input[name="primary-image"]:checked',d)?.value||orderedUrls[0]||"";await api("/api/items/"+itemId+"/images/manage",{method:"PATCH",body:{orderedUrls,primaryUrl}});d.close();notice("סדר התמונות נשמר")};
+  $$("[data-up]",d).forEach(b=>b.onclick=()=>move(b.closest("[data-url]"),-1));
+  $$("[data-down]",d).forEach(b=>b.onclick=()=>move(b.closest("[data-url]"),1));
+  $$("[data-delete]",d).forEach(b=>b.onclick=()=>b.closest("[data-url]").remove());
+  $("#save-image-order",d).onclick=async()=>{const rows=$$("[data-url]",d),orderedUrls=rows.map(r=>r.dataset.url),primaryUrl=$('input[name="primary-image"]:checked',d)?.value||orderedUrls[0]||"";await api("/api/items/"+itemId+"/images/manage",{method:"PATCH",body:{orderedUrls,primaryUrl}});d.close();notice("סדר התמונות נשמר")};
 }
 function installImageEditor(){
   const input=$("#item-images");if(!input||input.dataset.editorInstalled)return;input.dataset.editorInstalled="1";
