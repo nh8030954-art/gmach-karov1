@@ -345,6 +345,20 @@ async function logicalBackup(request,env){
 }
 async function backupList(request,env){await requireAdmin(request,env);const rows=await env.DB.prepare("SELECT * FROM backup_runs ORDER BY started_at DESC LIMIT 100").all();return json({backups:rows.results})}
 
+async function richChatMessage(request,env,requestId){
+  const {user,row}=await requestAccess(request,env,requestId);
+  if(row.returned_at&&Date.now()-Date.parse(row.returned_at)>14*86400000)throw new FinalError(409,"השיחה נסגרה 14 ימים לאחר ההחזרה");
+  const b=await body(request),type=["location","item","help_request"].includes(b.type)?b.type:null;
+  if(!type)throw new FinalError(400,"סוג הודעה לא נתמך");
+  const meta=b.metadata&&typeof b.metadata==="object"?b.metadata:{};
+  if(type==="location"){const lat=Number(meta.lat),lon=Number(meta.lon);if(!Number.isFinite(lat)||!Number.isFinite(lon))throw new FinalError(400,"מיקום לא תקין");meta.lat=lat;meta.lon=lon;}
+  if(type==="item"&&!meta.itemId)throw new FinalError(400,"מזהה מוצר חסר");
+  if(type==="help_request"&&!meta.helpRequestId)throw new FinalError(400,"מזהה בקשה חסר");
+  const id=crypto.randomUUID(),label=type==="location"?"מיקום":type==="item"?"כרטיס מוצר":"כרטיס בקשת קהילה";
+  await env.DB.prepare("INSERT INTO request_messages(id,request_id,sender_id,body,message_type,metadata_json) VALUES(?,?,?,?,?,?)").bind(id,requestId,user.id,label,type,JSON.stringify(meta)).run();
+  return json({message:{id,type,metadata:meta}},201);
+}
+
 export async function ensureFinalFeaturesSchema(env){return ensureFinalSchema(env)}
 
 export async function runFinalMaintenance(env){
@@ -398,6 +412,7 @@ export async function handleFinalFeatures(request,env,ctx,url){
     m=path.match(/^\/api\/me\/saved-entities\/([^/]+)\/([^/]+)$/);if(m&&method==="DELETE")return savedEntities(request,env,decodeURIComponent(m[1]),decodeURIComponent(m[2]));
     m=path.match(/^\/api\/help-requests\/([^/]+)\/offers$/);if(m&&(method==="GET"||method==="POST"))return helpOffers(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/help-requests\/([^/]+)\/matches$/);if(m&&method==="GET")return communityMatches(request,env,decodeURIComponent(m[1]));
+    m=path.match(/^\/api\/loan-requests\/([^/]+)\/rich-message$/);if(m&&method==="POST")return richChatMessage(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/reviews\/([^/]+)\/(edit|helpful|report|respond)$/);if(m&&(method==="PATCH"||method==="POST"))return reviewAction(request,env,decodeURIComponent(m[1]),m[2]);
     if(path==="/api/admin/email-templates"&&method==="GET")return templates(request,env);
     m=path.match(/^\/api\/admin\/email-templates\/([^/]+)\/(he|en)$/);if(m&&method==="PUT")return templates(request,env,decodeURIComponent(m[1]),m[2]);
