@@ -6,7 +6,7 @@
   "description": "פלטפורמה קהילתית חינמית להשאלת ציוד, על Cloudflare Workers, D1 ו-R2",
   "scripts": {
     "dev": "wrangler dev",
-    "check": "node --check worker/index.js && node --check worker/platform-completion.js && node --check dist/app.js && node --check dist/platform-completion.js && node --check dist/platform-console.js",
+    "check": "node --check worker/index.js && node --check worker/platform-completion.js && node --check dist/app.js && node --check dist/platform-completion.js && node --check dist/platform-console.js && node --check dist/security-integrations.js",
     "test": "node test/smoke.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
