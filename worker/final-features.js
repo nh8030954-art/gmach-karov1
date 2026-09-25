@@ -248,6 +248,19 @@ async function communityMatches(request,env,id){
   const out=rows.results.map(x=>{let score=0;if(hr.category&&x.category===hr.category)score+=50;if(hr.city&&x.city===hr.city)score+=25;for(const w of q.split(/\s+/).filter(x=>x.length>2))if((x.title+" "+x.category).toLowerCase().includes(w))score+=4;if(x.availability_status==="available")score+=20;return{...x,score}}).filter(x=>x.score>10).sort((a,b)=>b.score-a.score).slice(0,50);
   return json({matches:out});
 }
+async function myReviews(request,env){
+  const u=await requireUser(request,env);
+  const authored=await env.DB.prepare(`SELECT r.*,i.title AS item_title,o.name AS organization_name,b.name AS branch_name,lr.returned_at
+    FROM reviews r JOIN loan_requests lr ON lr.id=r.request_id JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=r.organization_id
+    LEFT JOIN organization_branches b ON b.id=r.branch_id WHERE r.author_id=? ORDER BY r.created_at DESC LIMIT 200`).bind(u.id).all();
+  const received=await env.DB.prepare(`SELECT r.*,i.title AS item_title,o.name AS organization_name,b.name AS branch_name,
+    CASE WHEN instr(author.full_name,' ')>0 THEN substr(author.full_name,1,instr(author.full_name,' ')-1) ELSE author.full_name END AS author_first_name
+    FROM reviews r JOIN loan_requests lr ON lr.id=r.request_id JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=r.organization_id
+    JOIN users author ON author.id=r.author_id LEFT JOIN organization_branches b ON b.id=r.branch_id
+    WHERE o.owner_id=? ORDER BY r.created_at DESC LIMIT 300`).bind(u.id).all();
+  return json({authored:authored.results,received:received.results});
+}
+
 async function reviewAction(request,env,id,action){
   const u=await requireUser(request,env),r=await env.DB.prepare("SELECT * FROM reviews WHERE id=?").bind(id).first();if(!r)throw new FinalError(404,"הביקורת לא נמצאה");
   if(action==="edit"){
@@ -449,6 +462,7 @@ export async function handleFinalFeatures(request,env,ctx,url){
     m=path.match(/^\/api\/help-requests\/([^/]+)\/offers$/);if(m&&(method==="GET"||method==="POST"))return helpOffers(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/help-requests\/([^/]+)\/matches$/);if(m&&method==="GET")return communityMatches(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/loan-requests\/([^/]+)\/rich-message$/);if(m&&method==="POST")return richChatMessage(request,env,decodeURIComponent(m[1]));
+    if(path==="/api/me/reviews"&&method==="GET")return myReviews(request,env);
     m=path.match(/^\/api\/reviews\/([^/]+)\/(edit|helpful|report|respond)$/);if(m&&(method==="PATCH"||method==="POST"))return reviewAction(request,env,decodeURIComponent(m[1]),m[2]);
     if(path==="/api/admin/email-templates"&&method==="GET")return templates(request,env);
     m=path.match(/^\/api\/admin\/email-templates\/([^/]+)\/(he|en)$/);if(m&&method==="PUT")return templates(request,env,decodeURIComponent(m[1]),m[2]);
