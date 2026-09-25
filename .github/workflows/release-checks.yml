@@ -7,6 +7,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: release-checks-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   verify:
     runs-on: ubuntu-24.04
@@ -35,6 +38,7 @@ jobs:
           exit 1
       - name: Record verification result
         if: always()
+        continue-on-error: true
         run: |
           printf 'sha=%s\ninstall=%s\nsyntax=%s\nsmoke=%s\nlive=%s\n' "$GITHUB_SHA" "${{ steps.install.outcome }}" "${{ steps.syntax.outcome }}" "${{ steps.smoke.outcome }}" "${{ steps.live.outcome }}" > .release-check-result
           if [ -f smoke.log ]; then tail -n 12 smoke.log >> .release-check-result; fi
