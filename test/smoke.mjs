@@ -313,6 +313,16 @@ try {
   result = await request(`/api/items/${itemId}/similar`);
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.ok(Array.isArray(result.data.items));
+  result = await request("/api/me/saved-searches", { method: "POST", cookie: borrowerCookie, body: { name: "אירועים בעיר", filters: { q: "כיסאות", city: "ירושלים" }, notify: true } });
+  assert.equal(result.response.status, 201, JSON.stringify(result.data));
+  const savedSearchId = result.data.search.id;
+  result = await request(`/api/me/saved-searches/${savedSearchId}`, { method: "PATCH", cookie: adminCookie, body: { name: "חיפוש זר", filters: {}, notify: false } });
+  assert.equal(result.response.status, 404);
+  result = await request(`/api/me/saved-searches/${savedSearchId}`, { method: "PATCH", cookie: borrowerCookie, body: { name: "אירועים מעודכנים", filters: { q: "שולחן", city: "ירושלים" }, notify: false } });
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  result = await request("/api/me/saved-searches", { cookie: borrowerCookie });
+  assert.equal(result.data.searches.find(search => search.id === savedSearchId).name, "אירועים מעודכנים");
+  assert.equal(result.data.searches.find(search => search.id === savedSearchId).notify, false);
 
   result = await request("/api/auth/logout", { method: "POST", cookie: borrowerCookie });
   assert.equal(result.response.status, 200);
