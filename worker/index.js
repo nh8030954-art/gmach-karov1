@@ -990,7 +990,7 @@ async function getPublicOrganization(env, id) {
     o.address,o.website_url,o.hours_json,o.service_area,o.pickup_options,o.last_active_at,o.verified_phone,o.verified_address,
     ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
     FROM organizations o LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
-    WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 GROUP BY o.id`).bind(id).first();
+    WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 AND EXISTS (SELECT 1 FROM items pi WHERE pi.organization_id=o.id AND pi.status='active' AND pi.deleted_at IS NULL) GROUP BY o.id`).bind(id).first();
   if (!organization) throw new HttpError(404, "הגמ״ח לא נמצא");
   const [items, reviews] = await env.DB.batch([
     env.DB.prepare(`SELECT i.*,o.id AS org_id,o.name AS org_name,o.last_active_at AS org_last_active_at,
@@ -999,7 +999,13 @@ async function getPublicOrganization(env, id) {
       (SELECT COUNT(*) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_review_count,
       i.quantity AS available_count FROM items i JOIN organizations o ON o.id=i.organization_id
       WHERE i.organization_id=? AND i.status='active' ORDER BY i.availability_status,i.updated_at DESC`).bind(id),
-    env.DB.prepare(`SELECT r.rating,r.item_rating,r.comment,r.created_at,u.full_name AS author_name FROM reviews r JOIN users u ON u.id=r.author_id
+    env.DB.prepare(`SELECT r.id,r.rating,r.item_rating,r.service_rating,r.comment,r.created_at,r.updated_at,r.helpful_count,r.organization_response,r.organization_response_at,
+      substr(u.full_name,1,instr(u.full_name||' ',' ')-1) AS author_name,
+      i.title AS item_title,lr.requested_from,lr.returned_at,b.name AS branch_name
+      FROM reviews r JOIN users u ON u.id=r.author_id
+      LEFT JOIN loan_requests lr ON lr.id=r.request_id
+      LEFT JOIN items i ON i.id=lr.item_id
+      LEFT JOIN organization_branches b ON b.id=r.branch_id
       WHERE r.organization_id=? AND r.status='published' ORDER BY r.created_at DESC LIMIT 30`).bind(id)
   ]);
   return json({ organization: { ...organization, verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options) }, items: items.results.map(mapItem), reviews: reviews.results });
