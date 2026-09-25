@@ -1487,24 +1487,13 @@ async function updateAvailability(request, env, id) {
 
 async function getRequestParticipant(request, env, requestId, { allowAdmin = true } = {}) {
   const user = await requireUser(request, env);
-  const row = await env.DB.prepare(`SELECT lr.id,lr.borrower_id,lr.status,i.title AS item_title,o.owner_id,o.name AS org_name
+  const row = await env.DB.prepare(`SELECT lr.id,lr.borrower_id,lr.status,lr.returned_at,i.title AS item_title,o.owner_id,o.name AS org_name
     FROM loan_requests lr JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id
     WHERE lr.id = ?`).bind(requestId).first();
   if (!row) throw new HttpError(404, "בקשת ההשאלה לא נמצאה");
   const participant = row.borrower_id === user.id || row.owner_id === user.id;
   if (!participant && !(allowAdmin && user.role === "admin")) throw new HttpError(403, "השיחה זמינה רק לצדדים בבקשת ההשאלה");
   return { user, row, participant };
-}
-
-async function listRequestMessages(request, env, requestId) {
-  const { user, row } = await getRequestParticipant(request, env, requestId);
-  const result = await env.DB.prepare(`SELECT m.id,m.body,m.created_at,m.sender_id,u.full_name AS sender_name
-    FROM request_messages m JOIN users u ON u.id = m.sender_id
-    WHERE m.request_id = ? ORDER BY m.created_at ASC LIMIT 300`).bind(requestId).all();
-  return json({
-    request: { id: row.id, status: row.status, itemTitle: row.item_title, organizationName: row.org_name },
-    messages: result.results.map(message => ({ ...message, isMine: message.sender_id === user.id }))
-  });
 }
 
 async function createRequestMessage(request, env, requestId) {
