@@ -2003,7 +2003,9 @@ async function requireOrganizationRole(request,env,organizationId,allowed=["owne
 
 async function listBranches(request,env,organizationId){
   await requireOrganizationRole(request,env,organizationId);
-  const rows=await env.DB.prepare("SELECT * FROM organization_branches WHERE organization_id=? AND status!='archived' ORDER BY created_at").bind(organizationId).all();
+  const rows=await env.DB.prepare(`SELECT b.*,ROUND(AVG(r.rating),1) AS rating,COUNT(r.id) AS review_count
+    FROM organization_branches b LEFT JOIN reviews r ON r.branch_id=b.id AND r.status='published'
+    WHERE b.organization_id=? AND b.status!='archived' GROUP BY b.id ORDER BY b.created_at`).bind(organizationId).all();
   return json({branches:rows.results.map(row=>({...row,hours:safeJsonObject(row.hours_json)}))});
 }
 
