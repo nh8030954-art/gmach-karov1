@@ -422,6 +422,7 @@ async function routeApi(request, env, ctx, url) {
   if (method === "PATCH" && addressDetail) return updateAddress(request, env, decodeURIComponent(addressDetail[1]));
   if (method === "DELETE" && addressDetail) return deleteAddress(request, env, decodeURIComponent(addressDetail[1]));
   const savedSearchDetail = path.match(/^\/api\/me\/saved-searches\/([^/]+)$/);
+  if (method === "PATCH" && savedSearchDetail) return updateSavedSearch(request, env, decodeURIComponent(savedSearchDetail[1]));
   if (method === "DELETE" && savedSearchDetail) return deleteSavedSearch(request, env, decodeURIComponent(savedSearchDetail[1]));
   if (method === "GET" && path === "/api/me/support-tickets") return listMySupportTickets(request, env);
   const supportTicketMessages = path.match(/^\/api\/me\/support-tickets\/([^/]+)\/messages$/);
@@ -991,6 +992,14 @@ async function saveNotificationPreferences(request,env) {
 
 async function listSavedSearches(request,env){ const user=await requireUser(request,env); const rows=await env.DB.prepare("SELECT id,name,filters_json,notify,created_at FROM saved_searches WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(); return json({searches:rows.results.map(row=>({...row,filters:safeJsonObject(row.filters_json),notify:Boolean(row.notify)}))}); }
 async function createSavedSearch(request,env){ const user=await requireUser(request,env),body=await readJson(request),id=crypto.randomUUID(),filters=body.filters&&typeof body.filters==="object"&&!Array.isArray(body.filters)?body.filters:{}; await env.DB.prepare("INSERT INTO saved_searches(id,user_id,name,filters_json,notify) VALUES(?,?,?,?,?)").bind(id,user.id,cleanText(body.name,2,80,"שם החיפוש"),JSON.stringify(filters).slice(0,4000),body.notify===false?0:1).run(); return json({search:{id}},201); }
+async function updateSavedSearch(request,env,id){
+  const user=await requireUser(request,env),body=await readJson(request);
+  const filters=body.filters&&typeof body.filters==="object"&&!Array.isArray(body.filters)?body.filters:{};
+  const result=await env.DB.prepare("UPDATE saved_searches SET name=?,filters_json=?,notify=? WHERE id=? AND user_id=?")
+    .bind(cleanText(body.name,2,80,"שם החיפוש"),JSON.stringify(filters).slice(0,4000),body.notify===false?0:1,id,user.id).run();
+  if(!result.meta.changes)throw new HttpError(404,"החיפוש השמור לא נמצא");
+  return json({ok:true});
+}
 
 async function listItems(env, url) {
   const params = [];
