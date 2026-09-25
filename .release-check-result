@@ -1,7 +1,8 @@
-sha=e79b07b064972f9f4e588f15a8f03bc0d348baad
+sha=550867cd44d168be5d4d71f30c7272fbf9bece5e
 install=success
 syntax=success
 smoke=success
 live=success
 Final completion static release gate passed.
-{"ok":true,"release":"complete-platform-2026-09-25.8","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-25T11:34:35.624Z"}
+{"ok":true,"release":"complete-platform-2026-09-25.8","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-25T11:36:13.018Z"}
+platform_features={"release":"complete-platform-2026-09-25.6","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":false,"vapidPublicKey":null,"geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
