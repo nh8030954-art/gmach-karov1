@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "check": "node --check worker/index.js && node --check worker/platform-completion.js && node --check dist/app.js && node --check dist/platform-completion.js && node --check dist/platform-console.js && node --check dist/security-integrations.js",
-    "test": "node test/full-completion-smoke.mjs",
+    "test": "node test/full-completion-core.mjs",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "deploy": "npm run db:migrate:remote && wrangler deploy"
