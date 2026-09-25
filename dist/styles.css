@@ -52,7 +52,6 @@
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 110px; }
-html.app-booting body { visibility: hidden; }
 body {
   margin: 0;
   min-width: 320px;
