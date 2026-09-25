@@ -43,6 +43,34 @@ export async function ensurePlatformCompletionSchema(env){
     "CREATE INDEX IF NOT EXISTS content_reports_status_idx ON content_reports(status,severity,created_at)"
   ];
   for(const s of statements) await env.DB.prepare(s).run();
+  await env.DB.prepare("DROP TRIGGER IF EXISTS notifications_enqueue_delivery").run();
+  await env.DB.prepare(`CREATE TRIGGER notifications_enqueue_delivery AFTER INSERT ON notifications BEGIN
+    INSERT INTO notification_queue(id,user_id,notification_type,channel,title,body,payload_json,scheduled_at)
+    SELECT lower(hex(randomblob(16))),NEW.user_id,
+      CASE WHEN NEW.type IN ('request','status') THEN 'loan_status' WHEN NEW.type='message' THEN 'messages' ELSE 'security' END,
+      CASE WHEN p.digest='daily' THEN 'digest' ELSE 'email' END,NEW.title,NEW.body,
+      json_object('requestId',NEW.request_id,'notificationId',NEW.id),
+      CASE WHEN p.digest='daily' THEN datetime('now','+1 day','start of day','+8 hours') ELSE strftime('%Y-%m-%dT%H:%M:%fZ','now') END
+    FROM notification_preferences p JOIN users u ON u.id=p.user_id
+    WHERE p.user_id=NEW.user_id
+      AND p.notification_type=CASE WHEN NEW.type IN ('request','status') THEN 'loan_status' WHEN NEW.type='message' THEN 'messages' ELSE 'security' END
+      AND p.email=1 AND u.operational_emails_accepted=1;
+    INSERT INTO notification_queue(id,user_id,notification_type,channel,title,body,payload_json,scheduled_at)
+    SELECT lower(hex(randomblob(16))),NEW.user_id,
+      CASE WHEN NEW.type IN ('request','status') THEN 'loan_status' WHEN NEW.type='message' THEN 'messages' ELSE 'security' END,
+      'push',NEW.title,NEW.body,json_object('requestId',NEW.request_id,'notificationId',NEW.id),strftime('%Y-%m-%dT%H:%M:%fZ','now')
+    FROM notification_preferences p
+    WHERE p.user_id=NEW.user_id
+      AND p.notification_type=CASE WHEN NEW.type IN ('request','status') THEN 'loan_status' WHEN NEW.type='message' THEN 'messages' ELSE 'security' END
+      AND p.push=1;
+  END`).run();
+  const defaults=[
+    ["loan_status","operational_emails_accepted","immediate"],
+    ["messages","0","immediate"],["security","operational_emails_accepted","immediate"],
+    ["support","operational_emails_accepted","immediate"],["community","community_emails_accepted","daily"],
+    ["waitlist","operational_emails_accepted","immediate"]
+  ];
+  for(const [type,emailExpr,digest] of defaults) await env.DB.prepare(`INSERT OR IGNORE INTO notification_preferences(user_id,notification_type,in_app,email,push,digest) SELECT id,?,1,${emailExpr},0,? FROM users WHERE account_status='active'`).bind(type,digest).run();
 }
 
 export async function platformPreflight(request,env,url){
