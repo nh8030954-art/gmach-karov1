@@ -6,7 +6,7 @@ const base="http://local.test";
 const mf=new Miniflare({
   workers:[{
     name:"app",
-    config:{},
+    config:{type:"worker",name:"app",compatibilityDate:"2026-09-20"},
     modules:[
       {type:"ESModule",path:"worker/index.js"},
       {type:"ESModule",path:"worker/platform-completion.js"}
