@@ -29,8 +29,8 @@ jobs:
           if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$QA_D1_DATABASE_ID" ] && [ -n "$QA_URL" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "QA deployment skipped: Cloudflare QA secrets/resources are not configured."
+            echo "QA deployment blocked: Cloudflare QA secrets/resources are not configured." >&2
+            exit 1
           fi
       - uses: actions/checkout@v5
         if: steps.config.outputs.enabled == 'true'
