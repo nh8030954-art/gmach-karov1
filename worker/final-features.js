@@ -317,8 +317,8 @@ async function seoMeta(env,type,id,url){
 }
 async function sitemap(env,url){
   const [items,orgs]=await env.DB.batch([
-    env.DB.prepare("SELECT id,updated_at FROM items WHERE status='active' AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 10000"),
-    env.DB.prepare("SELECT id,updated_at FROM organizations WHERE is_hidden=0 AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 10000")
+    env.DB.prepare("SELECT i.id,i.updated_at FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.status='active' AND i.deleted_at IS NULL AND o.is_hidden=0 AND o.deleted_at IS NULL ORDER BY i.updated_at DESC LIMIT 10000"),
+    env.DB.prepare("SELECT o.id,o.updated_at FROM organizations o WHERE o.is_hidden=0 AND o.deleted_at IS NULL AND EXISTS(SELECT 1 FROM items i WHERE i.organization_id=o.id AND i.status='active' AND i.deleted_at IS NULL) ORDER BY o.updated_at DESC LIMIT 10000")
   ]);
   const escXml=s=>String(s).replace(/[<>&'"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;","'":"&apos;",'"':"&quot;"}[c]));
   const entries=[...orgs.results.map(x=>({loc:`${url.origin}/gmach/${x.id}`,last:x.updated_at})),...items.results.map(x=>({loc:`${url.origin}/item/${x.id}`,last:x.updated_at}))];
