@@ -2,6 +2,26 @@
 "use strict";
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function installSensitiveAdminFetch(){
+  const original=window.fetch.bind(window);
+  window.fetch=async(input,init={})=>{
+    const response=await original(input,init);
+    if(response.status!==428)return response;
+    let info={};try{info=await response.clone().json()}catch{return response}
+    if(!info.sensitiveAction||String(typeof input==="string"?input:input?.url||"").includes("/api/admin/sensitive-action/"))return response;
+    try{
+      const ch=await original("/api/admin/sensitive-action/challenge",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","Origin":location.origin},body:JSON.stringify({action:info.sensitiveAction})});
+      const challenge=await ch.json();if(!ch.ok)throw new Error(challenge.error||"לא ניתן לשלוח קוד אישור");
+      const code=prompt("פעולה רגישה: נשלח קוד אישור למייל המנהל. הזן את הקוד בן 6 הספרות:");
+      if(!code)return response;
+      const cf=await original("/api/admin/sensitive-action/confirm",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json","Origin":location.origin},body:JSON.stringify({challengeId:challenge.challengeId,code:String(code).trim()})});
+      const confirmed=await cf.json();if(!cf.ok)throw new Error(confirmed.error||"האימות נכשל");
+      const headers=new Headers(init.headers||{});headers.set("X-Admin-Action-Token",challenge.challengeId);
+      return original(input,{...init,headers});
+    }catch(e){notice(e.message||"האימות הנוסף נכשל",true);return response}
+  };
+}
+installSensitiveAdminFetch();
 async function api(path,options={}){
   const init={credentials:"same-origin",...options,headers:{...(options.headers||{})}};
   if(options.body && !(options.body instanceof FormData)){init.headers["Content-Type"]="application/json";init.body=JSON.stringify(options.body)}
