@@ -152,6 +152,7 @@ function platformClosedPage(closure){const reopens=new Intl.DateTimeFormat("he-I
 async function createSupportRequest(request, env, ctx) {
   await ensureProductionHardeningSchema(env);
   const body = await readJson(request);
+  await verifyTurnstileIfConfigured(request,env,body.turnstileToken);
   const name = cleanText(body.name, 2, 80, "שם");
   const email = cleanText(body.email, 5, 160, "אימייל").toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, "נא להזין כתובת אימייל תקינה");
@@ -279,7 +280,7 @@ async function routeApi(request, env, ctx, url) {
     const user = await currentUser(request, env);
     return json({ user: user ? publicUser(user) : null });
   }
-  if (method === "GET" && path === "/api/public-config") return json({ supportEmail: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL) });
+  if (method === "GET" && path === "/api/public-config") return json({ supportEmail: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL), turnstileSiteKey: String(env.TURNSTILE_SITE_KEY || ""), pushPublicKey: String(env.VAPID_PUBLIC_KEY || "") });
   if (method === "GET" && path === "/api/categories") return listCategories(env, url);
   if (method === "POST" && path === "/api/support") return createSupportRequest(request, env, ctx);
   if (method === "GET" && path === "/api/me/profile") return getProfile(request, env);
@@ -398,6 +399,7 @@ async function routeApi(request, env, ctx, url) {
 
 async function register(request, env, ctx, url) {
   const body = await readJson(request);
+  await verifyTurnstileIfConfigured(request,env,body.turnstileToken);
   if (body.termsAccepted !== true) throw new HttpError(400, "יש לאשר את תנאי השימוש ומדיניות הפרטיות");
   if (body.operationalEmailsAccepted !== true) throw new HttpError(400, "יש לאשר קבלת הודעות תפעוליות הנחוצות להפעלת החשבון");
   const email = normalizeEmail(body.email);
@@ -559,11 +561,7 @@ async function login(request, env, ctx, url) {
     return json({ requiresTwoFactor: true, challenge });
   }
 
-  const sessionToken = randomToken(32);
-  const tokenHash = await sha256(sessionToken);
-  const expiresAt = new Date(Date.now() + SESSION_SECONDS * 1000).toISOString();
-  await env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)").bind(tokenHash, user.id, expiresAt).run();
-  await env.DB.prepare("UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?").bind(new Date().toISOString(), new Date().toISOString(), user.id).run();
+  const {sessionToken}=await createSessionForLogin(request,env,user,ctx);
   ctx.waitUntil(env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(new Date().toISOString()).run());
   return json({ user: publicUser(user) }, 200, { "Set-Cookie": sessionCookie(sessionToken, url) });
 }
@@ -576,13 +574,8 @@ async function verifyTwoFactorLogin(request, env, url) {
     JOIN users u ON u.id = c.user_id WHERE c.token_hash = ? AND c.purpose = 'login_2fa' AND c.expires_at > ?`)
     .bind(await sha256(challenge), new Date().toISOString()).first();
   if (!row || !row.totp_secret || !(await verifyTotp(row.totp_secret, code))) throw new HttpError(401, "קוד האימות אינו נכון או שפג תוקפו");
-  const sessionToken = randomToken(32);
-  await env.DB.batch([
-    env.DB.prepare("DELETE FROM auth_challenges WHERE token_hash = ?").bind(row.token_hash),
-    env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)")
-      .bind(await sha256(sessionToken), row.user_id, new Date(Date.now() + SESSION_SECONDS * 1000).toISOString()),
-    env.DB.prepare("UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?").bind(new Date().toISOString(), new Date().toISOString(), row.user_id)
-  ]);
+  await env.DB.prepare("DELETE FROM auth_challenges WHERE token_hash = ?").bind(row.token_hash).run();
+  const {sessionToken}=await createSessionForLogin(request,env,row,null);
   return json({ user: publicUser(row) }, 200, { "Set-Cookie": sessionCookie(sessionToken, url) });
 }
 
@@ -1932,6 +1925,54 @@ function verificationCode() {
   const bytes = new Uint32Array(1);
   crypto.getRandomValues(bytes);
   return String(100000 + (bytes[0] % 900000));
+}
+
+async function verifyTurnstileIfConfigured(request, env, token) {
+  const secret=String(env.TURNSTILE_SECRET_KEY||""),siteKey=String(env.TURNSTILE_SITE_KEY||"");
+  if(!secret||!siteKey) return {enabled:false};
+  if(!token) throw new HttpError(400,"יש להשלים אימות אנושי");
+  const form=new FormData();
+  form.set("secret",secret); form.set("response",String(token));
+  const remote=request.headers.get("CF-Connecting-IP"); if(remote) form.set("remoteip",remote);
+  const response=await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify",{method:"POST",body:form});
+  if(!response.ok) throw new HttpError(503,"שירות האימות האנושי אינו זמין כרגע");
+  const result=await response.json();
+  if(!result.success) throw new HttpError(400,"האימות האנושי נכשל. נסו שוב");
+  return {enabled:true};
+}
+
+function requestDeviceLabel(request) {
+  const ua=String(request.headers.get("User-Agent")||"").slice(0,300);
+  const mobile=/Android|iPhone|iPad|Mobile/i.test(ua);
+  const browser=/Edg\//.test(ua)?"Edge":/Chrome\//.test(ua)?"Chrome":/Firefox\//.test(ua)?"Firefox":/Safari\//.test(ua)?"Safari":"דפדפן";
+  const os=/Android/i.test(ua)?"Android":/iPhone|iPad/i.test(ua)?"iOS/iPadOS":/Windows/i.test(ua)?"Windows":/Mac OS/i.test(ua)?"macOS":/Linux/i.test(ua)?"Linux":"מערכת";
+  return `${mobile?"נייד":"מחשב"} · ${browser} · ${os}`;
+}
+
+async function sendOperationalEmail(env,email,subject,text) {
+  if(!env.RESEND_API_KEY||!email) return false;
+  const deliver=env.RESEND_SERVICE?.fetch?env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE):fetch;
+  const response=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[email],subject,text,reply_to:String(env.SUPPORT_EMAIL||DEFAULT_SUPPORT_EMAIL)})});
+  return response.ok;
+}
+
+async function createSessionForLogin(request,env,user,ctx) {
+  const sessionToken=randomToken(32),tokenHash=await sha256(sessionToken),expiresAt=new Date(Date.now()+SESSION_SECONDS*1000).toISOString();
+  const device=requestDeviceLabel(request),ipHash=await sha256(request.headers.get("CF-Connecting-IP")||"unknown");
+  const known=await env.DB.prepare("SELECT 1 FROM sessions WHERE user_id=? AND device_label=? AND expires_at>? LIMIT 1").bind(user.id,device,new Date().toISOString()).first();
+  const now=new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO sessions(token_hash,user_id,expires_at,device_label,ip_hash,last_seen_at) VALUES(?,?,?,?,?,?)").bind(tokenHash,user.id,expiresAt,device,ipHash,now),
+    env.DB.prepare("UPDATE users SET last_login_at=?,updated_at=? WHERE id=?").bind(now,now,user.id)
+  ]);
+  if(!known&&user.last_login_at){
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO security_events(id,user_id,event_type,severity,ip_hash,device_label,details_json) VALUES(?,?,?,?,?,?,?)").bind(crypto.randomUUID(),user.id,"new_device_login","info",ipHash,device,JSON.stringify({at:now})),
+      notificationStatement(env,user.id,"system","כניסה ממכשיר חדש",`זוהתה כניסה ממכשיר חדש: ${device}. אם זו לא הייתם אתם, החליפו סיסמה ונתקו מכשירים.`,null)
+    ]);
+    ctx?.waitUntil(sendOperationalEmail(env,user.email,"כניסה ממכשיר חדש לגמ״ח ברגע",`זוהתה כניסה חדשה לחשבון שלך ממכשיר: ${device}. אם זו לא הייתה כניסה שלך, יש להחליף סיסמה ולנתק מכשירים מהאזור האישי.`).catch(console.error));
+  }
+  return {sessionToken,tokenHash,expiresAt,device};
 }
 
 async function sendVerificationEmail(env, email, fullName, code) {
