@@ -1,19 +1,21 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { FormData as WorkerFormData, Miniflare, convertV4MiniflareOptions } from "miniflare";
+import miniflare from "miniflare";
+const { FormData: WorkerFormData, Miniflare } = miniflare;
 
 const base = "http://local.test";
 const sentEmails = [];
-const mf = new Miniflare(convertV4MiniflareOptions({
+const mf = new Miniflare({
   modules: true,
   modulesRules: [{ type: "ESModule", include: ["**/*.js"], fallthrough: true }],
   scriptPath: "worker/index.js",
-  compatibilityDate: "2026-09-20",
+  // Keep the emulator date within the pinned workerd version; production keeps its newer date.
+  compatibilityDate: "2026-08-06",
   d1Databases: { DB: "smoke-db" },
   r2Buckets: ["ITEM_IMAGES"],
   bindings: { ADMIN_EMAILS: "", RESEND_API_KEY: "re_test", RESEND_FROM_EMAIL: "Gmach Berega <verify@example.org>", SUPPORT_EMAIL: "support@example.org", DATA_ENCRYPTION_KEY: "test-only-private-data-key-123456789" },
   serviceBindings: { RESEND_SERVICE: async request => { sentEmails.push(await request.json()); return Response.json({ id: crypto.randomUUID() }); } }
-}));
+});
 
 async function request(path, { method = "GET", body, cookie, form, origin = base } = {}) {
   const headers = new Headers();
@@ -44,11 +46,30 @@ async function verifyLatestEmail(email) {
   return verified.response.headers.get("set-cookie").split(";", 1)[0];
 }
 
+function splitMigration(sql) {
+  const statements = [];
+  let buffer = "";
+  let trigger = false;
+  for (const line of sql.split(/\r?\n/)) {
+    if (!line.trim() || line.trimStart().startsWith("--")) continue;
+    buffer += `${line}\n`;
+    if (!trigger && /^\s*CREATE\s+TRIGGER\b/i.test(buffer)) trigger = true;
+    const complete = trigger ? /^\s*END;\s*$/i.test(line) : /;\s*$/.test(line);
+    if (complete) {
+      statements.push(buffer.trim().replace(/;\s*$/, ""));
+      buffer = "";
+      trigger = false;
+    }
+  }
+  if (buffer.trim()) statements.push(buffer.trim());
+  return statements;
+}
+
 try {
   const db = await mf.getD1Database("DB");
   for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql", "0007_platform_expansion.sql", "0008_advanced_inventory_and_booking.sql", "0009_production_hardening.sql", "0010_open_gmach_and_dual_ratings.sql", "0011_production_platform.sql", "0012_complete_platform.sql", "0013_platform_completion.sql", "0014_search_moderation_completion.sql", "0015_notification_delivery.sql"]) {
     const migration = (await readFile(`migrations/${filename}`, "utf8")).replace(/^\s*--.*$/gm, "");
-    const statements = migration.split(/;\s*(?:\r?\n|$)/).map(statement => statement.trim()).filter(Boolean);
+    const statements = splitMigration(migration);
     await db.batch(statements.map(statement => db.prepare(statement)));
   }
 
@@ -122,9 +143,7 @@ try {
 
   result = await request("/api/admin/pending", { cookie: adminCookie });
   assert.equal(result.data.organizations.length, 0);
-  assert.equal(result.data.items.length, 1);
-  result = await request(`/api/admin/items/${itemId}`, { method: "PATCH", cookie: adminCookie, body: { status: "active" } });
-  assert.equal(result.response.status, 200);
+  assert.equal(result.data.items.length, 0, "New items should publish immediately without admin approval");
 
   result = await request("/api/auth/register", { method: "POST", body: { fullName: "שואלת ציוד", phone:"052-7654321", city:"ירושלים", address:"רחוב הבדיקה 1, ירושלים", email: "borrower@example.com", password: "AnotherPass!456", termsAccepted: true, operationalEmailsAccepted:true } });
   assert.equal(result.response.status, 201);
@@ -233,11 +252,14 @@ try {
   assert.equal(result.response.status, 201);
   result = await request("/api/admin/analytics", { cookie: adminCookie });
   assert.equal(result.response.status, 200);
-  result = await request(`/api/loan-requests/${requestId}/status`, { method: "PATCH", cookie: adminCookie, body: { status: "collected" } });
-  assert.equal(result.response.status, 200);
+  result = await request(`/api/items/${itemId}/units`, { cookie: adminCookie });
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  assert.ok(result.data.units.length >= 1);
+  result = await request(`/api/loan-requests/${requestId}/assign-units`, { method: "POST", cookie: adminCookie, body: { unitIds: [result.data.units[0].id] } });
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
   result = await request(`/api/loan-requests/${requestId}/status`, { method: "PATCH", cookie: adminCookie, body: { status: "returned" } });
   assert.equal(result.response.status, 200);
-  result = await request("/api/reviews", { method: "POST", cookie: borrowerCookie, body: { requestId, organizationRating: 5, itemRating: 4, comment: "שירות מצוין והפריט במצב טוב" } });
+  result = await request("/api/reviews", { method: "POST", cookie: borrowerCookie, body: { requestId, organizationRating: 5, itemRating: 4, serviceRating: 5, comment: "שירות מצוין והפריט במצב טוב" } });
   assert.equal(result.response.status, 201);
   assert.equal(result.data.review.organizationRating, 5);
   assert.equal(result.data.review.itemRating, 4);
