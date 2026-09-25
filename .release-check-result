@@ -1,18 +1,18 @@
-sha=76e55d3f48e71e7ab68d41ab0badc6f548642ad0
+sha=c195e03d9a8556e76b10e77b6a87909e7d66e699
 install=success
 syntax=success
 smoke=failure
 live=success
-    at async #assembleAndUpdateConfig (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:118592:30)
-    at async /home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:117367:7
-    at async Mutex.runWith (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:55603:16)
-    at async #waitForReady (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:118717:5)
-    at async _Miniflare._getProxyClient (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:119014:5)
-    at async #getProxy (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:119074:25)
-    at async file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790333868619:47:14 {
-  code: 'ERR_RUNTIME_FAILURE',
-  cause: undefined
-}
+    at throwUnsupportedOption (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:116804:9)
+    at addSourceOptions (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:116252:5)
+    at convertWorkerOptions (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:116179:20)
+    at /home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:116114:26
+    at Array.map (<anonymous>)
+    at convertV4MiniflareOptions (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:116113:35)
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790333950032:7:26
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async file:///home/runner/work/gmach-karov1/gmach-karov1/test/release-smoke.mjs:4:1
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-25.6","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"timestamp":"2026-09-25T10:57:56.440Z"}
+{"ok":true,"release":"complete-platform-2026-09-25.6","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"timestamp":"2026-09-25T10:59:19.506Z"}
