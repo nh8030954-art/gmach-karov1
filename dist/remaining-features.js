@@ -64,6 +64,22 @@ function installA11y(){
  document.addEventListener("invalid",e=>{const el=e.target;if(el&&el.focus){setTimeout(()=>el.focus(),0)}},true);
  document.addEventListener("keydown",e=>{if(e.key==="Escape")$$("dialog[open]").forEach(d=>d.close())});
 }
-function init(){installLanguage();installImageEditor();installAdminRemaining();installA11y();const obs=new MutationObserver(()=>{enhanceItemDialog();enhanceOrganizationDialog();if(lang==="en")translate(document.body);installImageEditor()});obs.observe(document.body,{subtree:true,childList:true});enhanceItemDialog();enhanceOrganizationDialog()}
+
+function osmEmbed(lat,lon){
+ const span=.018,bbox=[lon-span,lat-span,lon+span,lat+span].join("%2C");
+ return "https://www.openstreetmap.org/export/embed.html?bbox="+bbox+"&layer=mapnik&marker="+encodeURIComponent(lat+","+lon);
+}
+async function showAddressMap(){
+ const d=dialog("map-dialog",lang==="en"?"Map & location":"מפה ומיקום"),b=$(".remaining-body",d);
+ b.innerHTML=`<form id="map-search" style="display:grid;grid-template-columns:1fr auto;gap:8px"><input name="q" placeholder="עיר, רחוב ומספר" required><button class="button button-primary">חיפוש</button></form><p class="platform-note">החיפוש מופעל רק בלחיצה. אפשר גם להשתמש במיקום הנוכחי באופן חד־פעמי.</p><button type="button" class="button button-secondary" id="map-current">המיקום הנוכחי</button><div id="map-results" style="display:grid;gap:8px;margin-top:12px"></div><div id="map-frame" style="margin-top:12px"></div><small>© OpenStreetMap contributors</small>`;
+ d.showModal();const form=$("#map-search",d),results=$("#map-results",d),frame=$("#map-frame",d);
+ const renderMap=(lat,lon,label)=>{frame.innerHTML=`<iframe title="${esc(label||"מפה")}" src="${osmEmbed(Number(lat),Number(lon))}" style="width:100%;height:360px;border:0;border-radius:14px" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><a class="button button-secondary" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lat+","+lon)}">Google Maps</a><a class="button button-secondary" target="_blank" rel="noopener" href="https://waze.com/ul?ll=${encodeURIComponent(lat+","+lon)}&navigate=yes">Waze</a></div>`};
+ form.onsubmit=async e=>{e.preventDefault();results.innerHTML="<p>מחפשים…</p>";try{const x=await api("/api/maps/geocode?q="+encodeURIComponent(form.q.value));results.innerHTML=x.results.length?x.results.map((r,i)=>`<button type="button" class="button button-secondary" data-map-i="${i}" style="text-align:start">${esc(r.displayName)}</button>`).join(""):"<p>לא נמצאה כתובת.</p>";$$("[data-map-i]",results).forEach(btn=>btn.onclick=()=>{const r=x.results[Number(btn.dataset.mapI)];renderMap(r.lat,r.lon,r.displayName)})}catch(e){results.innerHTML="<p role=alert>"+esc(e.message)+"</p>"}};
+ $("#map-current",d).onclick=()=>navigator.geolocation?.getCurrentPosition(pos=>renderMap(pos.coords.latitude,pos.coords.longitude,"המיקום הנוכחי"),()=>toast("לא התקבלה הרשאת מיקום",true),{enableHighAccuracy:false,timeout:8000,maximumAge:60000});
+}
+function installMapEntry(){
+ if($("#map-entry"))return;const host=$(".site-actions,.header-actions,.top-actions,header nav");if(!host)return;const b=document.createElement("button");b.id="map-entry";b.type="button";b.className="button button-secondary";b.textContent=lang==="en"?"Map":"מפה";b.onclick=showAddressMap;host.append(b);
+}
+function init(){installLanguage();installMapEntry();installImageEditor();installAdminRemaining();installA11y();const obs=new MutationObserver(()=>{enhanceItemDialog();enhanceOrganizationDialog();if(lang==="en")translate(document.body);installImageEditor()});obs.observe(document.body,{subtree:true,childList:true});enhanceItemDialog();enhanceOrganizationDialog()}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
 })();
