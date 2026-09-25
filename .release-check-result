@@ -1,18 +1,7 @@
-sha=f6e3319457c8d8d8b57d04e719a287b431964a40
+sha=fc8d0e2d871efa56121d2710e724b44672e7f62c
 install=success
 syntax=success
-smoke=failure
+smoke=success
 live=success
-    at throwUnsupportedOption (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:116804:9)
-    at addSourceOptions (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:116252:5)
-    at convertWorkerOptions (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:116179:20)
-    at /home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:116114:26
-    at Array.map (<anonymous>)
-    at convertV4MiniflareOptions (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:116113:35)
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790334289252:7:26
-    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
-    at async node:internal/modules/esm/loader:647:26
-    at async file:///home/runner/work/gmach-karov1/gmach-karov1/test/release-smoke.mjs:4:1
-
-Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-25.7","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-25T11:06:05.709Z"}
+Final completion static release gate passed.
+{"ok":true,"release":"complete-platform-2026-09-25.7","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-25T11:12:20.123Z"}
