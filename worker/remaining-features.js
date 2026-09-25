@@ -41,11 +41,18 @@ async function imageEdits(request,env,itemId){
 async function availabilityCalendar(request,env,itemId,url){
  const item=await env.DB.prepare("SELECT id,quantity,preparation_minutes,turnaround_minutes,booking_horizon_days,max_per_user FROM items WHERE id=? AND deleted_at IS NULL").bind(itemId).first();if(!item)throw new RemainingError(404,"הפריט לא נמצא");
  const days=Math.max(7,Math.min(120,Number(url.searchParams.get("days"))||45)),start=url.searchParams.get("from")?new Date(url.searchParams.get("from")):new Date();if(Number.isNaN(start.getTime()))throw new RemainingError(400,"תאריך לא תקין");
+ const first=new Date(start);first.setUTCHours(0,0,0,0);
+ const last=new Date(first.getTime()+days*86400000);
+ const [requests,blocks]=await Promise.all([
+   env.DB.prepare("SELECT requested_from,requested_until,quantity FROM loan_requests WHERE item_id=? AND status IN ('pending','approved','collected') AND requested_from<? AND requested_until>?").bind(itemId,last.toISOString(),first.toISOString()).all(),
+   env.DB.prepare("SELECT starts_at,ends_at,quantity FROM inventory_blocks WHERE item_id=? AND starts_at<? AND ends_at>?").bind(itemId,last.toISOString(),first.toISOString()).all()
+ ]);
  const out=[];let nearest=null;
- for(let i=0;i<days;i++){const d=new Date(start);d.setDate(d.getDate()+i);const a=new Date(d);a.setHours(0,0,0,0);const z=new Date(a);z.setDate(z.getDate()+1);
-   const row=await env.DB.prepare("SELECT COALESCE(SUM(quantity),0) reserved FROM loan_requests WHERE item_id=? AND status IN ('pending','approved','collected') AND requested_from<? AND requested_until>?").bind(itemId,z.toISOString(),a.toISOString()).first();
-   const blocked=await env.DB.prepare("SELECT 1 FROM inventory_blocks WHERE item_id=? AND starts_at<? AND ends_at>? LIMIT 1").bind(itemId,z.toISOString(),a.toISOString()).first();
-   const available=Math.max(0,Number(item.quantity||0)-Number(row?.reserved||0)-(blocked?Number(item.quantity||0):0));const rec={date:dayKey(d),available,blocked:Boolean(blocked)};out.push(rec);if(!nearest&&available>0)nearest=rec.date;
+ for(let i=0;i<days;i++){
+   const a=new Date(first.getTime()+i*86400000),z=new Date(a.getTime()+86400000);
+   const reserved=requests.results.reduce((sum,r)=>sum+(r.requested_from<z.toISOString()&&r.requested_until>a.toISOString()?Number(r.quantity||0):0),0);
+   const unavailable=blocks.results.reduce((sum,b)=>sum+(b.starts_at<z.toISOString()&&b.ends_at>a.toISOString()?Number(b.quantity||0):0),0);
+   const available=Math.max(0,Number(item.quantity||0)-reserved-unavailable);const rec={date:dayKey(a),available,blocked:unavailable>0};out.push(rec);if(!nearest&&available>0)nearest=rec.date;
  }
  return json({itemId,days:out,nearestAvailableDate:nearest,maxPerUser:item.max_per_user||item.quantity,preparationMinutes:item.preparation_minutes||0,turnaroundMinutes:item.turnaround_minutes||0});
 }
