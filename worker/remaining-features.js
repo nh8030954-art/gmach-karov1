@@ -122,8 +122,56 @@ async function explicitGeocode(request,env,url){
   await env.DB.prepare("INSERT OR REPLACE INTO geocode_cache(query_key,query_text,result_json,expires_at) VALUES(?,?,?,?)").bind(key,q,JSON.stringify(results),new Date(Date.now()+30*86400000).toISOString()).run();
   return json({results,cached:false,attribution:"© OpenStreetMap contributors"});
 }
+
+async function automaticDailyBackup(env){
+  const today=new Date().toISOString().slice(0,10);
+  const existing=await env.DB.prepare("SELECT id FROM backup_runs WHERE backup_type='scheduled' AND substr(started_at,1,10)=? AND status='success' LIMIT 1").bind(today).first();
+  if(existing)return existing.id;
+  const id=crypto.randomUUID(),started=new Date().toISOString();
+  await env.DB.prepare("INSERT INTO backup_runs(id,backup_type,status,started_at) VALUES(?,'scheduled','running',?)").bind(id,started).run();
+  try{
+    const tableRows=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('auth_events','rate_limits') ORDER BY name").all();
+    const dump={version:2,createdAt:started,tables:{}},tables=[];
+    for(const row of tableRows.results){
+      const t=String(row.name);
+      if(!/^[A-Za-z0-9_]+$/.test(t))continue;
+      const rows=await env.DB.prepare("SELECT * FROM "+t).all();
+      dump.tables[t]=rows.results;
+      tables.push(t);
+    }
+    const objects=[];
+    if(env.ITEM_IMAGES?.list){
+      let cursor;
+      do{
+        const page=await env.ITEM_IMAGES.list({limit:1000,cursor});
+        for(const o of page.objects||[])if(!String(o.key).startsWith("_system-backups/"))objects.push({key:o.key,size:o.size,etag:o.etag,uploaded:o.uploaded});
+        cursor=page.truncated?page.cursor:undefined;
+      }while(cursor);
+    }
+    dump.r2Manifest=objects;
+    const raw=JSON.stringify(dump),bytes=new TextEncoder().encode(raw),checksum=await hash(raw),key="_system-backups/daily/"+today+"-"+id+".json";
+    await env.ITEM_IMAGES.put(key,raw,{httpMetadata:{contentType:"application/json"}});
+    const manifest={storageKey:key,bytes:bytes.length,checksum,tables,r2ObjectCount:objects.length};
+    await env.DB.batch([
+      env.DB.prepare("UPDATE backup_runs SET status='success',finished_at=?,manifest_json=? WHERE id=?").bind(new Date().toISOString(),JSON.stringify(manifest),id),
+      env.DB.prepare("INSERT OR REPLACE INTO backup_objects(backup_run_id,storage_key,object_type,size_bytes,checksum) VALUES(?,?,?,?,?)").bind(id,key,"database+r2-manifest",bytes.length,checksum)
+    ]);
+    const old=await env.DB.prepare("SELECT id,manifest_json FROM backup_runs WHERE backup_type='scheduled' AND status='success' ORDER BY started_at DESC LIMIT -1 OFFSET 14").all();
+    for(const x of old.results){
+      const m=safe(x.manifest_json,{});
+      if(m.storageKey)try{await env.ITEM_IMAGES.delete(m.storageKey)}catch{}
+      await env.DB.prepare("DELETE FROM backup_runs WHERE id=?").bind(x.id).run();
+    }
+    return id;
+  }catch(e){
+    await env.DB.prepare("UPDATE backup_runs SET status='failed',finished_at=?,error=? WHERE id=?").bind(new Date().toISOString(),String(e?.message||e).slice(0,1000),id).run();
+    try{await env.DB.prepare("INSERT INTO operational_alerts(id,alert_type,severity,details_json) VALUES(?,'backup_failed','critical',?)").bind(crypto.randomUUID(),JSON.stringify({error:String(e?.message||e)})).run()}catch{}
+    throw e;
+  }
+}
+
 export async function ensureRemainingFeaturesSchema(env){return ensureSchema(env)}
-export async function runRemainingMaintenance(env){await ensureSchema(env);await env.DB.prepare("UPDATE page_content SET status='published',publish_at=NULL,updated_at=? WHERE status='scheduled' AND publish_at IS NOT NULL AND publish_at<=?").bind(new Date().toISOString(),new Date().toISOString()).run()}
+export async function runRemainingMaintenance(env){await ensureSchema(env);const now=new Date().toISOString();await env.DB.prepare("UPDATE page_content SET status='published',publish_at=NULL,updated_at=? WHERE status='scheduled' AND publish_at IS NOT NULL AND publish_at<=?").bind(now,now).run();await automaticDailyBackup(env)}
 export async function handleRemainingFeatures(request,env,ctx,url){
  await ensureSchema(env);const method=request.method.toUpperCase(),path=url.pathname;
  try{
