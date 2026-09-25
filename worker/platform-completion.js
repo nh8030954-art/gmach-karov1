@@ -268,11 +268,41 @@ async function geocode(env,url){
   await qrun(env,"INSERT INTO geo_cache(query_key,response_json,expires_at) VALUES(?,?,datetime('now','+30 days')) ON CONFLICT(query_key) DO UPDATE SET response_json=excluded.response_json,expires_at=excluded.expires_at",[key,JSON.stringify(results)]);
   return json({results});
 }
+function editDistance(a,b){
+  a=String(a||"").toLowerCase();b=String(b||"").toLowerCase();
+  if(a===b)return 0;if(!a.length)return b.length;if(!b.length)return a.length;
+  let prev=Array.from({length:b.length+1},(_,i)=>i),cur=new Array(b.length+1);
+  for(let i=1;i<=a.length;i++){cur[0]=i;for(let j=1;j<=b.length;j++)cur[j]=Math.min(cur[j-1]+1,prev[j]+1,prev[j-1]+(a[i-1]===b[j-1]?0:1));[prev,cur]=[cur,prev]}
+  return prev[b.length];
+}
 async function nearbySearch(env,url){
-  const lat=Number(url.searchParams.get("lat")),lon=Number(url.searchParams.get("lon")),radius=Math.min(200,Math.max(1,Number(url.searchParams.get("radius")||20)));
+  const lat=Number(url.searchParams.get("lat")),lon=Number(url.searchParams.get("lon")),radius=Math.min(200,Math.max(1,Number(url.searchParams.get("radius")||20))),query=String(url.searchParams.get("q")||"").trim().toLowerCase();
   if(!Number.isFinite(lat)||!Number.isFinite(lon)) throw new HttpError(400,"מיקום אינו תקין");
-  const rows=await qall(env,`SELECT i.id,i.title,i.category,i.condition,i.condition_detail,i.availability_status,i.city,o.id organization_id,o.name organization_name,b.id branch_id,b.name branch_name,b.address,b.city branch_city,b.latitude,b.longitude FROM items i JOIN organizations o ON o.id=i.organization_id JOIN organization_branches b ON b.organization_id=o.id WHERE i.status='active' AND i.is_free=1 AND o.status='approved' AND o.is_hidden=0 AND b.status='active' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL LIMIT 500`,[]);
-  return json({results:rows.map(r=>({...r,distanceKm:haversine(lat,lon,+r.latitude,+r.longitude)})).filter(r=>r.distanceKm<=radius).sort((a,b)=>a.distanceKm-b.distanceKm).slice(0,100)});
+  const [rows,categories]=await Promise.all([
+    qall(env,`SELECT i.id,i.title,i.description,i.category,i.condition,i.condition_detail,i.availability_status,i.city,o.id organization_id,o.name organization_name,b.id branch_id,b.name branch_name,b.address,b.city branch_city,b.latitude,b.longitude,
+      COALESCE((SELECT AVG(rr.item_rating) FROM reviews rr WHERE rr.item_id=i.id AND rr.status='published'),0) item_rating,
+      COALESCE((SELECT AVG(rr.rating) FROM reviews rr WHERE rr.organization_id=o.id AND rr.status='published'),0) organization_rating
+      FROM items i JOIN organizations o ON o.id=i.organization_id JOIN organization_branches b ON b.organization_id=o.id
+      WHERE i.status='active' AND i.is_free=1 AND i.deleted_at IS NULL AND o.status='approved' AND o.is_hidden=0 AND b.status='active' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL LIMIT 800`,[]),
+    qall(env,"SELECT name_he,name_en,synonyms_json FROM categories WHERE status='active'",[])
+  ]);
+  const expanded=new Set(query?[query]:[]);
+  if(query)for(const cat of categories){const names=[cat.name_he,cat.name_en,...safeJson(cat.synonyms_json,[])].filter(Boolean).map(x=>String(x).toLowerCase());if(names.some(x=>x.includes(query)||query.includes(x)))for(const x of names)expanded.add(x)}
+  const words=[...expanded];
+  let results=rows.map(r=>{
+    const distanceKm=haversine(lat,lon,+r.latitude,+r.longitude),hay=`${r.title} ${r.description||""} ${r.category} ${r.organization_name}`.toLowerCase();
+    let textScore=query?0:35;
+    if(query){
+      for(const term of words)if(hay.includes(term))textScore=Math.max(textScore,term===query?90:70);
+      const candidates=String(r.title+" "+r.category).toLowerCase().split(/\s+/).filter(Boolean);
+      const typo=candidates.reduce((best,w)=>Math.min(best,editDistance(query,w)),99);
+      if(typo<=1)textScore=Math.max(textScore,60);else if(typo===2&&query.length>=5)textScore=Math.max(textScore,40);
+    }
+    const available=r.availability_status==="available"?20:0,rating=Number(r.item_rating||0)*4+Number(r.organization_rating||0)*2,condition=/חדש|מצוין/.test(r.condition_detail||r.condition)?8:/טוב/.test(r.condition_detail||r.condition)?5:2;
+    return {...r,distanceKm,matchScore:textScore+available+rating+condition-Math.min(30,distanceKm/Math.max(1,radius)*20)};
+  }).filter(r=>r.distanceKm<=radius&&(!query||r.matchScore>10)).sort((a,b)=>b.matchScore-a.matchScore||a.distanceKm-b.distanceKm).slice(0,100);
+  try{await qrun(env,"INSERT INTO search_suggestion_events(id,query,corrected_query,result_count,source) VALUES(?,?,?,?,?)",[crypto.randomUUID(),query||"(nearby)",words.length>1?words.slice(1,5).join(", "):null,results.length,"nearby"])}catch{}
+  return json({results,query,expandedTerms:words});
 }
 async function compareItems(env,url){
   const ids=[...new Set(String(url.searchParams.get("ids")||"").split(",").map(x=>x.trim()).filter(Boolean))].slice(0,5);if(!ids.length)return json({items:[]});
