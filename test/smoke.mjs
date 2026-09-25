@@ -263,6 +263,9 @@ try {
   result = await request(`/api/organizations/${organizationId}/public`);
   assert.equal(result.response.status, 200);
   assert.equal(result.data.items.length, 1);
+  result = await request("/api/organizations/nonexistent/public");
+  assert.equal(result.response.status, 404);
+  assert.ok(result.data.requestId);
   result = await request("/api/help-requests", { method: "POST", cookie: borrowerCookie, body: { title: "צריך שולחן מתקפל", description: "דרוש שולחן מתקפל לאירוע משפחתי קרוב", category: "אירועים", city: "ירושלים", urgency: "urgent" } });
   assert.equal(result.response.status, 201);
   result = await request("/api/help-requests?city=ירושלים");
@@ -288,6 +291,10 @@ try {
   result = await request(`/api/items/${itemId}`);
   assert.equal(result.data.item.rating, 4);
   assert.equal(result.data.item.organizations.rating, 5);
+  result = await request(`/api/organizations/${organizationId}/public`);
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  assert.equal(result.data.reviews.length, 1);
+  assert.equal(result.data.reviews[0].service_rating, 5);
 
   result = await request("/api/auth/logout", { method: "POST", cookie: borrowerCookie });
   assert.equal(result.response.status, 200);
