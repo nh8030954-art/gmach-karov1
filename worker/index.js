@@ -1024,12 +1024,14 @@ async function createOrganization(request, env) {
     hoursJson: sanitizeHours(body.hours),
     pickupOptions: sanitizePickupOptions(body.pickupOptions)
   };
+  const organizationType=["private","family","community","nonprofit","business","institution"].includes(body.organizationType)?body.organizationType:"private";
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO organizations (id,owner_id,name,primary_category,city,neighborhood,description,address,website_url,service_area,hours_json,pickup_options,last_active_at,status,verified) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'approved',0)")
-      .bind(id, user.id, values.name, category, values.city, values.neighborhood, values.description, values.address, null, values.serviceArea, values.hoursJson, values.pickupOptions, new Date().toISOString()),
-    env.DB.prepare("INSERT INTO organization_contacts (organization_id,contact_phone) VALUES (?,?)").bind(id, values.phone)
+    env.DB.prepare("INSERT INTO organizations (id,owner_id,name,primary_category,city,neighborhood,description,address,website_url,service_area,hours_json,pickup_options,last_active_at,status,verified,is_hidden,organization_type) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'approved',0,1,?)")
+      .bind(id, user.id, values.name, category, values.city, values.neighborhood, values.description, values.address, null, values.serviceArea, values.hoursJson, values.pickupOptions, new Date().toISOString(),organizationType),
+    env.DB.prepare("INSERT INTO organization_contacts (organization_id,contact_phone) VALUES (?,?)").bind(id, values.phone),
+    env.DB.prepare("INSERT OR IGNORE INTO organization_onboarding(organization_id) VALUES(?)").bind(id)
   ]);
-  return json({ organization: { id, ...values, primaryCategory: category, status: "approved" } }, 201);
+  return json({ organization: { id, ...values, primaryCategory: category, organizationType, status: "approved", publiclyVisible:false } }, 201);
 }
 
 async function updateOrganization(request, env, id) {
