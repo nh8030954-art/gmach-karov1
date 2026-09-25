@@ -6,6 +6,8 @@ const platform=await readFile("worker/platform-completion.js","utf8");
 const finalWorker=await readFile("worker/final-features.js","utf8");
 const html=await readFile("dist/index.html","utf8");
 const finalClient=await readFile("dist/final-features.js","utf8");
+const remainingWorker=await readFile("worker/remaining-features.js","utf8");
+const remainingClient=await readFile("dist/remaining-features.js","utf8");
 const migration=await readFile("migrations/0014_final_features.sql","utf8");
 
 for(const file of ["dist/sw.js","dist/platform-completion.js","migrations/0013_platform_completion.sql","migrations/0015_notification_delivery.sql"]) await access(file);
@@ -32,6 +34,7 @@ for(const route of [
 
 assert.ok(html.includes("./platform-completion.js"));
 assert.ok(html.includes("./final-features.js"));
+assert.ok(html.includes("./remaining-features.js"));
 assert.ok(finalClient.includes("אשף פתיחת גמ״ח"));
 assert.ok(finalClient.includes("chat-attachment"));
 assert.ok(finalClient.includes("pushManager"));
@@ -40,3 +43,6 @@ assert.ok(platform.includes("processWaitlist"));
 assert.ok(platform.includes("createBackup"));
 
 console.log("Final completion static release gate passed.");
+
+for(const token of ["/availability-calendar","/similar","operations-dashboard","/api/admin/page-content","/validate"]) assert.ok(remainingWorker.includes(token),token+" missing from remaining worker");
+for(const token of ["ניהול תמונות","לוח זמינות","CMS ותוכן","language-switch"]) assert.ok(remainingClient.includes(token),token+" missing from remaining client");
