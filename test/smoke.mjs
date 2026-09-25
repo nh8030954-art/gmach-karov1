@@ -305,6 +305,9 @@ try {
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(result.data.reviews.length, 1);
   assert.equal(result.data.reviews[0].service_rating, 5);
+  result = await request(`/api/items/${itemId}/similar`);
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  assert.ok(Array.isArray(result.data.items));
 
   result = await request("/api/auth/logout", { method: "POST", cookie: borrowerCookie });
   assert.equal(result.response.status, 200);

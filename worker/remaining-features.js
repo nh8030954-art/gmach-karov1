@@ -51,8 +51,12 @@ async function availabilityCalendar(request,env,itemId,url){
 }
 async function similarItems(env,itemId,url){
  const item=await env.DB.prepare("SELECT id,category,city,title FROM items WHERE id=?").bind(itemId).first();if(!item)throw new RemainingError(404,"הפריט לא נמצא");
- const rows=await env.DB.prepare(`SELECT i.id,i.title,i.category,i.city,i.condition,i.image_urls,i.availability_status,o.name organization_name,o.rating organization_rating
- FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.id<>? AND i.status='active' AND i.deleted_at IS NULL AND o.deleted_at IS NULL AND o.is_hidden=0 AND (i.category=? OR i.city=?) ORDER BY CASE WHEN i.category=? THEN 0 ELSE 1 END,COALESCE(o.rating,0) DESC,i.created_at DESC LIMIT 12`).bind(itemId,item.category,item.city,item.category).all();
+ const rows=await env.DB.prepare(`SELECT i.id,i.title,i.category,i.city,i.condition,i.image_urls,i.availability_status,o.name organization_name,
+ (SELECT ROUND(AVG(r.rating),1) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') organization_rating
+ FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.id<>? AND i.status='active' AND i.deleted_at IS NULL
+ AND (i.publish_at IS NULL OR i.publish_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+ AND o.status='approved' AND o.deleted_at IS NULL AND o.is_hidden=0 AND o.temporarily_closed=0
+ AND (i.category=? OR i.city=?) ORDER BY CASE WHEN i.category=? THEN 0 ELSE 1 END,COALESCE(organization_rating,0) DESC,i.created_at DESC LIMIT 12`).bind(itemId,item.category,item.city,item.category).all();
  return json({items:rows.results});
 }
 async function updateReview(request,env,id){
