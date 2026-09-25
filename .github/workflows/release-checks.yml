@@ -36,6 +36,11 @@ jobs:
             sleep 10
           done
           exit 1
+      - name: Inspect live platform configuration
+        if: always()
+        run: |
+          curl -fsS https://gmach-karov1.nh8030954.workers.dev/api/platform/features > platform-features.log || echo '{}' > platform-features.log
+
       - name: Record verification result
         if: always()
         continue-on-error: true
@@ -43,6 +48,7 @@ jobs:
           printf 'sha=%s\ninstall=%s\nsyntax=%s\nsmoke=%s\nlive=%s\n' "$GITHUB_SHA" "${{ steps.install.outcome }}" "${{ steps.syntax.outcome }}" "${{ steps.smoke.outcome }}" "${{ steps.live.outcome }}" > .release-check-result
           if [ -f smoke.log ]; then tail -n 12 smoke.log >> .release-check-result; fi
           if [ -f live.log ]; then tail -n 3 live.log >> .release-check-result; fi
+          if [ -f platform-features.log ]; then echo "platform_features=$(cat platform-features.log)" >> .release-check-result; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .release-check-result
