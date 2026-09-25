@@ -45,6 +45,14 @@ export default {
         const response = await routeApi(request, env, ctx, url);
         return withSecurityHeaders(response);
       }
+      if (url.pathname === "/sitemap.xml") {
+        const response = await handleFinalFeatures(request, env, ctx, url);
+        return withSecurityHeaders(response || new Response("Not found",{status:404}));
+      }
+      if (url.pathname === "/robots.txt") {
+        const body = "User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /#/dashboard\nDisallow: /#/admin\nSitemap: "+url.origin+"/sitemap.xml\n";
+        return withSecurityHeaders(new Response(body,{headers:{"Content-Type":"text/plain; charset=utf-8","Cache-Control":"public, max-age=3600"}}));
+      }
       if (url.pathname.startsWith("/media/")) {
         const response = await serveMedia(request, env, url);
         return withSecurityHeaders(response);
