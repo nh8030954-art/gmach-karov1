@@ -1,0 +1,103 @@
+PRAGMA foreign_keys = ON;
+
+INSERT OR IGNORE INTO categories(id,parent_id,name_he,name_en,icon,status,sort_order) VALUES
+('events',NULL,'אירועים','Events','calendar','active',10),
+('tools',NULL,'כלי עבודה','Tools','tools','active',20),
+('baby',NULL,'תינוקות וילדים','Baby & kids','baby','active',30),
+('medical',NULL,'רפואה ושיקום','Medical & rehabilitation','medical','active',40),
+('travel',NULL,'טיולים וקמפינג','Travel & camping','travel','active',50),
+('home',NULL,'בית ואירוח','Home & hosting','home','active',60),
+('electronics',NULL,'חשמל ואלקטרוניקה','Electronics','power','active',70),
+('study',NULL,'לימודים ומשרד','Study & office','book','active',80),
+('religion',NULL,'יהדות ותשמישי קדושה','Judaica','star','active',90),
+('clothing',NULL,'ביגוד ואביזרים','Clothing & accessories','shirt','active',100),
+('sports',NULL,'ספורט ופנאי','Sports & leisure','ball','active',110),
+('mobility',NULL,'ניידות ותחבורה','Mobility & transport','car','active',120),
+('food',NULL,'מטבח ומזון','Kitchen & food','utensils','active',130),
+('care',NULL,'טיפוח ואירוח אישי','Personal care','heart','active',140),
+('community',NULL,'ציוד קהילתי','Community equipment','users','active',150),
+('other',NULL,'אחר','Other','box','active',999),
+
+('events-tables','events','שולחנות וכיסאות','Tables & chairs','chair','active',11),
+('events-decor','events','עיצוב וקישוט','Decorations','sparkles','active',12),
+('events-sound','events','הגברה ומיקרופונים','Sound & microphones','speaker','active',13),
+('events-lighting','events','תאורה לאירועים','Event lighting','light','active',14),
+('events-serving','events','כלי הגשה','Serving ware','plate','active',15),
+('events-chuppah','events','חופה ואביזרי חתונה','Wedding & chuppah','heart','active',16),
+('events-bar-mitzvah','events','בר/בת מצווה','Bar/Bat Mitzvah','star','active',17),
+('events-kids','events','הפעלות ילדים','Kids activities','game','active',18),
+
+('tools-hand','tools','כלי עבודה ידניים','Hand tools','hammer','active',21),
+('tools-power','tools','כלי עבודה חשמליים','Power tools','drill','active',22),
+('tools-garden','tools','כלי גינה','Garden tools','leaf','active',23),
+('tools-ladder','tools','סולמות וציוד גובה','Ladders','ladder','active',24),
+('tools-measure','tools','מדידה ובדיקה','Measurement','ruler','active',25),
+('tools-clean','tools','ניקיון ותחזוקה','Cleaning & maintenance','clean','active',26),
+
+('baby-stroller','baby','עגלות ומנשאים','Strollers & carriers','stroller','active',31),
+('baby-crib','baby','מיטות ולולים','Cribs & playpens','bed','active',32),
+('baby-feeding','baby','האכלה','Feeding','bottle','active',33),
+('baby-car-seat','baby','כיסאות בטיחות','Car seats','seat','active',34),
+('baby-toys','baby','צעצועים ומשחקים','Toys & games','toy','active',35),
+('baby-clothes','baby','ביגוד ילדים','Kids clothing','shirt','active',36),
+
+('medical-mobility','medical','כיסאות גלגלים והליכונים','Wheelchairs & walkers','wheelchair','active',41),
+('medical-crutches','medical','קביים ומקלות','Crutches & canes','cane','active',42),
+('medical-home','medical','ציוד רפואי ביתי','Home medical equipment','medical','active',43),
+('medical-rehab','medical','שיקום ופיזיותרפיה','Rehabilitation','rehab','active',44),
+('medical-hospital','medical','ציוד לאחר אשפוז','Post-hospital equipment','bed','active',45),
+
+('travel-tent','travel','אוהלים ומחסות','Tents & shelters','tent','active',51),
+('travel-sleep','travel','שקי שינה ומזרנים','Sleeping bags & mats','sleep','active',52),
+('travel-cooking','travel','בישול שטח','Camp cooking','fire','active',53),
+('travel-bags','travel','תיקים ותרמילים','Bags & backpacks','bag','active',54),
+('travel-water','travel','מים וצידניות','Water & coolers','water','active',55),
+
+('home-furniture','home','ריהוט זמני','Temporary furniture','chair','active',61),
+('home-bedding','home','מצעים ושינה','Bedding & sleep','bed','active',62),
+('home-heating','home','חימום וקירור','Heating & cooling','fan','active',63),
+('home-cleaning','home','ניקיון','Cleaning','clean','active',64),
+('home-guest','home','אירוח אורחים','Guest hosting','home','active',65),
+
+('electronics-computer','electronics','מחשבים וציוד היקפי','Computers','computer','active',71),
+('electronics-projector','electronics','מקרנים ומסכים','Projectors & screens','projector','active',72),
+('electronics-chargers','electronics','מטענים וכבלים','Chargers & cables','plug','active',73),
+('electronics-audio','electronics','אודיו ואוזניות','Audio','headphones','active',74),
+('electronics-photo','electronics','צילום ומצלמות','Photography','camera','active',75),
+
+('study-books','study','ספרי לימוד','Textbooks','book','active',81),
+('study-office','study','ציוד משרדי','Office equipment','briefcase','active',82),
+('study-printer','study','מדפסות וסורקים','Printers & scanners','printer','active',83),
+('study-presentation','study','ציוד למצגות','Presentation equipment','presentation','active',84),
+
+('religion-sefarim','religion','ספרי קודש','Religious books','book','active',91),
+('religion-tefillin','religion','תפילין וטלית','Tefillin & tallit','star','active',92),
+('religion-shabbat','religion','שבת וחג','Shabbat & holidays','candles','active',93),
+('religion-sukkah','religion','סוכה וארבעת המינים','Sukkah','sukkah','active',94),
+('religion-simcha','religion','ציוד לשמחות','Jewish celebrations','cup','active',95),
+
+('clothing-formal','clothing','ביגוד חגיגי','Formal wear','shirt','active',101),
+('clothing-winter','clothing','מעילים וחורף','Winter clothing','coat','active',102),
+('clothing-shoes','clothing','נעליים','Shoes','shoe','active',103),
+('clothing-costumes','clothing','תחפושות','Costumes','mask','active',104),
+
+('sports-balls','sports','כדורים וציוד משחק','Balls & games','ball','active',111),
+('sports-fitness','sports','כושר ואימון','Fitness','fitness','active',112),
+('sports-bikes','sports','אופניים וקסדות','Bikes & helmets','bike','active',113),
+('sports-water','sports','ספורט מים','Water sports','water','active',114),
+
+('mobility-car','mobility','אביזרי רכב','Car accessories','car','active',121),
+('mobility-bike','mobility','אופניים וקורקינטים','Bikes & scooters','bike','active',122),
+('mobility-cart','mobility','עגלות נשיאה','Carts','cart','active',123),
+
+('food-cookware','food','סירים ומחבתות','Cookware','pot','active',131),
+('food-appliances','food','מכשירי מטבח','Kitchen appliances','mixer','active',132),
+('food-serving','food','אירוח והגשה','Serving & hosting','plate','active',133),
+('food-shabbat','food','פלטות ומיחמים','Shabbat appliances','kettle','active',134),
+
+('care-hair','care','טיפוח שיער','Hair care','care','active',141),
+('care-guest','care','ציוד אורחים','Guest care','guest','active',142),
+
+('community-signage','community','שילוט ומחסומים','Signs & barriers','sign','active',151),
+('community-tables','community','ציוד למפגשים','Meeting equipment','users','active',152),
+('community-emergency','community','ציוד חירום קהילתי','Community emergency','alert','active',153);
