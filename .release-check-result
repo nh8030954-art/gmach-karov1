@@ -1,4 +1,4 @@
-sha=01348fb200a1d93f0daa64325d7df2ce5203dbb9
+sha=f6e3319457c8d8d8b57d04e719a287b431964a40
 install=success
 syntax=success
 smoke=failure
@@ -9,10 +9,10 @@ live=success
     at /home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:116114:26
     at Array.map (<anonymous>)
     at convertV4MiniflareOptions (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:116113:35)
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790334074793:7:26
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790334289252:7:26
     at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
     at async node:internal/modules/esm/loader:647:26
     at async file:///home/runner/work/gmach-karov1/gmach-karov1/test/release-smoke.mjs:4:1
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-25.6","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"timestamp":"2026-09-25T11:01:22.197Z"}
+{"ok":true,"release":"complete-platform-2026-09-25.7","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-25T11:06:05.709Z"}
