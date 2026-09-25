@@ -105,6 +105,16 @@ try {
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
   const adminCookie = await verifyLatestEmail("admin@example.org");
 
+  const geocodeKey = createHash("sha256").update("ירושלים").digest("base64url").slice(0, 40);
+  await db.prepare("INSERT INTO geocode_cache(query_key,query_text,result_json,expires_at) VALUES(?,?,?,?)")
+    .bind(geocodeKey, "ירושלים", JSON.stringify([{ displayName: "ירושלים", lat: 31.77, lon: 35.21 }]), new Date(Date.now() + 60000).toISOString()).run();
+  result = await request("/api/maps/geocode?q=" + encodeURIComponent("ירושלים"));
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  assert.equal(result.data.cached, true);
+  await db.prepare("UPDATE geocode_throttle SET last_request_at=? WHERE id=1").bind(new Date().toISOString()).run();
+  result = await request("/api/maps/geocode?q=" + encodeURIComponent("תל אביב"));
+  assert.equal(result.response.status, 429, JSON.stringify(result.data));
+
   const backupId = crypto.randomUUID();
   const backupKey = `_system-backups/daily/test-${backupId}.json`;
   const backupText = JSON.stringify({ version: 2, tables: { users: [{ id: "example" }] }, r2Manifest: [] });
