@@ -16,6 +16,13 @@ const IMAGE_TYPES = new Map([
 ]);
 const CATEGORIES = new Set(["אירועים", "כלי עבודה", "תינוקות", "רפואה", "טיולים", "בית ואירוח", "כללי"]);
 const CONDITIONS = new Set(["כמו חדש", "מצוין", "טוב"]);
+const PRODUCT_CONDITIONS = new Set(["חדש","כמו חדש","מצב טוב","מצב סביר","בלאי נראה לעין","מצוין","טוב"]);
+function normalizeProductCondition(value){
+  const detail=String(value||"").trim();
+  if(!PRODUCT_CONDITIONS.has(detail)) throw new HttpError(400,"נא לבחור מצב פריט תקין");
+  const base=detail==="חדש"||detail==="כמו חדש"?"כמו חדש":detail==="מצוין"?"מצוין":"טוב";
+  return {base,detail};
+}
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -1048,8 +1055,8 @@ async function createOrganization(request, env) {
     pickupOptions: sanitizePickupOptions(body.pickupOptions)
   };
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO organizations (id,owner_id,name,primary_category,city,neighborhood,description,address,website_url,service_area,hours_json,pickup_options,last_active_at,status,verified) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'approved',0)")
-      .bind(id, user.id, values.name, category, values.city, values.neighborhood, values.description, values.address, null, values.serviceArea, values.hoursJson, values.pickupOptions, new Date().toISOString()),
+    env.DB.prepare("INSERT INTO organizations (id,owner_id,name,primary_category,city,neighborhood,description,address,website_url,service_area,hours_json,pickup_options,last_active_at,status,verified,is_hidden,organization_type) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'approved',0,1,?)")
+      .bind(id, user.id, values.name, category, values.city, values.neighborhood, values.description, values.address, null, values.serviceArea, values.hoursJson, values.pickupOptions, new Date().toISOString(),["private","family","community","nonprofit","business","authority"].includes(body.organizationType)?body.organizationType:"private"),
     env.DB.prepare("INSERT INTO organization_contacts (organization_id,contact_phone) VALUES (?,?)").bind(id, values.phone)
   ]);
   return json({ organization: { id, ...values, primaryCategory: category, status: "approved" } }, 201);
@@ -1102,9 +1109,9 @@ async function createItem(request, env) {
     .bind(organizationId, user.id).first();
   if (!organization) throw new HttpError(403, "אין הרשאה לפרסם בגמ״ח הזה");
   const category = cleanText(body.category, 2, 40, "קטגוריה");
-  const condition = cleanText(body.condition, 2, 20, "מצב הפריט");
+  const conditionInfo = normalizeProductCondition(cleanText(body.condition, 2, 30, "מצב הפריט"));
+  const condition = conditionInfo.base;
   if (!CATEGORIES.has(category) || category === "כללי") throw new HttpError(400, "נא לבחור קטגוריה תקינה");
-  if (!CONDITIONS.has(condition)) throw new HttpError(400, "נא לבחור מצב פריט תקין");
   const quantity = Number(body.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw new HttpError(400, "כמות הפריטים אינה תקינה");
   const title = cleanText(body.title, 2, 120, "שם הפריט");
@@ -1116,10 +1123,10 @@ async function createItem(request, env) {
   if(maxLoanMinutes<minLoanMinutes) throw new HttpError(400,"משך ההשאלה המקסימלי חייב להיות גדול או שווה למינימלי");
   const id = crypto.randomUUID();
   await env.DB.prepare(`
-    INSERT INTO items (id,organization_id,title,category,description,condition,quantity,loan_conditions,city,neighborhood,item_type,subcategory,tags_json,pickup_method,inventory_updated_at,
+    INSERT INTO items (id,organization_id,title,category,description,condition,condition_detail,quantity,loan_conditions,city,neighborhood,item_type,subcategory,tags_json,pickup_method,inventory_updated_at,
       min_loan_minutes,max_loan_minutes,booking_notice_minutes,turnaround_minutes,booking_horizon_days,approval_mode,deposit_required,deposit_amount_agorot,
-      status,availability_status,is_free,icon,cover_color)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending','available',1,'box','#e6f2ef')
+      publish_at,max_per_user,preparation_minutes,max_loan_days,service_radius_km,status,availability_status,is_free,icon,cover_color)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active','available',1,'box','#e6f2ef')
   `).bind(
     id,
     organizationId,
@@ -1127,6 +1134,7 @@ async function createItem(request, env) {
     category,
     cleanText(body.description, 10, 1200, "תיאור"),
     condition,
+    conditionInfo.detail,
     quantity,
     cleanOptional(body.loanConditions, 300),
     organization.city,
@@ -1135,9 +1143,15 @@ async function createItem(request, env) {
     minLoanMinutes, maxLoanMinutes,
     positiveInt(body.bookingNoticeMinutes,0,0,525600,"זמן התראה"), positiveInt(body.turnaroundMinutes,0,0,10080,"זמן התארגנות"),
     positiveInt(body.bookingHorizonDays,365,1,1095,"טווח הזמנה"), body.approvalMode==="automatic"?"automatic":"manual",
-    body.depositRequired?1:0, body.depositRequired?moneyAgorot(body.depositAmount):0
+    body.depositRequired?1:0, body.depositRequired?moneyAgorot(body.depositAmount):0,
+    body.publishAt?validateDateTime(body.publishAt,"מועד פרסום"):null,
+    body.maxPerUser?positiveInt(body.maxPerUser,1,1,999,"מגבלה למשתמש"):null,
+    positiveInt(body.preparationMinutes,0,0,10080,"זמן הכנה"),
+    body.maxLoanDays?positiveInt(body.maxLoanDays,1,1,3650,"ימי השאלה מרביים"):null,
+    body.serviceRadiusKm?Math.max(0.1,Math.min(500,Number(body.serviceRadiusKm))):null
   ).run();
-  return json({ item: { id, status: "pending" } }, 201);
+  await env.DB.prepare("UPDATE organizations SET is_hidden=0,updated_at=? WHERE id=?").bind(new Date().toISOString(),organizationId).run();
+  return json({ item: { id, status: "active" } }, 201);
 }
 
 async function updateItem(request, env, id) {
@@ -1159,9 +1173,9 @@ async function updateItem(request, env, id) {
   }
 
   const category = cleanText(body.category, 2, 40, "קטגוריה");
-  const condition = cleanText(body.condition, 2, 20, "מצב הפריט");
+  const conditionInfo = normalizeProductCondition(cleanText(body.condition, 2, 30, "מצב הפריט"));
+  const condition = conditionInfo.base;
   if (!CATEGORIES.has(category) || category === "כללי") throw new HttpError(400, "נא לבחור קטגוריה תקינה");
-  if (!CONDITIONS.has(condition)) throw new HttpError(400, "נא לבחור מצב פריט תקין");
   const quantity = Number(body.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw new HttpError(400, "כמות הפריטים אינה תקינה");
   const values = {
@@ -1172,12 +1186,25 @@ async function updateItem(request, env, id) {
   };
   const changed = values.title !== existing.title || category !== existing.category || values.description !== existing.description ||
     condition !== existing.condition || quantity !== Number(existing.quantity) || (values.loanConditions || null) !== (existing.loan_conditions || null) || values.itemType !== (existing.item_type||"loan") || values.pickupMethod !== (existing.pickup_method||"pickup") || values.subcategory !== (existing.subcategory||null) || values.tagsJson !== (existing.tags_json||"[]");
-  const status = user.role === "admin" || !changed ? existing.status : "pending";
-  await env.DB.prepare(`UPDATE items SET title = ?, category = ?, description = ?, condition = ?, quantity = ?, loan_conditions = ?,item_type=?,pickup_method=?,subcategory=?,tags_json=?,inventory_updated_at=?,
-    city = ?, neighborhood = ?, status = ?, updated_at = ? WHERE id = ?`).bind(
-    values.title, category, values.description, condition, quantity, values.loanConditions,values.itemType,values.pickupMethod,values.subcategory,values.tagsJson,new Date().toISOString(),
-    existing.org_city, existing.org_neighborhood, status, new Date().toISOString(), id
+  const status = existing.status==="archived"?"archived":"active";
+  const materialChange = changed && ["title","category","description","condition","quantity","loan_conditions"].some(key=>{
+    const next={title:values.title,category,description:values.description,condition,quantity,loan_conditions:values.loanConditions}[key];
+    return String(next??"")!==String(existing[key]??"");
+  });
+  await env.DB.prepare(`UPDATE items SET title = ?, category = ?, description = ?, condition = ?, condition_detail=?, quantity = ?, loan_conditions = ?,item_type=?,pickup_method=?,subcategory=?,tags_json=?,inventory_updated_at=?,
+    city = ?, neighborhood = ?, status = ?, material_version=material_version+?,last_material_change_at=CASE WHEN ? THEN ? ELSE last_material_change_at END, updated_at = ? WHERE id = ?`).bind(
+    values.title, category, values.description, condition, conditionInfo.detail, quantity, values.loanConditions,values.itemType,values.pickupMethod,values.subcategory,values.tagsJson,new Date().toISOString(),
+    existing.org_city, existing.org_neighborhood, status, materialChange?1:0,materialChange?1:0,new Date().toISOString(),new Date().toISOString(), id
   ).run();
+  if(materialChange){
+    const active=await env.DB.prepare("SELECT lr.id,lr.borrower_id FROM loan_requests lr WHERE lr.item_id=? AND lr.status IN ('pending','approved')").bind(id).all();
+    const statements=[];
+    for(const requestRow of active.results||[]){
+      statements.push(notificationStatement(env,requestRow.borrower_id,"status","פרטי המוצר השתנו","בוצע שינוי מהותי במוצר שהזמנת. יש לבדוק את הפרטים המעודכנים ולאשר מחדש.",requestRow.id));
+      statements.push(env.DB.prepare("UPDATE loan_requests SET workflow_status='change_reapproval_required',updated_at=? WHERE id=?").bind(new Date().toISOString(),requestRow.id));
+    }
+    if(statements.length) await env.DB.batch(statements);
+  }
   const minLoanMinutes=positiveInt(body.minLoanMinutes,Number(existing.min_loan_minutes||60),1,525600,"משך מינימלי");
   const maxLoanMinutes=positiveInt(body.maxLoanMinutes,Number(existing.max_loan_minutes||10080),1,525600,"משך מקסימלי");
   if(maxLoanMinutes<minLoanMinutes) throw new HttpError(400,"משך ההשאלה המקסימלי חייב להיות גדול או שווה למינימלי");
