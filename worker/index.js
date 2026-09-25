@@ -1510,18 +1510,33 @@ async function listRequestMessages(request, env, requestId) {
 async function createRequestMessage(request, env, requestId) {
   const { user, row, participant } = await getRequestParticipant(request, env, requestId, { allowAdmin: false });
   if (!participant) throw new HttpError(403, "רק השואל ומנהל הגמ״ח יכולים לשלוח הודעות");
-  const body = await readJson(request);
-  const message = cleanText(body.message, 1, 1000, "הודעה");
-  const recent = await env.DB.prepare(`SELECT COUNT(*) AS count FROM request_messages
-    WHERE sender_id = ? AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 minute')`).bind(user.id).first();
+  if (row.status === "returned" && row.returned_at && Date.now() - Date.parse(row.returned_at) > 14 * 86400000) throw new HttpError(410, "הצ׳אט נסגר 14 ימים לאחר החזרת הפריט");
+  const recipientId = row.borrower_id === user.id ? row.owner_id : row.borrower_id;
+  const block = await env.DB.prepare(`SELECT blocker_id,effective_after_request_id FROM user_blocks
+    WHERE ((blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)) LIMIT 1`).bind(user.id,recipientId,recipientId,user.id).first();
+  if (block && (!block.effective_after_request_id || block.effective_after_request_id !== requestId || row.status === "returned")) throw new HttpError(403, "לא ניתן לשלוח הודעות בין המשתמשים");
+  const body = await readJson(request), message = cleanText(body.message, 1, 1000, "הודעה");
+  const links = message.match(/https?:\/\/[^\s]+/gi) || [];
+  if (links.length > 3 || links.some(link => /(?:bit\.ly|tinyurl\.com|t\.co|cutt\.ly|rb\.gy)/i.test(link))) {
+    await env.DB.prepare("INSERT INTO security_events(id,user_id,event_type,severity,details_json) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),user.id,"suspicious_chat_link","warning",JSON.stringify({requestId,links:links.slice(0,5)})).run();
+    throw new HttpError(400, "ההודעה כוללת קישור מקוצר או חשוד. שלחו כתובת מלאה ומוכרת");
+  }
+  const recent = await env.DB.prepare(`SELECT COUNT(*) AS count FROM request_messages WHERE sender_id = ? AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 minute')`).bind(user.id).first();
   if (Number(recent?.count || 0) >= 10) throw new HttpError(429, "נשלחו יותר מדי הודעות. נסו שוב בעוד דקה");
   const id = crypto.randomUUID();
-  const recipientId = row.borrower_id === user.id ? row.owner_id : row.borrower_id;
   await env.DB.batch([
     env.DB.prepare("INSERT INTO request_messages (id,request_id,sender_id,body) VALUES (?,?,?,?)").bind(id, requestId, user.id, message),
     notificationStatement(env, recipientId, "message", `הודעה חדשה על ${row.item_title}`, `${user.full_name}: ${message.slice(0, 120)}`, requestId)
   ]);
   return json({ message: { id, request_id: requestId, sender_id: user.id, sender_name: user.full_name, body: message, isMine: true, created_at: new Date().toISOString() } }, 201);
+}
+
+async function listRequestMessages(request, env, requestId) {
+  const { user, row } = await getRequestParticipant(request, env, requestId);
+  const result = await env.DB.prepare(`SELECT m.id,m.body,m.created_at,m.sender_id,m.message_type,m.media_url,m.deleted_at,m.read_at,u.full_name AS sender_name
+    FROM request_messages m JOIN users u ON u.id = m.sender_id WHERE m.request_id = ? ORDER BY m.created_at ASC LIMIT 300`).bind(requestId).all();
+  const closed = row.status === "returned" && row.returned_at && Date.now() - Date.parse(row.returned_at) > 14 * 86400000;
+  return json({request:{id:row.id,status:row.status,itemTitle:row.item_title,organizationName:row.org_name,chatClosed:Boolean(closed)},messages:result.results.map(message=>({...message,isMine:message.sender_id===user.id}))});
 }
 
 async function listNotifications(request, env) {
