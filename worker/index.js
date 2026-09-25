@@ -1532,6 +1532,7 @@ async function dashboard(request, env) {
   const items = itemsResult.results.map(row => ({ ...row, image_urls: parseJsonArray(row.image_urls), tags: parseJsonArray(row.tags_json), organizations: { name: row.org_name } }));
   const requests = requestsResult.results.map(row => ({
     id: row.id,
+    item_id: row.item_id,
     status: row.status,
     requested_from: row.requested_from,
     requested_until: row.requested_until,
@@ -2474,7 +2475,7 @@ function withSecurityHeaders(response) {
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("Permissions-Policy", "camera=(self), microphone=(self), geolocation=(self), payment=()");
   headers.set("X-Frame-Options", "DENY");
-  headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+  headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com https://www.openstreetmap.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
   headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   headers.set("Cross-Origin-Opener-Policy", "same-origin");
   headers.set("Cross-Origin-Resource-Policy", "same-origin");
