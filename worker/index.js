@@ -159,10 +159,16 @@ async function createSupportRequest(request, env, ctx) {
   const subject = cleanText(body.subject, 2, 120, "נושא");
   const message = cleanText(body.message, 10, 2000, "הודעה");
   await enforcePublicRateLimit(env, email, "support", ctx, 5);
-  const id = crypto.randomUUID();
-  await env.DB.prepare("INSERT INTO support_requests (id,name,email,subject,message,status,created_at) VALUES (?,?,?,?,?,'new',?)")
-    .bind(id, name, email, subject, message, new Date().toISOString()).run();
-  return json({ ok: true, id }, 201);
+  const id = crypto.randomUUID(),ticketId=crypto.randomUUID(),now=new Date().toISOString();
+  const current=await currentUser(request,env);
+  const next=await env.DB.prepare("SELECT COALESCE(MAX(ticket_number),1000)+1 AS n FROM support_tickets").first();
+  const ticketNumber=Number(next?.n||1001);
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO support_requests (id,name,email,subject,message,status,created_at) VALUES (?,?,?,?,?,'new',?)").bind(id,name,email,subject,message,now),
+    env.DB.prepare("INSERT INTO support_tickets(id,ticket_number,user_id,name,email,subject,message,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'open',?,?)").bind(ticketId,ticketNumber,current?.id||null,name,email,subject,message,now,now),
+    env.DB.prepare("INSERT INTO support_ticket_messages(id,ticket_id,sender_id,body) VALUES(?,?,?,?)").bind(crypto.randomUUID(),ticketId,current?.id||null,message)
+  ]);
+  return json({ ok: true, id, ticketId, ticketNumber }, 201);
 }
 
 async function ensureAdvancedBookingSchema(env) {
