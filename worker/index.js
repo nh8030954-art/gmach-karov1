@@ -131,8 +131,9 @@ export default {
       return withSecurityHeaders(response);
     } catch (error) {
       const status = error instanceof HttpError ? error.status : 500;
-      if (status >= 500) console.error(error);
-      return withSecurityHeaders(json({ error: error instanceof HttpError ? error.message : "אירעה תקלה זמנית בשרת" }, status));
+      const requestId = crypto.randomUUID();
+      if (status >= 500) console.error("Request failed", { requestId, path: url.pathname, error });
+      return withSecurityHeaders(json({ error: error instanceof HttpError ? error.message : "אירעה תקלה זמנית בשרת", requestId }, status, { "X-Request-Id": requestId }));
     }
   },
   async scheduled(_event, env, ctx) {
