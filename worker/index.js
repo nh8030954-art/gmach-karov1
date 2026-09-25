@@ -1,4 +1,5 @@
-import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata } from "./platform-completion.js";\nconst SESSION_COOKIE = "gmach_session";
+import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata } from "./platform-completion.js";
+const SESSION_COOKIE = "gmach_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
 // Keep PBKDF2 within the Cloudflare Workers CPU budget. Existing production
 // accounts and the seeded administrator already use this compatible cost.
