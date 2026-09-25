@@ -126,12 +126,15 @@ async function explicitGeocode(request,env,url){
   const q=clean(url.searchParams.get("q"),3,180,"כתובת"),key=(await hash(q.toLowerCase())).slice(0,40),now=new Date();
   const cached=await env.DB.prepare("SELECT result_json FROM geocode_cache WHERE query_key=? AND expires_at>?").bind(key,now.toISOString()).first();
   if(cached)return json({results:safe(cached.result_json,[]),cached:true,attribution:"© OpenStreetMap contributors"});
-  const throttle=await env.DB.prepare("SELECT last_request_at FROM geocode_throttle WHERE id=1").first();
-  if(throttle?.last_request_at&&now-new Date(throttle.last_request_at)<1100)throw new RemainingError(429,"נא להמתין שנייה לפני חיפוש כתובת נוסף");
-  await env.DB.prepare("UPDATE geocode_throttle SET last_request_at=? WHERE id=1").bind(now.toISOString()).run();
+  const reserved=await env.DB.prepare("UPDATE geocode_throttle SET last_request_at=? WHERE id=1 AND (last_request_at IS NULL OR last_request_at<=?)")
+    .bind(now.toISOString(),new Date(now.getTime()-1100).toISOString()).run();
+  if(!reserved.meta?.changes)throw new RemainingError(429,"נא להמתין שנייה לפני חיפוש כתובת נוסף");
   const target=new URL("https://nominatim.openstreetmap.org/search");
   target.searchParams.set("format","jsonv2");target.searchParams.set("limit","5");target.searchParams.set("countrycodes","il");target.searchParams.set("addressdetails","1");target.searchParams.set("q",q);
-  const response=await fetch(target.toString(),{headers:{"User-Agent":"GmachBerega/1.0 (+https://gmach-karov1.nh8030954.workers.dev; contact: support@example.org)","Accept-Language":"he,en"}});
+  const contact=String(env.SUPPORT_EMAIL||"").trim();
+  let response;
+  try{response=await fetch(target.toString(),{headers:{"User-Agent":`GmachBerega/1.0 (+https://gmach-karov1.nh8030954.workers.dev${contact?`; contact: ${contact}`:""})`,"Accept-Language":"he,en"},signal:AbortSignal.timeout(8000)})}
+  catch{throw new RemainingError(503,"שירות חיפוש הכתובות אינו זמין כרגע")}
   if(!response.ok)throw new RemainingError(503,"שירות חיפוש הכתובות אינו זמין כרגע");
   const raw=await response.json(),results=(Array.isArray(raw)?raw:[]).map(x=>({displayName:x.display_name,lat:Number(x.lat),lon:Number(x.lon),type:x.type,importance:Number(x.importance||0)})).filter(x=>Number.isFinite(x.lat)&&Number.isFinite(x.lon));
   await env.DB.prepare("INSERT OR REPLACE INTO geocode_cache(query_key,query_text,result_json,expires_at) VALUES(?,?,?,?)").bind(key,q,JSON.stringify(results),new Date(Date.now()+30*86400000).toISOString()).run();
@@ -227,22 +230,22 @@ export async function runRemainingMaintenance(env){await ensureSchema(env);const
 export async function handleRemainingFeatures(request,env,ctx,url){
  await ensureSchema(env);const method=request.method.toUpperCase(),path=url.pathname;
  try{
-  let m=path.match(/^\/api\/items\/([^/]+)\/image-edits$/);if(m&&(method==="GET"||method==="PUT"))return imageEdits(request,env,decodeURIComponent(m[1]));
-  m=path.match(/^\/api\/items\/([^/]+)\/availability-calendar$/);if(m&&method==="GET")return availabilityCalendar(request,env,decodeURIComponent(m[1]),url);
-  m=path.match(/^\/api\/items\/([^/]+)\/similar$/);if(m&&method==="GET")return similarItems(env,decodeURIComponent(m[1]),url);
-  m=path.match(/^\/api\/reviews\/([^/]+)$/);if(m&&method==="PATCH")return updateReview(request,env,decodeURIComponent(m[1]));
-  m=path.match(/^\/api\/reviews\/([^/]+)\/helpful$/);if(m&&method==="POST")return helpfulReview(request,env,decodeURIComponent(m[1]));
-  m=path.match(/^\/api\/reviews\/([^/]+)\/report$/);if(m&&method==="POST")return reportReview(request,env,decodeURIComponent(m[1]));
-  m=path.match(/^\/api\/reviews\/([^/]+)\/response$/);if(m&&method==="POST")return respondReview(request,env,decodeURIComponent(m[1]));
-  m=path.match(/^\/api\/organizations\/([^/]+)\/operations-dashboard$/);if(m&&method==="GET")return orgDashboard(request,env,decodeURIComponent(m[1]),url);
-  if(path==="/api/content"&&method==="GET")return pageContent(request,env,url);
-  if(path==="/api/admin/page-content"&&(method==="GET"||method==="PUT"))return adminPageContent(request,env);
-  m=path.match(/^\/api\/admin\/page-content\/([^/]+)\/versions$/);if(m&&method==="GET")return adminPageVersions(request,env,decodeURIComponent(m[1]),url);
-  m=path.match(/^\/api\/admin\/page-versions\/([^/]+)\/restore$/);if(m&&method==="POST")return restorePage(request,env,decodeURIComponent(m[1]));
-  m=path.match(/^\/api\/admin\/backups\/([^/]+)\/validate$/);if(m&&method==="POST")return validateBackup(request,env,decodeURIComponent(m[1]));
-  if(path==="/api/admin/external-services"&&method==="GET")return externalStatus(request,env);
-  if(path==="/api/admin/moderation-unified"&&(method==="GET"||method==="PATCH"))return unifiedModeration(request,env,url);
-  if(path==="/api/maps/geocode"&&method==="GET")return explicitGeocode(request,env,url);
+  let m=path.match(/^\/api\/items\/([^/]+)\/image-edits$/);if(m&&(method==="GET"||method==="PUT"))return await imageEdits(request,env,decodeURIComponent(m[1]));
+  m=path.match(/^\/api\/items\/([^/]+)\/availability-calendar$/);if(m&&method==="GET")return await availabilityCalendar(request,env,decodeURIComponent(m[1]),url);
+  m=path.match(/^\/api\/items\/([^/]+)\/similar$/);if(m&&method==="GET")return await similarItems(env,decodeURIComponent(m[1]),url);
+  m=path.match(/^\/api\/reviews\/([^/]+)$/);if(m&&method==="PATCH")return await updateReview(request,env,decodeURIComponent(m[1]));
+  m=path.match(/^\/api\/reviews\/([^/]+)\/helpful$/);if(m&&method==="POST")return await helpfulReview(request,env,decodeURIComponent(m[1]));
+  m=path.match(/^\/api\/reviews\/([^/]+)\/report$/);if(m&&method==="POST")return await reportReview(request,env,decodeURIComponent(m[1]));
+  m=path.match(/^\/api\/reviews\/([^/]+)\/response$/);if(m&&method==="POST")return await respondReview(request,env,decodeURIComponent(m[1]));
+  m=path.match(/^\/api\/organizations\/([^/]+)\/operations-dashboard$/);if(m&&method==="GET")return await orgDashboard(request,env,decodeURIComponent(m[1]),url);
+  if(path==="/api/content"&&method==="GET")return await pageContent(request,env,url);
+  if(path==="/api/admin/page-content"&&(method==="GET"||method==="PUT"))return await adminPageContent(request,env);
+  m=path.match(/^\/api\/admin\/page-content\/([^/]+)\/versions$/);if(m&&method==="GET")return await adminPageVersions(request,env,decodeURIComponent(m[1]),url);
+  m=path.match(/^\/api\/admin\/page-versions\/([^/]+)\/restore$/);if(m&&method==="POST")return await restorePage(request,env,decodeURIComponent(m[1]));
+  m=path.match(/^\/api\/admin\/backups\/([^/]+)\/validate$/);if(m&&method==="POST")return await validateBackup(request,env,decodeURIComponent(m[1]));
+  if(path==="/api/admin/external-services"&&method==="GET")return await externalStatus(request,env);
+  if(path==="/api/admin/moderation-unified"&&(method==="GET"||method==="PATCH"))return await unifiedModeration(request,env,url);
+  if(path==="/api/maps/geocode"&&method==="GET")return await explicitGeocode(request,env,url);
   return null;
  }catch(e){const status=e instanceof RemainingError?e.status:500;if(status>=500)console.error("remaining-features",e);return json({error:e instanceof RemainingError?e.message:"אירעה תקלה בשכבת ההשלמה"},status)}
 }
