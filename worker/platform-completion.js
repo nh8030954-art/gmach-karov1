@@ -447,5 +447,52 @@ async function currentSecurityBlock(request,env){const id=await sha256(request.h
 async function recordSecurityFailure(request,env,type){const id=await sha256(request.headers.get("CF-Connecting-IP")||"unknown"),now=new Date().toISOString();await qrun(env,"INSERT INTO security_events(id,event_type,severity,ip_hash,details_json) VALUES(?,?,?,?,?)",[crypto.randomUUID(),type,"warning",id,"{}"]);const recent=await qfirst(env,"SELECT COUNT(*) n FROM security_events WHERE ip_hash=? AND created_at>datetime('now','-1 hour')",[id]);if(Number(recent?.n||0)>=5)await qrun(env,"INSERT INTO security_blocks(identity_hash,reason,level,blocked_until) VALUES(?,?,?,datetime('now','+1 hour')) ON CONFLICT(identity_hash) DO UPDATE SET reason=excluded.reason,level=MIN(10,security_blocks.level+1),blocked_until=datetime('now','+'||(MIN(24,security_blocks.level+1))||' hours'),updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')",[id,type,1]);}
 async function sendSecurityEmail(env,userId,subject,body){const u=await qfirst(env,"SELECT email,full_name,preferred_language FROM users WHERE id=?",[userId]);if(u)try{await sendEmail(env,u.email,subject,body,u.full_name,u.preferred_language)}catch{}}
 async function sendEmail(env,email,subject,body,name,language){if(!env.RESEND_API_KEY)return;const he=language!=="en",r=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:env.RESEND_FROM_EMAIL||"Gmach Berega <onboarding@resend.dev>",to:[email],subject,text:body,html:`<div dir="${he?"rtl":"ltr"}" style="font-family:Arial,sans-serif;max-width:600px;margin:auto"><h2>גמ״ח ברגע</h2><p>${escapeHtml(name||"")}</p><p>${escapeHtml(body)}</p></div>`,reply_to:env.SUPPORT_EMAIL||undefined})});if(!r.ok)throw new Error("Email "+r.status);}
-async function sendPushPlaceholder(env,userId,title,body){if(!env.VAPID_PUBLIC_KEY||!env.VAPID_PRIVATE_KEY)return;await qrun(env,"INSERT INTO notifications(id,user_id,type,title,body) VALUES(?,?,?,?,?)",[crypto.randomUUID(),userId,"push",title,body]);}
+function b64uEncode(input){const bytes=input instanceof Uint8Array?input:new Uint8Array(input);let s="";for(const b of bytes)s+=String.fromCharCode(b);return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");}
+function b64uDecode(value){let s=String(value||"").replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";const raw=atob(s),out=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out;}
+function concatBytes(...parts){const arrays=parts.map(p=>p instanceof Uint8Array?p:new Uint8Array(p)),n=arrays.reduce((s,a)=>s+a.length,0),out=new Uint8Array(n);let o=0;for(const a of arrays){out.set(a,o);o+=a.length}return out;}
+async function hmac256(keyBytes,data){const key=await crypto.subtle.importKey("raw",keyBytes,{name:"HMAC",hash:"SHA-256"},false,["sign"]);return new Uint8Array(await crypto.subtle.sign("HMAC",key,data));}
+async function hkdfExpand(prk,info,length){const t=await hmac256(prk,concatBytes(info,new Uint8Array([1])));return t.slice(0,length);}
+async function vapidHeaders(env,endpoint){
+  const pub=b64uDecode(env.VAPID_PUBLIC_KEY),priv=b64uDecode(env.VAPID_PRIVATE_KEY);
+  if(pub.length!==65||pub[0]!==4||priv.length!==32)throw new Error("Invalid VAPID key format");
+  const enc=new TextEncoder(),header=b64uEncode(enc.encode(JSON.stringify({typ:"JWT",alg:"ES256"})));
+  const payload=b64uEncode(enc.encode(JSON.stringify({aud:new URL(endpoint).origin,exp:Math.floor(Date.now()/1000)+12*3600,sub:env.VAPID_SUBJECT||("mailto:"+(env.SUPPORT_EMAIL||"support@example.com"))})));
+  const key=await crypto.subtle.importKey("jwk",{kty:"EC",crv:"P-256",x:b64uEncode(pub.slice(1,33)),y:b64uEncode(pub.slice(33,65)),d:b64uEncode(priv),ext:true},{name:"ECDSA",namedCurve:"P-256"},false,["sign"]);
+  const sig=new Uint8Array(await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},key,enc.encode(header+"."+payload)));
+  const jwt=header+"."+payload+"."+b64uEncode(sig);
+  return {Authorization:`vapid t=${jwt}, k=${env.VAPID_PUBLIC_KEY}`,TTL:"86400"};
+}
+async function encryptWebPush(subscription,payload){
+  const clientPub=b64uDecode(subscription.p256dh),auth=b64uDecode(subscription.auth),enc=new TextEncoder();
+  const serverKeys=await crypto.subtle.generateKey({name:"ECDH",namedCurve:"P-256"},true,["deriveBits"]);
+  const serverPub=new Uint8Array(await crypto.subtle.exportKey("raw",serverKeys.publicKey));
+  const clientKey=await crypto.subtle.importKey("raw",clientPub,{name:"ECDH",namedCurve:"P-256"},false,[]);
+  const shared=new Uint8Array(await crypto.subtle.deriveBits({name:"ECDH",public:clientKey},serverKeys.privateKey,256));
+  const prkKey=await hmac256(auth,shared);
+  const ikm=await hkdfExpand(prkKey,concatBytes(enc.encode("WebPush: info\0"),clientPub,serverPub),32);
+  const salt=crypto.getRandomValues(new Uint8Array(16)),prk=await hmac256(salt,ikm);
+  const cek=await hkdfExpand(prk,enc.encode("Content-Encoding: aes128gcm\0"),16),nonce=await hkdfExpand(prk,enc.encode("Content-Encoding: nonce\0"),12);
+  const aes=await crypto.subtle.importKey("raw",cek,"AES-GCM",false,["encrypt"]);
+  const plain=concatBytes(enc.encode(payload),new Uint8Array([2]));
+  const cipher=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv:nonce},aes,plain));
+  const rs=new Uint8Array(4);new DataView(rs.buffer).setUint32(0,4096);
+  return concatBytes(salt,rs,new Uint8Array([serverPub.length]),serverPub,cipher);
+}
+async function sendPushPlaceholder(env,userId,title,body){
+  if(!env.VAPID_PUBLIC_KEY||!env.VAPID_PRIVATE_KEY)return;
+  const subs=await qall(env,"SELECT endpoint,p256dh,auth FROM push_subscriptions WHERE user_id=?",[userId]);
+  if(!subs.length)return;
+  const payload=JSON.stringify({title,body,url:"/#/dashboard",tag:"gmach-"+userId});
+  let delivered=0,lastError=null;
+  for(const sub of subs){
+    try{
+      const [headers,encrypted]=await Promise.all([vapidHeaders(env,sub.endpoint),encryptWebPush(sub,payload)]);
+      const response=await fetch(sub.endpoint,{method:"POST",headers:{...headers,"Content-Encoding":"aes128gcm","Content-Type":"application/octet-stream","Urgency":"normal"},body:encrypted});
+      if(response.status===404||response.status===410){await qrun(env,"DELETE FROM push_subscriptions WHERE endpoint=?",[sub.endpoint]);continue}
+      if(!response.ok)throw new Error("Push "+response.status);
+      delivered++;
+    }catch(e){lastError=e;}
+  }
+  if(!delivered&&lastError)throw lastError;
+}
 function escapeHtml(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
