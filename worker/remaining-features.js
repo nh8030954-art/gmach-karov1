@@ -177,18 +177,26 @@ async function automaticDailyBackup(env){
         cursor=page.truncated?page.cursor:undefined;
       }while(cursor);
     }
-    dump.r2Manifest=objects;
+    const backupStorage=env.BACKUP_STORAGE||env.ITEM_IMAGES,objectCopies=[];
+    for(const object of objects){
+      const source=await env.ITEM_IMAGES.get(object.key);if(!source)continue;
+      const backupKey=`_system-backups/objects/${today}/${id}/${object.key}`;
+      await backupStorage.put(backupKey,source.body,{httpMetadata:source.httpMetadata,customMetadata:{sourceKey:object.key,sourceEtag:object.etag||""}});
+      objectCopies.push({sourceKey:object.key,backupKey,size:object.size,etag:object.etag});
+    }
+    dump.r2Manifest=objectCopies;
     const raw=JSON.stringify(dump),bytes=new TextEncoder().encode(raw),checksum=await hash(raw),key="_system-backups/daily/"+today+"-"+id+".json";
-    await env.ITEM_IMAGES.put(key,raw,{httpMetadata:{contentType:"application/json"}});
-    const manifest={storageKey:key,bytes:bytes.length,checksum,tables,r2ObjectCount:objects.length};
+    await backupStorage.put(key,raw,{httpMetadata:{contentType:"application/json"}});
+    const manifest={storageKey:key,bytes:bytes.length,checksum,tables,r2ObjectCount:objectCopies.length,separateStorage:Boolean(env.BACKUP_STORAGE)};
     await env.DB.batch([
       env.DB.prepare("UPDATE backup_runs SET status='completed',completed_at=?,finished_at=?,manifest_json=? WHERE id=?").bind(new Date().toISOString(),new Date().toISOString(),JSON.stringify(manifest),id),
       env.DB.prepare("INSERT OR REPLACE INTO backup_objects(backup_run_id,storage_key,object_type,size_bytes,checksum) VALUES(?,?,?,?,?)").bind(id,key,"database+r2-manifest",bytes.length,checksum)
     ]);
-    const old=await env.DB.prepare("SELECT id,manifest_json FROM backup_runs WHERE backup_type='scheduled' AND status='completed' ORDER BY started_at DESC LIMIT -1 OFFSET 14").all();
+    const old=await env.DB.prepare("SELECT id,started_at,manifest_json FROM backup_runs WHERE backup_type='scheduled' AND status='completed' ORDER BY started_at DESC LIMIT -1 OFFSET 14").all();
     for(const x of old.results){
       const m=safe(x.manifest_json,{});
-      if(m.storageKey)try{await env.ITEM_IMAGES.delete(m.storageKey)}catch{}
+      if(m.storageKey)try{await backupStorage.delete(m.storageKey)}catch{}
+      try{let cursor;do{const page=await backupStorage.list({prefix:`_system-backups/objects/${String(x.started_at||"").slice(0,10)}/${x.id}/`,limit:1000,cursor});for(const object of page.objects||[])await backupStorage.delete(object.key);cursor=page.truncated?page.cursor:undefined}while(cursor)}catch{}
       await env.DB.prepare("DELETE FROM backup_runs WHERE id=?").bind(x.id).run();
     }
     return id;
