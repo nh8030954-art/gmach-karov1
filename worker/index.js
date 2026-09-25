@@ -340,6 +340,7 @@ async function routeApi(request, env, ctx, url) {
   if (method === "POST" && path === "/api/me/addresses") return createAddress(request, env);
   const addressDetail = path.match(/^\/api\/me\/addresses\/([^/]+)$/);
   if (method === "PATCH" && addressDetail) return updateAddress(request, env, decodeURIComponent(addressDetail[1]));
+  if (method === "PATCH" && addressDetail) return updateAddress(request, env, decodeURIComponent(addressDetail[1]));
   if (method === "DELETE" && addressDetail) return deleteAddress(request, env, decodeURIComponent(addressDetail[1]));
   const savedSearchDetail = path.match(/^\/api\/me\/saved-searches\/([^/]+)$/);
   if (method === "DELETE" && savedSearchDetail) return deleteSavedSearch(request, env, decodeURIComponent(savedSearchDetail[1]));
@@ -767,8 +768,9 @@ async function revokeSession(request,env,sessionId){
 
 async function listAddresses(request,env){
   const user=await requireUser(request,env);
-  const rows=await env.DB.prepare("SELECT id,label,city,latitude,longitude,is_default,created_at,updated_at FROM user_addresses WHERE user_id=? ORDER BY is_default DESC,updated_at DESC").bind(user.id).all();
-  return json({addresses:rows.results.map(row=>({...row,isDefault:Boolean(row.is_default)}))});
+  const rows=await env.DB.prepare("SELECT id,label,address_cipher,city,latitude,longitude,is_default,created_at,updated_at FROM user_addresses WHERE user_id=? ORDER BY is_default DESC,updated_at DESC").bind(user.id).all();
+  const addresses=[];for(const row of rows.results)addresses.push({...row,address:await decryptPrivateValue(row.address_cipher,env),address_cipher:undefined,isDefault:Boolean(row.is_default)});
+  return json({addresses});
 }
 
 async function createAddress(request,env){
@@ -989,7 +991,7 @@ async function discovery(env, url) {
       ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
       FROM organizations o LEFT JOIN items i ON i.organization_id=o.id AND i.status='active'
       LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
-      WHERE o.status='approved' AND o.is_hidden=0 GROUP BY o.id ORDER BY rating DESC,item_count DESC LIMIT 100`)
+      WHERE o.status='approved' AND o.is_hidden=0 AND EXISTS(SELECT 1 FROM items ai WHERE ai.organization_id=o.id AND ai.status='active' AND ai.deleted_at IS NULL AND (ai.publish_at IS NULL OR ai.publish_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now'))) GROUP BY o.id ORDER BY rating DESC,item_count DESC LIMIT 100`)
   ]);
   return json({ categories: categories.results, cities: cities.results, suggestions: suggestions.results.map(row => row.title), organizations: organizations.results });
 }
@@ -999,7 +1001,7 @@ async function getPublicOrganization(env, id) {
     o.address,o.website_url,o.hours_json,o.service_area,o.pickup_options,o.last_active_at,o.verified_phone,o.verified_address,
     ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
     FROM organizations o LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
-    WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 GROUP BY o.id`).bind(id).first();
+    WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 AND EXISTS(SELECT 1 FROM items ai WHERE ai.organization_id=o.id AND ai.status='active' AND ai.deleted_at IS NULL AND (ai.publish_at IS NULL OR ai.publish_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now'))) GROUP BY o.id`).bind(id).first();
   if (!organization) throw new HttpError(404, "הגמ״ח לא נמצא");
   const [items, reviews] = await env.DB.batch([
     env.DB.prepare(`SELECT i.*,o.id AS org_id,o.name AS org_name,o.last_active_at AS org_last_active_at,
@@ -2402,6 +2404,17 @@ async function encryptPrivateValue(value, env) {
   const iv=crypto.getRandomValues(new Uint8Array(12));
   const encrypted=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(value)));
   return `v1.${bytesToBase64Url(iv)}.${bytesToBase64Url(encrypted)}`;
+}
+
+async function decryptPrivateValue(value,env){
+  const parts=String(value||"").split(".");if(parts.length!==3||parts[0]!=="v1")return "";
+  try{
+    const secret=String(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY||"");
+    const keyBytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(secret));
+    const key=await crypto.subtle.importKey("raw",keyBytes,{name:"AES-GCM"},false,["decrypt"]);
+    const plain=await crypto.subtle.decrypt({name:"AES-GCM",iv:fromBase64Url(parts[1])},key,fromBase64Url(parts[2]));
+    return new TextDecoder().decode(plain);
+  }catch{return "";}
 }
 
 function bytesToBase64Url(bytes){let binary="";for(const byte of bytes)binary+=String.fromCharCode(byte);return btoa(binary).replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,"");}
