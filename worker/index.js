@@ -1051,9 +1051,9 @@ async function createReview(request, env) {
   const rating = Number(body.organizationRating); const itemRating = Number(body.itemRating);
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new HttpError(400, "דירוג הגמ״ח חייב להיות בין 1 ל־5");
   if (!Number.isInteger(itemRating) || itemRating < 1 || itemRating > 5) throw new HttpError(400, "דירוג הפריט חייב להיות בין 1 ל־5");
-  const row = await env.DB.prepare(`SELECT lr.borrower_id,lr.status,i.id AS item_id,o.id AS organization_id FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.id=?`).bind(requestId).first();
+  const row = await env.DB.prepare(`SELECT lr.borrower_id,lr.status,lr.branch_id,i.id AS item_id,o.id AS organization_id FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.id=?`).bind(requestId).first();
   if (!row || row.borrower_id !== user.id || row.status !== "returned") throw new HttpError(403, "אפשר לדרג רק השאלה שהושלמה");
-  try { const id=crypto.randomUUID(); await env.DB.prepare("INSERT INTO reviews(id,request_id,author_id,organization_id,item_id,rating,item_rating,comment) VALUES (?,?,?,?,?,?,?,?)").bind(id,requestId,user.id,row.organization_id,row.item_id,rating,itemRating,cleanOptional(body.comment,800)).run(); return json({ review:{id,organizationRating:rating,itemRating}},201); }
+  try { const id=crypto.randomUUID(),editedUntil=new Date(Date.now()+7*86400000).toISOString(); await env.DB.prepare("INSERT INTO reviews(id,request_id,author_id,organization_id,item_id,rating,item_rating,comment,branch_id,edited_until) VALUES (?,?,?,?,?,?,?,?,?,?)").bind(id,requestId,user.id,row.organization_id,row.item_id,rating,itemRating,cleanOptional(body.comment,800),row.branch_id||null,editedUntil).run(); return json({ review:{id,organizationRating:rating,itemRating,branchId:row.branch_id||null,editedUntil}},201); }
   catch (error) { if (String(error).toLowerCase().includes("unique")) throw new HttpError(409,"כבר דירגתם את ההשאלה הזו"); throw error; }
 }
 
