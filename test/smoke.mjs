@@ -149,7 +149,7 @@ try {
   assert.equal(result.response.status, 200);
   assert.match(result.data.otpauthUri, /^otpauth:\/\/totp\//);
 
-  result = await request("/api/organizations", { method: "POST", cookie: adminCookie, body: { name: "גמ״ח בדיקה", primaryCategory: "אירועים", city: "ירושלים", neighborhood: "מרכז", description: "ציוד חינמי לאירועים קהילתיים ולשמחות משפחתיות.", phone: "050-1234567" } });
+  result = await request("/api/organizations", { method: "POST", cookie: adminCookie, body: { name: "גמ״ח בדיקה", primaryCategory: "אירועים", city: "ירושלים", neighborhood: "מרכז", address: "רחוב הבדיקה 1, ירושלים", hours: { "שעות": "א׳–ה׳ 09:00–17:00" }, description: "ציוד חינמי לאירועים קהילתיים ולשמחות משפחתיות.", phone: "050-1234567" } });
   assert.equal(result.response.status, 201);
   const organizationId = result.data.organization.id;
 
@@ -164,7 +164,7 @@ try {
   assert.equal(result.data.units.length,2);
 
   const form = new WorkerFormData();
-  form.append("images", new Blob([new Uint8Array([137, 80, 78, 71])], { type: "image/png" }), "sample.png");
+  form.append("images", new Blob([new Uint8Array([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82])], { type: "image/png" }), "sample.png");
   result = await request(`/api/items/${itemId}/images`, { method: "POST", cookie: adminCookie, form });
   assert.equal(result.response.status, 201);
   assert.equal(result.data.imageUrls.length, 1);
@@ -278,6 +278,8 @@ try {
   result = await request(`/api/organizations/${organizationId}/public`);
   assert.equal(result.response.status, 200);
   assert.equal(result.data.items.length, 1);
+  assert.equal(result.data.organization.address, "רחוב הבדיקה 1, ירושלים");
+  assert.equal(result.data.organization.contact_phone, "050-1234567");
   result = await request("/api/organizations/nonexistent/public");
   assert.equal(result.response.status, 404);
   assert.ok(result.data.requestId);

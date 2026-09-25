@@ -232,7 +232,7 @@
           <div class="section-heading centered-heading"><div><span class="section-kicker">משאילים בראש שקט</span><h2 id="trust-title">קהילה בטוחה, פרטיות ברורה</h2></div></div>
           <svg class="trust-shield" viewBox="0 0 160 190" aria-hidden="true"><path d="M80 176S20 145 20 70V35L80 12l60 23v35c0 75-60 106-60 106Z"/><path d="m52 91 19 19 39-44"/></svg>
           <div class="trust-grid">
-            <article><span class="trust-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s8-4 8-11V5l-8-3-8 3v5c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/></svg></span><h3>גמ״חים עוברים בדיקה</h3><p>עמודי גמ״חים נבדקים לפני הפרסום וניתן לדווח על מידע שגוי.</p></article>
+            <article><span class="trust-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s8-4 8-11V5l-8-3-8 3v5c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/></svg></span><h3>דירוגים מניסיון אמיתי</h3><p>רק מי שהשלים השאלה יכול לדרג גמ״ח, מוצר ושירות, וניתן לדווח על מידע שגוי.</p></article>
             <article><span class="trust-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v2"/></svg></span><h3>פרטים אישיים נשארים פרטיים</h3><p>פרטי קשר אינם מוצגים בקטלוג הפתוח ונחשפים רק למי שצריך.</p></article>
             <article><span class="trust-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg></span><h3>הכול ללא תשלום</h3><p>הפרסום, הבקשה וההשאלה בפלטפורמה חינמיים לחלוטין.</p></article>
           </div>
@@ -451,17 +451,17 @@
 
   <dialog class="modal modal-wide" id="gmach-dialog" aria-labelledby="gmach-form-title">
     <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת החלון">×</button>
-    <div class="dialog-heading align-start"><span class="section-kicker">מצטרפים לקהילה</span><h2 id="gmach-form-title">פתיחת עמוד גמ״ח</h2><p id="gmach-form-description">ממלאים פרטים בסיסיים. העמוד יפורסם לאחר בדיקה קצרה.</p></div>
+    <div class="dialog-heading align-start"><span class="section-kicker">מצטרפים לקהילה</span><h2 id="gmach-form-title">פתיחת עמוד גמ״ח</h2><p id="gmach-form-description">ממלאים פרטים בסיסיים. העמוד יפורסם אוטומטית לאחר הוספת המוצר הראשון.</p></div>
     <form id="gmach-form" class="stack-form">
       <div class="two-columns"><label><span>שם הגמ״ח</span><input id="gmach-name" required maxlength="90" placeholder="למשל: גמ״ח אירועים משפחת לוי"></label><label><span>תחום מרכזי</span><select id="gmach-category" required><option value="">בחירה</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option><option>כללי</option></select></label></div>
       <div class="two-columns"><label><span>עיר</span><input id="gmach-city" list="israel-cities" required autocomplete="address-level2"></label><label><span>שכונה <small>(רשות)</small></span><input id="gmach-neighborhood"></label></div>
-      <label><span>כתובת איסוף <small>(לא תוצג בקטלוג הפתוח)</small></span><input id="gmach-address" autocomplete="street-address"></label>
+      <label><span>כתובת מלאה <small>(תוצג בעמוד הגמ״ח)</small></span><input id="gmach-address" autocomplete="street-address" required></label>
       <label><span>אזור שירות</span><input id="gmach-service-area" maxlength="180" placeholder="למשל: פתח תקווה והסביבה"></label>
-      <div class="two-columns"><label><span>שעות פעילות</span><input id="gmach-hours" maxlength="60" placeholder="א׳–ה׳ 16:00–20:00"></label><fieldset class="inline-options"><legend>אפשרויות מסירה</legend><label><input type="checkbox" name="gmach-pickup" value="pickup" checked> איסוף עצמי</label><label><input type="checkbox" name="gmach-pickup" value="delivery"> משלוח</label><label><input type="checkbox" name="gmach-pickup" value="coordination"> בתיאום</label></fieldset></div>
+      <div class="two-columns"><label><span>שעות פעילות</span><input id="gmach-hours" maxlength="60" placeholder="א׳–ה׳ 16:00–20:00" required></label><fieldset class="inline-options"><legend>אפשרויות מסירה</legend><label><input type="checkbox" name="gmach-pickup" value="pickup" checked> איסוף עצמי</label><label><input type="checkbox" name="gmach-pickup" value="delivery"> משלוח</label><label><input type="checkbox" name="gmach-pickup" value="coordination"> בתיאום</label></fieldset></div>
       <label><span>תיאור קצר</span><textarea id="gmach-description" rows="3" maxlength="600" required placeholder="מה אפשר להשאיל, למי מיועד ואיך מתאמים"></textarea></label>
-      <label><span>טלפון לתיאום <small>(לא יוצג ללא אישורכם)</small></span><input id="gmach-phone" type="tel" inputmode="tel" dir="ltr" required></label>
+      <label><span>טלפון ליצירת קשר <small>(יוצג בעמוד הגמ״ח)</small></span><input id="gmach-phone" type="tel" inputmode="tel" dir="ltr" required></label>
       <label class="consent-row"><input id="gmach-consent" type="checkbox" required><span>אני מאשר/ת שהפעילות, הפריטים, הבקשות והתיאום ינוהלו בתוך גמ״ח ברגע; שהפריטים יוצעו ללא תשלום; ושקראתי את <button type="button" data-open-info="terms">תנאי השימוש</button> ואת <button type="button" data-open-info="privacy">מדיניות הפרטיות</button>.</span></label>
-      <button class="button button-primary button-full" id="gmach-submit" type="submit">שליחה לבדיקה</button>
+      <button class="button button-primary button-full" id="gmach-submit" type="submit">פתיחת גמ״ח</button>
     </form>
   </dialog>
 

@@ -1086,9 +1086,9 @@ async function getPublicOrganization(env, id) {
   // endpoint. Ensure the additive schema before querying them on live D1.
   await ensureFinalFeaturesSchema(env);
   const organization = await env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,
-    o.address,o.website_url,o.hours_json,o.service_area,o.pickup_options,o.last_active_at,o.verified_phone,o.verified_address,
+    o.address,o.website_url,o.hours_json,o.service_area,o.pickup_options,o.last_active_at,o.verified_phone,o.verified_address,c.contact_phone,
     ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
-    FROM organizations o LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
+    FROM organizations o LEFT JOIN organization_contacts c ON c.organization_id=o.id LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
     WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 AND EXISTS (SELECT 1 FROM items pi WHERE pi.organization_id=o.id AND pi.status='active' AND pi.deleted_at IS NULL) GROUP BY o.id`).bind(id).first();
   if (!organization) throw new HttpError(404, "הגמ״ח לא נמצא");
   const [items, reviews, orgCategories] = await env.DB.batch([
@@ -1193,9 +1193,9 @@ async function createOrganization(request, env) {
     neighborhood: cleanOptional(body.neighborhood, 80),
     description: cleanText(body.description, 10, 600, "תיאור"),
     phone: validatePhone(body.phone),
-    address: cleanOptional(body.address, 180),
+    address: cleanText(body.address, 5, 180, "כתובת מלאה"),
     serviceArea: cleanOptional(body.serviceArea, 180),
-    hoursJson: sanitizeHours(body.hours),
+    hoursJson: requiredHours(body.hours),
     pickupOptions: sanitizePickupOptions(body.pickupOptions)
   };
   await env.DB.batch([
@@ -1229,8 +1229,8 @@ async function updateOrganization(request, env, id) {
     neighborhood: cleanOptional(body.neighborhood, 80),
     description: cleanText(body.description, 10, 600, "תיאור"),
     phone: validatePhone(body.phone),
-    address: cleanOptional(body.address, 180),
-    serviceArea: cleanOptional(body.serviceArea, 180), hoursJson: sanitizeHours(body.hours), pickupOptions: sanitizePickupOptions(body.pickupOptions)
+    address: cleanText(body.address, 5, 180, "כתובת מלאה"),
+    serviceArea: cleanOptional(body.serviceArea, 180), hoursJson: requiredHours(body.hours), pickupOptions: sanitizePickupOptions(body.pickupOptions)
   };
   const status = existing.status === "rejected" && user.role !== "admin" ? "rejected" : "approved";
   const now = new Date().toISOString();
@@ -1380,13 +1380,18 @@ async function uploadImages(request, env, itemId) {
   const files = form.getAll("images").filter(value => value instanceof File);
   const existing = parseJsonArray(item.image_urls);
   if (!files.length) throw new HttpError(400, "לא נבחרו תמונות");
-  if (files.length + existing.length > 4) throw new HttpError(400, "אפשר להעלות עד 4 תמונות לפריט");
+  if (files.length + existing.length > 12) throw new HttpError(400, "אפשר להעלות עד 12 תמונות לפריט");
   const uploadedKeys = [];
   try {
     for (const file of files) {
       const extension = IMAGE_TYPES.get(file.type);
       if (!extension) throw new HttpError(400, "אפשר להעלות JPG, PNG או WebP בלבד");
       if (file.size > 5 * 1024 * 1024) throw new HttpError(400, "כל תמונה יכולה להיות עד 5MB");
+      const signature=new Uint8Array(await file.slice(0,16).arrayBuffer());
+      const validJpeg=file.type==="image/jpeg"&&signature[0]===0xff&&signature[1]===0xd8&&signature[2]===0xff;
+      const validPng=file.type==="image/png"&&[0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a].every((byte,index)=>signature[index]===byte);
+      const validWebp=file.type==="image/webp"&&String.fromCharCode(...signature.slice(0,4))==="RIFF"&&String.fromCharCode(...signature.slice(8,12))==="WEBP";
+      if(!validJpeg&&!validPng&&!validWebp)throw new HttpError(400,"קובץ התמונה פגום או שסוגו אינו תואם לתוכן");
       const key = `items/${user.id}/${itemId}/${crypto.randomUUID()}.${extension}`;
       await env.ITEM_IMAGES.put(key, file.stream(), { httpMetadata: { contentType: file.type, cacheControl: "public, max-age=31536000, immutable" } });
       uploadedKeys.push(key);
@@ -2424,6 +2429,11 @@ function sanitizeHours(value) {
   const result = {}; for (const [day, hours] of Object.entries(value).slice(0, 7)) {
     if (/^[א-ת\s'-]{2,20}$/.test(day) && typeof hours === "string" && hours.length <= 60) result[day] = hours.trim();
   } return JSON.stringify(result);
+}
+function requiredHours(value){
+  const hours=sanitizeHours(value),parsed=JSON.parse(hours);
+  if(!Object.values(parsed).some(entry=>String(entry||"").trim().length>=3))throw new HttpError(400,"יש להזין שעות פעילות");
+  return hours;
 }
 
 function sanitizePickupOptions(value) {
