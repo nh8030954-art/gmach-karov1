@@ -155,6 +155,7 @@ function platformClosedPage(closure){const reopens=new Intl.DateTimeFormat("he-I
 
 async function createSupportRequest(request, env, ctx) {
   await ensureProductionHardeningSchema(env);
+  await ensureCompletePlatformSchema(env);
   const body = await readJson(request);
   const name = cleanText(body.name, 2, 80, "שם");
   const email = cleanText(body.email, 5, 160, "אימייל").toLowerCase();
@@ -162,10 +163,17 @@ async function createSupportRequest(request, env, ctx) {
   const subject = cleanText(body.subject, 2, 120, "נושא");
   const message = cleanText(body.message, 10, 2000, "הודעה");
   await enforcePublicRateLimit(env, email, "support", ctx, 5);
+  const user = await currentUser(request, env);
   const id = crypto.randomUUID();
-  await env.DB.prepare("INSERT INTO support_requests (id,name,email,subject,message,status,created_at) VALUES (?,?,?,?,?,'new',?)")
-    .bind(id, name, email, subject, message, new Date().toISOString()).run();
-  return json({ ok: true, id }, 201);
+  const next = await env.DB.prepare("SELECT COALESCE(MAX(ticket_number),0)+1 AS number FROM support_tickets").first();
+  const ticketNumber = Number(next?.number || 1);
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO support_tickets(id,ticket_number,user_id,name,email,subject,message,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,'open',?,?)")
+      .bind(id,ticketNumber,user?.id||null,name,email,subject,message,new Date().toISOString(),new Date().toISOString()),
+    env.DB.prepare("INSERT INTO support_ticket_messages(id,ticket_id,sender_id,body) VALUES(?,?,?,?)")
+      .bind(crypto.randomUUID(),id,user?.id||null,message)
+  ]);
+  return json({ ok: true, id, ticketNumber }, 201);
 }
 
 async function ensureAdvancedBookingSchema(env) {
@@ -308,6 +316,8 @@ async function routeApi(request, env, ctx, url) {
   if (method === "GET" && path === "/api/me/support-tickets") return listMySupportTickets(request, env);
   const supportTicketMessages = path.match(/^\/api\/me\/support-tickets\/([^/]+)\/messages$/);
   if (method === "POST" && supportTicketMessages) return addSupportTicketMessage(request, env, decodeURIComponent(supportTicketMessages[1]));
+  const supportTicketStatus = path.match(/^\/api\/me\/support-tickets\/([^/]+)\/status$/);
+  if (method === "PATCH" && supportTicketStatus) return updateSupportTicketStatus(request, env, decodeURIComponent(supportTicketStatus[1]));
 
   if (method === "GET" && path === "/api/items") return listItems(env, url);
   if (method === "GET" && path === "/api/discovery") return discovery(env, url);
@@ -775,6 +785,17 @@ async function addSupportTicketMessage(request,env,ticketId){
     env.DB.prepare("UPDATE support_tickets SET status=CASE WHEN status='closed' THEN 'reopened' ELSE status END,updated_at=? WHERE id=?").bind(now,ticketId)
   ]);
   return json({message:{id,createdAt:now}},201);
+}
+
+async function updateSupportTicketStatus(request,env,ticketId){
+  const user=await requireUser(request,env),body=await readJson(request);
+  const ticket=await env.DB.prepare("SELECT id,user_id,email,status FROM support_tickets WHERE id=?").bind(ticketId).first();
+  if(!ticket) throw new HttpError(404,"הפנייה לא נמצאה");
+  if(user.role!=="admin"&&ticket.user_id!==user.id&&String(ticket.email||"").toLowerCase()!==String(user.email||"").toLowerCase()) throw new HttpError(403,"אין הרשאה");
+  const status=body.status==="closed"?"closed":body.status==="open"?"reopened":null;
+  if(!status) throw new HttpError(400,"סטטוס הפנייה אינו תקין");
+  await env.DB.prepare("UPDATE support_tickets SET status=?,updated_at=? WHERE id=?").bind(status,new Date().toISOString(),ticketId).run();
+  return json({ok:true,status});
 }
 
 async function adminCategories(request,env){
