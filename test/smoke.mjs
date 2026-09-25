@@ -263,6 +263,9 @@ try {
   result = await request(`/api/organizations/${organizationId}/public`);
   assert.equal(result.response.status, 200);
   assert.equal(result.data.items.length, 1);
+  result = await request("/api/organizations/nonexistent/public");
+  assert.equal(result.response.status, 404);
+  assert.ok(result.data.requestId);
   result = await request("/api/help-requests", { method: "POST", cookie: borrowerCookie, body: { title: "צריך שולחן מתקפל", description: "דרוש שולחן מתקפל לאירוע משפחתי קרוב", category: "אירועים", city: "ירושלים", urgency: "urgent" } });
   assert.equal(result.response.status, 201);
   result = await request("/api/help-requests?city=ירושלים");
