@@ -1,6 +1,26 @@
 (()=>{
   const $=(s,r=document)=>r.querySelector(s);
   const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const turnstileState={enabled:false,siteKey:null,tokens:{register:null,support:null},widgets:{}};
+  window.GmachTurnstile={token:scope=>turnstileState.tokens[scope]||null,reset:scope=>{const id=turnstileState.widgets[scope];if(window.turnstile&&id!==undefined)window.turnstile.reset(id);turnstileState.tokens[scope]=null;}};
+  async function setupTurnstile(){
+    let features;try{features=await fetch("/api/platform/features",{credentials:"same-origin"}).then(r=>r.json());}catch{return;}
+    if(!features?.turnstileEnabled||!features.turnstileSiteKey)return;
+    turnstileState.enabled=true;turnstileState.siteKey=features.turnstileSiteKey;
+    if(!document.querySelector('script[data-gmach-turnstile]')){
+      const s=document.createElement("script");s.src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";s.async=true;s.defer=true;s.dataset.gmachTurnstile="1";document.head.appendChild(s);
+    }
+    const wait=()=>new Promise(resolve=>{if(window.turnstile)return resolve();const t=setInterval(()=>{if(window.turnstile){clearInterval(t);resolve()}},80);setTimeout(()=>{clearInterval(t);resolve()},8000)});
+    await wait();if(!window.turnstile)return;
+    const add=(scope,form)=>{
+      if(!form||form.querySelector('[data-turnstile-scope="'+scope+'"]'))return;
+      const host=document.createElement("div");host.dataset.turnstileScope=scope;host.style.minHeight="66px";host.setAttribute("aria-label","אימות אנושי");const submit=form.querySelector('[type="submit"]');submit?.parentNode?.insertBefore(host,submit);
+      turnstileState.widgets[scope]=window.turnstile.render(host,{sitekey:turnstileState.siteKey,theme:"auto",callback:t=>turnstileState.tokens[scope]=t,"expired-callback":()=>turnstileState.tokens[scope]=null,"error-callback":()=>turnstileState.tokens[scope]=null});
+    };
+    add("register",document.getElementById("auth-form"));add("support",document.getElementById("support-form"));
+    const sync=()=>{const reg=document.querySelector('[data-turnstile-scope="register"]');if(reg)reg.hidden=document.querySelector('[data-auth-mode="register"]')?.getAttribute("aria-selected")!=="true";};
+    new MutationObserver(sync).observe(document.getElementById("auth-dialog")||document.body,{subtree:true,attributes:true,attributeFilter:["aria-selected"]});sync();
+  }
   const api=async(path,opts={})=>{
     const res=await fetch(path,{credentials:"same-origin",...opts,headers:{"Content-Type":"application/json",...(opts.headers||{})},body:opts.body&&typeof opts.body!=="string"?JSON.stringify(opts.body):opts.body});
     const data=await res.json().catch(()=>({}));
@@ -124,6 +144,6 @@
     const b=document.createElement("button");b.id="platform-tools-entry";b.type="button";b.className="button button-secondary";b.textContent="הגדרות וניהול";b.addEventListener("click",openTools);
     const host=dash.querySelector(".dashboard-actions,.dashboard-header,.section-heading")||dash;host.prepend(b);
   }
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",installEntry,{once:true});else installEntry();
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>{installEntry();setupTurnstile();},{once:true});else{installEntry();setupTurnstile();}
   new MutationObserver(installEntry).observe(document.body,{subtree:true,childList:true});
 })();
