@@ -164,7 +164,19 @@ async function activePlatformClosure(env,now){
     if(row)return {message:row.title_he||"האתר סגור זמנית",endsAt:row.ends_at};
     const configured=JSON.parse(String(env.JEWISH_HOLIDAY_CLOSURES_JSON||"[]"));
     const item=Array.isArray(configured)?configured.find(entry=>iso>=entry.startsAt&&iso<entry.endsAt):null;
-    return item?{message:item.message||"חג שמח — האתר סגור כעת לכבוד החג",endsAt:item.endsAt}:null;
+    if(item)return {message:item.message||"חג שמח — האתר סגור כעת לכבוד החג",endsAt:item.endsAt};
+    // Hebrew dates begin the previous evening. Looking six hours ahead makes the
+    // civil-date formatter follow the Jewish day across the evening boundary
+    // without requiring an external calendar service.
+    const shifted=new Date(now.getTime()+6*3600000);
+    const hp=Object.fromEntries(new Intl.DateTimeFormat("en-u-ca-hebrew",{timeZone:"Asia/Jerusalem",month:"long",day:"numeric",year:"numeric"}).formatToParts(shifted).filter(p=>p.type!=="literal").map(p=>[p.type,p.value]));
+    const rule=await env.DB.prepare("SELECT * FROM holiday_rules WHERE enabled=1 AND lower(hebrew_month)=lower(?) AND hebrew_day=? LIMIT 1").bind(String(hp.month||""),Number(hp.day||0)).first().catch(()=>null);
+    if(rule){
+      const local=Object.fromEntries(new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Jerusalem",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(now).filter(p=>p.type!=="literal").map(p=>[p.type,p.value]));
+      const reopen=israelUtcForLocal(Number(local.year),Number(local.month),Number(local.day)+1,20,30);
+      return {message:rule.message_he||rule.title_he||"חג שמח — האתר סגור כעת לכבוד החג",endsAt:reopen.toISOString()};
+    }
+    return null;
   }catch{return null;}
 }
 function platformClosedPage(closure){const reopens=new Intl.DateTimeFormat("he-IL",{timeZone:"Asia/Jerusalem",dateStyle:"full",timeStyle:"short"}).format(new Date(closure.endsAt));return new Response(`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>גמ״ח ברגע — סגור זמנית</title></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#fff;font-family:Arial,sans-serif;color:#123c46;text-align:center"><main style="max-width:620px;padding:40px 24px"><img src="/gmach-berega-logo.jpg" alt="גמ״ח ברגע" style="max-width:260px"><h1>${escapeHtml(closure.message)}</h1><p>האתר ישוב לפעילות ב־${escapeHtml(reopens)}</p></main></body></html>`,{status:503,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});}
@@ -1277,7 +1289,11 @@ async function uploadImages(request, env, itemId) {
     }
     const newUrls=uploadedKeys.map(key=>`/media/${key}`),urls=[...existing,...newUrls],now=new Date().toISOString();
     const statements=[env.DB.prepare("UPDATE items SET image_urls=?,primary_image_url=COALESCE(primary_image_url,?),updated_at=? WHERE id=?").bind(JSON.stringify(urls),urls[0]||null,now,itemId)];
-    newUrls.forEach((url,index)=>statements.push(env.DB.prepare("INSERT OR IGNORE INTO item_images(id,item_id,storage_key,url,sort_order,is_primary,moderation_status) VALUES(?,?,?,?,?,?,?)").bind(crypto.randomUUID(),itemId,uploadedKeys[index],url,existing.length+index,existing.length===0&&index===0?1:0,"pending")));
+    newUrls.forEach((url,index)=>{
+      const imageId=crypto.randomUUID();
+      statements.push(env.DB.prepare("INSERT OR IGNORE INTO item_images(id,item_id,storage_key,url,sort_order,is_primary,moderation_status) VALUES(?,?,?,?,?,?,?)").bind(imageId,itemId,uploadedKeys[index],url,existing.length+index,existing.length===0&&index===0?1:0,"pending"));
+      statements.push(env.DB.prepare("INSERT OR IGNORE INTO moderation_jobs(id,entity_type,entity_id,reason,severity,status,auto_hidden) VALUES(?,'item_image',?,'תמונה חדשה לבדיקה','normal','pending',0)").bind(crypto.randomUUID(),imageId));
+    });
     await env.DB.batch(statements);
     return json({ imageUrls: urls }, 201);
   } catch (error) {
