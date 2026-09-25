@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { readFile, readdir } from "node:fs/promises";
 import miniflare from "miniflare";
 const { FormData: WorkerFormData, Miniflare } = miniflare;
 
@@ -13,7 +14,7 @@ const mf = new Miniflare({
   compatibilityDate: "2026-08-06",
   d1Databases: { DB: "smoke-db" },
   r2Buckets: ["ITEM_IMAGES"],
-  bindings: { ADMIN_EMAILS: "", RESEND_API_KEY: "re_test", RESEND_FROM_EMAIL: "Gmach Berega <verify@example.org>", SUPPORT_EMAIL: "support@example.org", DATA_ENCRYPTION_KEY: "test-only-private-data-key-123456789" },
+  bindings: { ADMIN_EMAILS: "admin@example.org", RESEND_API_KEY: "re_test", RESEND_FROM_EMAIL: "Gmach Berega <verify@example.org>", SUPPORT_EMAIL: "support@example.org", DATA_ENCRYPTION_KEY: "test-only-private-data-key-123456789" },
   serviceBindings: { RESEND_SERVICE: async request => { sentEmails.push(await request.json()); return Response.json({ id: crypto.randomUUID() }); } }
 });
 
@@ -67,7 +68,8 @@ function splitMigration(sql) {
 
 try {
   const db = await mf.getD1Database("DB");
-  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql", "0007_platform_expansion.sql", "0008_advanced_inventory_and_booking.sql", "0009_production_hardening.sql", "0010_open_gmach_and_dual_ratings.sql", "0011_production_platform.sql", "0012_complete_platform.sql", "0013_platform_completion.sql", "0014_search_moderation_completion.sql", "0015_notification_delivery.sql"]) {
+  // Exercise the same schema as production, including migrations added after this test.
+  for (const filename of (await readdir("migrations")).filter(name => /^\d+.*\.sql$/.test(name)).sort()) {
     const migration = (await readFile(`migrations/${filename}`, "utf8")).replace(/^\s*--.*$/gm, "");
     const statements = splitMigration(migration);
     await db.batch(statements.map(statement => db.prepare(statement)));
@@ -93,10 +95,30 @@ try {
   assert.equal(result.data.items.length, 0);
   assert.equal(result.data.items.every(item => item.is_free !== false), true);
 
-  result = await request("/api/auth/login", { method: "POST", body: { email: "netanelhirsh@gmail.com", password: "GbR!7qN9#vK4xP2mZ8sL" } });
-  assert.equal(result.response.status, 200);
-  assert.equal(result.data.user.role, "admin");
-  const adminCookie = result.response.headers.get("set-cookie").split(";", 1)[0];
+  result = await request("/api/auth/register", { method: "POST", body: { fullName: "משתמש ראשון", phone: "052-1112233", city: "ירושלים", address: "רחוב הבדיקה 9, ירושלים", email: "first@example.org", password: "FirstUserPass!456", termsAccepted: true, operationalEmailsAccepted: true } });
+  assert.equal(result.response.status, 201, JSON.stringify(result.data));
+  const firstCookie = await verifyLatestEmail("first@example.org");
+  result = await request("/api/auth/me", { cookie: firstCookie });
+  assert.notEqual(result.data.user.role, "admin", "The first registrant must not become an administrator");
+
+  result = await request("/api/auth/register", { method: "POST", body: { fullName: "מנהל בדיקה", phone: "052-1234567", city: "ירושלים", address: "רחוב הבדיקה 1, ירושלים", email: "admin@example.org", password: "UniqueAdminPass!456", termsAccepted: true, operationalEmailsAccepted: true } });
+  assert.equal(result.response.status, 201, JSON.stringify(result.data));
+  const adminCookie = await verifyLatestEmail("admin@example.org");
+
+  const backupId = crypto.randomUUID();
+  const backupKey = `_system-backups/daily/test-${backupId}.json`;
+  const backupText = JSON.stringify({ version: 2, tables: { users: [{ id: "example" }] }, r2Manifest: [] });
+  const backupChecksum = createHash("sha256").update(backupText).digest("base64url");
+  const images = await mf.getR2Bucket("ITEM_IMAGES");
+  await images.put(backupKey, backupText);
+  await db.prepare("INSERT INTO backup_runs(id,status,backup_type,started_at,manifest_json) VALUES(?,'completed','scheduled',?,?)")
+    .bind(backupId, new Date().toISOString(), JSON.stringify({ storageKey: backupKey, checksum: backupChecksum, tables: ["users"] })).run();
+  result = await request(`/api/admin/backups/${backupId}/validate`, { method: "POST", cookie: adminCookie, body: {} });
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  assert.equal(result.data.validation.rowCount, 1);
+  await images.put(backupKey, backupText + "corruption");
+  result = await request(`/api/admin/backups/${backupId}/validate`, { method: "POST", cookie: adminCookie, body: {} });
+  assert.notEqual(result.response.status, 200, "Corrupt backups must fail validation");
 
   result = await request("/api/admin/site-settings", { cookie: adminCookie });
   assert.equal(result.response.status, 200);
@@ -105,7 +127,7 @@ try {
   result = await request("/api/admin/site-settings", { method: "PATCH", cookie: adminCookie, body: { siteName: "גמ״ח ברגע", tagline: "גדולה גמילות חסדים יותר מן הצדקה", heroTitle: "מה צריך להשאיל היום?", heroDescription: "מוצאים ציוד זמין מגמחים ואנשים טובים באזור שלכם ללא תשלום.", primaryColor: "#243f75", secondaryColor: "#9d7137", accentColor: "#e7bd78", fontFamily: "Arial, sans-serif", baseFontSize: 16, logoUrl: "/gmach-berega-logo.jpg" } });
   assert.equal(result.response.status, 200);
   result = await request("/api/admin/users", { cookie: adminCookie });
-  assert.equal(result.data.users.some(user => user.email === "netanelhirsh@gmail.com"), true);
+  assert.equal(result.data.users.some(user => user.email === "admin@example.org"), true);
   result = await request("/api/admin/page-customizations", { method: "PUT", cookie: adminCookie, body: { key: "#hero-title", text: "מה תרצו להשאיל?", styles: { fontSize: "64px", color: "#243f75", position: "fixed" }, attributes: { hidden: false } } });
   assert.equal(result.response.status, 200);
   assert.equal(result.data.customization.styles.position, undefined);

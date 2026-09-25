@@ -99,7 +99,22 @@ async function adminPageVersions(request,env,key,url){await requireAdmin(request
 async function restorePage(request,env,id){const admin=await requireAdmin(request,env),v=await env.DB.prepare("SELECT * FROM page_versions WHERE id=?").bind(id).first();if(!v)throw new RemainingError(404,"הגרסה לא נמצאה");await env.DB.prepare(`INSERT INTO page_content(content_key,language,content,status,updated_by) VALUES(?,?,?,'published',?) ON CONFLICT(content_key,language) DO UPDATE SET content=excluded.content,status='published',publish_at=NULL,updated_by=excluded.updated_by,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`).bind(v.content_key,v.language,v.content,admin.id).run();return json({ok:true})}
 async function validateBackup(request,env,id){
  await requireAdmin(request,env);const backup=await env.DB.prepare("SELECT * FROM backup_runs WHERE id=?").bind(id).first();if(!backup)throw new RemainingError(404,"הגיבוי לא נמצא");const vid=crypto.randomUUID(),started=new Date().toISOString();await env.DB.prepare("INSERT INTO restore_validations(id,backup_run_id,status,started_at) VALUES(?,?,'running',?)").bind(vid,id,started).run();
- try{const tables=(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").all()).results;let rows=0;for(const t of tables){const c=await env.DB.prepare(`SELECT COUNT(*) count FROM ${t.name}`).first();rows+=Number(c?.count||0)}const checksum=await hash(JSON.stringify({backup:id,tables:tables.map(x=>x.name).sort(),rows}));await env.DB.prepare("UPDATE restore_validations SET table_count=?,row_count=?,checksum=?,status='completed',details_json=?,finished_at=? WHERE id=?").bind(tables.length,rows,checksum,JSON.stringify({manifest:safe(backup.manifest_json,{})}),new Date().toISOString(),vid).run();return json({validation:{id:vid,status:"success",tableCount:tables.length,rowCount:rows,checksum}})}catch(e){await env.DB.prepare("UPDATE restore_validations SET status='failed',details_json=?,finished_at=? WHERE id=?").bind(JSON.stringify({error:String(e)}),new Date().toISOString(),vid).run();throw e}
+ try{
+  const manifest=safe(backup.manifest_json,{});
+  if(backup.status!=="completed"||!manifest.storageKey||!manifest.checksum)throw new Error("Backup manifest is incomplete");
+  const object=await env.ITEM_IMAGES.get(manifest.storageKey);
+  if(!object)throw new Error("Backup artifact is missing");
+  const raw=await object.text(),checksum=await hash(raw);
+  if(checksum!==manifest.checksum)throw new Error("Backup checksum mismatch");
+  const dump=JSON.parse(raw);
+  if(!dump.tables||typeof dump.tables!=="object"||Array.isArray(dump.tables))throw new Error("Backup tables are invalid");
+  const tables=Object.keys(dump.tables).sort();
+  if(!tables.length||tables.some(name=>!/^[A-Za-z0-9_]+$/.test(name)||!Array.isArray(dump.tables[name])))throw new Error("Backup rows are invalid");
+  if(JSON.stringify(tables)!==JSON.stringify([...(manifest.tables||[])].sort()))throw new Error("Backup table list mismatch");
+  const rows=tables.reduce((sum,name)=>sum+dump.tables[name].length,0);
+  await env.DB.prepare("UPDATE restore_validations SET table_count=?,row_count=?,checksum=?,status='success',details_json=?,finished_at=? WHERE id=?").bind(tables.length,rows,checksum,JSON.stringify({manifest,artifactVerified:true,restorePerformed:false}),new Date().toISOString(),vid).run();
+  return json({validation:{id:vid,status:"success",tableCount:tables.length,rowCount:rows,checksum,restorePerformed:false}});
+ }catch(e){await env.DB.prepare("UPDATE restore_validations SET status='failed',details_json=?,finished_at=? WHERE id=?").bind(JSON.stringify({error:String(e)}),new Date().toISOString(),vid).run();throw e}
 }
 async function externalStatus(request,env){
  await requireAdmin(request,env);const checks=[

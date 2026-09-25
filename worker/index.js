@@ -565,12 +565,8 @@ async function register(request, env, ctx, url) {
   const salt = randomToken(16);
   const passwordHash = await derivePassword(password, salt, PASSWORD_ITERATIONS);
   const admins = String(env.ADMIN_EMAILS || "").split(",").map(normalizeEmailLoose).filter(Boolean);
-  let userCount,existingAdmin;
-  try { [userCount,existingAdmin]=await Promise.all([env.DB.prepare("SELECT COUNT(*) AS count FROM users").first(),env.DB.prepare("SELECT id FROM users WHERE role = 'admin' LIMIT 1").first()]); }
-  catch(error) { console.error("Registration role lookup failed",error); throw new HttpError(503,"לא הצלחנו לבדוק את החשבון (שלב הרשאות)"); }
-  const isFirstAccount = Number(userCount?.count || 0) === 0;
   let role;
-  try { role=admins.includes(email)||(!existingAdmin&&isFirstAccount)?"admin":await compatibleMemberRole(env); }
+  try { role=admins.includes(email)?"admin":await compatibleMemberRole(env); }
   catch(error) { console.error("Registration role compatibility failed",error); role="member"; }
   const code = verificationCode();
   const challengeHash = await sha256(`${id}:${code}`);
