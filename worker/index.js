@@ -1002,6 +1002,10 @@ async function updateSavedSearch(request,env,id){
 }
 
 async function listItems(env, url) {
+  // Public reads must also heal additive schema drift. Deployments can contain
+  // data created before the rating/category migrations, and a catalog should
+  // never become unavailable because an optional enrichment column is absent.
+  await ensureFinalFeaturesSchema(env).catch(error => console.error("Catalog schema reconciliation failed", error));
   const params = [];
   const where = ["i.status = 'active'", "i.is_free = 1", "o.status = 'approved'", "o.is_hidden = 0"];
   const query = cleanOptional(url.searchParams.get("q"), 120);
@@ -1032,23 +1036,50 @@ async function listItems(env, url) {
       AND lr.requested_from <= ? AND lr.requested_until >= ?) < i.quantity`);
     params.push(date, date);
   }
-  const result = await env.DB.prepare(`
-    SELECT i.*, o.id AS org_id, o.name AS org_name,
-      o.last_active_at AS org_last_active_at,
-      (SELECT ROUND(AVG(r.rating),1) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_rating,
-      (SELECT COUNT(*) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_review_count,
-      (SELECT ROUND(AVG(r.item_rating),1) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_rating,
-      (SELECT COUNT(*) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_review_count,
-      MAX(0, i.quantity - (SELECT COALESCE(SUM(lr.quantity),0) FROM loan_requests lr WHERE lr.item_id=i.id AND lr.status IN ('pending','approved','collected'))) AS available_count
-    FROM items i JOIN organizations o ON o.id = i.organization_id
-    WHERE ${where.join(" AND ")}
-    ORDER BY CASE i.availability_status WHEN 'available' THEN 0 ELSE 1 END, i.created_at DESC
-    LIMIT 100
-  `).bind(...params).all();
+  let result;
+  try {
+    result = await env.DB.prepare(`
+      SELECT i.*, o.id AS org_id, o.name AS org_name,
+        o.last_active_at AS org_last_active_at,
+        (SELECT ROUND(AVG(r.rating),1) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_rating,
+        (SELECT COUNT(*) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_review_count,
+        (SELECT ROUND(AVG(r.item_rating),1) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_rating,
+        (SELECT COUNT(*) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_review_count,
+        CASE WHEN i.quantity - (SELECT COALESCE(SUM(lr.quantity),0) FROM loan_requests lr WHERE lr.item_id=i.id AND lr.status IN ('pending','approved','collected')) > 0
+          THEN i.quantity - (SELECT COALESCE(SUM(lr.quantity),0) FROM loan_requests lr WHERE lr.item_id=i.id AND lr.status IN ('pending','approved','collected')) ELSE 0 END AS available_count
+      FROM items i JOIN organizations o ON o.id = i.organization_id
+      WHERE ${where.join(" AND ")}
+      ORDER BY CASE i.availability_status WHEN 'available' THEN 0 ELSE 1 END, i.created_at DESC
+      LIMIT 100
+    `).bind(...params).all();
+  } catch (error) {
+    console.error("Enhanced catalog query failed; serving compatible catalog", error);
+    const fallbackWhere = ["i.status = 'active'", "i.is_free = 1", "o.status = 'approved'"];
+    const fallbackParams = [];
+    if (query) {
+      fallbackWhere.push("(i.title LIKE ? OR i.description LIKE ? OR o.name LIKE ?)");
+      const like = `%${query.replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
+      fallbackParams.push(like, like, like);
+    }
+    if (category) { fallbackWhere.push("i.category = ?"); fallbackParams.push(category); }
+    if (city) { fallbackWhere.push("i.city = ?"); fallbackParams.push(city); }
+    if (condition) { fallbackWhere.push("i.condition = ?"); fallbackParams.push(condition); }
+    if (availableOnly) fallbackWhere.push("i.availability_status = 'available'");
+    result = await env.DB.prepare(`
+      SELECT i.*, o.id AS org_id, o.name AS org_name,
+        NULL AS org_last_active_at, NULL AS org_rating, 0 AS org_review_count,
+        NULL AS item_rating, 0 AS item_review_count, i.quantity AS available_count
+      FROM items i JOIN organizations o ON o.id = i.organization_id
+      WHERE ${fallbackWhere.join(" AND ")}
+      ORDER BY CASE i.availability_status WHEN 'available' THEN 0 ELSE 1 END, i.created_at DESC
+      LIMIT 100
+    `).bind(...fallbackParams).all();
+  }
   return json({ items: result.results.map(mapItem) });
 }
 
 async function getItem(env, id) {
+  await ensureFinalFeaturesSchema(env).catch(error => console.error("Item schema reconciliation failed", error));
   const row = await env.DB.prepare(`
     SELECT i.*, o.id AS org_id, o.name AS org_name,
       o.last_active_at AS org_last_active_at,
