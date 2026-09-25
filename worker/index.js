@@ -44,19 +44,29 @@ async function serveSeoEntityPage(request,env,url){
     if(!row||row.deleted_at) return null;
     title=row.title+" | גמ״ח ברגע";description=String(row.description||("השאלת "+row.title+" בחינם דרך "+row.organization_name)).slice(0,180);
     image=parseJsonArray(row.image_urls)[0]||null;noindex=row.status!=="active";
-  }else{
-    m=url.pathname.match(/^\/gmach\/([^/]+)$/);
-    if(!m)return null;
+  }else if((m=url.pathname.match(/^\/gmach\/([^/]+)$/))){
     kind="organization";id=decodeURIComponent(m[1]);
     row=await env.DB.prepare("SELECT o.id,o.name,o.description,o.logo_url,o.is_hidden,o.deleted_at,EXISTS(SELECT 1 FROM items i WHERE i.organization_id=o.id AND i.status='active' AND i.deleted_at IS NULL) AS has_items FROM organizations o WHERE o.id=?").bind(id).first();
     if(!row||row.deleted_at)return null;
     title=row.name+" | גמ״ח ברגע";description=String(row.description||("עמוד "+row.name+" בגמ״ח ברגע")).slice(0,180);
     image=row.logo_url||null;noindex=Boolean(row.is_hidden||!row.has_items);
-  }
+  }else if((m=url.pathname.match(/^\/category\/([^/]+)$/))){
+    kind="category";id=decodeURIComponent(m[1]);
+    row=await env.DB.prepare("SELECT id,name_he,name_en,image_url,status FROM categories WHERE id=? OR name_he=? LIMIT 1").bind(id,id).first();
+    if(!row)return null;
+    title=(row.name_he||id)+" להשאלה בחינם | גמ״ח ברגע";description="מצאו "+(row.name_he||id)+" להשאלה בחינם מגמ״חים ואנשים טובים ברחבי ישראל.";
+    image=row.image_url||null;noindex=row.status!=="active";
+  }else if((m=url.pathname.match(/^\/area\/([^/]+)$/))){
+    kind="area";id=decodeURIComponent(m[1]);
+    const exists=await env.DB.prepare("SELECT COUNT(*) AS count FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.status='active' AND i.deleted_at IS NULL AND o.is_hidden=0 AND o.deleted_at IS NULL AND (i.city=? OR o.city=?)").bind(id,id).first();
+    if(!Number(exists?.count||0))return null;
+    title="גמ״חים וציוד להשאלה ב"+id+" | גמ״ח ברגע";description="מצאו ציוד להשאלה בחינם וגמ״חים פעילים ב"+id+".";
+    image=null;noindex=false;
+  }else return null;
   const assetUrl=new URL("/",url.origin);
   const assetResponse=await env.ASSETS.fetch(new Request(assetUrl.toString(),{method:"GET",headers:request.headers}));
   if(!assetResponse.ok)return assetResponse;
-  let html=await assetResponse.text(),canonical=url.origin+"/"+(kind==="item"?"item/":"gmach/")+encodeURIComponent(id);
+  let html=await assetResponse.text(),canonical=url.origin+"/"+({item:"item/",organization:"gmach/",category:"category/",area:"area/"}[kind])+encodeURIComponent(id);
   const absoluteImage=image?new URL(image,url.origin).toString():null;
   html=html.replace(/<title>[\s\S]*?<\/title>/i,"<title>"+escapeMeta(title)+"</title>");
   html=html.replace(/<meta name="description"[^>]*>/i,'<meta name="description" content="'+escapeMeta(description)+'">');
