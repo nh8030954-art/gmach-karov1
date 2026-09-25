@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import miniflare from "miniflare";
 const { FormData: WorkerFormData, Miniflare } = miniflare;
 
@@ -67,7 +67,8 @@ function splitMigration(sql) {
 
 try {
   const db = await mf.getD1Database("DB");
-  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql", "0007_platform_expansion.sql", "0008_advanced_inventory_and_booking.sql", "0009_production_hardening.sql", "0010_open_gmach_and_dual_ratings.sql", "0011_production_platform.sql", "0012_complete_platform.sql", "0013_platform_completion.sql", "0014_search_moderation_completion.sql", "0015_notification_delivery.sql"]) {
+  // Exercise the same schema as production, including migrations added after this test.
+  for (const filename of (await readdir("migrations")).filter(name => /^\d+.*\.sql$/.test(name)).sort()) {
     const migration = (await readFile(`migrations/${filename}`, "utf8")).replace(/^\s*--.*$/gm, "");
     const statements = splitMigration(migration);
     await db.batch(statements.map(statement => db.prepare(statement)));
