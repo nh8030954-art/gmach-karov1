@@ -95,6 +95,12 @@ try {
   assert.equal(result.data.items.length, 0);
   assert.equal(result.data.items.every(item => item.is_free !== false), true);
 
+  result = await request("/api/auth/register", { method: "POST", body: { fullName: "משתמש ראשון", phone: "052-1112233", city: "ירושלים", address: "רחוב הבדיקה 9, ירושלים", email: "first@example.org", password: "FirstUserPass!456", termsAccepted: true, operationalEmailsAccepted: true } });
+  assert.equal(result.response.status, 201, JSON.stringify(result.data));
+  const firstCookie = await verifyLatestEmail("first@example.org");
+  result = await request("/api/auth/me", { cookie: firstCookie });
+  assert.notEqual(result.data.user.role, "admin", "The first registrant must not become an administrator");
+
   result = await request("/api/auth/register", { method: "POST", body: { fullName: "מנהל בדיקה", phone: "052-1234567", city: "ירושלים", address: "רחוב הבדיקה 1, ירושלים", email: "admin@example.org", password: "UniqueAdminPass!456", termsAccepted: true, operationalEmailsAccepted: true } });
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
   const adminCookie = await verifyLatestEmail("admin@example.org");
