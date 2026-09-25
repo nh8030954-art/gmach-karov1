@@ -1,3 +1,4 @@
+import { handleRemainingFeatures, runRemainingMaintenance, ensureRemainingFeaturesSchema } from "./remaining-features.js";
 import { handleFinalFeatures, runFinalMaintenance, ensureFinalFeaturesSchema } from "./final-features.js";
 import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata, ensurePlatformCompletionSchema } from "./platform-completion.js";
 const SESSION_COOKIE = "gmach_session";
@@ -77,7 +78,7 @@ export default {
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env)]); })());
+    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env)]); })());
   }
 };
 
@@ -444,6 +445,8 @@ async function routeApi(request, env, ctx, url) {
 
   const finalFeaturesResponse = await handleFinalFeatures(request, env, ctx, url);
   if (finalFeaturesResponse) return finalFeaturesResponse;
+  const remainingFeaturesResponse = await handleRemainingFeatures(request, env, ctx, url);
+  if (remainingFeaturesResponse) return remainingFeaturesResponse;
 
   throw new HttpError(404, "הכתובת לא נמצאה");
 }
