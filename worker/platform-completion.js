@@ -447,5 +447,68 @@ async function currentSecurityBlock(request,env){const id=await sha256(request.h
 async function recordSecurityFailure(request,env,type){const id=await sha256(request.headers.get("CF-Connecting-IP")||"unknown"),now=new Date().toISOString();await qrun(env,"INSERT INTO security_events(id,event_type,severity,ip_hash,details_json) VALUES(?,?,?,?,?)",[crypto.randomUUID(),type,"warning",id,"{}"]);const recent=await qfirst(env,"SELECT COUNT(*) n FROM security_events WHERE ip_hash=? AND created_at>datetime('now','-1 hour')",[id]);if(Number(recent?.n||0)>=5)await qrun(env,"INSERT INTO security_blocks(identity_hash,reason,level,blocked_until) VALUES(?,?,?,datetime('now','+1 hour')) ON CONFLICT(identity_hash) DO UPDATE SET reason=excluded.reason,level=MIN(10,security_blocks.level+1),blocked_until=datetime('now','+'||(MIN(24,security_blocks.level+1))||' hours'),updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')",[id,type,1]);}
 async function sendSecurityEmail(env,userId,subject,body){const u=await qfirst(env,"SELECT email,full_name,preferred_language FROM users WHERE id=?",[userId]);if(u)try{await sendEmail(env,u.email,subject,body,u.full_name,u.preferred_language)}catch{}}
 async function sendEmail(env,email,subject,body,name,language){if(!env.RESEND_API_KEY)return;const he=language!=="en",r=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:env.RESEND_FROM_EMAIL||"Gmach Berega <onboarding@resend.dev>",to:[email],subject,text:body,html:`<div dir="${he?"rtl":"ltr"}" style="font-family:Arial,sans-serif;max-width:600px;margin:auto"><h2>גמ״ח ברגע</h2><p>${escapeHtml(name||"")}</p><p>${escapeHtml(body)}</p></div>`,reply_to:env.SUPPORT_EMAIL||undefined})});if(!r.ok)throw new Error("Email "+r.status);}
-async function sendPushPlaceholder(env,userId,title,body){if(!env.VAPID_PUBLIC_KEY||!env.VAPID_PRIVATE_KEY)return;await qrun(env,"INSERT INTO notifications(id,user_id,type,title,body) VALUES(?,?,?,?,?)",[crypto.randomUUID(),userId,"push",title,body]);}
+
+function b64uBytes(value){let s=String(value||"").replace(/-/g,"+").replace(/_/g,"/");while(s.length%4)s+="=";const raw=atob(s),out=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)out[i]=raw.charCodeAt(i);return out}
+function b64uEncode(bytes){let raw="";for(const b of bytes)raw+=String.fromCharCode(b);return btoa(raw).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}
+function concatBytes(...parts){const n=parts.reduce((s,p)=>s+p.length,0),out=new Uint8Array(n);let o=0;for(const p of parts){out.set(p,o);o+=p.length}return out}
+async function hmacSha256(key,data){const k=await crypto.subtle.importKey("raw",key,{name:"HMAC",hash:"SHA-256"},false,["sign"]);return new Uint8Array(await crypto.subtle.sign("HMAC",k,data))}
+async function hkdfExtract(salt,ikm){return hmacSha256(salt,ikm)}
+async function hkdfExpand(prk,info,len){let t=new Uint8Array(0),out=new Uint8Array(0),i=1;while(out.length<len){t=await hmacSha256(prk,concatBytes(t,info,new Uint8Array([i++])));out=concatBytes(out,t)}return out.slice(0,len)}
+function utf8(s){return new TextEncoder().encode(s)}
+async function vapidJwt(env,endpoint){
+  const audience=new URL(endpoint).origin,subject=String(env.VAPID_SUBJECT||("mailto:"+String(env.SUPPORT_EMAIL||"support@example.org")));
+  const header=b64uEncode(utf8(JSON.stringify({typ:"JWT",alg:"ES256"})));
+  const payload=b64uEncode(utf8(JSON.stringify({aud:audience,exp:Math.floor(Date.now()/1000)+12*3600,sub:subject})));
+  const privateBytes=b64uBytes(env.VAPID_PRIVATE_KEY);
+  if(privateBytes.length!==32)throw new Error("VAPID private key must be a 32-byte base64url P-256 scalar");
+  const publicBytes=b64uBytes(env.VAPID_PUBLIC_KEY);
+  if(publicBytes.length!==65||publicBytes[0]!==4)throw new Error("VAPID public key must be an uncompressed P-256 key");
+  const jwk={kty:"EC",crv:"P-256",d:b64uEncode(privateBytes),x:b64uEncode(publicBytes.slice(1,33)),y:b64uEncode(publicBytes.slice(33,65)),ext:true};
+  const key=await crypto.subtle.importKey("jwk",jwk,{name:"ECDSA",namedCurve:"P-256"},false,["sign"]);
+  let sig=new Uint8Array(await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},key,utf8(header+"."+payload)));
+  // Workers returns JOSE-compatible 64-byte P-1363 for ECDSA. Convert DER only if a runtime returns ASN.1.
+  if(sig.length!==64&&sig[0]===0x30){
+    let p=2;if(sig[1]&0x80)p=2+(sig[1]&0x7f);if(sig[p++]!==2)throw new Error("Invalid ECDSA signature");
+    const rl=sig[p++],r=sig.slice(p,p+rl);p+=rl;if(sig[p++]!==2)throw new Error("Invalid ECDSA signature");const sl=sig[p++],s=sig.slice(p,p+sl);
+    const raw=new Uint8Array(64),rr=r[0]===0?r.slice(1):r,ss=s[0]===0?s.slice(1):s;raw.set(rr.slice(-32),32-Math.min(32,rr.length));raw.set(ss.slice(-32),64-Math.min(32,ss.length));sig=raw;
+  }
+  if(sig.length!==64)throw new Error("Unexpected ECDSA signature format");
+  return header+"."+payload+"."+b64uEncode(sig);
+}
+async function encryptWebPushPayload(subscription,payload){
+  const uaPublic=b64uBytes(subscription.p256dh),auth=b64uBytes(subscription.auth);
+  if(uaPublic.length!==65||auth.length<16)throw new Error("Invalid push subscription keys");
+  const uaKey=await crypto.subtle.importKey("raw",uaPublic,{name:"ECDH",namedCurve:"P-256"},false,[]);
+  const serverPair=await crypto.subtle.generateKey({name:"ECDH",namedCurve:"P-256"},true,["deriveBits"]);
+  const serverPublic=new Uint8Array(await crypto.subtle.exportKey("raw",serverPair.publicKey));
+  const shared=new Uint8Array(await crypto.subtle.deriveBits({name:"ECDH",public:uaKey},serverPair.privateKey,256));
+  const authPrk=await hkdfExtract(auth,shared);
+  const ikm=await hkdfExpand(authPrk,concatBytes(utf8("WebPush: info"),new Uint8Array([0]),uaPublic,serverPublic),32);
+  const salt=crypto.getRandomValues(new Uint8Array(16)),prk=await hkdfExtract(salt,ikm);
+  const cek=await hkdfExpand(prk,concatBytes(utf8("Content-Encoding: aes128gcm"),new Uint8Array([0])),16);
+  const nonce=await hkdfExpand(prk,concatBytes(utf8("Content-Encoding: nonce"),new Uint8Array([0])),12);
+  const plain=concatBytes(utf8(JSON.stringify(payload)),new Uint8Array([2]));
+  const key=await crypto.subtle.importKey("raw",cek,{name:"AES-GCM"},false,["encrypt"]);
+  const encrypted=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv:nonce,tagLength:128},key,plain));
+  const header=new Uint8Array(16+4+1+serverPublic.length);header.set(salt,0);new DataView(header.buffer).setUint32(16,4096,false);header[20]=serverPublic.length;header.set(serverPublic,21);
+  return concatBytes(header,encrypted);
+}
+async function sendPushPlaceholder(env,userId,title,body){
+  if(!env.VAPID_PUBLIC_KEY||!env.VAPID_PRIVATE_KEY)throw new Error("Web Push VAPID is not configured");
+  const subscriptions=await qall(env,"SELECT id,endpoint,p256dh,auth FROM push_subscriptions WHERE user_id=?",[userId]);
+  if(!subscriptions.length)throw new Error("No active push subscription");
+  let delivered=0,lastError=null;
+  const payload={title,body,url:"/#/dashboard",tag:"gmach-update"};
+  for(const sub of subscriptions){
+    try{
+      const jwt=await vapidJwt(env,sub.endpoint),encrypted=await encryptWebPushPayload(sub,payload);
+      const response=await fetch(sub.endpoint,{method:"POST",headers:{"TTL":"86400","Content-Encoding":"aes128gcm","Content-Type":"application/octet-stream","Authorization":"vapid t="+jwt+", k="+env.VAPID_PUBLIC_KEY},body:encrypted});
+      if(response.status===404||response.status===410){await qrun(env,"DELETE FROM push_subscriptions WHERE id=?",[sub.id]);continue}
+      if(!response.ok)throw new Error("Push provider returned "+response.status);
+      delivered++;
+    }catch(e){lastError=e}
+  }
+  if(!delivered)throw (lastError||new Error("Push delivery failed"));
+  return delivered;
+}
 function escapeHtml(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
