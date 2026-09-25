@@ -167,7 +167,6 @@
           <label><span>מצב הפריט</span><select id="condition-filter"><option value="">כל המצבים</option><option value="כמו חדש">כמו חדש</option><option value="מצוין">מצוין</option><option value="טוב">טוב</option></select></label>
           <label><span>סוג</span><select id="type-filter"><option value="">הכול</option><option value="loan">השאלה</option><option value="donation">מסירה</option><option value="service">שירות</option></select></label>
           <label><span>איסוף</span><select id="pickup-filter"><option value="">כל האפשרויות</option><option value="pickup">איסוף עצמי</option><option value="delivery">משלוח</option><option value="coordination">בתיאום</option></select></label>
-          <label class="checkbox-filter"><input id="verified-only" type="checkbox"><span>גמ״חים מאומתים בלבד</span></label>
           <label class="checkbox-filter"><input id="available-only" type="checkbox" checked><span>רק פריטים זמינים</span></label>
           <button class="link-button" id="clear-filters" type="button">ניקוי סינון</button>
         </div>
@@ -297,6 +296,7 @@
         <button role="tab" aria-selected="true" data-dashboard-tab="requests">הבקשות שלי</button>
         <button role="tab" aria-selected="false" data-dashboard-tab="items">הפריטים שלי</button>
         <button role="tab" aria-selected="false" data-dashboard-tab="gmachim">הגמ״חים שלי</button>
+        <button role="tab" aria-selected="false" data-dashboard-tab="settings">פרופיל והגדרות</button>
         <button role="tab" aria-selected="false" data-dashboard-tab="admin" id="admin-tab" hidden>ניהול האתר</button>
       </div>
       <div id="dashboard-content" class="dashboard-content"></div>
@@ -381,9 +381,16 @@
     </div>
     <form id="auth-form" class="stack-form">
       <label id="auth-name-field" hidden><span>שם מלא</span><input id="auth-name" autocomplete="name" maxlength="80" placeholder="איך לפנות אליכם?"></label>
+      <div id="auth-profile-fields" hidden>
+        <label><span>טלפון</span><input id="auth-phone" type="tel" autocomplete="tel" inputmode="tel" dir="ltr" placeholder="05X-XXXXXXX"></label>
+        <label><span>עיר או יישוב</span><input id="auth-city" list="israel-cities" autocomplete="address-level2"></label>
+        <label><span>כתובת מלאה</span><input id="auth-address" autocomplete="street-address"></label>
+      </div>
       <label><span>כתובת אימייל</span><input id="auth-email" type="email" autocomplete="email" placeholder="name@example.com" required dir="ltr"></label>
       <label><span>סיסמה</span><input id="auth-password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required dir="ltr"><small>לפחות 10 תווים</small></label>
       <label class="consent-row" id="auth-consent-row" hidden><input id="auth-consent" type="checkbox"><span>קראתי ואני מסכים/ה ל<button type="button" data-open-info="terms">תנאי השימוש</button> ול<button type="button" data-open-info="privacy">מדיניות הפרטיות</button>.</span></label>
+      <label class="consent-row" id="auth-operational-row" hidden><input id="auth-operational" type="checkbox"><span>אני מסכים/ה לקבל הודעות תפעוליות הנחוצות להפעלת החשבון וההשאלות.</span></label>
+      <label class="consent-row" id="auth-community-row" hidden><input id="auth-community" type="checkbox"><span>אני מעוניין/ת לקבל הודעות קהילה והתנדבות <small>(רשות)</small>.</span></label>
       <button class="button button-primary button-full" id="auth-submit" type="submit">כניסה</button>
       <button class="link-button" id="forgot-password-button" type="button">שכחתי סיסמה</button>
     </form>
@@ -419,6 +426,7 @@
     <form id="request-form" class="stack-form">
       <input id="request-item-id" type="hidden">
       <div class="two-columns"><label><span>מתאריך</span><input id="request-start" type="date" required></label><label><span>עד תאריך</span><input id="request-end" type="date" required></label></div>
+      <label><span>כמות</span><input id="request-quantity" type="number" min="1" max="999" value="1" required></label>
       <label><span>טלפון לתיאום</span><input id="request-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="05X-XXXXXXX" dir="ltr" required></label>
       <label><span>כמה מילים למנהל הגמ״ח <small>(רשות)</small></span><textarea id="request-note" rows="3" maxlength="500" placeholder="למה אתם צריכים את הפריט ומתי נוח לאסוף"></textarea></label>
       <label class="consent-row"><input id="request-consent" type="checkbox" required><span>אני מתחייב/ת לשמור על הפריט ולהחזיר אותו בזמן ובמצב שבו התקבל.</span></label>
@@ -429,17 +437,17 @@
 
   <dialog class="modal modal-wide" id="gmach-dialog" aria-labelledby="gmach-form-title">
     <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת החלון">×</button>
-    <div class="dialog-heading align-start"><span class="section-kicker">מצטרפים לקהילה</span><h2 id="gmach-form-title">פתיחת עמוד גמ״ח</h2><p id="gmach-form-description">ממלאים פרטים בסיסיים. העמוד יפורסם לאחר בדיקה קצרה.</p></div>
+    <div class="dialog-heading align-start"><span class="section-kicker">מצטרפים לקהילה</span><h2 id="gmach-form-title">פתיחת עמוד גמ״ח</h2><p id="gmach-form-description">ממלאים פרטים בסיסיים. העמוד יפורסם אוטומטית לאחר הוספת המוצר הראשון.</p></div>
     <form id="gmach-form" class="stack-form">
       <div class="two-columns"><label><span>שם הגמ״ח</span><input id="gmach-name" required maxlength="90" placeholder="למשל: גמ״ח אירועים משפחת לוי"></label><label><span>תחום מרכזי</span><select id="gmach-category" required><option value="">בחירה</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option><option>כללי</option></select></label></div>
       <div class="two-columns"><label><span>עיר</span><input id="gmach-city" list="israel-cities" required autocomplete="address-level2"></label><label><span>שכונה <small>(רשות)</small></span><input id="gmach-neighborhood"></label></div>
-      <label><span>כתובת איסוף <small>(לא תוצג בקטלוג הפתוח)</small></span><input id="gmach-address" autocomplete="street-address"></label>
+      <label><span>כתובת איסוף <small>(תוצג בעמוד הגמ״ח)</small></span><input id="gmach-address" autocomplete="street-address" required></label>
       <label><span>אזור שירות</span><input id="gmach-service-area" maxlength="180" placeholder="למשל: פתח תקווה והסביבה"></label>
       <div class="two-columns"><label><span>שעות פעילות</span><input id="gmach-hours" maxlength="60" placeholder="א׳–ה׳ 16:00–20:00"></label><fieldset class="inline-options"><legend>אפשרויות מסירה</legend><label><input type="checkbox" name="gmach-pickup" value="pickup" checked> איסוף עצמי</label><label><input type="checkbox" name="gmach-pickup" value="delivery"> משלוח</label><label><input type="checkbox" name="gmach-pickup" value="coordination"> בתיאום</label></fieldset></div>
       <label><span>תיאור קצר</span><textarea id="gmach-description" rows="3" maxlength="600" required placeholder="מה אפשר להשאיל, למי מיועד ואיך מתאמים"></textarea></label>
-      <label><span>טלפון לתיאום <small>(לא יוצג ללא אישורכם)</small></span><input id="gmach-phone" type="tel" inputmode="tel" dir="ltr" required></label>
+      <label><span>טלפון לתיאום <small>(יוצג בעמוד הגמ״ח)</small></span><input id="gmach-phone" type="tel" inputmode="tel" dir="ltr" required></label>
       <label class="consent-row"><input id="gmach-consent" type="checkbox" required><span>אני מאשר/ת שהפעילות, הפריטים, הבקשות והתיאום ינוהלו בתוך גמ״ח ברגע; שהפריטים יוצעו ללא תשלום; ושקראתי את <button type="button" data-open-info="terms">תנאי השימוש</button> ואת <button type="button" data-open-info="privacy">מדיניות הפרטיות</button>.</span></label>
-      <button class="button button-primary button-full" id="gmach-submit" type="submit">שליחה לבדיקה</button>
+      <button class="button button-primary button-full" id="gmach-submit" type="submit">יצירת הגמ״ח</button>
     </form>
   </dialog>
 
@@ -449,11 +457,14 @@
     <form id="item-form" class="stack-form">
       <label><span>שייך לגמ״ח</span><select id="item-gmach" required><option value="">בחירת גמ״ח</option></select></label>
       <div class="two-columns"><label><span>שם הפריט</span><input id="item-name" maxlength="120" required placeholder="למשל: סט קשתות פרחים לאירוע"></label><label><span>קטגוריה</span><select id="item-category" required><option value="">בחירה</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option></select></label></div>
-      <div class="two-columns"><label><span>מצב הפריט</span><select id="item-condition" required><option>כמו חדש</option><option selected>מצוין</option><option>טוב</option></select></label><label><span>כמות זמינה</span><input id="item-quantity" type="number" min="1" max="999" value="1" required></label></div>
+      <div class="two-columns"><label><span>מצב הפריט</span><select id="item-condition" required><option>חדש</option><option>כמו חדש</option><option selected>מצב טוב</option><option>מצב סביר</option><option>בלאי נראה לעין</option></select></label><label><span>כמות זמינה</span><input id="item-quantity" type="number" min="1" max="999" value="1" required></label></div>
       <div class="two-columns"><label><span>סוג</span><select id="item-type"><option value="loan">השאלה</option><option value="donation">מסירה</option><option value="service">שירות</option></select></label><label><span>אופן קבלה</span><select id="item-pickup"><option value="pickup">איסוף עצמי</option><option value="delivery">משלוח</option><option value="coordination">בתיאום</option></select></label></div>
       <div class="two-columns"><label><span>קטגוריית משנה</span><input id="item-subcategory" maxlength="80" placeholder="למשל: עגלות"></label><label><span>תגיות</span><input id="item-tags" maxlength="250" placeholder="תינוק, עגלה, נסיעות"></label></div>
       <label><span>תיאור והוראות שימוש</span><textarea id="item-description" rows="4" maxlength="1200" required></textarea></label>
       <label><span>תנאי השאלה <small>(רשות)</small></span><input id="item-conditions" maxlength="300" placeholder="למשל: איסוף עצמי, החזרה תוך 3 ימים"></label>
+      <div class="two-columns"><label><span>פיקדון לציון בלבד <small>(האתר אינו צד לתשלום)</small></span><input id="item-deposit" type="number" min="0" step="0.01" placeholder="0"></label><label><span>מקסימום יחידות למשתמש</span><input id="item-max-per-user" type="number" min="1" max="999"></label></div>
+      <div class="two-columns"><label><span>זמן הכנה לפני איסוף (דקות)</span><input id="item-preparation" type="number" min="0" max="10080" value="0"></label><label><span>משך השאלה מרבי (ימים)</span><input id="item-max-days" type="number" min="1" max="365"></label></div>
+      <div class="two-columns"><label><span>הגבלת אזור (ק״מ)</span><input id="item-radius" type="number" min="0" step="0.5"></label><label><span>פרסום עתידי <small>(רשות)</small></span><input id="item-publish-at" type="datetime-local"></label></div>
       <label><span>תמונות <small>(עד 4, כל תמונה עד 5MB)</small></span><input id="item-images" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
       <label class="consent-row"><input id="item-free" type="checkbox" checked required><span>הפריט מוצע להשאלה חינמית בלבד.</span></label>
       <button class="button button-primary button-full" id="item-submit" type="submit">פרסום הפריט</button>
@@ -515,7 +526,7 @@
   <dialog class="modal modal-narrow" id="review-dialog" aria-labelledby="review-title">
     <button class="dialog-close" type="button" data-close-dialog aria-label="סגירה">×</button>
     <div class="dialog-heading"><h2 id="review-title">איך הייתה ההשאלה?</h2></div>
-    <form id="review-form" class="stack-form"><input id="review-request-id" type="hidden"><label><span>דירוג</span><select id="review-rating" required><option value="5">5 — מצוין</option><option value="4">4 — טוב מאוד</option><option value="3">3 — בסדר</option><option value="2">2 — טעון שיפור</option><option value="1">1 — לא טוב</option></select></label><label><span>ביקורת <small>(רשות)</small></span><textarea id="review-comment" rows="4" maxlength="800"></textarea></label><button class="button button-primary button-full" type="submit">פרסום ביקורת</button></form>
+    <form id="review-form" class="stack-form"><input id="review-request-id" type="hidden"><label><span>דירוג כללי לגמ״ח</span><select id="review-rating" required><option value="5">5 — מצוין</option><option value="4">4 — טוב מאוד</option><option value="3">3 — בסדר</option><option value="2">2 — טעון שיפור</option><option value="1">1 — לא טוב</option></select></label><div class="two-columns"><label><span>דירוג המוצר</span><select id="review-product-rating" required><option value="5">5</option><option value="4">4</option><option value="3">3</option><option value="2">2</option><option value="1">1</option></select></label><label><span>שירות ויחס</span><select id="review-service-rating" required><option value="5">5</option><option value="4">4</option><option value="3">3</option><option value="2">2</option><option value="1">1</option></select></label></div><label><span>ביקורת <small>(רשות)</small></span><textarea id="review-comment" rows="4" maxlength="800"></textarea></label><button class="button button-primary button-full" type="submit">פרסום ביקורת</button></form>
   </dialog>
 
   <dialog class="modal modal-medium" id="info-dialog" aria-labelledby="info-dialog-title">

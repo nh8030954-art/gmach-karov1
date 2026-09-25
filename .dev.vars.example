@@ -4,3 +4,7 @@ ADMIN_EMAILS=owner@example.com
 RESEND_API_KEY=re_xxxxxxxxxxxxxxxxx
 RESEND_FROM_EMAIL=Gmach Berega <verify@example.org>
 SUPPORT_EMAIL=support@example.org
+DATA_ENCRYPTION_KEY=replace-with-a-long-random-secret
+TURNSTILE_SECRET_KEY=replace-with-turnstile-secret
+ENVIRONMENT=development
+JEWISH_HOLIDAY_CLOSURES_JSON=[]
