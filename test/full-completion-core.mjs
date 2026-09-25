@@ -54,7 +54,7 @@ try{
     "0004_admin_console_and_security.sql","0005_visual_editor.sql","0006_refresh_public_copy.sql",
     "0007_platform_expansion.sql","0008_advanced_inventory_and_booking.sql","0009_production_hardening.sql",
     "0010_open_gmach_and_dual_ratings.sql","0011_production_platform.sql","0012_complete_platform.sql",
-    "0013_full_completion.sql"
+    "0013_full_completion.sql","0014_final_features.sql"
   ];
   for(const filename of migrations){
     const sql=(await readFile(`migrations/${filename}`,"utf8")).replace(/^\s*--.*$/gm,"");
@@ -66,6 +66,7 @@ try{
   assert.equal(result.response.status,200,JSON.stringify(result.data));
   assert.equal(result.data.release,"complete-platform-2026-09-25.6");
   assert.equal(result.data.completionSchema.ready,true);
+  assert.equal(result.data.finalFeaturesSchema.ready,true);
 
   const userId=crypto.randomUUID();
   const token="smoke-session-token-"+crypto.randomUUID();
