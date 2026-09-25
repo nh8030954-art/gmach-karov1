@@ -73,11 +73,40 @@ export async function ensurePlatformCompletionSchema(env){
   for(const [type,emailExpr,digest] of defaults) await env.DB.prepare(`INSERT OR IGNORE INTO notification_preferences(user_id,notification_type,in_app,email,push,digest) SELECT id,?,1,${emailExpr},0,? FROM users WHERE account_status='active'`).bind(type,digest).run();
 }
 
+function sensitiveAdminAction(path,method){
+  if(method==="PATCH"&&/^\/api\/admin\/users\/[^/]+$/.test(path))return "admin.user.update";
+  if(method==="POST"&&/^\/api\/admin\/(?:site-settings|page-customizations)\/versions\/[^/]+\/restore$/.test(path))return "admin.content.restore";
+  return null;
+}
+async function createAdminSensitiveChallenge(request,env){
+  const admin=await requireAdmin(request,env),b=await readJson(request),action=String(b.action||"");
+  if(!["admin.user.update","admin.content.restore"].includes(action))throw new HttpError(400,"פעולה רגישה אינה נתמכת");
+  const code=String(crypto.getRandomValues(new Uint32Array(1))[0]%1000000).padStart(6,"0"),id=crypto.randomUUID(),expires=new Date(Date.now()+10*60000).toISOString();
+  await qrun(env,"INSERT INTO admin_action_challenges(id,user_id,action,token_hash,expires_at) VALUES(?,?,?,?,?)",[id,admin.id,action,await sha256(code),expires]);
+  await sendEmail(env,admin.email,"קוד אישור לפעולת מנהל",`קוד האישור שלך הוא: ${code}. הקוד תקף ל-10 דקות.`,admin.full_name,admin.preferred_language);
+  return json({challengeId:id,expiresAt:expires});
+}
+async function confirmAdminSensitiveChallenge(request,env){
+  const admin=await requireAdmin(request,env),b=await readJson(request),id=clean(b.challengeId,1,120,"מזהה"),code=clean(b.code,6,6,"קוד");
+  const row=await qfirst(env,"SELECT * FROM admin_action_challenges WHERE id=? AND user_id=? AND used_at IS NULL AND expires_at>?",[id,admin.id,new Date().toISOString()]);
+  if(!row||row.token_hash!==await sha256(code))throw new HttpError(400,"קוד האישור שגוי או פג תוקף");
+  await qrun(env,"UPDATE admin_action_challenges SET used_at=? WHERE id=?",[new Date().toISOString(),id]);
+  return json({ok:true,action:row.action,challengeId:id});
+}
+async function sensitiveChallengeValid(request,env,action){
+  const admin=await requireAdmin(request,env),id=String(request.headers.get("X-Admin-Action-Token")||"").trim();if(!id)return false;
+  const row=await qfirst(env,"SELECT 1 ok FROM admin_action_challenges WHERE id=? AND user_id=? AND action=? AND used_at IS NOT NULL AND used_at>=datetime('now','-10 minutes') AND expires_at>?",[id,admin.id,action,new Date().toISOString()]);
+  return Boolean(row);
+}
+
 export async function platformPreflight(request,env,url){
   if(url.pathname==="/api/health") return null;
   const block=await currentSecurityBlock(request,env);
   if(block) return json({error:"הגישה הוגבלה זמנית בעקבות פעילות חריגה",blockedUntil:block.blocked_until},429);
-  if(!["POST","PUT","PATCH","DELETE"].includes(request.method.toUpperCase())) return null;
+  const method=request.method.toUpperCase();
+  if(!["POST","PUT","PATCH","DELETE"].includes(method)) return null;
+  const sensitive=sensitiveAdminAction(url.pathname,method);
+  if(sensitive && !(await sensitiveChallengeValid(request,env,sensitive))) return json({error:"נדרש אישור נוסף לפעולת מנהל רגישה",sensitiveAction:sensitive},428);
   if(!env.TURNSTILE_SECRET_KEY||!["/api/auth/register","/api/support"].includes(url.pathname)) return null;
   let body={}; try{body=await request.clone().json();}catch{return null;}
   const token=String(body.turnstileToken||"").trim();
@@ -103,6 +132,8 @@ export async function sessionMetadata(request,env,userId){
 
 export async function handlePlatformCompletionApi(request,env,ctx,url){
   const method=request.method.toUpperCase(),path=url.pathname;
+  if(method==="POST"&&path==="/api/admin/sensitive-action/challenge") return createAdminSensitiveChallenge(request,env);
+  if(method==="POST"&&path==="/api/admin/sensitive-action/confirm") return confirmAdminSensitiveChallenge(request,env);
   if(method==="GET"&&path==="/api/platform/features") return json({
     release:"complete-platform-2026-09-25.6",
     turnstileEnabled:Boolean(env.TURNSTILE_SECRET_KEY&&env.TURNSTILE_SITE_KEY),
