@@ -31,6 +31,11 @@ export default {
           if (url.pathname.startsWith("/api/")) return withSecurityHeaders(json({ error:"האתר סגור כעת לכבוד השבת. שבת שלום.", shabbat:true },503));
           return withSecurityHeaders(shabbatClosedPage(shabbat));
         }
+        const closure = await activePlatformClosure(env, new Date());
+        if (closure) {
+          if (url.pathname.startsWith("/api/")) return withSecurityHeaders(json({ error:closure.message, closure:true, reopensAt:closure.endsAt },503));
+          return withSecurityHeaders(platformClosedPage(closure));
+        }
       }
       if (url.pathname.startsWith("/api/")) {
         const response = await routeApi(request, env, ctx, url);
@@ -129,6 +134,18 @@ function shabbatClosedPage(state){
   return new Response(html,{status:503,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
 }
 
+async function activePlatformClosure(env,now){
+  try{
+    const iso=now.toISOString();
+    const row=await env.DB.prepare("SELECT title_he,ends_at FROM platform_closures WHERE active=1 AND starts_at<=? AND ends_at>? ORDER BY starts_at DESC LIMIT 1").bind(iso,iso).first();
+    if(row)return {message:row.title_he||"האתר סגור זמנית",endsAt:row.ends_at};
+    const configured=JSON.parse(String(env.JEWISH_HOLIDAY_CLOSURES_JSON||"[]"));
+    const item=Array.isArray(configured)?configured.find(entry=>iso>=entry.startsAt&&iso<entry.endsAt):null;
+    return item?{message:item.message||"חג שמח — האתר סגור כעת לכבוד החג",endsAt:item.endsAt}:null;
+  }catch{return null;}
+}
+function platformClosedPage(closure){const reopens=new Intl.DateTimeFormat("he-IL",{timeZone:"Asia/Jerusalem",dateStyle:"full",timeStyle:"short"}).format(new Date(closure.endsAt));return new Response(`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>גמ״ח ברגע — סגור זמנית</title></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#fff;font-family:Arial,sans-serif;color:#123c46;text-align:center"><main style="max-width:620px;padding:40px 24px"><img src="/gmach-berega-logo.jpg" alt="גמ״ח ברגע" style="max-width:260px"><h1>${escapeHtml(closure.message)}</h1><p>האתר ישוב לפעילות ב־${escapeHtml(reopens)}</p></main></body></html>`,{status:503,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});}
+
 async function createSupportRequest(request, env, ctx) {
   await ensureProductionHardeningSchema(env);
   const body = await readJson(request);
@@ -220,7 +237,7 @@ async function routeApi(request, env, ctx, url) {
     const bookingReady=itemSql.includes("min_loan_minutes")&&itemSql.includes("deposit_required")&&Boolean(waitlistTable)&&Boolean(blocksTable);
     const seededAdmin=await env.DB.prepare("SELECT password_hash FROM users WHERE id='admin-netanel-hirsh'").first();
     const adminCredentialRotated=!seededAdmin||seededAdmin.password_hash!=="5cSI6TEtFyH-uPzoGKFhS2ioqI9z-0NlihqSNTPgT5U";
-    return json({ ok:true,release:"production-platform-2026-09-25.1",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},timestamp:new Date().toISOString() });
+    return json({ ok:true,release:"complete-platform-2026-09-25.2",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
@@ -231,6 +248,7 @@ async function routeApi(request, env, ctx, url) {
   if (method === "POST" && path === "/api/auth/login") return login(request, env, ctx, url);
   if (method === "POST" && path === "/api/auth/2fa/verify-login") return verifyTwoFactorLogin(request, env, url);
   if (method === "POST" && path === "/api/auth/logout") return logout(request, env, url);
+  if (method === "POST" && path === "/api/auth/logout-all") return logoutAll(request, env, url);
   if (method === "POST" && path === "/api/auth/change-password") return changePassword(request, env);
   if (method === "DELETE" && path === "/api/me/account") return deleteAccount(request, env, url);
   if (method === "POST" && path === "/api/auth/2fa/setup") return setupTwoFactor(request, env);
@@ -241,7 +259,15 @@ async function routeApi(request, env, ctx, url) {
     return json({ user: user ? publicUser(user) : null });
   }
   if (method === "GET" && path === "/api/public-config") return json({ supportEmail: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL) });
+  if (method === "GET" && path === "/api/categories") return listCategories(env, url);
   if (method === "POST" && path === "/api/support") return createSupportRequest(request, env, ctx);
+  if (method === "GET" && path === "/api/me/profile") return getProfile(request, env);
+  if (method === "PATCH" && path === "/api/me/profile") return updateProfile(request, env);
+  if (method === "GET" && path === "/api/me/sessions") return listSessions(request, env);
+  if (method === "GET" && path === "/api/me/notification-preferences") return getNotificationPreferences(request, env);
+  if (method === "PUT" && path === "/api/me/notification-preferences") return saveNotificationPreferences(request, env);
+  if (method === "GET" && path === "/api/me/saved-searches") return listSavedSearches(request, env);
+  if (method === "POST" && path === "/api/me/saved-searches") return createSavedSearch(request, env);
 
   if (method === "GET" && path === "/api/items") return listItems(env, url);
   if (method === "GET" && path === "/api/discovery") return discovery(env, url);
@@ -249,6 +275,10 @@ async function routeApi(request, env, ctx, url) {
   if (method === "GET" && path === "/api/help-requests") return listHelpRequests(env, url);
   if (method === "POST" && path === "/api/help-requests") return createHelpRequest(request, env);
   if (method === "POST" && path === "/api/reviews") return createReview(request, env);
+  const helpfulReview = path.match(/^\/api\/reviews\/([^/]+)\/helpful$/);
+  if (method === "POST" && helpfulReview) return markReviewHelpful(request, env, decodeURIComponent(helpfulReview[1]));
+  const reportReview = path.match(/^\/api\/reviews\/([^/]+)\/report$/);
+  if (method === "POST" && reportReview) return reportReviewContent(request, env, decodeURIComponent(reportReview[1]));
   if (method === "GET" && path === "/api/site-settings") return getSiteSettings(env);
   if (method === "GET" && path === "/api/page-customizations") return getPageCustomizations(env);
   const itemDetail = path.match(/^\/api\/items\/([^/]+)$/);
@@ -270,6 +300,14 @@ async function routeApi(request, env, ctx, url) {
   if (favorite && method === "DELETE") return removeFavorite(request, env, decodeURIComponent(favorite[1]));
 
   if (method === "POST" && path === "/api/organizations") return createOrganization(request, env);
+  const organizationBranches = path.match(/^\/api\/organizations\/([^/]+)\/branches$/);
+  if (method === "GET" && organizationBranches) return listBranches(request, env, decodeURIComponent(organizationBranches[1]));
+  if (method === "POST" && organizationBranches) return createBranch(request, env, decodeURIComponent(organizationBranches[1]));
+  const organizationMembers = path.match(/^\/api\/organizations\/([^/]+)\/members$/);
+  if (method === "GET" && organizationMembers) return listOrganizationMembers(request, env, decodeURIComponent(organizationMembers[1]));
+  if (method === "POST" && organizationMembers) return addOrganizationMember(request, env, decodeURIComponent(organizationMembers[1]));
+  const organizationMember = path.match(/^\/api\/organizations\/([^/]+)\/members\/([^/]+)$/);
+  if (method === "DELETE" && organizationMember) return removeOrganizationMember(request, env, decodeURIComponent(organizationMember[1]), decodeURIComponent(organizationMember[2]));
   const publicOrganization = path.match(/^\/api\/organizations\/([^/]+)\/public$/);
   if (method === "GET" && publicOrganization) return getPublicOrganization(env, decodeURIComponent(publicOrganization[1]));
   const savedOrganization = path.match(/^\/api\/saved-organizations\/([^/]+)$/);
@@ -278,12 +316,26 @@ async function routeApi(request, env, ctx, url) {
   const organizationDetail = path.match(/^\/api\/organizations\/([^/]+)$/);
   if (method === "PATCH" && organizationDetail) return updateOrganization(request, env, decodeURIComponent(organizationDetail[1]));
   if (method === "POST" && path === "/api/items") return createItem(request, env);
+  const itemUnits = path.match(/^\/api\/items\/([^/]+)\/units$/);
+  if (method === "GET" && itemUnits) return listItemUnits(request, env, decodeURIComponent(itemUnits[1]));
+  if (method === "POST" && itemUnits) return createItemUnit(request, env, decodeURIComponent(itemUnits[1]));
   const imageUpload = path.match(/^\/api\/items\/([^/]+)\/images$/);
   if (method === "POST" && imageUpload) return uploadImages(request, env, decodeURIComponent(imageUpload[1]));
   if (method === "POST" && path === "/api/loan-requests") return createLoanRequest(request, env);
+  const loanTimeline = path.match(/^\/api\/loan-requests\/([^/]+)\/timeline$/);
+  if (method === "GET" && loanTimeline) return getLoanTimeline(request, env, decodeURIComponent(loanTimeline[1]));
+  const loanPickup = path.match(/^\/api\/loan-requests\/([^/]+)\/pickup-proposals$/);
+  if (method === "POST" && loanPickup) return createPickupProposal(request, env, decodeURIComponent(loanPickup[1]));
+  const acceptPickup = path.match(/^\/api\/pickup-proposals\/([^/]+)\/accept$/);
+  if (method === "POST" && acceptPickup) return acceptPickupProposal(request, env, decodeURIComponent(acceptPickup[1]));
+  const loanExtension = path.match(/^\/api\/loan-requests\/([^/]+)\/extension$/);
+  if (method === "POST" && loanExtension) return requestLoanExtension(request, env, decodeURIComponent(loanExtension[1]));
   const requestMessages = path.match(/^\/api\/loan-requests\/([^/]+)\/messages$/);
   if (method === "GET" && requestMessages) return listRequestMessages(request, env, decodeURIComponent(requestMessages[1]));
   if (method === "POST" && requestMessages) return createRequestMessage(request, env, decodeURIComponent(requestMessages[1]));
+  const helpOffers = path.match(/^\/api\/help-requests\/([^/]+)\/offers$/);
+  if (method === "GET" && helpOffers) return listHelpOffers(request, env, decodeURIComponent(helpOffers[1]));
+  if (method === "POST" && helpOffers) return createHelpOffer(request, env, decodeURIComponent(helpOffers[1]));
 
   if (method === "GET" && path === "/api/notifications") return listNotifications(request, env);
   if (method === "POST" && path === "/api/notifications/read-all") return markNotificationsRead(request, env);
@@ -323,8 +375,13 @@ async function routeApi(request, env, ctx, url) {
 async function register(request, env, ctx, url) {
   const body = await readJson(request);
   if (body.termsAccepted !== true) throw new HttpError(400, "יש לאשר את תנאי השימוש ומדיניות הפרטיות");
+  if (body.operationalEmailsAccepted !== true) throw new HttpError(400, "יש לאשר קבלת הודעות תפעוליות הנחוצות להפעלת החשבון");
   const email = normalizeEmail(body.email);
   const fullName = cleanText(body.fullName, 2, 80, "שם מלא");
+  const phone = validatePhone(body.phone);
+  const city = cleanText(body.city, 2, 80, "עיר או יישוב");
+  const address = cleanText(body.address, 5, 180, "כתובת מלאה");
+  const addressCipher = await encryptPrivateValue(address, env);
   const password = validatePassword(body.password);
   try { await enforceAuthRateLimit(env,email,"register",ctx); }
   catch(error) { if(error instanceof HttpError) throw error; console.error("Registration rate limit failed",error); throw new HttpError(503,"לא הצלחנו לבדוק את ההרשמה (שלב אבטחה)"); }
@@ -351,14 +408,14 @@ async function register(request, env, ctx, url) {
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
   try {
-    await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role) VALUES (?,?,?,?,?,?,?)")
-      .bind(id, email, passwordHash, salt, PASSWORD_ITERATIONS, fullName, role).run();
+    await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role,phone,city,address_cipher,terms_accepted_at,privacy_accepted_at,operational_emails_accepted,community_emails_accepted) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .bind(id, email, passwordHash, salt, PASSWORD_ITERATIONS, fullName, role, phone, city, addressCipher, new Date().toISOString(), new Date().toISOString(), 1, body.communityEmailsAccepted===true?1:0).run();
   } catch (error) {
     const message=String(error).toLowerCase();
     if (message.includes("unique")) throw new HttpError(409, "כבר קיים חשבון עם כתובת האימייל הזו");
     const fallbackRole=role==="member"?"borrower":role==="borrower"?"member":null;
     if (!fallbackRole) { console.error("Registration user write failed",error); throw new HttpError(503,"לא הצלחנו ליצור את החשבון במסד הנתונים"); }
-    try { await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role) VALUES (?,?,?,?,?,?,?)").bind(id,email,passwordHash,salt,PASSWORD_ITERATIONS,fullName,fallbackRole).run(); }
+    try { await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role,phone,city,address_cipher,terms_accepted_at,privacy_accepted_at,operational_emails_accepted,community_emails_accepted) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id,email,passwordHash,salt,PASSWORD_ITERATIONS,fullName,fallbackRole,phone,city,addressCipher,new Date().toISOString(),new Date().toISOString(),1,body.communityEmailsAccepted===true?1:0).run(); }
     catch (fallbackError) { console.error("Registration user fallback failed",fallbackError); throw new HttpError(503,"לא הצלחנו ליצור את החשבון במסד הנתונים"); }
   }
   try {
@@ -529,7 +586,11 @@ async function deleteAccount(request, env, url) {
   const password = validatePassword(body.password);
   const candidate = await derivePassword(password, user.password_salt, user.password_iterations);
   if (!constantTimeEqual(candidate, user.password_hash)) throw new HttpError(401, "הסיסמה אינה נכונה");
-  await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(user.id).run();
+  const now=new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE users SET account_status='suspended',deletion_requested_at=?,updated_at=? WHERE id=?").bind(now,now,user.id),
+    env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(user.id)
+  ]);
   return json({ ok: true }, 200, { "Set-Cookie": clearSessionCookie(url) });
 }
 
@@ -567,12 +628,67 @@ async function logout(request, env, url) {
   return json({ ok: true }, 200, { "Set-Cookie": clearSessionCookie(url) });
 }
 
+async function logoutAll(request, env, url) {
+  const user = await requireUser(request, env);
+  await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(user.id).run();
+  return json({ ok: true }, 200, { "Set-Cookie": clearSessionCookie(url) });
+}
+
+async function getProfile(request, env) {
+  const user = await requireUser(request, env);
+  return json({ profile: { ...publicUser(user), phone:user.phone||null, city:user.city||null, preferredLanguage:user.preferred_language||"he", operationalEmails:Boolean(user.operational_emails_accepted), communityEmails:Boolean(user.community_emails_accepted), deletionRequestedAt:user.deletion_requested_at||null } });
+}
+
+async function updateProfile(request, env) {
+  const user = await requireUser(request, env), body = await readJson(request);
+  const fullName=cleanText(body.fullName,2,80,"שם מלא"), phone=validatePhone(body.phone), city=cleanText(body.city,2,80,"עיר או יישוב");
+  const language=body.preferredLanguage==="en"?"en":"he", operational=body.operationalEmails===false?0:1, community=body.communityEmails===true?1:0;
+  await env.DB.prepare("UPDATE users SET full_name=?,phone=?,city=?,preferred_language=?,operational_emails_accepted=?,community_emails_accepted=?,updated_at=? WHERE id=?")
+    .bind(fullName,phone,city,language,operational,community,new Date().toISOString(),user.id).run();
+  return json({ profile:{...publicUser({...user,full_name:fullName}),phone,city,preferredLanguage:language,operationalEmails:Boolean(operational),communityEmails:Boolean(community)} });
+}
+
+async function listSessions(request, env) {
+  const user=await requireUser(request,env), token=cookieValue(request,SESSION_COOKIE), tokenHash=token?await sha256(token):"";
+  const rows=await env.DB.prepare("SELECT token_hash,device_label,last_seen_at,created_at,expires_at FROM sessions WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all();
+  return json({sessions:rows.results.map(row=>({deviceLabel:row.device_label||"מכשיר לא מזוהה",lastSeenAt:row.last_seen_at||row.created_at,createdAt:row.created_at,expiresAt:row.expires_at,current:row.token_hash===tokenHash}))});
+}
+
+async function listCategories(env,url) {
+  const locale=url.searchParams.get("locale")==="en"?"en":"he";
+  const rows=await env.DB.prepare("SELECT id,parent_id,name_he,name_en,icon,image_url FROM categories WHERE status='active' ORDER BY sort_order,name_he").all();
+  return json({categories:rows.results.map(row=>({...row,name:locale==="en"&&row.name_en?row.name_en:row.name_he}))});
+}
+
+async function getNotificationPreferences(request,env) {
+  const user=await requireUser(request,env);
+  const rows=await env.DB.prepare("SELECT notification_type,in_app,email,push,digest,quiet_start,quiet_end FROM notification_preferences WHERE user_id=? ORDER BY notification_type").bind(user.id).all();
+  return json({preferences:rows.results});
+}
+
+async function saveNotificationPreferences(request,env) {
+  const user=await requireUser(request,env), body=await readJson(request), rows=Array.isArray(body.preferences)?body.preferences:[];
+  if(rows.length>40) throw new HttpError(400,"נשלחו יותר מדי הגדרות");
+  const statements=[];
+  for(const row of rows){ const type=cleanText(row.type,2,60,"סוג התראה"),digest=row.digest==="daily"?"daily":"immediate";
+    statements.push(env.DB.prepare(`INSERT INTO notification_preferences(user_id,notification_type,in_app,email,push,digest,quiet_start,quiet_end) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(user_id,notification_type) DO UPDATE SET in_app=excluded.in_app,email=excluded.email,push=excluded.push,digest=excluded.digest,quiet_start=excluded.quiet_start,quiet_end=excluded.quiet_end`).bind(user.id,type,row.inApp===false?0:1,row.email===true?1:0,row.push===true?1:0,digest,cleanOptional(row.quietStart,5),cleanOptional(row.quietEnd,5))); }
+  if(statements.length) await env.DB.batch(statements);
+  return json({ok:true});
+}
+
+async function listSavedSearches(request,env){ const user=await requireUser(request,env); const rows=await env.DB.prepare("SELECT id,name,filters_json,notify,created_at FROM saved_searches WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(); return json({searches:rows.results.map(row=>({...row,filters:safeJsonObject(row.filters_json),notify:Boolean(row.notify)}))}); }
+async function createSavedSearch(request,env){ const user=await requireUser(request,env),body=await readJson(request),id=crypto.randomUUID(),filters=body.filters&&typeof body.filters==="object"&&!Array.isArray(body.filters)?body.filters:{}; await env.DB.prepare("INSERT INTO saved_searches(id,user_id,name,filters_json,notify) VALUES(?,?,?,?,?)").bind(id,user.id,cleanText(body.name,2,80,"שם החיפוש"),JSON.stringify(filters).slice(0,4000),body.notify===false?0:1).run(); return json({search:{id}},201); }
+
 async function listItems(env, url) {
   const params = [];
   const where = ["i.status = 'active'", "i.is_free = 1", "o.status = 'approved'", "o.is_hidden = 0"];
   const query = cleanOptional(url.searchParams.get("q"), 120);
   const category = cleanOptional(url.searchParams.get("category"), 40);
   const city = cleanOptional(url.searchParams.get("city"), 80);
+  const condition = cleanOptional(url.searchParams.get("condition"), 30);
+  const subcategory = cleanOptional(url.searchParams.get("subcategory"), 80);
+  const minimumRating = Number(url.searchParams.get("min_rating") || 0);
+  const minimumQuantity = Math.max(0, Number(url.searchParams.get("quantity") || 0));
   const requestedDate = cleanOptional(url.searchParams.get("date"), 10);
   const availableOnly = url.searchParams.get("available_only") === "true";
   if (query) {
@@ -582,6 +698,10 @@ async function listItems(env, url) {
   }
   if (category) { where.push("i.category = ?"); params.push(category); }
   if (city) { where.push("i.city = ?"); params.push(city); }
+  if (condition) { where.push("i.condition = ?"); params.push(condition); }
+  if (subcategory) { where.push("i.subcategory = ?"); params.push(subcategory); }
+  if (minimumRating > 0) { where.push("COALESCE((SELECT AVG(r.rating) FROM reviews r WHERE r.organization_id=o.id AND r.status='published'),0) >= ?"); params.push(Math.min(5,minimumRating)); }
+  if (minimumQuantity > 0) { where.push("MAX(0,i.quantity-(SELECT COALESCE(SUM(lq.quantity),0) FROM loan_requests lq WHERE lq.item_id=i.id AND lq.status IN ('pending','approved','collected'))) >= ?"); params.push(Math.min(999,minimumQuantity)); }
   if (availableOnly) where.push("i.availability_status = 'available'");
   if (requestedDate) {
     const date = validateDate(requestedDate, "תאריך החיפוש");
@@ -1532,6 +1652,67 @@ async function moderateReport(request, env, id) {
   return json({ id, status });
 }
 
+async function requireOrganizationRole(request,env,organizationId,allowed=["owner","requests","inventory","reports"]){
+  const user=await requireUser(request,env);
+  if(user.role==="admin") return {user,role:"owner"};
+  const row=await env.DB.prepare(`SELECT CASE WHEN o.owner_id=? THEN 'owner' ELSE m.role END AS role FROM organizations o LEFT JOIN organization_members m ON m.organization_id=o.id AND m.user_id=? WHERE o.id=?`).bind(user.id,user.id,organizationId).first();
+  if(!row?.role||!allowed.includes(row.role)) throw new HttpError(403,"אין הרשאה לבצע את הפעולה בגמ״ח הזה");
+  return {user,role:row.role};
+}
+
+async function listBranches(request,env,organizationId){
+  await requireOrganizationRole(request,env,organizationId);
+  const rows=await env.DB.prepare("SELECT * FROM organization_branches WHERE organization_id=? AND status!='archived' ORDER BY created_at").bind(organizationId).all();
+  return json({branches:rows.results.map(row=>({...row,hours:safeJsonObject(row.hours_json)}))});
+}
+
+async function createBranch(request,env,organizationId){
+  const {user}=await requireOrganizationRole(request,env,organizationId,["owner"]),body=await readJson(request),id=crypto.randomUUID();
+  const mode=["separate","shared","hybrid"].includes(body.inventoryMode)?body.inventoryMode:"separate";
+  await env.DB.batch([env.DB.prepare("INSERT INTO organization_branches(id,organization_id,name,address,city,latitude,longitude,phone,hours_json,inventory_mode) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(id,organizationId,cleanText(body.name,2,80,"שם הסניף"),cleanText(body.address,5,180,"כתובת"),cleanText(body.city,2,80,"עיר"),Number.isFinite(Number(body.latitude))?Number(body.latitude):null,Number.isFinite(Number(body.longitude))?Number(body.longitude):null,validatePhone(body.phone),sanitizeHours(body.hours),mode),auditStatement(env,user.id,"branch.create","organization_branch",id,{organizationId})]);
+  return json({branch:{id,organizationId,inventoryMode:mode}},201);
+}
+
+async function listOrganizationMembers(request,env,organizationId){
+  await requireOrganizationRole(request,env,organizationId,["owner"]);
+  const rows=await env.DB.prepare(`SELECT m.user_id,m.role,m.branch_scope_json,m.category_scope_json,m.created_at,u.full_name,u.email FROM organization_members m JOIN users u ON u.id=m.user_id WHERE m.organization_id=? ORDER BY m.created_at`).bind(organizationId).all();
+  return json({members:rows.results});
+}
+
+async function addOrganizationMember(request,env,organizationId){
+  const {user}=await requireOrganizationRole(request,env,organizationId,["owner"]),body=await readJson(request),email=normalizeEmail(body.email),role=["requests","inventory","reports"].includes(body.role)?body.role:null;
+  if(!role) throw new HttpError(400,"תפקיד המנהל אינו תקין");
+  const member=await env.DB.prepare("SELECT id FROM users WHERE email=? COLLATE NOCASE AND account_status='active'").bind(email).first();
+  if(!member) throw new HttpError(404,"לא נמצא משתמש פעיל עם כתובת האימייל הזו");
+  await env.DB.batch([env.DB.prepare(`INSERT INTO organization_members(organization_id,user_id,role,branch_scope_json,category_scope_json) VALUES(?,?,?,?,?) ON CONFLICT(organization_id,user_id) DO UPDATE SET role=excluded.role,branch_scope_json=excluded.branch_scope_json,category_scope_json=excluded.category_scope_json`).bind(organizationId,member.id,role,JSON.stringify(Array.isArray(body.branchIds)?body.branchIds.slice(0,50):[]),JSON.stringify(Array.isArray(body.categoryIds)?body.categoryIds.slice(0,50):[])),auditStatement(env,user.id,"organization.member.set","organization",organizationId,{memberId:member.id,role})]);
+  return json({member:{userId:member.id,role}},201);
+}
+
+async function removeOrganizationMember(request,env,organizationId,memberId){
+  const {user}=await requireOrganizationRole(request,env,organizationId,["owner"]);
+  await env.DB.batch([env.DB.prepare("DELETE FROM organization_members WHERE organization_id=? AND user_id=?").bind(organizationId,memberId),auditStatement(env,user.id,"organization.member.remove","organization",organizationId,{memberId})]);
+  return json({ok:true});
+}
+
+async function itemOrganization(env,itemId){return env.DB.prepare("SELECT i.organization_id,i.serial_prefix,o.name FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.id=?").bind(itemId).first();}
+async function listItemUnits(request,env,itemId){const item=await itemOrganization(env,itemId);if(!item)throw new HttpError(404,"הפריט לא נמצא");await requireOrganizationRole(request,env,item.organization_id,["owner","inventory"]);const rows=await env.DB.prepare("SELECT id,branch_id,serial_number,status,condition,created_at,updated_at FROM item_units WHERE item_id=? ORDER BY created_at").bind(itemId).all();return json({units:rows.results});}
+async function createItemUnit(request,env,itemId){const item=await itemOrganization(env,itemId);if(!item)throw new HttpError(404,"הפריט לא נמצא");const {user}=await requireOrganizationRole(request,env,item.organization_id,["owner","inventory"]),body=await readJson(request);const count=positiveInt(body.count,1,1,100,"כמות יחידות"),prefix=String(item.serial_prefix||item.name||"GMH").replace(/[^A-Za-z0-9א-ת]/g,"").slice(0,8).toUpperCase()||"GMH",created=[];for(let i=0;i<count;i++){let serial;for(let attempt=0;attempt<10;attempt++){serial=`${prefix}-${crypto.randomUUID().replaceAll("-","").slice(0,8).toUpperCase()}`;const exists=await env.DB.prepare("SELECT 1 FROM item_units WHERE serial_number=? UNION SELECT 1 FROM retired_serials WHERE serial_number=?").bind(serial,serial).first();if(!exists)break;}const id=crypto.randomUUID();await env.DB.prepare("INSERT INTO item_units(id,item_id,branch_id,serial_number,condition) VALUES(?,?,?,?,?)").bind(id,itemId,cleanOptional(body.branchId,100),serial,cleanText(body.condition,2,30,"מצב היחידה")).run();created.push({id,serialNumber:serial});}await auditStatement(env,user.id,"item.units.create","item",itemId,{count}).run();return json({units:created},201);}
+
+async function markReviewHelpful(request,env,reviewId){const user=await requireUser(request,env);const exists=await env.DB.prepare("SELECT id FROM reviews WHERE id=? AND status='published'").bind(reviewId).first();if(!exists)throw new HttpError(404,"הביקורת לא נמצאה");await env.DB.batch([env.DB.prepare("INSERT OR IGNORE INTO review_helpful_votes(review_id,user_id) VALUES(?,?)").bind(reviewId,user.id),env.DB.prepare("UPDATE reviews SET helpful_count=(SELECT COUNT(*) FROM review_helpful_votes WHERE review_id=?) WHERE id=?").bind(reviewId,reviewId)]);return json({helpful:true});}
+async function reportReviewContent(request,env,reviewId){const user=await requireUser(request,env),body=await readJson(request),id=crypto.randomUUID();try{await env.DB.prepare("INSERT INTO review_reports(id,review_id,reporter_id,reason) VALUES(?,?,?,?)").bind(id,reviewId,user.id,cleanText(body.reason,2,500,"סיבת הדיווח")).run();}catch(error){if(String(error).toLowerCase().includes("unique"))throw new HttpError(409,"כבר דיווחתם על הביקורת");throw error;}return json({report:{id,status:"pending"}},201);}
+
+async function loanAccess(request,env,requestId){
+  const user=await requireUser(request,env);const loan=await env.DB.prepare(`SELECT lr.*,i.organization_id,o.owner_id FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id LEFT JOIN organization_members m ON m.organization_id=o.id AND m.user_id=? WHERE lr.id=? AND (lr.borrower_id=? OR o.owner_id=? OR m.user_id IS NOT NULL OR ?='admin')`).bind(user.id,requestId,user.id,user.id,user.role).first();
+  if(!loan)throw new HttpError(404,"ההשאלה לא נמצאה או שאין הרשאה לצפות בה");return {user,loan};
+}
+async function getLoanTimeline(request,env,requestId){const {loan}=await loanAccess(request,env,requestId);const [events,proposals,ranges]=await env.DB.batch([env.DB.prepare("SELECT status,note,created_at FROM loan_status_events WHERE request_id=? ORDER BY created_at").bind(requestId),env.DB.prepare("SELECT id,starts_at,ends_at,status,created_at FROM pickup_proposals WHERE request_id=? ORDER BY created_at DESC").bind(requestId),env.DB.prepare("SELECT id,requested_from,requested_until,status FROM loan_date_ranges WHERE request_id=? ORDER BY requested_from").bind(requestId)]);return json({request:{id:loan.id,status:loan.status,workflowStatus:loan.workflow_status,requestedFrom:loan.requested_from,requestedUntil:loan.requested_until},events:events.results,proposals:proposals.results,dateRanges:ranges.results});}
+async function createPickupProposal(request,env,requestId){const {user,loan}=await loanAccess(request,env,requestId),body=await readJson(request),start=validateDateTime(body.startsAt,"תחילת חלון האיסוף"),end=validateDateTime(body.endsAt,"סיום חלון האיסוף");if(end<=start)throw new HttpError(400,"סיום חלון האיסוף חייב להיות אחרי תחילתו");const id=crypto.randomUUID(),now=new Date().toISOString();await env.DB.batch([env.DB.prepare("UPDATE pickup_proposals SET status='rejected' WHERE request_id=? AND status='pending'").bind(requestId),env.DB.prepare("INSERT INTO pickup_proposals(id,request_id,proposed_by,starts_at,ends_at) VALUES(?,?,?,?,?)").bind(id,requestId,user.id,start,end),env.DB.prepare("UPDATE loan_requests SET workflow_status='pickup_time_proposed',proposed_from=?,proposed_until=?,updated_at=? WHERE id=?").bind(start,end,now,requestId),env.DB.prepare("INSERT INTO loan_status_events(id,request_id,status,actor_id,note) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),requestId,"pickup_time_proposed",user.id,null)]);const recipient=user.id===loan.borrower_id?loan.owner_id:loan.borrower_id;await notificationStatement(env,recipient,"pickup_proposed","הוצע זמן איסוף","נשלחה הצעה חדשה לחלון איסוף.",requestId).run();return json({proposal:{id,startsAt:start,endsAt:end,status:"pending"}},201);}
+async function acceptPickupProposal(request,env,proposalId){const proposal=await env.DB.prepare("SELECT p.*,lr.borrower_id,i.organization_id,o.owner_id FROM pickup_proposals p JOIN loan_requests lr ON lr.id=p.request_id JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE p.id=?").bind(proposalId).first();if(!proposal)throw new HttpError(404,"הצעת הזמן לא נמצאה");const {user}=await loanAccess(request,env,proposal.request_id);if(user.id===proposal.proposed_by)throw new HttpError(403,"רק הצד השני יכול לאשר את ההצעה");const now=new Date().toISOString();await env.DB.batch([env.DB.prepare("UPDATE pickup_proposals SET status='accepted' WHERE id=? AND status='pending'").bind(proposalId),env.DB.prepare("UPDATE pickup_proposals SET status='rejected' WHERE request_id=? AND id<>? AND status='pending'").bind(proposal.request_id,proposalId),env.DB.prepare("UPDATE loan_requests SET status='approved',workflow_status='approved_ready_for_pickup',pickup_window_start=?,pickup_window_end=?,updated_at=? WHERE id=?").bind(proposal.starts_at,proposal.ends_at,now,proposal.request_id),env.DB.prepare("INSERT INTO loan_status_events(id,request_id,status,actor_id,note) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),proposal.request_id,"approved_ready_for_pickup",user.id,null)]);return json({ok:true,status:"approved_ready_for_pickup"});}
+async function requestLoanExtension(request,env,requestId){const {user,loan}=await loanAccess(request,env,requestId);if(user.id!==loan.borrower_id)throw new HttpError(403,"רק השואל יכול לבקש הארכה");if(!["approved","collected"].includes(loan.status))throw new HttpError(409,"לא ניתן לבקש הארכה בשלב הזה");const body=await readJson(request),until=validateDateTime(body.requestedUntil,"מועד החזרה חדש");if(until<=loan.requested_until)throw new HttpError(400,"מועד ההחזרה החדש חייב להיות מאוחר יותר");const conflict=await env.DB.prepare(`SELECT id FROM loan_requests WHERE item_id=? AND id<>? AND status IN ('pending','approved','collected') AND requested_from<? AND requested_until>? LIMIT 1`).bind(loan.item_id,requestId,until,loan.requested_until).first();if(conflict)throw new HttpError(409,"קיימת השאלה מתנגשת ולכן אי אפשר להאריך עד המועד הזה");await env.DB.batch([env.DB.prepare("UPDATE loan_requests SET extension_until=?,extension_status='pending',workflow_status='extension_pending',updated_at=? WHERE id=?").bind(until,new Date().toISOString(),requestId),env.DB.prepare("INSERT INTO loan_status_events(id,request_id,status,actor_id,note) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),requestId,"extension_pending",user.id,cleanOptional(body.note,500))]);await notificationStatement(env,loan.owner_id,"extension_requested","בקשת הארכה","השואל ביקש להאריך את ההשאלה.",requestId).run();return json({ok:true,status:"extension_pending"},201);}
+
+async function listHelpOffers(request,env,helpRequestId){const user=await requireUser(request,env);const help=await env.DB.prepare("SELECT requester_id AS user_id FROM help_requests WHERE id=?").bind(helpRequestId).first();if(!help)throw new HttpError(404,"בקשת הקהילה לא נמצאה");const rows=await env.DB.prepare(`SELECT h.*,u.full_name,i.title AS item_title FROM help_request_offers h JOIN users u ON u.id=h.responder_id LEFT JOIN items i ON i.id=h.item_id WHERE h.help_request_id=? AND (h.responder_id=? OR ?=? OR ?='admin') ORDER BY h.created_at DESC`).bind(helpRequestId,user.id,help.user_id,user.id,user.role).all();return json({offers:rows.results});}
+async function createHelpOffer(request,env,helpRequestId){const user=await requireUser(request,env),body=await readJson(request),help=await env.DB.prepare("SELECT requester_id AS user_id,status FROM help_requests WHERE id=?").bind(helpRequestId).first();if(!help||help.status!=="open")throw new HttpError(404,"בקשת הקהילה אינה פתוחה");if(help.user_id===user.id)throw new HttpError(400,"אי אפשר להציע מענה לבקשה שלכם");const itemId=cleanOptional(body.itemId,100);if(itemId){const permitted=await env.DB.prepare(`SELECT i.id FROM items i JOIN organizations o ON o.id=i.organization_id LEFT JOIN organization_members m ON m.organization_id=o.id AND m.user_id=? WHERE i.id=? AND (o.owner_id=? OR m.user_id IS NOT NULL OR ?='admin')`).bind(user.id,itemId,user.id,user.role).first();if(!permitted)throw new HttpError(403,"אין הרשאה להציע את הפריט הזה");}const id=crypto.randomUUID();await env.DB.batch([env.DB.prepare("INSERT INTO help_request_offers(id,help_request_id,responder_id,item_id,message) VALUES(?,?,?,?,?)").bind(id,helpRequestId,user.id,itemId,cleanOptional(body.message,800)),notificationStatement(env,help.user_id,"community_offer","התקבלה הצעה לבקשת הקהילה","מישהו הציע עזרה לבקשה שפרסמתם.")]);return json({offer:{id,status:"offered"}},201);}
+
 async function serveMedia(request, env, url) {
   if (request.method !== "GET" && request.method !== "HEAD") throw new HttpError(405, "הפעולה אינה נתמכת");
   const key = decodeURIComponent(url.pathname.slice("/media/".length));
@@ -1566,6 +1747,7 @@ async function requireAdmin(request, env) {
 }
 
 function notificationStatement(env, userId, type, title, body, requestId = null) {
+  if (!["request", "status", "message", "system"].includes(type)) type = "status";
   return env.DB.prepare("INSERT INTO notifications (id,user_id,type,title,body,request_id) VALUES (?,?,?,?,?,?)")
     .bind(crypto.randomUUID(), userId, type, title, body, requestId);
 }
@@ -1597,6 +1779,10 @@ async function runScheduledMaintenance(env) {
     env.DB.prepare("DELETE FROM auth_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')"),
     env.DB.prepare("DELETE FROM abuse_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')"),
     env.DB.prepare("UPDATE waitlist_entries SET status='expired' WHERE status IN ('waiting','notified') AND requested_until < ?").bind(now.slice(0,16)),
+    env.DB.prepare("UPDATE waitlist_offers SET declined_at=? WHERE accepted_at IS NULL AND declined_at IS NULL AND expires_at<=?").bind(now,now),
+    env.DB.prepare("UPDATE loan_requests SET workflow_status='overdue' WHERE status='collected' AND requested_until<? AND workflow_status!='overdue'").bind(now),
+    env.DB.prepare("UPDATE users SET deleted_at=?,email='deleted-'||id||'@invalid.local',full_name='משתמש שנמחק',phone=NULL,city=NULL,address_cipher=NULL WHERE deletion_requested_at IS NOT NULL AND deleted_at IS NULL AND deletion_requested_at<=datetime(?,'-7 days')").bind(now,now),
+    env.DB.prepare("UPDATE request_messages SET body='הודעה שנמחקה בהתאם למדיניות השמירה',media_url=NULL,deleted_at=? WHERE created_at<datetime(?,'-1 year') AND deleted_at IS NULL").bind(now,now),
     env.DB.prepare("DELETE FROM notifications WHERE read_at IS NOT NULL AND created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-180 days')"),
     env.DB.prepare("DELETE FROM analytics_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-395 days')"),
     env.DB.prepare("INSERT INTO operational_state(key,value,updated_at) VALUES ('last_maintenance_at',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(now,now)
@@ -1691,6 +1877,13 @@ function cleanOptional(value, max) {
   return text;
 }
 
+function validateDateTime(value, label) {
+  const text = String(value || "").trim();
+  const date = new Date(text);
+  if (!text || Number.isNaN(date.getTime())) throw new HttpError(400, `${label} אינו תקין`);
+  return date.toISOString();
+}
+
 function normalizeEmail(value) {
   const email = normalizeEmailLoose(value);
   if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new HttpError(400, "כתובת האימייל אינה תקינה");
@@ -1751,6 +1944,7 @@ async function sendPasswordResetEmail(env, email, fullName, code) {
   if (!response.ok) throw new Error(`Resend returned ${response.status}`);
 }
 
+function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[char]);}
 function escapeHtmlEmail(value) {
   return String(value || "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
 }
@@ -1861,6 +2055,18 @@ async function sha256(value) {
   const bytes = typeof value === "string" ? new TextEncoder().encode(value) : value;
   return toBase64Url(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
 }
+
+async function encryptPrivateValue(value, env) {
+  const secret=String(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY||"");
+  if(secret.length<24) throw new HttpError(503,"מפתח הצפנת הנתונים הפרטיים אינו מוגדר");
+  const keyBytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(secret));
+  const key=await crypto.subtle.importKey("raw",keyBytes,{name:"AES-GCM"},false,["encrypt"]);
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  const encrypted=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(value)));
+  return `v1.${bytesToBase64Url(iv)}.${bytesToBase64Url(encrypted)}`;
+}
+
+function bytesToBase64Url(bytes){let binary="";for(const byte of bytes)binary+=String.fromCharCode(byte);return btoa(binary).replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,"");}
 
 function randomToken(length) {
   return toBase64Url(crypto.getRandomValues(new Uint8Array(length)));

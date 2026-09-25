@@ -380,9 +380,14 @@
     </div>
     <form id="auth-form" class="stack-form">
       <label id="auth-name-field" hidden><span>שם מלא</span><input id="auth-name" autocomplete="name" maxlength="80" placeholder="איך לפנות אליכם?"></label>
+      <label class="auth-register-field" hidden><span>טלפון</span><input id="auth-phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="24" placeholder="050-0000000"></label>
+      <label class="auth-register-field" hidden><span>עיר או יישוב</span><input id="auth-city" autocomplete="address-level2" maxlength="80"></label>
+      <label class="auth-register-field" hidden><span>כתובת מלאה</span><input id="auth-address" autocomplete="street-address" maxlength="180"><small>הכתובת נשמרת מוצפנת ואינה מוצגת בפרופיל הציבורי.</small></label>
       <label><span>כתובת אימייל</span><input id="auth-email" type="email" autocomplete="email" placeholder="name@example.com" required dir="ltr"></label>
       <label><span>סיסמה</span><input id="auth-password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required dir="ltr"><small>לפחות 10 תווים</small></label>
       <label class="consent-row" id="auth-consent-row" hidden><input id="auth-consent" type="checkbox"><span>קראתי ואני מסכים/ה ל<button type="button" data-open-info="terms">תנאי השימוש</button> ול<button type="button" data-open-info="privacy">מדיניות הפרטיות</button>.</span></label>
+      <label class="consent-row auth-register-field" hidden><input id="auth-operational-consent" type="checkbox"><span>אני מסכים/ה לקבל הודעות תפעוליות הנחוצות להפעלת החשבון וההשאלות.</span></label>
+      <label class="consent-row auth-register-field" hidden><input id="auth-community-consent" type="checkbox"><span>אני מעוניין/ת לקבל גם עדכוני קהילה והתנדבות <small>(רשות)</small>.</span></label>
       <button class="button button-primary button-full" id="auth-submit" type="submit">כניסה</button>
       <button class="link-button" id="forgot-password-button" type="button">שכחתי סיסמה</button>
     </form>
