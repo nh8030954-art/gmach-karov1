@@ -1,0 +1,55 @@
+name: Automatic rollback
+
+on:
+  workflow_run:
+    workflows: ["Release checks"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  rollback:
+    if: github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: production-rollback
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Revert failed production commit when still current
+        env:
+          FAILED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+
+          if ! git merge-base --is-ancestor "$FAILED_SHA" HEAD; then
+            echo "Failed commit is no longer on main; nothing to rollback."
+            exit 0
+          fi
+
+          AFTER="$(git rev-list --reverse "$FAILED_SHA..HEAD")"
+          NON_RESULT_AFTER=0
+          for sha in $AFTER; do
+            files="$(git diff-tree --no-commit-id --name-only -r "$sha")"
+            if [ "$files" != ".release-check-result" ]; then
+              NON_RESULT_AFTER=$((NON_RESULT_AFTER+1))
+            fi
+          done
+
+          if [ "$NON_RESULT_AFTER" -gt 0 ]; then
+            echo "New production changes landed after the failed commit; automatic rollback skipped to avoid reverting newer work."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git revert --no-edit "$FAILED_SHA"
+          git commit --amend -m "Automatic rollback after failed release checks ($FAILED_SHA)"
+          git push origin main
