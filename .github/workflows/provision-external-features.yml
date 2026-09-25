@@ -1,0 +1,116 @@
+name: Provision external features
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/provision-external-features.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: provision-external-features
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check Cloudflare credentials
+        id: cf
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare credentials are not available as GitHub secrets; provisioning skipped."
+          fi
+
+      - uses: actions/checkout@v5
+        if: steps.cf.outputs.enabled == 'true'
+
+      - uses: actions/setup-node@v5
+        if: steps.cf.outputs.enabled == 'true'
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+        if: steps.cf.outputs.enabled == 'true'
+
+      - name: Read live feature state
+        if: steps.cf.outputs.enabled == 'true'
+        run: |
+          curl -fsS https://gmach-karov1.nh8030954.workers.dev/api/platform/features > "$RUNNER_TEMP/features.json" || echo '{}' > "$RUNNER_TEMP/features.json"
+
+      - name: Provision VAPID keys when missing
+        if: steps.cf.outputs.enabled == 'true'
+        run: |
+          PUSH="$(node -e "const x=require(process.env.RUNNER_TEMP+'/features.json');process.stdout.write(String(Boolean(x.pushConfigured)))")"
+          if [ "$PUSH" = "true" ]; then
+            echo "Web Push is already configured."
+            exit 0
+          fi
+          node - <<'NODE'
+          const fs=require('fs'),crypto=require('crypto');
+          const {privateKey,publicKey}=crypto.generateKeyPairSync('ec',{namedCurve:'prime256v1'});
+          const jwk=privateKey.export({format:'jwk'});
+          const pub=publicKey.export({format:'jwk'});
+          const dec=s=>Buffer.from(s.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-s.length%4)%4),'base64');
+          const rawPub=Buffer.concat([Buffer.from([4]),dec(pub.x),dec(pub.y)]).toString('base64url');
+          fs.writeFileSync(process.env.RUNNER_TEMP+'/vapid-private',jwk.d,{mode:0o600});
+          fs.writeFileSync(process.env.RUNNER_TEMP+'/vapid-public',rawPub,{mode:0o600});
+          NODE
+          cat "$RUNNER_TEMP/vapid-private" | npx wrangler secret put VAPID_PRIVATE_KEY --config wrangler.jsonc
+          cat "$RUNNER_TEMP/vapid-public" | npx wrangler secret put VAPID_PUBLIC_KEY --config wrangler.jsonc
+          printf '%s' 'mailto:support@gmach-berega.local' | npx wrangler secret put VAPID_SUBJECT --config wrangler.jsonc
+          rm -f "$RUNNER_TEMP/vapid-private" "$RUNNER_TEMP/vapid-public"
+          echo "VAPID keys provisioned."
+
+      - name: Provision Turnstile when missing and permitted
+        if: steps.cf.outputs.enabled == 'true'
+        continue-on-error: true
+        run: |
+          TURNSTILE="$(node -e "const x=require(process.env.RUNNER_TEMP+'/features.json');process.stdout.write(String(Boolean(x.turnstileEnabled)))")"
+          if [ "$TURNSTILE" = "true" ]; then
+            echo "Turnstile is already configured."
+            exit 0
+          fi
+
+          LIST="$(curl -fsS "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/challenges/widgets?per_page=50" -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")"
+          SITEKEY="$(printf '%s' "$LIST" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s),w=(x.result||[]).find(v=>v.name==='gmach-karov1-production');process.stdout.write(w?.sitekey||'')})")"
+
+          if [ -z "$SITEKEY" ]; then
+            CREATE="$(curl -fsS "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/challenges/widgets" \
+              -X POST \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data '{"domains":["gmach-karov1.nh8030954.workers.dev"],"mode":"managed","name":"gmach-karov1-production"}')"
+            printf '%s' "$CREATE" > "$RUNNER_TEMP/turnstile.json"
+          else
+            curl -fsS "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/challenges/widgets/$SITEKEY" \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" > "$RUNNER_TEMP/turnstile.json"
+          fi
+
+          node - <<'NODE'
+          const fs=require('fs'),x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/turnstile.json','utf8'));
+          if(!x.success||!x.result?.sitekey||!x.result?.secret)throw new Error('Turnstile API did not return a usable widget/secret');
+          fs.writeFileSync(process.env.RUNNER_TEMP+'/turnstile-sitekey',x.result.sitekey,{mode:0o600});
+          fs.writeFileSync(process.env.RUNNER_TEMP+'/turnstile-secret',x.result.secret,{mode:0o600});
+          NODE
+          cat "$RUNNER_TEMP/turnstile-sitekey" | npx wrangler secret put TURNSTILE_SITE_KEY --config wrangler.jsonc
+          cat "$RUNNER_TEMP/turnstile-secret" | npx wrangler secret put TURNSTILE_SECRET_KEY --config wrangler.jsonc
+          rm -f "$RUNNER_TEMP/turnstile-sitekey" "$RUNNER_TEMP/turnstile-secret" "$RUNNER_TEMP/turnstile.json"
+          echo "Turnstile provisioned."
+
+      - name: Verify feature state
+        if: steps.cf.outputs.enabled == 'true'
+        run: |
+          sleep 10
+          curl -fsS https://gmach-karov1.nh8030954.workers.dev/api/platform/features
