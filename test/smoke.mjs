@@ -6,6 +6,7 @@ const base = "http://local.test";
 const sentEmails = [];
 const mf = new Miniflare(convertV4MiniflareOptions({
   modules: true,
+  modulesRules: [{ type: "ESModule", include: ["**/*.js"], fallthrough: true }],
   scriptPath: "worker/index.js",
   compatibilityDate: "2026-09-20",
   d1Databases: { DB: "smoke-db" },
@@ -45,7 +46,7 @@ async function verifyLatestEmail(email) {
 
 try {
   const db = await mf.getD1Database("DB");
-  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql", "0007_platform_expansion.sql", "0008_advanced_inventory_and_booking.sql", "0009_production_hardening.sql", "0010_open_gmach_and_dual_ratings.sql", "0011_production_platform.sql", "0012_complete_platform.sql", "0013_platform_completion.sql", "0014_search_moderation_completion.sql"]) {
+  for (const filename of ["0001_initial.sql", "0002_remove_demo_catalog.sql", "0003_communication_and_management.sql", "0004_admin_console_and_security.sql", "0005_visual_editor.sql", "0006_refresh_public_copy.sql", "0007_platform_expansion.sql", "0008_advanced_inventory_and_booking.sql", "0009_production_hardening.sql", "0010_open_gmach_and_dual_ratings.sql", "0011_production_platform.sql", "0012_complete_platform.sql", "0013_platform_completion.sql", "0014_search_moderation_completion.sql", "0015_notification_delivery.sql"]) {
     const migration = (await readFile(`migrations/${filename}`, "utf8")).replace(/^\s*--.*$/gm, "");
     const statements = migration.split(/;\s*(?:\r?\n|$)/).map(statement => statement.trim()).filter(Boolean);
     await db.batch(statements.map(statement => db.prepare(statement)));
