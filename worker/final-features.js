@@ -316,12 +316,14 @@ async function seoMeta(env,type,id,url){
   throw new FinalError(404,"סוג SEO לא נתמך");
 }
 async function sitemap(env,url){
-  const [items,orgs]=await env.DB.batch([
+  const [items,orgs,categories,areas]=await env.DB.batch([
     env.DB.prepare("SELECT i.id,i.updated_at FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.status='active' AND i.deleted_at IS NULL AND o.is_hidden=0 AND o.deleted_at IS NULL ORDER BY i.updated_at DESC LIMIT 10000"),
-    env.DB.prepare("SELECT o.id,o.updated_at FROM organizations o WHERE o.is_hidden=0 AND o.deleted_at IS NULL AND EXISTS(SELECT 1 FROM items i WHERE i.organization_id=o.id AND i.status='active' AND i.deleted_at IS NULL) ORDER BY o.updated_at DESC LIMIT 10000")
+    env.DB.prepare("SELECT o.id,o.updated_at FROM organizations o WHERE o.is_hidden=0 AND o.deleted_at IS NULL AND EXISTS(SELECT 1 FROM items i WHERE i.organization_id=o.id AND i.status='active' AND i.deleted_at IS NULL) ORDER BY o.updated_at DESC LIMIT 10000"),
+    env.DB.prepare("SELECT c.id,c.updated_at FROM categories c WHERE c.status='active' AND EXISTS(SELECT 1 FROM item_categories ic JOIN items i ON i.id=ic.item_id JOIN organizations o ON o.id=i.organization_id WHERE ic.category_id=c.id AND i.status='active' AND i.deleted_at IS NULL AND o.is_hidden=0 AND o.deleted_at IS NULL) ORDER BY c.sort_order,c.name_he LIMIT 2000"),
+    env.DB.prepare("SELECT city,MAX(updated_at) updated_at FROM items WHERE status='active' AND deleted_at IS NULL AND city IS NOT NULL AND city<>'' GROUP BY city ORDER BY city LIMIT 2000")
   ]);
   const escXml=s=>String(s).replace(/[<>&'"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;","'":"&apos;",'"':"&quot;"}[c]));
-  const entries=[...orgs.results.map(x=>({loc:`${url.origin}/gmach/${x.id}`,last:x.updated_at})),...items.results.map(x=>({loc:`${url.origin}/item/${x.id}`,last:x.updated_at}))];
+  const entries=[...orgs.results.map(x=>({loc:`${url.origin}/gmach/${x.id}`,last:x.updated_at})),...items.results.map(x=>({loc:`${url.origin}/item/${x.id}`,last:x.updated_at})),...categories.results.map(x=>({loc:`${url.origin}/category/${encodeURIComponent(x.id)}`,last:x.updated_at})),...areas.results.map(x=>({loc:`${url.origin}/area/${encodeURIComponent(x.city)}`,last:x.updated_at}))];
   const xml='<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+entries.map(e=>`<url><loc>${escXml(e.loc)}</loc><lastmod>${new Date(e.last).toISOString()}</lastmod></url>`).join("")+"</urlset>";
   return new Response(xml,{headers:{"Content-Type":"application/xml; charset=utf-8","Cache-Control":"public, max-age=1800"}});
 }
