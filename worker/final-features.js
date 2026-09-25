@@ -345,6 +345,40 @@ async function logicalBackup(request,env){
 }
 async function backupList(request,env){await requireAdmin(request,env);const rows=await env.DB.prepare("SELECT * FROM backup_runs ORDER BY started_at DESC LIMIT 100").all();return json({backups:rows.results})}
 
+async function manageImages(request,env,itemId){
+  const item=await env.DB.prepare("SELECT i.id,i.organization_id,i.image_urls,i.primary_image_url FROM items i WHERE i.id=?").bind(itemId).first();
+  if(!item)throw new FinalError(404,"המוצר לא נמצא");
+  await orgAccess(request,env,item.organization_id,["owner","inventory"]);
+  const now=new Date().toISOString();
+  if(request.method==="GET"){
+    let rows=(await env.DB.prepare("SELECT * FROM item_images WHERE item_id=? ORDER BY sort_order,created_at").bind(itemId).all()).results;
+    if(!rows.length){
+      const urls=safeJson(item.image_urls,[]);
+      for(let i=0;i<urls.length;i++){const url=String(urls[i]),key=url.startsWith("/media/")?decodeURIComponent(url.slice(7)):"";await env.DB.prepare("INSERT OR IGNORE INTO item_images(id,item_id,storage_key,url,sort_order,is_primary,moderation_status) VALUES(?,?,?,?,?,?,?)").bind(crypto.randomUUID(),itemId,key,url,i,i===0?1:0,"approved").run();}
+      rows=(await env.DB.prepare("SELECT * FROM item_images WHERE item_id=? ORDER BY sort_order,created_at").bind(itemId).all()).results;
+    }
+    return json({images:rows});
+  }
+  const b=await body(request),ordered=Array.isArray(b.orderedUrls)?b.orderedUrls.map(String).slice(0,4):safeJson(item.image_urls,[]),primary=String(b.primaryUrl||ordered[0]||"");
+  const known=(await env.DB.prepare("SELECT id,url,storage_key FROM item_images WHERE item_id=?").bind(itemId).all()).results,byUrl=new Map(known.map(x=>[x.url,x]));
+  const keep=ordered.filter(url=>byUrl.has(url));
+  const remove=known.filter(x=>!keep.includes(x.url));
+  for(const x of remove){if(x.storage_key&&env.ITEM_IMAGES?.delete)await env.ITEM_IMAGES.delete(x.storage_key).catch(()=>{});await env.DB.prepare("DELETE FROM item_images WHERE id=?").bind(x.id).run();}
+  for(let i=0;i<keep.length;i++)await env.DB.prepare("UPDATE item_images SET sort_order=?,is_primary=? WHERE item_id=? AND url=?").bind(i,keep[i]===primary?1:0,itemId,keep[i]).run();
+  await env.DB.prepare("UPDATE items SET image_urls=?,primary_image_url=?,updated_at=? WHERE id=?").bind(JSON.stringify(keep),keep.includes(primary)?primary:(keep[0]||null),now,itemId).run();
+  return json({ok:true,imageUrls:keep,primaryUrl:keep.includes(primary)?primary:(keep[0]||null)});
+}
+async function reportImage(request,env,imageId){
+  const user=await requireUser(request,env),img=await env.DB.prepare("SELECT * FROM item_images WHERE id=?").bind(imageId).first();if(!img)throw new FinalError(404,"התמונה לא נמצאה");
+  const b=await body(request),reason=clean(b.reason,2,500,"סיבה"),severity=["normal","high","critical"].includes(b.severity)?b.severity:"normal";
+  const count=Number(img.report_count||0)+1,autoHide=severity==="critical"||count>=3,jobId=crypto.randomUUID();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE item_images SET report_count=?,moderation_status=? WHERE id=?").bind(count,autoHide?"hidden":img.moderation_status,imageId),
+    env.DB.prepare("INSERT INTO moderation_jobs(id,entity_type,entity_id,reason,severity,status,auto_hidden) VALUES(?,'item_image',?,?,?,'pending',?)").bind(jobId,imageId,reason,severity,autoHide?1:0)
+  ]);
+  return json({ok:true,autoHidden:autoHide},201);
+}
+
 async function richChatMessage(request,env,requestId){
   const {user,row}=await requestAccess(request,env,requestId);
   if(row.returned_at&&Date.now()-Date.parse(row.returned_at)>14*86400000)throw new FinalError(409,"השיחה נסגרה 14 ימים לאחר ההחזרה");
@@ -403,6 +437,8 @@ export async function handleFinalFeatures(request,env,ctx,url){
     m=path.match(/^\/api\/loan-requests\/([^/]+)\/branch-proposal$/);if(m&&method==="POST")return proposeBranch(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/branch-proposals\/([^/]+)\/respond$/);if(m&&method==="POST")return respondBranch(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/item-units\/([^/]+)\/history$/);if(m&&method==="GET")return unitHistory(request,env,decodeURIComponent(m[1]));
+    m=path.match(/^\/api\/items\/([^/]+)\/images\/manage$/);if(m&&(method==="GET"||method==="PATCH"))return manageImages(request,env,decodeURIComponent(m[1]));
+    m=path.match(/^\/api\/item-images\/([^/]+)\/report$/);if(m&&method==="POST")return reportImage(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/item-units\/scan\/([^/]+)$/);if(m&&method==="GET")return scanSerial(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/item-units\/([^/]+)\/scan-action$/);if(m&&method==="POST")return unitScanAction(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/organizations\/([^/]+)\/inventory\/bulk$/);if(m&&method==="POST")return bulkInventory(request,env,decodeURIComponent(m[1]));
