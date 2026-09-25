@@ -50,17 +50,6 @@ CREATE TABLE auth_challenges (
 INSERT INTO site_settings (id,site_name,tagline,hero_title,hero_description,primary_color,secondary_color,accent_color,font_family,base_font_size,logo_url)
 VALUES (1,'גמ״ח ברגע','גדולה גמילות חסדים יותר מן הצדקה','מה צריך להשאיל היום?','מוצאים ציוד זמין מגמ״חים ואנשים טובים באזור שלכם — בלי תשלום ובלי להסתבך.','#243f75','#9d7137','#e7bd78','Arial, sans-serif',16,'/gmach-berega-logo.jpg');
 
-INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role,email_verified)
-VALUES ('admin-netanel-hirsh','netanelhirsh@gmail.com','5cSI6TEtFyH-uPzoGKFhS2ioqI9z-0NlihqSNTPgT5U','xcEC4K-hYRHx8qGkzLxv1g',100000,'נתנאל הירש','admin',1)
-ON CONFLICT(email) DO UPDATE SET
-  password_hash = excluded.password_hash,
-  password_salt = excluded.password_salt,
-  password_iterations = excluded.password_iterations,
-  role = 'admin',
-  email_verified = 1,
-  account_status = 'active',
-  updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now');
-
 CREATE INDEX site_versions_created_idx ON site_setting_versions(created_at DESC);
 CREATE INDEX audit_log_created_idx ON audit_log(created_at DESC);
 CREATE INDEX auth_challenges_expiry_idx ON auth_challenges(expires_at);
