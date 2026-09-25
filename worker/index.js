@@ -317,6 +317,7 @@ async function routeApi(request, env, ctx, url) {
   if (method === "GET" && path === "/api/me/addresses") return listAddresses(request, env);
   if (method === "POST" && path === "/api/me/addresses") return createAddress(request, env);
   const addressDetail = path.match(/^\/api\/me\/addresses\/([^/]+)$/);
+  if (method === "PATCH" && addressDetail) return updateAddress(request, env, decodeURIComponent(addressDetail[1]));
   if (method === "DELETE" && addressDetail) return deleteAddress(request, env, decodeURIComponent(addressDetail[1]));
   const savedSearchDetail = path.match(/^\/api\/me\/saved-searches\/([^/]+)$/);
   if (method === "DELETE" && savedSearchDetail) return deleteSavedSearch(request, env, decodeURIComponent(savedSearchDetail[1]));
@@ -755,6 +756,21 @@ async function createAddress(request,env){
     .bind(id,user.id,label,cipher,city,Number.isFinite(Number(body.latitude))?Number(body.latitude):null,Number.isFinite(Number(body.longitude))?Number(body.longitude):null,isDefault));
   await env.DB.batch(statements);
   return json({address:{id,label,city,isDefault:Boolean(isDefault)}},201);
+}
+
+async function updateAddress(request,env,id){
+  const user=await requireUser(request,env),body=await readJson(request);
+  const existing=await env.DB.prepare("SELECT * FROM user_addresses WHERE id=? AND user_id=?").bind(id,user.id).first();
+  if(!existing) throw new HttpError(404,"הכתובת לא נמצאה");
+  const label=body.label===undefined?existing.label:cleanText(body.label,1,50,"שם הכתובת");
+  const city=body.city===undefined?existing.city:cleanText(body.city,2,80,"עיר או יישוב");
+  const cipher=body.address===undefined?existing.address_cipher:await encryptPrivateValue(cleanText(body.address,5,180,"כתובת מלאה"),env);
+  const lat=body.latitude===undefined?existing.latitude:(Number.isFinite(Number(body.latitude))?Number(body.latitude):null);
+  const lon=body.longitude===undefined?existing.longitude:(Number.isFinite(Number(body.longitude))?Number(body.longitude):null);
+  const isDefault=body.isDefault===undefined?Number(existing.is_default):(body.isDefault?1:0),now=new Date().toISOString();
+  const s=[];if(isDefault)s.push(env.DB.prepare("UPDATE user_addresses SET is_default=0,updated_at=? WHERE user_id=?").bind(now,user.id));
+  s.push(env.DB.prepare("UPDATE user_addresses SET label=?,address_cipher=?,city=?,latitude=?,longitude=?,is_default=?,updated_at=? WHERE id=? AND user_id=?").bind(label,cipher,city,lat,lon,isDefault,now,id,user.id));
+  await env.DB.batch(s);return json({ok:true,address:{id,label,city,latitude:lat,longitude:lon,isDefault:Boolean(isDefault)}});
 }
 
 async function deleteAddress(request,env,id){
@@ -2426,7 +2442,7 @@ function withSecurityHeaders(response) {
   const headers = new Headers(response.headers);
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+  headers.set("Permissions-Policy", "camera=(self), microphone=(self), geolocation=(self), payment=()");
   headers.set("X-Frame-Options", "DENY");
   headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
   headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
