@@ -163,7 +163,7 @@
     $("#detail-request-button").addEventListener("click", () => startRequest(item.id)); $("#detail-favorite-button").addEventListener("click", () => toggleFavorite(item.id, true)); $("#detail-report-button").addEventListener("click", () => openReport(item.id)); analytics("item_view", { entityId:item.id, category:item.category, city:item.city }); openDialog($("#item-dialog"));
   }
   async function shareItem(item) {
-    const url = `${location.origin}${location.pathname}#/item/${encodeURIComponent(item.id)}`; const data = { title:item.title, text:`מצאתי את ${item.title} בגמ״ח ברגע`, url };
+    const url = `${location.origin}/item/${encodeURIComponent(item.id)}`; const data = { title:item.title, text:`מצאתי את ${item.title} בגמ״ח ברגע`, url };
     try { if (navigator.share) await navigator.share(data); else { await navigator.clipboard.writeText(url); toast("הקישור הועתק"); } analytics("share", { entityId:item.id }); } catch { /* User cancelled sharing. */ }
   }
   async function openOrganization(id) {
@@ -497,7 +497,7 @@
   }
 
   async function init() {
-    setupEvents(); setAuthMode("login"); updateAuthUI(); await detectServer(); await Promise.all([loadSiteSettings(), loadPageCustomizations(), loadPublicConfig(),loadDiscovery()]); document.documentElement.classList.remove("app-booting"); await refreshUser(); await loadItems(); registerWebMCP();
+    setupEvents(); setAuthMode("login"); updateAuthUI(); await detectServer(); await Promise.all([loadSiteSettings(), loadPageCustomizations(), loadPublicConfig(),loadDiscovery()]); document.documentElement.classList.remove("app-booting"); await refreshUser(); await loadItems(); const seoRoute=document.body.dataset.seoRoute||""; if(seoRoute.startsWith("item:")) await openItem(seoRoute.slice(5)); else if(seoRoute.startsWith("organization:")) await openOrganization(seoRoute.slice(13)); registerWebMCP();
     window.setInterval(() => { if (state.user && document.visibilityState === "visible") refreshNotifications(true); }, 30000);
     if (location.hash === "#/dashboard") state.user ? showDashboard() : requireAuth(() => showDashboard()); else if (location.hash === "#/catalog") window.setTimeout(() => $("#catalog").scrollIntoView(), 0);
   }
