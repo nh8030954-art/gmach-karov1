@@ -1,1 +1,1 @@
-// Release gate uses the Miniflare v5 full-completion smoke suite.\nawait import(new URL("./full-completion-smoke.mjs", import.meta.url).href + "?release=" + Date.now());\n
+// Release gate uses the secret-free full completion smoke suite.\nawait import(new URL("./full-completion-core.mjs", import.meta.url).href + "?release=" + Date.now());\n
