@@ -992,7 +992,7 @@ async function getPublicOrganization(env, id) {
     FROM organizations o LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
     WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 AND EXISTS (SELECT 1 FROM items pi WHERE pi.organization_id=o.id AND pi.status='active' AND pi.deleted_at IS NULL) GROUP BY o.id`).bind(id).first();
   if (!organization) throw new HttpError(404, "הגמ״ח לא נמצא");
-  const [items, reviews] = await env.DB.batch([
+  const [items, reviews, orgCategories] = await env.DB.batch([
     env.DB.prepare(`SELECT i.*,o.id AS org_id,o.name AS org_name,o.last_active_at AS org_last_active_at,
       NULL AS org_rating,0 AS org_review_count,
       (SELECT ROUND(AVG(r.item_rating),1) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_rating,
@@ -1006,9 +1006,10 @@ async function getPublicOrganization(env, id) {
       LEFT JOIN loan_requests lr ON lr.id=r.request_id
       LEFT JOIN items i ON i.id=lr.item_id
       LEFT JOIN organization_branches b ON b.id=r.branch_id
-      WHERE r.organization_id=? AND r.status='published' ORDER BY r.created_at DESC LIMIT 30`).bind(id)
+      WHERE r.organization_id=? AND r.status='published' ORDER BY r.created_at DESC LIMIT 30`).bind(id),
+    env.DB.prepare(`SELECT c.id,c.name_he,c.name_en,c.icon,c.image_url FROM organization_categories oc JOIN categories c ON c.id=oc.category_id WHERE oc.organization_id=? AND c.status='active' ORDER BY c.sort_order,c.name_he`).bind(id)
   ]);
-  return json({ organization: { ...organization, verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options) }, items: items.results.map(mapItem), reviews: reviews.results });
+  return json({ organization: { ...organization, verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options), categories: orgCategories.results }, items: items.results.map(mapItem), reviews: reviews.results });
 }
 
 async function toggleSavedOrganization(request, env, organizationId, save) {
