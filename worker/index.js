@@ -1,4 +1,4 @@
-import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata } from "./platform-completion.js";
+import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata, ensurePlatformCompletionSchema } from "./platform-completion.js";
 const SESSION_COOKIE = "gmach_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
 // Keep PBKDF2 within the Cloudflare Workers CPU budget. Existing production
@@ -61,7 +61,7 @@ export default {
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil(Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env)]));
+    ctx.waitUntil((async()=>{ await ensurePlatformCompletionSchema(env); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env)]); })());
   }
 };
 
@@ -246,6 +246,7 @@ async function routeApi(request, env, ctx, url) {
     await ensureAdvancedBookingSchema(env);
     await ensureProductionHardeningSchema(env);
     await ensureCompletePlatformSchema(env);
+    await ensurePlatformCompletionSchema(env);
     const [usersTable,challengesTable,itemsTable,waitlistTable,blocksTable,securityTable,sessionsTable]=await Promise.all([
       env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").first(),
       env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='auth_challenges'").first(),
