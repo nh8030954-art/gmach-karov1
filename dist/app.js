@@ -83,7 +83,7 @@
     $("#connection-banner").hidden = state.serverAvailable;
   }
   async function loadPublicConfig() {
-    if (!state.serverAvailable) return; try { const data = await api("/api/public-config"); state.supportEmail = data.supportEmail || ""; } catch { /* Optional public configuration. */ }
+    try { const data = await api("/api/public-config"); state.supportEmail = data.supportEmail || ""; } catch { /* Optional public configuration. */ }
   }
   async function loadDiscovery(query = "") {
     try { const data = await api(`/api/discovery${query ? `?q=${encodeURIComponent(query)}` : ""}`); state.discovery = data; renderDiscovery(); state.serverAvailable = true; $("#connection-banner").hidden = true; }
@@ -205,7 +205,6 @@
     state.user = user; state.pendingVerificationEmail = ""; updateAuthUI(); await refreshAccountSnapshot(); await refreshNotifications(true); form?.reset(); closeDialog($("#auth-dialog")); const action = state.pendingAction; state.pendingAction = null; action?.();
   }
   async function refreshUser() {
-    if (!state.serverAvailable) return;
     try { const data = await api("/api/auth/me"); state.user = data.user; updateAuthUI(); if (state.user) { await refreshAccountSnapshot(); await refreshNotifications(true); } }
     catch { state.user = null; updateAuthUI(); }
   }
@@ -332,7 +331,6 @@
   async function restoreVisualVersion(id) { try { await api(`/api/admin/page-customizations/versions/${encodeURIComponent(id)}/restore`, { method: "POST", body: {} }); location.reload(); } catch (error) { toast(error.message, "error"); } }
   async function saveManagedUser(id) { try { const role = document.querySelector(`[data-user-role="${CSS.escape(id)}"]`).value, accountStatus = document.querySelector(`[data-user-status="${CSS.escape(id)}"]`).value, emailVerified = document.querySelector(`[data-user-verified="${CSS.escape(id)}"]`).checked; await api(`/api/admin/users/${encodeURIComponent(id)}`, { method: "PATCH", body: { role, accountStatus, emailVerified } }); toast("המשתמש עודכן"); await renderAdmin(); } catch (error) { toast(error.message, "error"); } }
   async function loadSiteSettings() {
-    if (!state.serverAvailable) return;
     try {
       const { settings: s } = await api("/api/site-settings"); if (!s) return;
       document.documentElement.style.setProperty("--navy", s.primary_color); document.documentElement.style.setProperty("--teal", s.secondary_color); document.documentElement.style.setProperty("--accent", s.accent_color); document.documentElement.style.setProperty("--site-font", s.font_family); document.documentElement.style.fontSize = `${s.base_font_size}px`;
@@ -340,7 +338,6 @@
     } catch (error) { console.warn("Site settings unavailable", error); }
   }
   async function loadPageCustomizations() {
-    if (!state.serverAvailable) return;
     try { const data = await api("/api/page-customizations"); state.customizations = new Map((data.customizations || []).map(item => [item.key, item])); for (const item of state.customizations.values()) applyPageCustomization(item); }
     catch (error) { console.warn("Page customizations unavailable", error); }
   }
@@ -505,8 +502,7 @@
     setupEvents(); setAuthMode("login"); updateAuthUI();
     await detectServer();
     document.documentElement.classList.remove("app-booting");
-    await Promise.allSettled([loadSiteSettings(), loadPageCustomizations(), loadPublicConfig(), loadDiscovery()]);
-    await Promise.allSettled([refreshUser(), loadItems()]);
+    await Promise.allSettled([loadSiteSettings(), loadPageCustomizations(), loadPublicConfig(), loadDiscovery(), refreshUser(), loadItems()]);
     window.setInterval(async () => {
       if (state.serverAvailable || document.visibilityState !== "visible") return;
       await detectServer();
