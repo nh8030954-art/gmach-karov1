@@ -103,6 +103,16 @@ async function installPush(){
   }catch(e){console.warn("push unavailable",e)}
 }
 function urlBase64ToUint8Array(base64String){const padding="=".repeat((4-base64String.length%4)%4),base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/"),raw=atob(base64);return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)))}
+function installInviteRoute(){
+  const run=async()=>{
+    const m=location.hash.match(/^#\/invite\/([^/]+)$/);if(!m)return;
+    try{
+      const me=await api("/api/auth/me");if(!me.user){notice("יש להתחבר או להירשם עם כתובת המייל שאליה נשלחה ההזמנה, ואז לפתוח שוב את הקישור.",true);return}
+      const result=await api("/api/manager-invitations/accept",{method:"POST",body:{token:decodeURIComponent(m[1])}});
+      notice("ההזמנה אושרה. הגמ״ח נוסף לאזור הניהול שלך.");location.hash="#/dashboard";
+    }catch(e){notice(e.message,true)}
+  };window.addEventListener("hashchange",run);run();
+}
 function installQrRoute(){
   const scan=async()=>{
     const m=location.hash.match(/^#\/scan\/(.+)$/);if(!m)return;
@@ -213,11 +223,14 @@ function orgLifecycleDialog(orgId,name){
   $("#org-owner-transfer",d).onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await api("/api/organizations/"+orgId+"/transfer",{method:"POST",body:{email:f.get("email")}});d.close();notice("בקשת העברת הבעלות נשלחה")};
 }
 async function orgMembersDialog(orgId){
-  const data=await api("/api/organizations/"+orgId+"/members");
-  const d=modal("מנהלים והרשאות",`<div class="platform-list" id="org-member-list">${(data.members||[]).map(m=>`<div class="platform-row"><div><strong>${esc(m.full_name)}</strong><p>${esc(m.email)} · ${esc(m.role)}</p></div><button class="platform-action danger" data-member-remove="${m.user_id}">הסרה</button></div>`).join("")||'<div class="platform-note">אין מנהלים נוספים.</div>'}</div><form id="org-member-add" class="platform-form"><label><span>אימייל של משתמש רשום</span><input name="email" type="email" required></label><label><span>תפקיד</span><select name="role"><option value="requests">בקשות ואיסופים</option><option value="inventory">מלאי</option><option value="reports">דוחות</option></select></label><label class="wide"><span>מזהי סניפים מורשים, מופרדים בפסיק (ריק = הכל)</span><input name="branches"></label><label class="wide"><span>מזהי קטגוריות מורשות, מופרדים בפסיק (ריק = הכל)</span><input name="categories"></label><button class="platform-action" type="submit">הוספה/עדכון</button></form>`);
-  $("[data-member-remove]",d).forEach(b=>b.onclick=async()=>{await api("/api/organizations/"+orgId+"/members/"+b.dataset.memberRemove,{method:"DELETE"});d.close();notice("המנהל הוסר")});
+  const [data,inv]=await Promise.all([api("/api/organizations/"+orgId+"/members"),api("/api/organizations/"+orgId+"/manager-invitations")]);
+  const d=modal("מנהלים והרשאות",`<h3>מנהלים קיימים</h3><div class="platform-list" id="org-member-list">${(data.members||[]).map(m=>`<div class="platform-row"><div><strong>${esc(m.full_name)}</strong><p>${esc(m.email)} · ${esc(m.role)}</p></div><button class="platform-action danger" data-member-remove="${m.user_id}">הסרה</button></div>`).join("")||'<div class="platform-note">אין מנהלים נוספים.</div>'}</div><form id="org-member-add" class="platform-form"><label><span>אימייל של משתמש רשום</span><input name="email" type="email" required></label><label><span>תפקיד</span><select name="role"><option value="requests">בקשות ואיסופים</option><option value="inventory">מלאי</option><option value="reports">דוחות</option></select></label><label class="wide"><span>מזהי סניפים מורשים, מופרדים בפסיק (ריק = הכל)</span><input name="branches"></label><label class="wide"><span>מזהי קטגוריות מורשות, מופרדים בפסיק (ריק = הכל)</span><input name="categories"></label><button class="platform-action" type="submit">הוספה/עדכון</button></form><hr><h3>הזמנה במייל</h3><form id="org-member-invite" class="platform-form"><label><span>אימייל להזמנה</span><input name="email" type="email" required></label><label><span>תפקיד</span><select name="role"><option value="requests">בקשות ואיסופים</option><option value="inventory">מלאי</option><option value="reports">דוחות</option></select></label><label><span>תוקף בימים</span><input name="days" type="number" min="1" max="30" value="7"></label><label class="wide"><span>הודעה אישית</span><textarea name="message" maxlength="500"></textarea></label><button class="platform-action secondary" type="submit">שליחת הזמנה</button></form><h3>הזמנות</h3><div class="platform-list">${(inv.invitations||[]).map(x=>`<div class="platform-row"><div><strong>${esc(x.invitee_email||"")}</strong><p>${esc(x.role)} · עד ${esc(x.expires_at)} ${x.accepted_at?"· התקבלה":x.cancelled_at?"· בוטלה":""}</p></div>${!x.accepted_at&&!x.cancelled_at?`<button class="platform-action danger" data-invite-cancel="${x.id}">ביטול</button>`:""}</div>`).join("")||'<div class="platform-muted">אין הזמנות.</div>'}</div>`);
+  $$("[data-member-remove]",d).forEach(b=>b.onclick=async()=>{await api("/api/organizations/"+orgId+"/members/"+b.dataset.memberRemove,{method:"DELETE"});d.close();notice("המנהל הוסר")});
+  $$("[data-invite-cancel]",d).forEach(b=>b.onclick=async()=>{await api("/api/manager-invitations/"+b.dataset.inviteCancel,{method:"DELETE"});d.close();notice("ההזמנה בוטלה")});
   $("#org-member-add",d).onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);await api("/api/organizations/"+orgId+"/members",{method:"POST",body:{email:f.get("email"),role:f.get("role"),branchIds:String(f.get("branches")||"").split(",").map(x=>x.trim()).filter(Boolean),categoryIds:String(f.get("categories")||"").split(",").map(x=>x.trim()).filter(Boolean)}});d.close();notice("הרשאות המנהל נשמרו")};
+  $("#org-member-invite",d).onsubmit=async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const result=await api("/api/organizations/"+orgId+"/manager-invitations",{method:"POST",body:{email:f.get("email"),role:f.get("role"),expiresDays:Number(f.get("days")),message:f.get("message")}});try{await navigator.clipboard?.writeText(result.invitation.link)}catch{}d.close();notice("ההזמנה נשלחה במייל והקישור הועתק אם הדפדפן אפשר זאת")};
 }
+
 async function orgWaitlistDialog(orgId){
   const data=await api("/api/organizations/"+orgId+"/waitlist");
   modal("רשימת המתנה",`<div class="platform-list">${(data.entries||[]).map((x,i)=>`<div class="platform-row"><div><strong>#${i+1} · ${esc(x.full_name||"משתמש")}</strong><p>${esc(x.item_title||"")} · ${esc(x.status)} · ${esc(x.created_at||"")}</p></div></div>`).join("")||'<div class="platform-note">אין ממתינים כרגע.</div>'}</div>`);
@@ -302,7 +315,7 @@ function reportPerformance(){
   }catch{}
 }
 document.addEventListener("DOMContentLoaded",()=>{
-  installWizardEntry();installAdvancedEntry();installPush();installQrRoute();enhanceChat();installImageEditor();addAdminFinalPanels();supportFaq();reportPerformance();
+  installWizardEntry();installAdvancedEntry();installPush();installInviteRoute();installQrRoute();enhanceChat();installImageEditor();addAdminFinalPanels();supportFaq();reportPerformance();
   const watcher=new MutationObserver(()=>{if(!$("#dashboard-view")?.hidden)installTour()});watcher.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["hidden"]});
 });
 })();
