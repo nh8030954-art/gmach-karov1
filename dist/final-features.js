@@ -64,9 +64,9 @@ async function openWizard(){
 }
 async function installWizardEntry(){
   const add=()=>{
-    const consoleNav=$(".platform-console-nav");if(consoleNav&&!$("#final-wizard-button")){
-      const b=document.createElement("button");b.id="final-wizard-button";b.type="button";b.textContent="אשף פתיחת גמ״ח";b.onclick=()=>openWizard().catch(e=>notice(e.message,true));consoleNav.append(b);
-    }
+    const dash=$("#dashboard-view");if(!dash||$("#final-wizard-button"))return;
+    const b=document.createElement("button");b.id="final-wizard-button";b.type="button";b.className="button button-secondary";b.textContent="אשף פתיחת גמ״ח";b.onclick=()=>openWizard().catch(e=>notice(e.message,true));
+    const host=dash.querySelector(".dashboard-actions,.dashboard-header,.section-heading")||dash;host.prepend(b);
   };new MutationObserver(add).observe(document.body,{childList:true,subtree:true});add();
 }
 async function installPush(){
@@ -77,8 +77,8 @@ async function installPush(){
     const me=await api("/api/auth/me");if(!me.user)return;
     let sub=await reg.pushManager.getSubscription();
     if(!sub && Notification.permission==="granted")sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(cfg.pushPublicKey)});
-    if(sub){const j=sub.toJSON();await api("/api/me/push-subscriptions",{method:"POST",body:{endpoint:j.endpoint,keys:j.keys}})}
-    const addButton=()=>{const host=$("#platform-panel");if(!host||$("#enable-push"))return;const b=document.createElement("button");b.id="enable-push";b.className="platform-action secondary";b.textContent="הפעלת התראות Push";b.onclick=async()=>{const perm=await Notification.requestPermission();if(perm!=="granted")return notice("לא ניתנה הרשאת התראות",true);const s=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(cfg.pushPublicKey)});const j=s.toJSON();await api("/api/me/push-subscriptions",{method:"POST",body:{endpoint:j.endpoint,keys:j.keys}});notice("התראות Push הופעלו")};host.prepend(b)};
+    if(sub){const j=sub.toJSON();await api("/api/push-subscriptions",{method:"POST",body:{endpoint:j.endpoint,keys:j.keys}})}
+    const addButton=()=>{const dash=$("#dashboard-view");if(!dash||$("#enable-push"))return;const host=dash.querySelector(".dashboard-actions,.dashboard-header,.section-heading")||dash;const b=document.createElement("button");b.id="enable-push";b.className="platform-action secondary";b.textContent="הפעלת התראות Push";b.onclick=async()=>{const perm=await Notification.requestPermission();if(perm!=="granted")return notice("לא ניתנה הרשאת התראות",true);const s=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(cfg.pushPublicKey)});const j=s.toJSON();await api("/api/push-subscriptions",{method:"POST",body:{endpoint:j.endpoint,keys:j.keys}});notice("התראות Push הופעלו")};host.prepend(b)};
     new MutationObserver(addButton).observe(document.body,{childList:true,subtree:true});addButton();
   }catch(e){console.warn("push unavailable",e)}
 }
@@ -101,27 +101,62 @@ function enhanceChat(){
     $$("[data-chat-media]",tools).forEach(b=>b.onclick=async()=>{
       const requestId=$("#chat-request-id")?.value||form.dataset.requestId||document.querySelector("[data-chat-request]")?.dataset.chatRequest;if(!requestId)return notice("לא נמצא מזהה השאלה",true);
       try{
-        if(b.dataset.chatMedia==="location"){navigator.geolocation.getCurrentPosition(async p=>{await api("/api/loan-requests/"+requestId+"/chat-rich",{method:"POST",body:{type:"location",metadata:{lat:p.coords.latitude,lon:p.coords.longitude}}});notice("המיקום נשלח")},()=>notice("לא ניתנה הרשאת מיקום",true));return}
-        if(b.dataset.chatMedia==="item"){const itemId=prompt("מזהה המוצר לשיתוף:");if(itemId)await api("/api/loan-requests/"+requestId+"/chat-rich",{method:"POST",body:{type:"item",metadata:{itemId}}});return}
-        const input=document.createElement("input");input.type="file";input.accept=b.dataset.chatMedia==="audio"?"audio/*":"image/*";if(b.dataset.chatMedia==="image")input.capture="environment";input.onchange=async()=>{const fd=new FormData();fd.set("file",input.files[0]);fd.set("type",b.dataset.chatMedia);const r=await fetch("/api/loan-requests/"+requestId+"/chat-attachment",{method:"POST",credentials:"same-origin",body:fd,headers:{"Origin":location.origin}});if(!r.ok){const j=await r.json();throw new Error(j.error)}notice("הקובץ נשלח")};input.click();
+        if(b.dataset.chatMedia==="location"){navigator.geolocation.getCurrentPosition(async p=>{await api("/api/loan-requests/"+requestId+"/rich-message",{method:"POST",body:{type:"location",metadata:{lat:p.coords.latitude,lon:p.coords.longitude}}});notice("המיקום נשלח")},()=>notice("לא ניתנה הרשאת מיקום",true));return}
+        if(b.dataset.chatMedia==="item"){const itemId=prompt("מזהה המוצר לשיתוף:");if(itemId)await api("/api/loan-requests/"+requestId+"/rich-message",{method:"POST",body:{type:"item",metadata:{itemId}}});return}
+        const input=document.createElement("input");input.type="file";input.accept=b.dataset.chatMedia==="audio"?"audio/*":"image/*";if(b.dataset.chatMedia==="image")input.capture="environment";input.onchange=async()=>{const fd=new FormData();fd.set("file",input.files[0]);fd.set("type",b.dataset.chatMedia);const r=await fetch("/api/loan-requests/"+requestId+"/media",{method:"POST",credentials:"same-origin",body:fd,headers:{"Origin":location.origin}});if(!r.ok){const j=await r.json();throw new Error(j.error)}notice("הקובץ נשלח")};input.click();
       }catch(e){notice(e.message,true)}
     });
   };new MutationObserver(apply).observe(document.body,{childList:true,subtree:true});apply();
 }
 function addAdminFinalPanels(){
-  const apply=()=>{
-    const nav=$(".platform-console-nav");if(!nav||$("#final-admin-button")||!nav.textContent.includes("ניהול־על"))return;
-    const b=document.createElement("button");b.id="final-admin-button";b.textContent="תפעול מתקדם";b.onclick=async()=>{
+  const apply=async()=>{
+    const dash=$("#dashboard-view");if(!dash||$("#final-admin-button"))return;
+    try{const me=await api("/api/auth/me");if(me.user?.role!=="admin")return;}catch{return}
+    const b=document.createElement("button");b.id="final-admin-button";b.className="button button-secondary";b.textContent="תפעול מתקדם";b.onclick=async()=>{
       try{
-        const [analytics,audit,templates,holidays,mod,backups]=await Promise.all([
-          api("/api/admin/analytics/operations"),api("/api/admin/audit"),api("/api/admin/email-templates"),api("/api/admin/holiday-rules"),api("/api/admin/moderation"),api("/api/admin/backups")
-        ]);
-        const d=modal("תפעול מתקדם",`<div class="platform-kpis"><article><strong>${analytics.loans.total||0}</strong><span>השאלות</span></article><article><strong>${analytics.loans.completed||0}</strong><span>הושלמו</span></article><article><strong>${analytics.loans.cancelled||0}</strong><span>בוטלו</span></article><article><strong>${analytics.loans.late||0}</strong><span>איחורים</span></article></div><h3>גיבויים</h3><p><button class="platform-action" id="backup-now">יצירת גיבוי לוגי עכשיו</button> · ${backups.backups.length} גיבויים רשומים</p><h3>תבניות אימייל</h3><div class="platform-list">${templates.templates.slice(0,20).map(t=>`<div class="platform-row"><div><strong>${esc(t.template_key)} · ${esc(t.language)}</strong><p>${esc(t.subject)}</p></div></div>`).join("")}</div><h3>חגים</h3><div class="platform-list">${holidays.holidays.map(h=>`<div class="platform-row"><div><strong>${esc(h.title_he)}</strong><p>${esc(h.hebrew_day)} ${esc(h.hebrew_month)} · ${h.enabled?"פעיל":"כבוי"}</p></div></div>`).join("")}</div><h3>Moderation</h3><p>${mod.jobs.length} פריטים לבדיקה</p><h3>Audit</h3><p>${audit.entries.length} פעולות אחרונות זמינות לצפייה/ייצוא.</p>`);
+        const [analytics,audit,templates,holidays,mod,backups]=await Promise.all([api("/api/admin/analytics/operations"),api("/api/admin/audit"),api("/api/admin/email-templates"),api("/api/admin/holiday-rules"),api("/api/admin/moderation"),api("/api/admin/backups")]);
+        const d=modal("תפעול מתקדם",`<div class="platform-kpis"><article><strong>${analytics.loans.total||0}</strong><span>השאלות</span></article><article><strong>${analytics.loans.completed||0}</strong><span>הושלמו</span></article><article><strong>${analytics.loans.cancelled||0}</strong><span>בוטלו</span></article><article><strong>${analytics.loans.late||0}</strong><span>איחורים</span></article></div><h3>גיבויים</h3><p><button class="platform-action" id="backup-now">יצירת גיבוי לוגי עכשיו</button> · ${backups.backups.length} גיבויים רשומים</p><h3>תבניות אימייל</h3><div class="platform-list">${templates.templates.slice(0,20).map(t=>`<div class="platform-row"><div><strong>${esc(t.template_key)} · ${esc(t.language)}</strong><p>${esc(t.subject)}</p></div></div>`).join("")}</div><h3>חגים</h3><div class="platform-list">${holidays.holidays.map(h=>`<div class="platform-row"><div><strong>${esc(h.title_he)}</strong><p>${esc(h.hebrew_day)} ${esc(h.hebrew_month)} · ${h.enabled?"פעיל":"כבוי"}</p></div></div>`).join("")}</div><h3>Moderation</h3><p>${mod.jobs.length} פריטים לבדיקה</p><h3>Audit</h3><p>${audit.entries.length} פעולות אחרונות.</p>`);
         $("#backup-now",d).onclick=async()=>{await api("/api/admin/backups",{method:"POST",body:{}});notice("הגיבוי נוצר")};
       }catch(e){notice(e.message,true)}
-    };nav.append(b);
+    };
+    const host=dash.querySelector(".dashboard-actions,.dashboard-header,.section-heading")||dash;host.prepend(b);
   };new MutationObserver(apply).observe(document.body,{childList:true,subtree:true});apply();
 }
+
+async function openAdvancedTools(){
+  const data=await api("/api/me/dashboard"),orgs=data.organizations||[],items=data.items||[],helps=data.helpRequests||[];
+  const d=modal("כלים מתקדמים",`<div class="platform-row-actions" id="adv-tabs"><button class="platform-action" data-tab="orgs">גמ״חים וסניפים</button><button class="platform-action secondary" data-tab="inventory">מלאי ו־QR</button><button class="platform-action secondary" data-tab="community">קהילה</button><button class="platform-action secondary" data-tab="saved">מועדפים ומחזוריות</button></div><div id="adv-body" style="margin-top:16px"></div>`);
+  const body=$("#adv-body",d);
+  const showOrgs=async()=>{
+    const blocks=[];
+    for(const org of orgs){
+      const [ready,branches]=await Promise.all([api("/api/organizations/"+org.id+"/publish-readiness").catch(()=>({ready:false,missing:[]})),api("/api/organizations/"+org.id+"/branches").catch(()=>({branches:[]}))]);
+      blocks.push(`<section class="platform-note"><h3>${esc(org.name)}</h3><p>${ready.ready?"מוכן לפרסום":"חסרים: "+esc((ready.missing||[]).join(", "))}</p><div class="platform-list">${(branches.branches||[]).map(b=>`<div class="platform-row"><div><strong>${esc(b.name)}</strong><p>${esc(b.address||"")} · ${esc(b.city||"")}</p></div><span class="platform-chip">${esc(b.status||"active")}</span></div>`).join("")||'<div class="platform-muted">אין סניפים.</div>'}</div></section>`);
+    }
+    body.innerHTML=blocks.join("")||'<div class="platform-note">אין גמ״חים בניהולך.</div>';
+  };
+  const showInventory=async()=>{
+    body.innerHTML=items.length?items.map(i=>`<section class="platform-row"><div><strong>${esc(i.title)}</strong><p>${esc(i.organizations?.name||"")} · ${esc(i.status)} · ${Number(i.quantity||0)} יחידות</p></div><div class="platform-row-actions"><button class="platform-action secondary" data-units="${i.id}">יחידות/QR</button><button class="platform-action secondary" data-clone="${i.id}">שכפול</button><button class="platform-action danger" data-remove="${i.id}">מחיקה בטוחה</button></div></section>`).join(""):'<div class="platform-note">אין מוצרים.</div>';
+    $$("[data-units]",body).forEach(b=>b.onclick=async()=>{const u=await api("/api/items/"+b.dataset.units+"/units");body.innerHTML=(u.units||[]).map(x=>`<div class="platform-row"><div><strong dir="ltr">${esc(x.serial_number)}</strong><p>${esc(x.status)} · ${esc(x.condition)}</p></div><button class="platform-action secondary" data-qr="${x.id}">QR</button></div>`).join("")||'<div class="platform-note">אין יחידות סידוריות.</div>';$$("[data-qr]",body).forEach(q=>q.onclick=async()=>{const qr=await api("/api/item-units/"+q.dataset.qr+"/qr");modal("QR ליחידה",`<p><strong>${esc(qr.serialNumber||qr.serial_number||"")}</strong></p><p dir="ltr">${esc(qr.target||"")}</p><p class="platform-muted">ניתן להדפיס חלון זה כתווית.</p><button class="platform-action" onclick="window.print()">הדפסה</button>`)})});
+    $$("[data-clone]",body).forEach(b=>b.onclick=async()=>{await api("/api/items/"+b.dataset.clone+"/clone",{method:"POST",body:{}});notice("המוצר שוכפל")});
+    $$("[data-remove]",body).forEach(b=>b.onclick=async()=>{if(confirm("להסיר את המוצר לפי כללי ההיסטוריה?")){await api("/api/items/"+b.dataset.remove+"/remove",{method:"POST",body:{}});notice("המוצר טופל")}}); 
+  };
+  const showCommunity=async()=>{
+    body.innerHTML=helps.length?helps.map(h=>`<section class="platform-row"><div><strong>${esc(h.title)}</strong><p>${esc(h.city)} · ${esc(h.status)}</p></div><button class="platform-action secondary" data-match="${h.id}">התאמות</button></section>`).join(""):'<div class="platform-note">אין בקשות קהילה שלך.</div>';
+    $$("[data-match]",body).forEach(b=>b.onclick=async()=>{const m=await api("/api/help-requests/"+b.dataset.match+"/matches");body.innerHTML=(m.matches||[]).map(x=>`<div class="platform-row"><div><strong>${esc(x.title)}</strong><p>${esc(x.organization_name)} · ציון ${Math.round(x.score)}</p></div></div>`).join("")||'<div class="platform-note">לא נמצאו התאמות.</div>'});
+  };
+  const showSaved=async()=>{
+    const [saved,recurring]=await Promise.all([api("/api/me/saved-entities"),api("/api/me/recurring-loans")]);
+    body.innerHTML=`<h3>מועדפים מורחבים</h3><div class="platform-list">${(saved.saved||[]).map(x=>`<div class="platform-row"><div><strong>${esc(x.entity_type)}</strong><p>${esc(x.entity_id)}</p></div></div>`).join("")||'<div class="platform-muted">אין.</div>'}</div><h3>בקשות מחזוריות</h3><div class="platform-list">${(recurring.rules||[]).map(x=>`<div class="platform-row"><div><strong>${esc(x.title)}</strong><p>${esc(x.frequency)} · ${esc(x.status)}</p></div></div>`).join("")||'<div class="platform-muted">אין.</div>'}</div>`;
+  };
+  const render={orgs:showOrgs,inventory:showInventory,community:showCommunity,saved:showSaved};
+  $$("[data-tab]",d).forEach(b=>b.onclick=async()=>{$$("[data-tab]",d).forEach(x=>x.classList.add("secondary"));b.classList.remove("secondary");await render[b.dataset.tab]()});
+  await showOrgs();
+}
+function installAdvancedEntry(){
+  const add=()=>{const dash=$("#dashboard-view");if(!dash||$("#final-advanced-button"))return;const b=document.createElement("button");b.id="final-advanced-button";b.className="button button-secondary";b.textContent="כלים מתקדמים";b.onclick=()=>openAdvancedTools().catch(e=>notice(e.message,true));const host=dash.querySelector(".dashboard-actions,.dashboard-header,.section-heading")||dash;host.prepend(b)};new MutationObserver(add).observe(document.body,{childList:true,subtree:true});add();
+}
+
 async function supportFaq(){
   const form=$("#support-form");if(!form||$("#support-faq-suggestions"))return;
   try{const data=await api("/api/faqs");const box=document.createElement("div");box.id="support-faq-suggestions";box.className="platform-note";box.innerHTML="<strong>לפני פתיחת פנייה — אולי זה יעזור:</strong>"+data.articles.slice(0,4).map(a=>`<details><summary>${esc(a.title)}</summary><p>${esc(a.body)}</p></details>`).join("");form.prepend(box)}catch{}
@@ -135,7 +170,7 @@ function reportPerformance(){
   }catch{}
 }
 document.addEventListener("DOMContentLoaded",()=>{
-  installWizardEntry();installPush();installQrRoute();enhanceChat();addAdminFinalPanels();supportFaq();reportPerformance();
+  installWizardEntry();installAdvancedEntry();installPush();installQrRoute();enhanceChat();addAdminFinalPanels();supportFaq();reportPerformance();
   const watcher=new MutationObserver(()=>{if(!$("#dashboard-view")?.hidden)installTour()});watcher.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["hidden"]});
 });
 })();
