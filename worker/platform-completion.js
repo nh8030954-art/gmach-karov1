@@ -2,6 +2,49 @@ const SESSION_COOKIE="gmach_session";
 
 class HttpError extends Error{constructor(status,message){super(message);this.status=status;}}
 
+
+export async function ensurePlatformCompletionSchema(env){
+  const alters={
+    sessions:[["user_agent_hash","TEXT"],["trusted","INTEGER NOT NULL DEFAULT 0 CHECK (trusted IN (0,1))"]],
+    users:[["consent_version","TEXT NOT NULL DEFAULT '2026-09-25'"],["deletion_reminder_sent_at","TEXT"]],
+    organizations:[["deletion_cancelled_at","TEXT"],["transfer_pending_to","TEXT"],["draft_json","TEXT NOT NULL DEFAULT '{}'"]],
+    items:[["primary_image_url","TEXT"],["material_version","INTEGER NOT NULL DEFAULT 1"],["last_material_change_at","TEXT"]],
+    loan_requests:[["hold_expires_at","TEXT"],["pickup_expires_at","TEXT"],["no_show_at","TEXT"],["cancellation_undo_until","TEXT"],["change_pending_json","TEXT"]],
+    waitlist_entries:[["response_minutes","INTEGER NOT NULL DEFAULT 120"],["offer_expires_at","TEXT"]],
+    request_messages:[["metadata_json","TEXT NOT NULL DEFAULT '{}'"]],
+    reviews:[["branch_id","TEXT"],["edited_until","TEXT"]],
+    saved_searches:[["last_checked_at","TEXT"],["last_result_signature","TEXT"]],
+    push_subscriptions:[["user_agent","TEXT"]]
+  };
+  for(const [table,defs] of Object.entries(alters)){
+    const info=await env.DB.prepare(`PRAGMA table_info(${table})`).all().catch(()=>({results:[]}));
+    const cols=new Set((info.results||[]).map(r=>r.name));
+    for(const [name,def] of defs) if(!cols.has(name)) await env.DB.prepare(`ALTER TABLE ${table} ADD COLUMN ${name} ${def}`).run();
+  }
+  const statements=[
+    "CREATE TABLE IF NOT EXISTS organization_transfers (id TEXT PRIMARY KEY,organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,from_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,to_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined','cancelled','expired')),expires_at TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),responded_at TEXT)",
+    "CREATE TABLE IF NOT EXISTS branch_transfers (id TEXT PRIMARY KEY,organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,unit_id TEXT REFERENCES item_units(id) ON DELETE SET NULL,from_branch_id TEXT REFERENCES organization_branches(id) ON DELETE SET NULL,to_branch_id TEXT NOT NULL REFERENCES organization_branches(id) ON DELETE CASCADE,status TEXT NOT NULL DEFAULT 'in_transit' CHECK (status IN ('in_transit','received','cancelled')),quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 999),created_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),received_at TEXT)",
+    "CREATE TABLE IF NOT EXISTS inventory_holds (id TEXT PRIMARY KEY,item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,request_id TEXT REFERENCES loan_requests(id) ON DELETE CASCADE,quantity INTEGER NOT NULL CHECK (quantity BETWEEN 1 AND 999),starts_at TEXT NOT NULL,ends_at TEXT NOT NULL,expires_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','converted','released','expired')),created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
+    "CREATE TABLE IF NOT EXISTS item_images (id TEXT PRIMARY KEY,item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,storage_key TEXT NOT NULL,url TEXT NOT NULL,sort_order INTEGER NOT NULL DEFAULT 0,is_primary INTEGER NOT NULL DEFAULT 0 CHECK (is_primary IN (0,1)),moderation_status TEXT NOT NULL DEFAULT 'approved' CHECK (moderation_status IN ('pending','approved','hidden','rejected')),report_count INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
+    "CREATE TABLE IF NOT EXISTS message_reports (id TEXT PRIMARY KEY,message_id TEXT NOT NULL REFERENCES request_messages(id) ON DELETE CASCADE,reporter_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,reason TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','reviewed','dismissed','removed')),created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),UNIQUE(message_id,reporter_id))",
+    "CREATE TABLE IF NOT EXISTS security_blocks (identity_hash TEXT PRIMARY KEY,reason TEXT NOT NULL,level INTEGER NOT NULL DEFAULT 1 CHECK (level BETWEEN 1 AND 10),blocked_until TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
+    "CREATE TABLE IF NOT EXISTS admin_action_challenges (id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,action TEXT NOT NULL,token_hash TEXT NOT NULL,expires_at TEXT NOT NULL,used_at TEXT,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
+    "CREATE TABLE IF NOT EXISTS calendar_preferences (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,preferred_app TEXT NOT NULL DEFAULT 'ics' CHECK (preferred_app IN ('ics','google','apple','outlook')),reminder_minutes INTEGER NOT NULL DEFAULT 1440 CHECK (reminder_minutes BETWEEN 0 AND 10080),updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
+    "CREATE TABLE IF NOT EXISTS user_data_requests (id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,request_type TEXT NOT NULL CHECK (request_type IN ('export','access','correction')),details TEXT,status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','processing','completed','rejected')),created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),completed_at TEXT)",
+    "CREATE TABLE IF NOT EXISTS notification_queue (id TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,notification_type TEXT NOT NULL,channel TEXT NOT NULL CHECK (channel IN ('email','push','digest')),title TEXT NOT NULL,body TEXT NOT NULL,payload_json TEXT NOT NULL DEFAULT '{}',scheduled_at TEXT NOT NULL,sent_at TEXT,failed_at TEXT,error TEXT,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
+    "CREATE TABLE IF NOT EXISTS backup_runs (id TEXT PRIMARY KEY,backup_key TEXT,status TEXT NOT NULL CHECK (status IN ('started','completed','failed')),row_count INTEGER NOT NULL DEFAULT 0,size_bytes INTEGER NOT NULL DEFAULT 0,error TEXT,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),completed_at TEXT)",
+    "CREATE TABLE IF NOT EXISTS geo_cache (query_key TEXT PRIMARY KEY,response_json TEXT NOT NULL,expires_at TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
+    "CREATE TABLE IF NOT EXISTS content_reports (id TEXT PRIMARY KEY,entity_type TEXT NOT NULL,entity_id TEXT NOT NULL,reporter_id TEXT REFERENCES users(id) ON DELETE SET NULL,reason TEXT NOT NULL,severity TEXT NOT NULL DEFAULT 'normal',status TEXT NOT NULL DEFAULT 'pending',created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
+    "CREATE TABLE IF NOT EXISTS cms_versions (id TEXT PRIMARY KEY,content_key TEXT NOT NULL,locale TEXT NOT NULL DEFAULT 'he',content_json TEXT NOT NULL,created_by TEXT REFERENCES users(id) ON DELETE SET NULL,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
+    "CREATE INDEX IF NOT EXISTS inventory_holds_lookup_idx ON inventory_holds(item_id,status,starts_at,ends_at,expires_at)",
+    "CREATE INDEX IF NOT EXISTS branch_transfers_org_status_idx ON branch_transfers(organization_id,status,created_at DESC)",
+    "CREATE INDEX IF NOT EXISTS notification_queue_due_idx ON notification_queue(channel,scheduled_at,sent_at,failed_at)",
+    "CREATE INDEX IF NOT EXISTS geo_cache_expiry_idx ON geo_cache(expires_at)",
+    "CREATE INDEX IF NOT EXISTS content_reports_status_idx ON content_reports(status,severity,created_at)"
+  ];
+  for(const s of statements) await env.DB.prepare(s).run();
+}
+
 export async function platformPreflight(request,env,url){
   if(url.pathname==="/api/health") return null;
   const block=await currentSecurityBlock(request,env);
