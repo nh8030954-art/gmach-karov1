@@ -29,7 +29,7 @@ jobs:
           for i in {1..12}; do
             body="$(curl -fsS https://gmach-karov1.nh8030954.workers.dev/api/health || true)"
             echo "$body" > live.log
-            if echo "$body" | grep -q '"release":"complete-platform-2026-09-25.2"' && echo "$body" | grep -q '"ready":true' && echo "$body" | grep -q '"adminCredentialRotated":true'; then exit 0; fi
+            if echo "$body" | grep -q '"release":"complete-platform-2026-09-25.3"' && echo "$body" | grep -q '"completePlatformSchema":{"ready":true' && echo "$body" | grep -q '"adminCredentialRotated":true'; then exit 0; fi
             sleep 10
           done
           exit 1
