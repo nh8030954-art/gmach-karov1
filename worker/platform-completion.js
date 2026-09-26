@@ -50,21 +50,21 @@ export async function ensurePlatformCompletionSchema(env){
   await env.DB.prepare(`CREATE TRIGGER notifications_enqueue_delivery AFTER INSERT ON notifications BEGIN
     INSERT INTO notification_queue(id,user_id,notification_type,channel,title,body,payload_json,scheduled_at)
     SELECT lower(hex(randomblob(16))),NEW.user_id,
-      CASE WHEN NEW.type IN ('request','status') THEN 'loan_status' WHEN NEW.type='message' THEN 'messages' ELSE 'security' END,
+      CASE WHEN NEW.type IN ('request','status') THEN 'loan_status' WHEN NEW.type='message' THEN 'messages' WHEN NEW.title LIKE '%רשימת המתנה%' OR NEW.title LIKE '%התפנה%' OR NEW.title LIKE '%זמין עבורך%' THEN 'waitlist' WHEN NEW.title LIKE '%קהילה%' OR NEW.title LIKE '%הצעה%' THEN 'community' WHEN NEW.title LIKE '%אבטח%' OR NEW.title LIKE '%כניסה%' OR NEW.title LIKE '%מכשיר%' THEN 'security' ELSE 'support' END,
       CASE WHEN p.digest='daily' THEN 'digest' ELSE 'email' END,NEW.title,NEW.body,
       json_object('requestId',NEW.request_id,'notificationId',NEW.id),
       CASE WHEN p.digest='daily' THEN datetime('now','+1 day','start of day','+8 hours') ELSE strftime('%Y-%m-%dT%H:%M:%fZ','now') END
     FROM notification_preferences p JOIN users u ON u.id=p.user_id
     WHERE p.user_id=NEW.user_id
-      AND p.notification_type=CASE WHEN NEW.type IN ('request','status') THEN 'loan_status' WHEN NEW.type='message' THEN 'messages' ELSE 'security' END
+      AND p.notification_type=CASE WHEN NEW.type IN ('request','status') THEN 'loan_status' WHEN NEW.type='message' THEN 'messages' WHEN NEW.title LIKE '%רשימת המתנה%' OR NEW.title LIKE '%התפנה%' OR NEW.title LIKE '%זמין עבורך%' THEN 'waitlist' WHEN NEW.title LIKE '%קהילה%' OR NEW.title LIKE '%הצעה%' THEN 'community' WHEN NEW.title LIKE '%אבטח%' OR NEW.title LIKE '%כניסה%' OR NEW.title LIKE '%מכשיר%' THEN 'security' ELSE 'support' END
       AND p.email=1 AND u.operational_emails_accepted=1;
     INSERT INTO notification_queue(id,user_id,notification_type,channel,title,body,payload_json,scheduled_at)
     SELECT lower(hex(randomblob(16))),NEW.user_id,
-      CASE WHEN NEW.type IN ('request','status') THEN 'loan_status' WHEN NEW.type='message' THEN 'messages' ELSE 'security' END,
+      CASE WHEN NEW.type IN ('request','status') THEN 'loan_status' WHEN NEW.type='message' THEN 'messages' WHEN NEW.title LIKE '%רשימת המתנה%' OR NEW.title LIKE '%התפנה%' OR NEW.title LIKE '%זמין עבורך%' THEN 'waitlist' WHEN NEW.title LIKE '%קהילה%' OR NEW.title LIKE '%הצעה%' THEN 'community' WHEN NEW.title LIKE '%אבטח%' OR NEW.title LIKE '%כניסה%' OR NEW.title LIKE '%מכשיר%' THEN 'security' ELSE 'support' END,
       'push',NEW.title,NEW.body,json_object('requestId',NEW.request_id,'notificationId',NEW.id),strftime('%Y-%m-%dT%H:%M:%fZ','now')
     FROM notification_preferences p
     WHERE p.user_id=NEW.user_id
-      AND p.notification_type=CASE WHEN NEW.type IN ('request','status') THEN 'loan_status' WHEN NEW.type='message' THEN 'messages' ELSE 'security' END
+      AND p.notification_type=CASE WHEN NEW.type IN ('request','status') THEN 'loan_status' WHEN NEW.type='message' THEN 'messages' WHEN NEW.title LIKE '%רשימת המתנה%' OR NEW.title LIKE '%התפנה%' OR NEW.title LIKE '%זמין עבורך%' THEN 'waitlist' WHEN NEW.title LIKE '%קהילה%' OR NEW.title LIKE '%הצעה%' THEN 'community' WHEN NEW.title LIKE '%אבטח%' OR NEW.title LIKE '%כניסה%' OR NEW.title LIKE '%מכשיר%' THEN 'security' ELSE 'support' END
       AND p.push=1;
   END`).run();
   const defaults=[
