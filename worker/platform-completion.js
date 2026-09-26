@@ -12,7 +12,7 @@ export async function ensurePlatformCompletionSchema(env){
     loan_requests:[["hold_expires_at","TEXT"],["pickup_expires_at","TEXT"],["no_show_at","TEXT"],["cancellation_undo_until","TEXT"],["change_pending_json","TEXT"]],
     waitlist_entries:[["response_minutes","INTEGER NOT NULL DEFAULT 120"],["offer_expires_at","TEXT"]],
     request_messages:[["metadata_json","TEXT NOT NULL DEFAULT '{}'"]],
-    reviews:[["branch_id","TEXT"],["edited_until","TEXT"]],
+    reviews:[["branch_id","TEXT"],["branch_rating","INTEGER"],["edited_until","TEXT"]],
     organization_invitations:[["invited_email","TEXT"]],
     saved_searches:[["last_checked_at","TEXT"],["last_result_signature","TEXT"]],
     push_subscriptions:[["user_agent","TEXT"]]
