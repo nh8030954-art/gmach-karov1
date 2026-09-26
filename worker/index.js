@@ -1660,7 +1660,7 @@ async function createLoanRequest(request, env) {
   const item = await env.DB.prepare(`
     SELECT i.id,i.title,i.quantity,i.availability_status,i.min_loan_minutes,i.max_loan_minutes,
       i.booking_notice_minutes,i.booking_horizon_days,i.turnaround_minutes,i.approval_mode,
-      i.deposit_required,i.deposit_amount_agorot,i.max_per_user,i.service_radius_km,o.owner_id,o.id AS organization_id
+      i.deposit_required,i.deposit_amount_agorot,i.max_per_user,i.service_radius_km,i.preparation_minutes,i.max_loan_days,o.owner_id,o.id AS organization_id
     FROM items i JOIN organizations o ON o.id=i.organization_id
     WHERE i.id=? AND i.status='active' AND i.is_free=1 AND o.status='approved'
   `).bind(itemId).first();
@@ -1676,9 +1676,10 @@ async function createLoanRequest(request, env) {
   if (duration <= 0) throw new HttpError(400, "מועד ההחזרה חייב להיות אחרי מועד האיסוף");
   if (duration < Number(item.min_loan_minutes)) throw new HttpError(400, `משך ההשאלה המינימלי הוא ${item.min_loan_minutes} דקות`);
   if (duration > Number(item.max_loan_minutes)) throw new HttpError(400, `משך ההשאלה המקסימלי הוא ${item.max_loan_minutes} דקות`);
+  if(Number(item.max_loan_days||0)>0&&duration>Number(item.max_loan_days)*1440) throw new HttpError(400,`משך ההשאלה המרבי הוא ${item.max_loan_days} ימים`);
   const now = Date.now();
   const fromMs = Date.parse(from);
-  if (fromMs < now + Number(item.booking_notice_minutes) * 60000) throw new HttpError(400, "מועד האיסוף מוקדם מדי לפי תנאי הגמ״ח");
+  if (fromMs < now + (Number(item.booking_notice_minutes)+Number(item.preparation_minutes||0)) * 60000) throw new HttpError(400, "מועד האיסוף מוקדם מדי לפי זמן ההזמנה וההכנה של הגמ״ח");
   if (fromMs > now + Number(item.booking_horizon_days) * 86400000) throw new HttpError(400, "מועד האיסוף רחוק מדי לפי תנאי הגמ״ח");
 
   const quantity = Number(body.quantity || 1);
