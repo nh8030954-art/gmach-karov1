@@ -64,3 +64,6 @@ for(const token of ["ניהול תמונות","לוח זמינות","CMS ותו�
 assert.ok(remainingClient.includes("observeTranslations"));
 assert.ok(remainingClient.includes("Saved items & recurring requests"));
 assert.ok(remainingClient.includes("Advanced operations"));
+
+const appClient=await readFile("dist/app.js","utf8");
+for(const token of ["openOrganizationManager","data-manage-org","org-branch-form","org-member-form","openUnitManager","data-units-item","print-unit-qrs","data-unit-history"])assert.ok(appClient.includes(token),token+" missing from app client");
