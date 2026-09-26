@@ -235,7 +235,6 @@ export async function runPlatformCompletionMaintenance(env){
   await processWaitlist(env,now);
   await processDeletionLifecycle(env,now);
   await processSavedSearches(env,now);
-  await fanOutNotifications(env,now);
   await processNotificationQueue(env,now);
   await maybeBackup(env,now);
 }
@@ -400,26 +399,6 @@ async function processWaitlist(env,now){const items=await qall(env,"SELECT DISTI
 async function processDeletionLifecycle(env,now){const users=await qall(env,"SELECT id,deletion_requested_at,deletion_reminder_sent_at FROM users WHERE deletion_requested_at IS NOT NULL AND deleted_at IS NULL LIMIT 200",[]);for(const u of users){const t=Date.parse(u.deletion_requested_at);if(!t)continue;if(!u.deletion_reminder_sent_at&&Date.now()-t>=5*86400000){await queueEmail(env,u.id,"account_deletion","מחיקת החשבון מתקרבת","בקשת המחיקה תושלם בתום שבעה ימים אם אין השאלה פעילה.");await qrun(env,"UPDATE users SET deletion_reminder_sent_at=? WHERE id=?",[now,u.id]);}if(Date.now()-t>=7*86400000&&!await qfirst(env,"SELECT 1 FROM loan_requests WHERE borrower_id=? AND status IN ('pending','approved','collected') LIMIT 1",[u.id]))await qrun(env,"UPDATE users SET deleted_at=?,account_status='suspended',email='deleted-'||id||'@invalid.local',full_name='משתמש שנמחק',phone=NULL,city=NULL,address_cipher=NULL WHERE id=?",[now,u.id]);}
 const orgs=await qall(env,"SELECT id,deletion_requested_at FROM organizations WHERE deletion_requested_at IS NOT NULL AND deleted_at IS NULL LIMIT 100",[]);for(const o of orgs){if(Date.now()-Date.parse(o.deletion_requested_at)<7*86400000)continue;if(await qfirst(env,"SELECT 1 FROM loan_requests lr JOIN items i ON i.id=lr.item_id WHERE i.organization_id=? AND lr.status IN ('pending','approved','collected') LIMIT 1",[o.id]))continue;const h=await qfirst(env,"SELECT 1 FROM loan_requests lr JOIN items i ON i.id=lr.item_id WHERE i.organization_id=? LIMIT 1",[o.id]);if(h)await qrun(env,"UPDATE organizations SET deleted_at=?,is_hidden=1,name='גמ״ח שנמחק',description='הגמ״ח אינו פעיל עוד' WHERE id=?",[now,o.id]);else await qrun(env,"DELETE FROM organizations WHERE id=?",[o.id]);}}
 async function processSavedSearches(env,now){const searches=await qall(env,"SELECT id,user_id,filters_json,last_result_signature FROM saved_searches WHERE notify=1 LIMIT 300",[]);for(const s of searches){const f=safeJson(s.filters_json,{}),q=String(f.q||f.query||"").trim(),city=String(f.city||"").trim(),category=String(f.category||"").trim();let sql="SELECT i.id FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.status='active' AND i.is_free=1 AND o.status='approved' AND COALESCE(o.temporarily_closed,0)=0",args=[];if(q){sql+=" AND (i.title LIKE ? OR i.description LIKE ?)";args.push("%"+q+"%","%"+q+"%");}if(city){sql+=" AND i.city=?";args.push(city);}if(category){sql+=" AND i.category=?";args.push(category);}sql+=" ORDER BY i.updated_at DESC LIMIT 20";const ids=(await qall(env,sql,args)).map(x=>x.id),sig=await sha256(ids.join("|"));if(s.last_result_signature&&s.last_result_signature!==sig&&ids.length)await env.DB.batch([notify(env,s.user_id,"saved_search","נמצאו תוצאות חדשות","נוספו תוצאות חדשות לחיפוש השמור שלך.",null),env.DB.prepare("UPDATE saved_searches SET last_result_signature=?,last_checked_at=? WHERE id=?").bind(sig,now,s.id)]);else await qrun(env,"UPDATE saved_searches SET last_result_signature=?,last_checked_at=? WHERE id=?",[sig,now,s.id]);}}
-async function fanOutNotifications(env,now){
-  const rows=await qall(env,`SELECT n.id,n.user_id,n.type,n.title,n.body,n.request_id,u.operational_emails_accepted,u.preferred_language FROM notifications n JOIN users u ON u.id=n.user_id WHERE n.created_at>=datetime(?,'-2 days') ORDER BY n.created_at LIMIT 500`,[now]);
-  const prefKey=t=>t==="message"?"messages":t==="request"||t==="status"?"loan_status":t==="waitlist"?"waitlist":t==="community"?"community":t==="security"?"security":t==="support"?"support":"loan_status";
-  for(const n of rows){
-    const key=prefKey(n.type),pref=await qfirst(env,"SELECT * FROM notification_preferences WHERE user_id=? AND notification_type=?",[n.user_id,key]);
-    if(!pref)continue;
-    const channels=[];
-    if(pref.email&&n.operational_emails_accepted!==0)channels.push(pref.digest==="daily"?"digest":"email");
-    if(pref.push)channels.push("push");
-    for(const channel of [...new Set(channels)]){
-      const seen=await qfirst(env,"SELECT 1 ok FROM notification_dispatch_log WHERE notification_id=? AND channel=?",[n.id,channel]);if(seen)continue;
-      let scheduled=now;
-      if(channel==="digest"){const d=new Date(now);d.setUTCHours(17,0,0,0);if(d<=new Date(now))d.setUTCDate(d.getUTCDate()+1);scheduled=d.toISOString();}
-      await env.DB.batch([
-        env.DB.prepare("INSERT INTO notification_queue(id,user_id,notification_type,channel,title,body,payload_json,scheduled_at) VALUES(?,?,?,?,?,?,?,?)").bind(crypto.randomUUID(),n.user_id,key,channel,n.title,n.body,JSON.stringify({notificationId:n.id,requestId:n.request_id||null}),scheduled),
-        env.DB.prepare("INSERT OR IGNORE INTO notification_dispatch_log(notification_id,channel) VALUES(?,?)").bind(n.id,channel)
-      ]);
-    }
-  }
-}
 async function processNotificationQueue(env,now){
   const rows=await qall(env,"SELECT q.*,u.email,u.full_name,u.preferred_language FROM notification_queue q JOIN users u ON u.id=q.user_id WHERE q.sent_at IS NULL AND q.failed_at IS NULL AND q.scheduled_at<=? ORDER BY q.scheduled_at LIMIT 200",[now]);
   const digestGroups=new Map();
