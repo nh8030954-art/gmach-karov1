@@ -67,3 +67,6 @@ assert.ok(remainingClient.includes("Advanced operations"));
 
 const appClient=await readFile("dist/app.js","utf8");
 for(const token of ["openOrganizationManager","data-manage-org","org-branch-form","org-member-form","openUnitManager","data-units-item","print-unit-qrs","data-unit-history"])assert.ok(appClient.includes(token),token+" missing from app client");
+
+const indexHtml=await readFile("dist/index.html","utf8");
+for(const condition of ["חדש","כמו חדש","מצב טוב","מצב סביר","בלאי נראה לעין"])assert.ok(indexHtml.includes(condition),"condition taxonomy missing: "+condition);
