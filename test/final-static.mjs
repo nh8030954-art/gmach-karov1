@@ -57,3 +57,6 @@ console.log("Final completion static release gate passed.");
 
 for(const token of ["/availability-calendar","/similar","operations-dashboard","/api/admin/page-content","/validate"]) assert.ok(remainingWorker.includes(token),token+" missing from remaining worker");
 for(const token of ["ניהול תמונות","לוח זמינות","CMS ותוכן","language-switch"]) assert.ok(remainingClient.includes(token),token+" missing from remaining client");
+assert.ok(remainingClient.includes("observeTranslations"));
+assert.ok(remainingClient.includes("Saved items & recurring requests"));
+assert.ok(remainingClient.includes("Advanced operations"));
