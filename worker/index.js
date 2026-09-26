@@ -1111,9 +1111,9 @@ async function discovery(env, url) {
 }
 
 async function getPublicOrganization(env, id) {
-  // Public review fields were introduced after the original organization
-  // endpoint. Ensure the additive schema before querying them on live D1.
-  await ensureFinalFeaturesSchema(env);
+  // Keep public page loads on the read-only fast path. Additive schema repair
+  // is performed by health and scheduled maintenance; running the complete
+  // reconciler here can exceed the browser request timeout on a fresh isolate.
   const organization = await env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,
     o.address,o.website_url,o.hours_json,o.service_area,o.pickup_options,o.last_active_at,o.verified_phone,o.verified_address,c.contact_phone,
     ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
