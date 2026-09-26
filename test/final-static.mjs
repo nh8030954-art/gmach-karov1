@@ -148,3 +148,5 @@ assert.ok(appClient.includes("button.dataset.orgBulk"),"bulk inventory dashboard
 for(const token of ["installFormErrorFocus","aria-invalid",":invalid","scrollIntoView"])assert.ok(appClient.includes(token),token+" missing from accessible form error focus");
 
 for(const token of ["image/svg+xml","X-Gmach-QR-Payload","<metadata>"])assert.ok(platform.includes(token),token+" missing from printable unit label endpoint");
+
+for(const token of ["lr.workflow_status","lr.extension_status","lr.change_pending_json","lr.cancellation_undo_until"])assert.ok(worker.includes(token),token+" missing from dashboard workflow state");
