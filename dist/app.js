@@ -658,8 +658,9 @@
     window.addEventListener("pagehide", () => controller.abort(), { once: true });
   }
 
+  function installFormErrorFocus(){document.addEventListener("invalid",event=>{const el=event.target;if(!(el instanceof HTMLElement))return;el.setAttribute("aria-invalid","true");el.addEventListener("input",()=>el.removeAttribute("aria-invalid"),{once:true});requestAnimationFrame(()=>{el.focus({preventScroll:true});el.scrollIntoView({behavior:"smooth",block:"center"})})},true);document.addEventListener("submit",event=>{const form=event.target;if(!(form instanceof HTMLFormElement)||form.checkValidity())return;const first=form.querySelector(":invalid");if(first){first.setAttribute("aria-invalid","true");first.focus({preventScroll:true});first.scrollIntoView({behavior:"smooth",block:"center"})}},true)}
   async function init() {
-    setupEvents(); setAuthMode("login"); updateAuthUI();
+    setupEvents(); installFormErrorFocus(); setAuthMode("login"); updateAuthUI();
     const siteCopyReady = Promise.allSettled([loadSiteSettings(), loadPageCustomizations()])
       .finally(() => document.documentElement.classList.remove("site-copy-pending"));
     await detectServer();
