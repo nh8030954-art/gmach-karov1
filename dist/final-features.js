@@ -125,6 +125,13 @@ function installPersonalFinalPanels(){
     };nav.append(b);
   };new MutationObserver(apply).observe(document.body,{childList:true,subtree:true});apply();
 }
+function installReviewPanel(){
+  const apply=()=>{const nav=$(".platform-console-nav");if(!nav||$("#final-reviews-button"))return;const b=document.createElement("button");b.id="final-reviews-button";b.type="button";b.textContent="הביקורות שלי";b.onclick=async()=>{try{const data=await api("/api/me/reviews");const d=modal("הביקורות שלי",`<h3>ביקורות שכתבתי</h3><div class="platform-list">${(data.authored||[]).map(r=>`<div class="platform-row"><div><strong>${esc(r.item_title||r.organization_name||"ביקורת")}</strong><p>גמ״ח ${r.rating||""}★ · מוצר ${r.product_rating||r.rating||""}★ · שירות ${r.service_rating||r.rating||""}★</p><p>${esc(r.comment||"")}</p></div><button class="platform-action secondary" data-edit-review="${esc(r.id)}">עריכה</button></div>`).join("")||'<p class="platform-muted">עדיין לא כתבת ביקורות.</p>'}</div><h3>ביקורות על הגמ״חים שלי</h3><div class="platform-list">${(data.received||[]).map(r=>`<div class="platform-row"><div><strong>${esc(r.item_title||r.organization_name||"ביקורת")}</strong><p>${esc(r.author_name||"משתמש")} · ${r.rating||""}★</p><p>${esc(r.comment||"")}</p>${r.organization_response?`<p><strong>התגובה שלך:</strong> ${esc(r.organization_response)}</p>`:""}</div><button class="platform-action secondary" data-respond-review="${esc(r.id)}">תגובה</button></div>`).join("")||'<p class="platform-muted">אין ביקורות שהתקבלו.</p>'}</div>`);
+        $("[data-edit-review]",d).forEach(x=>x.onclick=async()=>{const r=(data.authored||[]).find(v=>v.id===x.dataset.editReview);const rating=Number(prompt("דירוג כללי 1-5",String(r.rating||5)));const product=Number(prompt("דירוג מוצר 1-5",String(r.product_rating||r.rating||5)));const service=Number(prompt("דירוג שירות 1-5",String(r.service_rating||r.rating||5)));const comment=prompt("עדכון הביקורת",r.comment||"");if(!rating||!product||!service)return;await api("/api/reviews/"+encodeURIComponent(r.id)+"/edit",{method:"PATCH",body:{rating,productRating:product,serviceRating:service,comment}});notice("הביקורת עודכנה");d.close();b.click()});
+        $("[data-respond-review]",d).forEach(x=>x.onclick=async()=>{const r=(data.received||[]).find(v=>v.id===x.dataset.respondReview);const response=prompt("תגובת הגמ״ח לביקורת",r.organization_response||"");if(!response)return;await api("/api/reviews/"+encodeURIComponent(r.id)+"/respond",{method:"POST",body:{response}});notice("תגובת הגמ״ח נשמרה");d.close();b.click()});
+      }catch(e){notice(e.message,true)}};nav.append(b)};
+  new MutationObserver(apply).observe(document.body,{childList:true,subtree:true});apply();
+}
 function addAdminFinalPanels(){
   const apply=()=>{
     const nav=$(".platform-console-nav");if(!nav||$("#final-admin-button")||!nav.textContent.includes("ניהול־על"))return;
@@ -162,7 +169,7 @@ function reportPerformance(){
   }catch{}
 }
 document.addEventListener("DOMContentLoaded",()=>{
-  installWizardEntry();installPush();installQrRoute();enhanceChat();installPersonalFinalPanels();addAdminFinalPanels();supportFaq();reportPerformance();
+  installWizardEntry();installPush();installQrRoute();enhanceChat();installPersonalFinalPanels();installReviewPanel();addAdminFinalPanels();supportFaq();reportPerformance();
   const watcher=new MutationObserver(()=>{if(!$("#dashboard-view")?.hidden)installTour()});watcher.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["hidden"]});
 });
 })();
