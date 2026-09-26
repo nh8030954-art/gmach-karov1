@@ -109,3 +109,9 @@ for(const token of ["renderTransfers","/api/me/organization-transfers","data-tra
 assert.ok(platformWorker.includes("/api/me/organization-transfers"),"ownership transfer listing route missing");
 
 assert.ok(worker.includes("requestAccountDeletion"),"account deletion request endpoint missing");
+
+for(const token of ["saved-entity-form","recurring-loan-form","data-waitlist-accept","data-waitlist-decline"])assert.ok(finalClient.includes(token),token+" missing from saved/recurring/waitlist UI");
+
+for(const token of ["myWaitlistOffers","/api/me/waitlist-offers","const expiredOffers="])assert.ok(finalWorker.includes(token),token+" missing from actionable waitlist lifecycle");
+
+for(const token of ["openHelpMatches","data-help-matches","data-offer-match"])assert.ok(appClient.includes(token),token+" missing from community matching UI");
