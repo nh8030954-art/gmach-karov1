@@ -212,6 +212,7 @@ async function bulkInventory(request,env,orgId){
   await audit(env,user,"inventory.bulk","organization",orgId,{action,affected},null,b,null,request);
   return json({job:{id,action,affected}});
 }
+async function myWaitlistOffers(request,env,id=null,action=null){const u=await requireUser(request,env),now=new Date().toISOString();await env.DB.prepare("UPDATE waitlist_entries SET status='waiting' WHERE status='notified' AND id IN (SELECT waitlist_entry_id FROM waitlist_offers WHERE accepted_at IS NULL AND declined_at IS NULL AND expires_at<=?)").bind(now).run();if(!id){const rows=await env.DB.prepare("SELECT o.id,o.expires_at,o.accepted_at,o.declined_at,w.id waitlist_entry_id,w.item_id,w.requested_from,w.requested_until,w.quantity,w.status,i.title FROM waitlist_offers o JOIN waitlist_entries w ON w.id=o.waitlist_entry_id JOIN items i ON i.id=w.item_id WHERE w.user_id=? ORDER BY o.offered_at DESC").bind(u.id).all();return json({offers:rows.results})}const row=await env.DB.prepare("SELECT o.*,w.user_id,w.item_id,w.requested_from,w.requested_until,w.quantity FROM waitlist_offers o JOIN waitlist_entries w ON w.id=o.waitlist_entry_id WHERE o.id=?").bind(id).first();if(!row||row.user_id!==u.id)throw new FinalError(404,"ההצעה לא נמצאה");if(row.accepted_at||row.declined_at||Date.parse(row.expires_at)<=Date.now())throw new FinalError(409,"ההצעה כבר אינה פעילה");if(action==="decline"){await env.DB.batch([env.DB.prepare("UPDATE waitlist_offers SET declined_at=? WHERE id=?").bind(now,id),env.DB.prepare("UPDATE waitlist_entries SET status='cancelled' WHERE id=?").bind(row.waitlist_entry_id)]);return json({ok:true,status:"declined"})}const rid=crypto.randomUUID();await env.DB.batch([env.DB.prepare("INSERT INTO loan_requests(id,item_id,borrower_id,requested_from,requested_until,quantity,status,workflow_status) VALUES(?,?,?,?,?,?,'pending','inventory_held')").bind(rid,row.item_id,u.id,row.requested_from,row.requested_until,row.quantity),env.DB.prepare("UPDATE waitlist_offers SET accepted_at=? WHERE id=?").bind(now,id),env.DB.prepare("UPDATE waitlist_entries SET status='converted' WHERE id=?").bind(row.waitlist_entry_id)]);return json({ok:true,status:"accepted",requestId:rid})}
 async function recurringLoans(request,env,id=null){
   const u=await requireUser(request,env);
   if(request.method==="GET"){const rows=await env.DB.prepare("SELECT r.*,i.title FROM recurring_loan_rules r JOIN items i ON i.id=r.item_id WHERE r.user_id=? ORDER BY r.created_at DESC").bind(u.id).all();return json({rules:rows.results})}
@@ -363,6 +364,8 @@ export async function runFinalMaintenance(env){
     env.DB.prepare("UPDATE help_requests SET status='closed',updated_at=? WHERE status='open' AND requested_until IS NOT NULL AND requested_until<?").bind(now,now),
     env.DB.prepare("UPDATE items SET status='active',updated_at=? WHERE publish_at IS NOT NULL AND publish_at<=? AND status='pending'").bind(now,now)
   ]);
+  const expiredOffers=await env.DB.prepare("SELECT o.id,o.waitlist_entry_id FROM waitlist_offers o JOIN waitlist_entries w ON w.id=o.waitlist_entry_id WHERE o.accepted_at IS NULL AND o.declined_at IS NULL AND o.expires_at<=? AND w.status='notified'").bind(now).all();
+  for(const o of expiredOffers.results||[]) await env.DB.prepare("UPDATE waitlist_entries SET status='waiting' WHERE id=?").bind(o.waitlist_entry_id).run();
   const waiting=await env.DB.prepare("SELECT w.*,i.waitlist_response_minutes,i.waitlist_near_response_minutes FROM waitlist_entries w JOIN items i ON i.id=w.item_id WHERE w.status='waiting' ORDER BY w.created_at LIMIT 100").all();
   for(const w of waiting.results){
     const conflict=await env.DB.prepare(`SELECT COALESCE(SUM(quantity),0) reserved FROM loan_requests WHERE item_id=? AND status IN ('pending','approved','collected') AND requested_from<? AND requested_until>?`).bind(w.item_id,w.requested_until,w.requested_from).first();
@@ -400,6 +403,8 @@ export async function handleFinalFeatures(request,env,ctx,url){
     m=path.match(/^\/api\/item-units\/scan\/([^/]+)$/);if(m&&method==="GET")return await scanSerial(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/item-units\/([^/]+)\/scan-action$/);if(m&&method==="POST")return await unitScanAction(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/organizations\/([^/]+)\/inventory\/bulk$/);if(m&&method==="POST")return await bulkInventory(request,env,decodeURIComponent(m[1]));
+    if(path==="/api/me/waitlist-offers"&&method==="GET")return await myWaitlistOffers(request,env);
+    m=path.match(/^\/api\/me\/waitlist-offers\/([^/]+)\/(accept|decline)$/);if(m&&method==="POST")return await myWaitlistOffers(request,env,decodeURIComponent(m[1]),m[2]);
     if(path==="/api/me/recurring-loans"&&(method==="GET"||method==="POST"))return await recurringLoans(request,env);
     m=path.match(/^\/api\/me\/recurring-loans\/([^/]+)$/);if(m&&method==="DELETE")return await recurringLoans(request,env,decodeURIComponent(m[1]));
     if(path==="/api/me/saved-entities"&&(method==="GET"||method==="POST"))return await savedEntities(request,env);
