@@ -261,8 +261,8 @@ async function reviewAction(request,env,id,action){
   if(action==="edit"){
     if(r.author_id!==u.id)throw new FinalError(403,"אין הרשאה");
     const limit=r.edited_until?new Date(r.edited_until):new Date(new Date(r.created_at).getTime()+7*86400000);if(new Date()>limit)throw new FinalError(410,"חלון העריכה הסתיים");
-    const b=await body(request),rating=Math.max(1,Math.min(5,Number(b.rating)||r.rating)),product=Math.max(1,Math.min(5,Number(b.productRating)||r.product_rating||rating)),service=Math.max(1,Math.min(5,Number(b.serviceRating)||r.service_rating||rating));
-    await env.DB.prepare("UPDATE reviews SET rating=?,product_rating=?,service_rating=?,comment=?,updated_at=?,edited_until=COALESCE(edited_until,?) WHERE id=?").bind(rating,product,service,optional(b.comment,1500),new Date().toISOString(),limit.toISOString(),id).run();
+    const b=await body(request),rating=Math.max(1,Math.min(5,Number(b.rating)||r.rating)),product=Math.max(1,Math.min(5,Number(b.productRating)||r.product_rating||rating)),service=Math.max(1,Math.min(5,Number(b.serviceRating)||r.service_rating||rating)),branch=r.branch_id?Math.max(1,Math.min(5,Number(b.branchRating)||r.branch_rating||rating)):null;
+    await env.DB.prepare("UPDATE reviews SET rating=?,product_rating=?,service_rating=?,branch_rating=?,comment=?,updated_at=?,edited_until=COALESCE(edited_until,?) WHERE id=?").bind(rating,product,service,branch,optional(b.comment,1500),new Date().toISOString(),limit.toISOString(),id).run();
     return json({ok:true});
   }
   if(action==="helpful"){try{await env.DB.prepare("INSERT INTO review_helpful_votes(review_id,user_id) VALUES(?,?)").bind(id,u.id).run();await env.DB.prepare("UPDATE reviews SET helpful_count=helpful_count+1 WHERE id=?").bind(id).run()}catch{}return json({ok:true})}
