@@ -106,7 +106,7 @@ for(const token of ["renderPrivacy","/api/me/export","/api/me/data-request","req
 
 for(const token of ["renderTransfers","/api/me/organization-transfers","data-transfer-accept","data-transfer-decline"])assert.ok(platformClient.includes(token),token+" missing from ownership transfer account UI");
 
-assert.ok(platformWorker.includes("/api/me/organization-transfers"),"ownership transfer listing route missing");
+assert.ok(platform.includes("/api/me/organization-transfers"),"ownership transfer listing route missing");
 
 assert.ok(worker.includes("requestAccountDeletion"),"account deletion request endpoint missing");
 
