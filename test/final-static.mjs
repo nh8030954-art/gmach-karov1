@@ -54,6 +54,8 @@ assert.ok(platformClient.includes("/api/admin/categories/"));
 assert.ok(platformClient.includes("/api/admin/closures/"));
 assert.ok(platformClient.includes("/api/admin/category-suggestions"));
 assert.ok(platformClient.includes("pt-category-suggestions"));
+assert.ok(platformClient.includes("data-approve"));
+assert.ok(platformClient.includes("data-reject"));
 
 console.log("Final completion static release gate passed.");
 
