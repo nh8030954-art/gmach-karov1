@@ -1379,6 +1379,8 @@ async function updateOrganization(request, env, id) {
 function positiveInt(value,fallback,min,max,label){ const n=value===""||value==null?fallback:Number(value); if(!Number.isInteger(n)||n<min||n>max) throw new HttpError(400,`${label} אינו תקין`); return n; }
 function moneyAgorot(value){ const n=Number(value); if(!Number.isFinite(n)||n<0||n>1000000) throw new HttpError(400,"סכום הפיקדון אינו תקין"); return Math.round(n*100); }
 
+async function notifyMatchingSavedSearches(env,item){const rows=await env.DB.prepare("SELECT id,user_id,name,filters_json FROM saved_searches WHERE notify=1").all();for(const row of rows.results||[]){const f=safeJsonObject(row.filters_json),q=String(f.query||"").trim().toLowerCase(),matchesQuery=!q||[item.title,item.description,item.organizationName].some(v=>String(v||"").toLowerCase().includes(q)),matchesCity=!f.city||String(f.city)===String(item.city),matchesCategory=!f.category||String(f.category)===String(item.category),matchesCondition=!f.condition||String(f.condition)===String(item.condition);if(matchesQuery&&matchesCity&&matchesCategory&&matchesCondition)await notificationStatement(env,row.user_id,"status","פריט חדש מתאים לחיפוש שמור",`${item.title} נוסף ומתאים לחיפוש "${row.name}".`,null).run()}}
+
 async function createItem(request, env) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
@@ -1433,6 +1435,7 @@ async function createItem(request, env) {
   const publishStatus=publishAt&&Date.parse(publishAt)>Date.now()?"pending":"active";
   if(publishStatus!=="active") await env.DB.prepare("UPDATE items SET status='pending' WHERE id=?").bind(id).run();
   else await env.DB.prepare("UPDATE organizations SET is_hidden=0,updated_at=? WHERE id=?").bind(new Date().toISOString(),organizationId).run();
+  if(publishStatus==="active") await notifyMatchingSavedSearches(env,{id,title,description:body.description,organizationName:organization.name,city:organization.city,category,condition});
   return json({ item: { id, status: publishStatus,publishAt } }, 201);
 }
 
