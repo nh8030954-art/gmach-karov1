@@ -909,10 +909,12 @@ async function listMySupportTickets(request,env){
 
 async function listSupportTicketMessages(request,env,ticketId){
   const user=await requireUser(request,env);
-  const ticket=await env.DB.prepare("SELECT id FROM support_tickets WHERE id=? AND (user_id=? OR email=? COLLATE NOCASE)").bind(ticketId,user.id,user.email).first();
+  const ticket=await env.DB.prepare("SELECT id,message,created_at FROM support_tickets WHERE id=? AND (user_id=? OR email=? COLLATE NOCASE)").bind(ticketId,user.id,user.email).first();
   if(!ticket)throw new HttpError(404,"הפנייה לא נמצאה");
   const rows=await env.DB.prepare("SELECT m.id,m.body,m.created_at,m.sender_id,u.role AS sender_role FROM support_ticket_messages m LEFT JOIN users u ON u.id=m.sender_id WHERE m.ticket_id=? ORDER BY m.created_at ASC LIMIT 200").bind(ticketId).all();
-  return json({messages:rows.results.map(row=>({id:row.id,body:row.body,createdAt:row.created_at,fromSupport:row.sender_role==="admin"&&row.sender_id!==user.id}))});
+  const messages=rows.results.map(row=>({id:row.id,body:row.body,createdAt:row.created_at,fromSupport:row.sender_role==="admin"&&row.sender_id!==user.id}));
+  if(ticket.message&&!messages.length)messages.push({id:"original",body:ticket.message,createdAt:ticket.created_at,fromSupport:false});
+  return json({messages});
 }
 
 async function addSupportTicketMessage(request,env,ticketId){
