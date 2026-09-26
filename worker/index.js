@@ -2421,6 +2421,8 @@ async function enforcePublicRateLimit(env, identityValue, action, ctx, limit = 1
 async function runScheduledMaintenance(env) {
   await ensureProductionHardeningSchema(env);
   const now = new Date().toISOString();
+  const scheduledItems=await env.DB.prepare(`SELECT i.id,i.title,i.description,i.city,i.category,i.condition,o.name organization_name FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.status='pending' AND i.publish_at IS NOT NULL AND i.publish_at<=?`).bind(now).all();
+  for(const item of scheduledItems.results||[]){await env.DB.prepare("UPDATE items SET status='active',updated_at=? WHERE id=? AND status='pending'").bind(now,item.id).run();await notifyMatchingSavedSearches(env,{id:item.id,title:item.title,description:item.description,organizationName:item.organization_name,city:item.city,category:item.category,condition:item.condition})}
   const newlyOverdue=await env.DB.prepare(`SELECT lr.id,lr.borrower_id,i.title,o.owner_id FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.status='collected' AND lr.requested_until<? AND lr.workflow_status!='overdue'`).bind(now).all();
   await env.DB.batch([
     env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now),
