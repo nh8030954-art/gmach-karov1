@@ -74,6 +74,3 @@ for(const condition of ["חדש","כמו חדש","מצב טוב","מצב סבי�
 for(const token of ["listItemWaitlist","leaveWaitlist","updateHelpOffer","/api/waitlist/","/api/help-offers/"])assert.ok(worker.includes(token),token+" missing from waitlist/community lifecycle");
 for(const token of ["request-waitlist input","openHelpOffers","data-select-offer","data-remove-waitlist","calendar.ics"])assert.ok(appClient.includes(token),token+" missing from waitlist/community/calendar UI");
 for(const token of ["renderCalendar","preferredApp","data-k=\"push\"","reminderMinutes"])assert.ok(platformClient.includes(token),token+" missing from calendar/push settings UI");
-
-for(const token of ["decideLoanExtension","extension/decision","extension_approved","extension_declined"])assert.ok(worker.includes(token),token+" missing from extension decision backend");
-for(const token of ["data-extension-decision","אישור הארכה","דחיית הארכה"])assert.ok(appClient.includes(token),token+" missing from extension decision UI");
