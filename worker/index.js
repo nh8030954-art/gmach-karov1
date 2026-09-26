@@ -412,6 +412,10 @@ async function routeApi(request, env, ctx, url) {
   if (method === "PUT" && path === "/api/me/notification-preferences") return saveNotificationPreferences(request, env);
   if (method === "GET" && path === "/api/me/saved-searches") return listSavedSearches(request, env);
   if (method === "POST" && path === "/api/me/saved-searches") return createSavedSearch(request, env);
+  if (method === "GET" && path === "/api/me/saved-categories") return listSavedCategories(request, env);
+  const savedCategory = path.match(/^\/api\/me\/saved-categories\/([^/]+)$/);
+  if (savedCategory && method === "PUT") return saveCategory(request, env, decodeURIComponent(savedCategory[1]));
+  if (savedCategory && method === "DELETE") return removeSavedCategory(request, env, decodeURIComponent(savedCategory[1]));
 
   if (method === "POST" && path === "/api/me/account/cancel-deletion") return cancelAccountDeletion(request, env);
   const sessionRevoke = path.match(/^\/api\/me\/sessions\/([^/]+)$/);
@@ -991,6 +995,23 @@ async function saveNotificationPreferences(request,env) {
 }
 
 async function listSavedSearches(request,env){ const user=await requireUser(request,env); const rows=await env.DB.prepare("SELECT id,name,filters_json,notify,created_at FROM saved_searches WHERE user_id=? ORDER BY created_at DESC").bind(user.id).all(); return json({searches:rows.results.map(row=>({...row,filters:safeJsonObject(row.filters_json),notify:Boolean(row.notify)}))}); }
+async function listSavedCategories(request,env){
+  const user=await requireUser(request,env);
+  const rows=await env.DB.prepare("SELECT c.id,c.name_he,c.name_en FROM saved_categories s JOIN categories c ON c.id=s.category_id WHERE s.user_id=? AND c.status='active' ORDER BY c.sort_order,c.name_he").bind(user.id).all();
+  return json({categories:rows.results});
+}
+async function saveCategory(request,env,id){
+  const user=await requireUser(request,env);
+  const category=await env.DB.prepare("SELECT id FROM categories WHERE id=? AND status='active'").bind(id).first();
+  if(!category)throw new HttpError(404,"הקטגוריה לא נמצאה");
+  await env.DB.prepare("INSERT OR IGNORE INTO saved_categories(user_id,category_id) VALUES(?,?)").bind(user.id,id).run();
+  return json({saved:true});
+}
+async function removeSavedCategory(request,env,id){
+  const user=await requireUser(request,env);
+  await env.DB.prepare("DELETE FROM saved_categories WHERE user_id=? AND category_id=?").bind(user.id,id).run();
+  return json({saved:false});
+}
 async function createSavedSearch(request,env){ const user=await requireUser(request,env),body=await readJson(request),id=crypto.randomUUID(),filters=body.filters&&typeof body.filters==="object"&&!Array.isArray(body.filters)?body.filters:{}; await env.DB.prepare("INSERT INTO saved_searches(id,user_id,name,filters_json,notify) VALUES(?,?,?,?,?)").bind(id,user.id,cleanText(body.name,2,80,"שם החיפוש"),JSON.stringify(filters).slice(0,4000),body.notify===false?0:1).run(); return json({search:{id}},201); }
 async function updateSavedSearch(request,env,id){
   const user=await requireUser(request,env),body=await readJson(request);
