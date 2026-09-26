@@ -24,7 +24,7 @@
 
   const state = {
     serverAvailable: false, items: [], filteredItems: [], favorites: new Set(), user: null, selectedItem: null,
-    visibleCount: 8, activeCategory: "", pendingAction: null, dashboardTab: "requests", myOrganizations: [], dashboard: null, authMode: "login",
+    visibleCount: 8, activeCategory: "", compareIds: new Set(), pendingAction: null, dashboardTab: "requests", myOrganizations: [], dashboard: null, authMode: "login",
     editingOrganizationId: null, editingItemId: null, chatRequestId: null, chatTimer: null, notifications: [],
     customizations: new Map(), visualEditMode: false, selectedEditable: null, pendingVerificationEmail: "", supportEmail: "",
     discovery: { categories: [], cities: [], suggestions: [], organizations: [] }, viewMode: "list"
@@ -107,7 +107,7 @@
   function renderSkeletons() { $("#items-grid").innerHTML = Array.from({ length: 8 }, () => '<div class="skeleton-card" aria-hidden="true"></div>').join(""); }
   async function loadItems() {
     renderSkeletons();
-    try { const params = new URLSearchParams(); if ($("#date-filter").value) params.set("date", $("#date-filter").value); const data = await api(`/api/items${params.size ? `?${params}` : ""}`); state.items = data.items || []; applyFilters(); state.serverAvailable = true; $("#connection-banner").hidden = true; }
+    try { const params = new URLSearchParams(); if ($("#date-filter").value) params.set("date", $("#date-filter").value); const data = await api(`/api/items${params.size ? `?${params}` : ""}`); state.items = data.items || []; for (const id of state.compareIds) if (!state.items.some(item => String(item.id) === id)) state.compareIds.delete(id); applyFilters(); renderCompareTray(); state.serverAvailable = true; $("#connection-banner").hidden = true; }
     catch (error) { console.error("Unable to load items", error); $("#items-grid").innerHTML = ""; $("#empty-state").hidden = false; $("#empty-state h3").textContent = "לא הצלחנו לטעון את הפריטים"; $("#empty-state p").textContent = "כדאי לרענן את הדף בעוד רגע."; $("#results-summary").textContent = "שגיאה בטעינת הקטלוג"; }
   }
   function applyFilters({ resetVisible = true } = {}) {
@@ -121,7 +121,7 @@
   }
   function itemCardMarkup(item) {
     const image = safeImageUrl(item.image_urls?.[0]), favorite = state.favorites.has(item.id), available = item.availability_status === "available", count = Number(item.available_count ?? item.quantity), updated = item.inventory_updated_at ? formatRelative(item.inventory_updated_at) : "";
-    return `<article class="item-card" data-item-id="${escapeHTML(item.id)}"><div class="item-card-media" style="--media-bg:${safeColor(item.cover_color)}">${image ? `<img src="${escapeHTML(image)}" alt="${escapeHTML(item.title)}" loading="lazy">` : `<span class="item-symbol">${iconSvg(item.icon)}</span>`}<span class="availability-badge ${available ? "" : "is-busy"}">${available ? count > 0 ? `${count} זמינים` : "זמין עכשיו" : "בתיאום"}</span><button class="favorite-button ${favorite ? "is-favorite" : ""}" type="button" data-favorite-id="${escapeHTML(item.id)}" aria-label="${favorite ? "הסרה מהמועדפים" : "הוספה למועדפים"}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS.heart}</svg></button></div><div class="item-card-body"><div class="item-card-topline"><span class="item-category-label">${escapeHTML(item.category)}</span><span>${escapeHTML(item.condition)}</span></div><h3>${escapeHTML(item.title)}</h3><p>${escapeHTML(item.description)}</p><div class="trust-line"><button type="button" data-open-organization="${escapeHTML(item.organizations?.id)}">${escapeHTML(item.organizations?.name || "גמ״ח")}</button>${item.organizations?.rating ? `<span title="דירוג הגמ״ח">גמ״ח ⭐ ${escapeHTML(item.organizations.rating)}</span>` : ""}${item.rating ? `<span title="דירוג הפריט">פריט ⭐ ${escapeHTML(item.rating)}</span>` : ""}<small>${updated ? `עודכן ${escapeHTML(updated)}` : ""}</small></div><div class="item-card-footer"><span class="item-location">📍 ${escapeHTML([item.city, item.neighborhood].filter(Boolean).join(", "))}</span><button class="item-card-open" type="button" data-open-item="${escapeHTML(item.id)}">לפרטים ←</button></div></div></article>`;
+    return `<article class="item-card" data-item-id="${escapeHTML(item.id)}"><div class="item-card-media" style="--media-bg:${safeColor(item.cover_color)}">${image ? `<img src="${escapeHTML(image)}" alt="${escapeHTML(item.title)}" loading="lazy">` : `<span class="item-symbol">${iconSvg(item.icon)}</span>`}<span class="availability-badge ${available ? "" : "is-busy"}">${available ? count > 0 ? `${count} זמינים` : "זמין עכשיו" : "בתיאום"}</span><button class="favorite-button ${favorite ? "is-favorite" : ""}" type="button" data-favorite-id="${escapeHTML(item.id)}" aria-label="${favorite ? "הסרה מהמועדפים" : "הוספה למועדפים"}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS.heart}</svg></button></div><div class="item-card-body"><div class="item-card-topline"><span class="item-category-label">${escapeHTML(item.category)}</span><span>${escapeHTML(item.condition)}</span></div><h3>${escapeHTML(item.title)}</h3><p>${escapeHTML(item.description)}</p><div class="trust-line"><button type="button" data-open-organization="${escapeHTML(item.organizations?.id)}">${escapeHTML(item.organizations?.name || "גמ״ח")}</button>${item.organizations?.rating ? `<span title="דירוג הגמ״ח">גמ״ח ⭐ ${escapeHTML(item.organizations.rating)}</span>` : ""}${item.rating ? `<span title="דירוג הפריט">פריט ⭐ ${escapeHTML(item.rating)}</span>` : ""}<small>${updated ? `עודכן ${escapeHTML(updated)}` : ""}</small></div><div class="item-card-footer"><span class="item-location">📍 ${escapeHTML([item.city, item.neighborhood].filter(Boolean).join(", "))}</span><span class="item-card-controls"><button class="compare-toggle" type="button" data-compare-item="${escapeHTML(item.id)}" aria-pressed="${state.compareIds.has(String(item.id))}">${state.compareIds.has(String(item.id)) ? "✓ להשוואה" : "+ להשוואה"}</button><button class="item-card-open" type="button" data-open-item="${escapeHTML(item.id)}">לפרטים ←</button></span></div></div></article>`;
   }
   function formatRelative(value) { const days = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86400000)); return days === 0 ? "היום" : days === 1 ? "אתמול" : `לפני ${days} ימים`; }
   function renderItems() {
@@ -152,9 +152,45 @@
       $("#empty-state p").textContent = "נסו להרחיב את האזור או לבחור קטגוריה אחרת.";
       $("#empty-clear-button").textContent = "ניקוי החיפוש";
     }
-    setResultsView(state.viewMode); $$('[data-open-item]').forEach(button => button.addEventListener("click", () => openItem(button.dataset.openItem))); $$('[data-favorite-id]').forEach(button => button.addEventListener("click", event => { event.stopPropagation(); toggleFavorite(button.dataset.favoriteId); })); $$('[data-open-organization]').forEach(button => button.addEventListener("click", event => { event.stopPropagation(); openOrganization(button.dataset.openOrganization); })); $$(".item-card").forEach(card => card.addEventListener("dblclick", () => openItem(card.dataset.itemId)));
+    setResultsView(state.viewMode); $$('[data-open-item]').forEach(button => button.addEventListener("click", () => openItem(button.dataset.openItem))); $$('[data-favorite-id]').forEach(button => button.addEventListener("click", event => { event.stopPropagation(); toggleFavorite(button.dataset.favoriteId); })); $$('[data-compare-item]').forEach(button => button.addEventListener("click", event => { event.stopPropagation(); toggleCompare(button.dataset.compareItem); })); $$('[data-open-organization]').forEach(button => button.addEventListener("click", event => { event.stopPropagation(); openOrganization(button.dataset.openOrganization); })); $$(".item-card").forEach(card => card.addEventListener("dblclick", () => openItem(card.dataset.itemId)));
   }
   function findItem(id) { return state.items.find(item => String(item.id) === String(id)); }
+  function toggleCompare(id) {
+    id = String(id);
+    if (state.compareIds.has(id)) state.compareIds.delete(id);
+    else if (state.compareIds.size >= 5) { toast("אפשר להשוות עד חמישה פריטים", "error"); return; }
+    else state.compareIds.add(id);
+    $$('[data-compare-item]').filter(button => button.dataset.compareItem === id).forEach(button => {
+      const selected = state.compareIds.has(id);
+      button.setAttribute("aria-pressed", String(selected));
+      button.textContent = selected ? "✓ להשוואה" : "+ להשוואה";
+    });
+    renderCompareTray();
+  }
+  function renderCompareTray() {
+    let tray = $("#compare-tray");
+    if (!tray) { tray = document.createElement("aside"); tray.id = "compare-tray"; tray.className = "compare-tray"; tray.setAttribute("aria-label", "השוואת פריטים"); document.body.append(tray); }
+    tray.hidden = state.compareIds.size === 0;
+    if (tray.hidden) return;
+    tray.innerHTML = `<span>${state.compareIds.size} מתוך 5 פריטים להשוואה</span><button type="button" class="button button-primary button-small" data-open-compare ${state.compareIds.size < 2 ? "disabled" : ""}>השוואה</button><button type="button" class="button button-secondary button-small" data-clear-compare>ניקוי</button>`;
+    tray.querySelector('[data-open-compare]').addEventListener("click", openComparison);
+    tray.querySelector('[data-clear-compare]').addEventListener("click", () => { state.compareIds.clear(); renderCompareTray(); renderItems(); });
+  }
+  function openComparison() {
+    const items = [...state.compareIds].map(findItem).filter(Boolean);
+    if (items.length < 2) return;
+    let dialog = $("#compare-dialog");
+    if (!dialog) { dialog = document.createElement("dialog"); dialog.id = "compare-dialog"; dialog.className = "modal compare-dialog"; document.body.append(dialog); dialog.addEventListener("close", () => { if (!$("dialog[open]")) document.body.classList.remove("dialog-open"); }); }
+    const rows = [
+      ["גמ״ח", item => item.organizations?.name], ["קטגוריה", item => item.category], ["מצב", item => item.condition],
+      ["זמינות", item => item.availability_status === "available" ? "זמין" : "בתיאום"], ["כמות זמינה", item => item.available_count ?? item.quantity],
+      ["עיר", item => item.city], ["תנאי השאלה", item => item.loan_conditions]
+    ];
+    dialog.innerHTML = `<button class="dialog-close" type="button" aria-label="סגירת השוואה" data-close-compare>×</button><h2>השוואת פריטים</h2><p>השוו עד חמישה פריטים ובחרו מה מתאים לכם.</p><div class="compare-scroll"><table class="compare-table"><thead><tr><th scope="col">פרט</th>${items.map(item => `<th scope="col">${escapeHTML(item.title)}<button type="button" data-remove-compare="${escapeHTML(item.id)}" aria-label="הסרת ${escapeHTML(item.title)} מההשוואה">הסרה</button></th>`).join("")}</tr></thead><tbody>${rows.map(([label, value]) => `<tr><th scope="row">${label}</th>${items.map(item => `<td>${escapeHTML(value(item) ?? "לא צוין")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    dialog.querySelector('[data-close-compare]').addEventListener("click", () => closeDialog(dialog));
+    dialog.querySelectorAll('[data-remove-compare]').forEach(button => button.addEventListener("click", () => { state.compareIds.delete(button.dataset.removeCompare); closeDialog(dialog); renderCompareTray(); renderItems(); if (state.compareIds.size >= 2) openComparison(); }));
+    openDialog(dialog);
+  }
   function openItem(id) {
     const item = findItem(id); if (!item) return; state.selectedItem = item;
     $("#item-dialog-content").dataset.itemId = String(item.id);
