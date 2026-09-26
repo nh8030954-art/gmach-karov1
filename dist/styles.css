@@ -456,8 +456,8 @@ html.a11y-high-contrast :focus-visible { outline-color: #ffdf00 !important; }
 .stats-grid article { padding: 22px; border: 1px solid var(--line); border-radius: 20px; background: #fff; box-shadow: var(--shadow-sm); }
 .stats-grid span { display: block; color: var(--ink-soft); font-size: .82rem; font-weight: 700; }
 .stats-grid strong { display: block; margin-top: 5px; color: var(--navy); font-family: "Noto Serif Hebrew", serif; font-size: 2.2rem; }
-.dashboard-tabs { display: flex; gap: 8px; padding: 6px; border-radius: 16px; background: #e9eeeb; }
-.dashboard-tabs button { flex: 1; min-height: 46px; border: 0; border-radius: 12px; background: transparent; font-weight: 800; }
+.dashboard-tabs { display: flex; flex-wrap: wrap; gap: 8px; padding: 6px; border-radius: 16px; background: #e9eeeb; }
+.dashboard-tabs button { flex: 1 1 150px; min-height: 46px; border: 0; border-radius: 12px; background: transparent; font-weight: 800; }
 .dashboard-tabs button[aria-selected="true"] { background: #fff; color: var(--teal); box-shadow: var(--shadow-sm); }
 .dashboard-content { margin-top: 20px; display: grid; gap: 12px; }
 .dashboard-row { padding: 17px 18px; border: 1px solid var(--line); border-radius: 17px; background: #fff; display: grid; grid-template-columns: 1.5fr 1fr auto; align-items: center; gap: 20px; }
@@ -542,6 +542,11 @@ html.a11y-high-contrast :focus-visible { outline-color: #ffdf00 !important; }
 .dashboard-section-title { margin: 18px 0 4px; color: var(--navy); font-family: "Noto Serif Hebrew", serif; font-size: 1.35rem; }
 .dashboard-section-title:first-child { margin-top: 0; }
 .dashboard-row-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 7px; }
+.dashboard-subsection .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 14px; margin-top: 20px; }
+.dashboard-subsection .form-grid h3, .dashboard-subsection .form-grid .wide { grid-column: 1 / -1; }
+.dashboard-subsection .form-grid label { display: grid; gap: 6px; font-weight: 700; }
+.dashboard-subsection .form-grid label.check { display: flex; align-items: center; }
+.dashboard-subsection .form-grid input:not([type="checkbox"]) { width: 100%; min-height: 44px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
 .contact-detail { color: var(--teal); font-weight: 750; }
 .free-note { margin: -4px 0 0; display: flex; justify-content: center; align-items: center; gap: 6px; color: var(--success); font-size: .78rem; font-weight: 800; }
 .free-note svg { width: 17px; height: 17px; }
