@@ -117,3 +117,5 @@ for(const token of ["myWaitlistOffers","/api/me/waitlist-offers","const expiredO
 for(const token of ["openHelpMatches","data-help-matches","data-offer-match"])assert.ok(appClient.includes(token),token+" missing from community matching UI");
 
 assert.ok(appClient.includes("data-counter-pickup"),"pickup counter proposal UI missing");
+
+for(const token of ["maps.apple.com","data-copy-map-address","navigator.geolocation","/api/maps/geocode"])assert.ok(remainingClient.includes(token),token+" missing from completed map/navigation UI");
