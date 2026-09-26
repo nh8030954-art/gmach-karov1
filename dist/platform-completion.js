@@ -54,7 +54,7 @@
   $(".pt-close",dialog).onclick=()=>dialog.close();
 
   const tabs=[
-    ["profile","פרופיל"],["addresses","כתובות"],["devices","מכשירים"],["notifications","התראות"],["searches","חיפושים שמורים"],["support","תמיכה"],["admin","ניהול־על"]
+    ["profile","פרופיל"],["addresses","כתובות"],["devices","מכשירים"],["notifications","התראות"],["searches","חיפושים שמורים"],["categories","קטגוריות שמורות"],["support","תמיכה"],["admin","ניהול־על"]
   ];
   let profile=null, active="profile";
   const tabbar=$(".pt-tabs",dialog), body=$(".pt-body",dialog);
@@ -68,7 +68,7 @@
     try{
       if(!profile) profile=(await api("/api/me/profile")).profile;
       if(id==="admin" && profile.role!=="admin"){body.innerHTML="<p>המסך זמין למנהל האתר בלבד.</p>";return;}
-      await ({profile:renderProfile,addresses:renderAddresses,devices:renderDevices,notifications:renderNotifications,searches:renderSearches,support:renderSupport,admin:renderAdmin}[id])();
+      await ({profile:renderProfile,addresses:renderAddresses,devices:renderDevices,notifications:renderNotifications,searches:renderSearches,categories:renderSavedCategories,support:renderSupport,admin:renderAdmin}[id])();
     }catch(e){body.innerHTML=`<p role="alert">${esc(e.message)}</p>`;}
   }
 
@@ -121,6 +121,22 @@
       d.querySelector("[data-del]").onclick=async()=>{try{await api("/api/me/saved-searches/"+encodeURIComponent(s.id),{method:"DELETE"});await renderSearches()}catch(e){status.textContent=e.message}};list.appendChild(d)}
     form.onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,field=key=>f.elements.namedItem(key);const payload={name:field("name").value,filters:{q:field("q").value,city:field("city").value,category:field("category").value},notify:field("notify").checked};const button=f.querySelector('[type="submit"]');button.disabled=true;status.textContent="";
       try{await api(editingId?"/api/me/saved-searches/"+encodeURIComponent(editingId):"/api/me/saved-searches",{method:editingId?"PATCH":"POST",body:payload});await renderSearches()}catch(error){status.textContent=error.message;button.disabled=false}};
+  }
+
+  async function renderSavedCategories(){
+    const [all,saved]=await Promise.all([api("/api/categories"),api("/api/me/saved-categories")]);
+    const savedIds=new Set((saved.categories||[]).map(category=>category.id));
+    body.innerHTML='<h3>קטגוריות שמורות</h3><p class="pt-muted">בחרו קטגוריות שתרצו למצוא בקלות.</p><div class="pt-list" id="pt-category-list"></div><div class="pt-status" role="status"></div>';
+    const list=$("#pt-category-list",body);
+    for(const category of all.categories||[]){
+      const row=document.createElement("div");row.className="pt-card pt-row";
+      const title=document.createElement("strong");title.textContent=category.name_he||category.name;
+      const button=document.createElement("button");button.type="button";button.className="pt-btn";
+      const refresh=()=>{button.textContent=savedIds.has(category.id)?"הסרה מהשמורים":"שמירת קטגוריה";button.setAttribute("aria-pressed",String(savedIds.has(category.id)))};refresh();
+      button.onclick=async()=>{button.disabled=true;try{const remove=savedIds.has(category.id);await api("/api/me/saved-categories/"+encodeURIComponent(category.id),{method:remove?"DELETE":"PUT"});if(remove)savedIds.delete(category.id);else savedIds.add(category.id);refresh();setStatus(remove?"הקטגוריה הוסרה.":"הקטגוריה נשמרה.")}catch(error){setStatus(error.message,true)}finally{button.disabled=false}};
+      row.append(title,button);list.append(row);
+    }
+    if(!list.children.length)list.innerHTML='<p class="pt-muted">אין קטגוריות זמינות כרגע.</p>';
   }
 
   async function renderSupport(){
