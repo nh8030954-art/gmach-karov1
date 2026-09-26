@@ -52,6 +52,8 @@ const platformClient=await readFile("dist/platform-completion.js","utf8");
 assert.ok(platformClient.includes("pt-admin-categories"));
 assert.ok(platformClient.includes("/api/admin/categories/"));
 assert.ok(platformClient.includes("/api/admin/closures/"));
+assert.ok(platformClient.includes("/api/admin/category-suggestions"));
+assert.ok(platformClient.includes("pt-category-suggestions"));
 
 console.log("Final completion static release gate passed.");
 
