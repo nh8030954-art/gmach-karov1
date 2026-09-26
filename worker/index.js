@@ -1002,10 +1002,9 @@ async function updateSavedSearch(request,env,id){
 }
 
 async function listItems(env, url) {
-  // Public reads must also heal additive schema drift. Deployments can contain
-  // data created before the rating/category migrations, and a catalog should
-  // never become unavailable because an optional enrichment column is absent.
-  await ensureFinalFeaturesSchema(env).catch(error => console.error("Catalog schema reconciliation failed", error));
+  // Keep this hot public path read-only and fast. Schema reconciliation runs
+  // from health/scheduled maintenance; the compatible query below keeps older
+  // databases readable while that maintenance catches up.
   const params = [];
   const where = ["i.status = 'active'", "i.is_free = 1", "o.status = 'approved'", "o.is_hidden = 0"];
   const query = cleanOptional(url.searchParams.get("q"), 120);
@@ -1079,7 +1078,6 @@ async function listItems(env, url) {
 }
 
 async function getItem(env, id) {
-  await ensureFinalFeaturesSchema(env).catch(error => console.error("Item schema reconciliation failed", error));
   const row = await env.DB.prepare(`
     SELECT i.*, o.id AS org_id, o.name AS org_name,
       o.last_active_at AS org_last_active_at,
