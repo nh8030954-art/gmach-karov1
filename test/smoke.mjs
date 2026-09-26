@@ -129,6 +129,11 @@ try {
   await images.put(backupKey, backupText + "corruption");
   result = await request(`/api/admin/backups/${backupId}/validate`, { method: "POST", cookie: adminCookie, body: {} });
   assert.notEqual(result.response.status, 200, "Corrupt backups must fail validation");
+  result = await request("/api/admin/backups", { method: "POST", cookie: adminCookie, body: {} });
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  result = await request(`/api/admin/backups/${result.data.backup.id}/validate`, { method: "POST", cookie: adminCookie, body: {} });
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  assert.equal(result.data.validation.status, "success");
 
   result = await request("/api/admin/site-settings", { cookie: adminCookie });
   assert.equal(result.response.status, 200);
@@ -325,6 +330,12 @@ try {
   result = await request("/api/me/saved-searches", { cookie: borrowerCookie });
   assert.equal(result.data.searches.find(search => search.id === savedSearchId).name, "אירועים מעודכנים");
   assert.equal(result.data.searches.find(search => search.id === savedSearchId).notify, false);
+  await db.prepare("DROP TABLE organization_categories").run();
+  result = await request(`/api/organizations/${organizationId}/public`);
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  assert.equal(result.data.partial, true);
+  assert.equal(result.data.organization.id, organizationId);
+  assert.equal(result.data.items.length, 1);
 
   result = await request("/api/auth/logout", { method: "POST", cookie: borrowerCookie });
   assert.equal(result.response.status, 200);
