@@ -223,7 +223,6 @@ async function recurringLoans(request,env,id=null){
     .bind(rid,u.id,b.itemId,Math.max(1,Math.min(999,Number(b.quantity)||1)),clean(b.startsAt,10,40),Math.max(30,Math.min(525600,Number(b.durationMinutes)||60)),frequency,Math.max(2,Math.min(52,Number(b.occurrences)||2))).run();
   return json({rule:{id:rid,status:"active"}},201);
 }
-async function myReviews(request,env){const u=await requireUser(request,env);const authored=await env.DB.prepare(`SELECT r.*,i.title item_title,o.name organization_name,b.name branch_name FROM reviews r LEFT JOIN items i ON i.id=r.item_id LEFT JOIN organizations o ON o.id=r.organization_id LEFT JOIN organization_branches b ON b.id=r.branch_id WHERE r.author_id=? ORDER BY r.created_at DESC`).bind(u.id).all();const received=await env.DB.prepare(`SELECT r.*,i.title item_title,o.name organization_name,b.name branch_name,substr(x.full_name,1,instr(x.full_name||' ',' ')-1) author_name FROM reviews r JOIN organizations o ON o.id=r.organization_id JOIN users x ON x.id=r.author_id LEFT JOIN items i ON i.id=r.item_id LEFT JOIN organization_branches b ON b.id=r.branch_id WHERE o.owner_id=? ORDER BY r.created_at DESC LIMIT 200`).bind(u.id).all();return json({authored:authored.results,received:received.results})}
 async function savedEntities(request,env,type=null,id=null){
   const u=await requireUser(request,env);
   if(request.method==="GET"){const rows=await env.DB.prepare("SELECT * FROM saved_entities WHERE user_id=? ORDER BY created_at DESC").bind(u.id).all();return json({saved:rows.results})}
@@ -408,7 +407,6 @@ export async function handleFinalFeatures(request,env,ctx,url){
     m=path.match(/^\/api\/me\/waitlist-offers\/([^/]+)\/(accept|decline)$/);if(m&&method==="POST")return await myWaitlistOffers(request,env,decodeURIComponent(m[1]),m[2]);
     if(path==="/api/me/recurring-loans"&&(method==="GET"||method==="POST"))return await recurringLoans(request,env);
     m=path.match(/^\/api\/me\/recurring-loans\/([^/]+)$/);if(m&&method==="DELETE")return await recurringLoans(request,env,decodeURIComponent(m[1]));
-    if(path==="/api/me/reviews"&&method==="GET")return await myReviews(request,env);
     if(path==="/api/me/saved-entities"&&(method==="GET"||method==="POST"))return await savedEntities(request,env);
     m=path.match(/^\/api\/me\/saved-entities\/([^/]+)\/([^/]+)$/);if(m&&method==="DELETE")return await savedEntities(request,env,decodeURIComponent(m[1]),decodeURIComponent(m[2]));
     m=path.match(/^\/api\/help-requests\/([^/]+)\/offers$/);if(m&&(method==="GET"||method==="POST"))return await helpOffers(request,env,decodeURIComponent(m[1]));
