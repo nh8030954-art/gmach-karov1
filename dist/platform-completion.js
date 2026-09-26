@@ -39,7 +39,7 @@
     .pt-tabs button[aria-selected="true"]{font-weight:700;border-color:#7e8b95}
     .pt-body{padding:18px 22px;max-height:68vh;overflow:auto}.pt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
     .pt-card{border:1px solid #e4e9ee;border-radius:14px;padding:14px;background:#fff}.pt-card h3{margin-top:0}
-    .pt-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pt-form{display:grid;gap:10px}.pt-form input,.pt-form select,.pt-form textarea{width:100%;padding:10px;border:1px solid #ccd5dc;border-radius:10px}
+    .pt-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pt-form{display:grid;gap:10px}.pt-form[hidden]{display:none}.pt-form input,.pt-form select,.pt-form textarea{width:100%;padding:10px;border:1px solid #ccd5dc;border-radius:10px}
     .pt-btn{border:0;border-radius:10px;padding:9px 13px;cursor:pointer;background:#e9eef2}.pt-btn.primary{background:#173a4d;color:#fff}.pt-btn.danger{background:#fff0f0;color:#9f1d1d}
     .pt-muted{color:#667681;font-size:.92rem}.pt-status{min-height:1.4em;margin-top:8px}.pt-list{display:grid;gap:10px}
     @media(max-width:700px){.platform-tools{width:100vw;max-width:100vw;border-radius:18px 18px 0 0;margin:auto 0 0}.pt-body{max-height:72vh}}
@@ -92,7 +92,17 @@
     body.innerHTML=`<div class="pt-grid"><section class="pt-card"><h3>כתובות שמורות</h3><div class="pt-list" id="pt-address-list"></div></section><section class="pt-card"><h3>הוספת כתובת</h3><form class="pt-form" id="pt-address-form"><input name="label" placeholder="למשל: בית" required><input name="city" placeholder="עיר/יישוב" required><input name="address" placeholder="כתובת מלאה" required><label><input type="checkbox" name="isDefault"> כתובת ברירת מחדל</label><button class="pt-btn primary">הוספה</button></form></section></div><div class="pt-status"></div>`;
     const list=$("#pt-address-list",body);
     if(!data.addresses.length) list.innerHTML='<p class="pt-muted">עדיין אין כתובות שמורות.</p>';
-    for(const x of data.addresses){const d=document.createElement("div");d.className="pt-card";d.innerHTML=`<strong>${esc(x.label)}</strong> · ${esc(x.city)} ${x.isDefault?"· ברירת מחדל":""}<div><button class="pt-btn danger" data-del>מחיקה</button></div>`;d.querySelector("[data-del]").onclick=async()=>{await api("/api/me/addresses/"+encodeURIComponent(x.id),{method:"DELETE"});renderAddresses()};list.appendChild(d);}
+    for(const x of data.addresses){
+      const d=document.createElement("div");d.className="pt-card";
+      d.innerHTML=`<strong>${esc(x.label)}</strong> · ${esc(x.city)} ${x.isDefault?"· ברירת מחדל":""}<div class="pt-row"><button class="pt-btn" type="button" data-edit>עריכה</button>${x.isDefault?"":'<button class="pt-btn" type="button" data-default>הגדרה כברירת מחדל</button>'}<button class="pt-btn danger" type="button" data-del>מחיקה</button></div><form class="pt-form" data-edit-form hidden><label>שם הכתובת<input name="label" value="${esc(x.label)}" maxlength="50" required></label><label>עיר או יישוב<input name="city" value="${esc(x.city)}" maxlength="80" required></label><label>כתובת חדשה, רק אם רוצים להחליף<input name="address" autocomplete="street-address" minlength="5" maxlength="180" placeholder="הכתובת השמורה אינה מוצגת מטעמי פרטיות"></label><div class="pt-row"><button class="pt-btn primary" type="submit">שמירת שינויים</button><button class="pt-btn" type="button" data-cancel>ביטול</button></div></form>`;
+      const path="/api/me/addresses/"+encodeURIComponent(x.id),edit=d.querySelector("[data-edit-form]");
+      d.querySelector("[data-edit]").onclick=()=>{edit.hidden=false;edit.elements.namedItem("label").focus()};
+      d.querySelector("[data-cancel]").onclick=()=>{edit.reset();edit.hidden=true};
+      edit.onsubmit=async event=>{event.preventDefault();const button=edit.querySelector('[type="submit"]');button.disabled=true;try{const payload={label:edit.elements.namedItem("label").value,city:edit.elements.namedItem("city").value};const address=edit.elements.namedItem("address").value.trim();if(address)payload.address=address;await api(path,{method:"PATCH",body:payload});await renderAddresses();setStatus("הכתובת עודכנה.")}catch(error){setStatus(error.message,true);button.disabled=false}};
+      d.querySelector("[data-default]")?.addEventListener("click",async event=>{event.currentTarget.disabled=true;try{await api(path,{method:"PATCH",body:{isDefault:true}});await renderAddresses();setStatus("כתובת ברירת המחדל עודכנה.")}catch(error){setStatus(error.message,true);event.currentTarget.disabled=false}});
+      d.querySelector("[data-del]").onclick=async event=>{event.currentTarget.disabled=true;try{await api(path,{method:"DELETE"});await renderAddresses();setStatus("הכתובת נמחקה.")}catch(error){setStatus(error.message,true);event.currentTarget.disabled=false}};
+      list.appendChild(d);
+    }
     $("#pt-address-form",body).onsubmit=async e=>{e.preventDefault();const f=e.currentTarget;try{await api("/api/me/addresses",{method:"POST",body:{label:f.label.value,city:f.city.value,address:f.address.value,isDefault:f.isDefault.checked}});await renderAddresses();}catch(err){setStatus(err.message,true)}};
   }
 
