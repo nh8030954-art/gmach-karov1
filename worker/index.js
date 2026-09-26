@@ -1446,7 +1446,7 @@ async function createItem(request, env) {
   const publishStatus=publishAt&&Date.parse(publishAt)>Date.now()?"pending":"active";
   if(publishStatus!=="active") await env.DB.prepare("UPDATE items SET status='pending' WHERE id=?").bind(id).run();
   else await env.DB.prepare("UPDATE organizations SET is_hidden=0,updated_at=? WHERE id=?").bind(new Date().toISOString(),organizationId).run();
-  if(publishStatus==="active") await notifyMatchingSavedSearches(env,{id,title,description:body.description,organizationName:organization.name,city:organization.city,category,condition});
+  if(publishStatus==="active"){await notifyMatchingSavedSearches(env,{id,title,description:body.description,organizationName:organization.name,city:organization.city,category,condition});await notifySavedFollowers(env,{itemId:id,organizationId,category,title,event:"created"});}
   return json({ item: { id, status: publishStatus,publishAt } }, 201);
 }
 
@@ -1501,6 +1501,7 @@ async function updateItem(request, env, id) {
       statements.push(env.DB.prepare("UPDATE loan_requests SET workflow_status='change_reapproval_required',updated_at=? WHERE id=?").bind(new Date().toISOString(),requestRow.id));
     }
     if(statements.length) await env.DB.batch(statements);
+    await notifySavedFollowers(env,{itemId:id,organizationId:existing.organization_id,category,title:values.title,event:"changed"});
   }
   const minLoanMinutes=positiveInt(body.minLoanMinutes,Number(existing.min_loan_minutes||60),1,525600,"משך מינימלי");
   const maxLoanMinutes=positiveInt(body.maxLoanMinutes,Number(existing.max_loan_minutes||10080),1,525600,"משך מקסימלי");
@@ -1883,6 +1884,7 @@ async function updateRequestStatus(request, env, id) {
   }
   await env.DB.batch(statusStatements);
   if(["declined","returned"].includes(target)) await advanceWaitlist(env,row.item_id);
+  if(target==="returned") await notifySavedFollowers(env,{itemId:row.item_id,organizationId:row.organization_id,category:row.category,title:row.item_title,event:"available"});
   return json({ id, status: target, managerNote });
 }
 
@@ -2407,6 +2409,8 @@ async function requireAdmin(request, env) {
   if (user.role !== "admin") throw new HttpError(403, "הפעולה מיועדת למנהלי האתר");
   return user;
 }
+
+async function notifySavedFollowers(env,{itemId,organizationId,category,title,event}){try{const rows=await env.DB.prepare(`SELECT DISTINCT user_id FROM saved_entities WHERE notify=1 AND ((entity_type='item' AND entity_id=?) OR (entity_type='organization' AND entity_id=?) OR (entity_type='category' AND entity_id=?))`).bind(itemId||"",organizationId||"",category||"").all();if(!rows.results?.length)return;const messages={created:["נוסף מוצר שעשוי לעניין אותך",`${title} נוסף לתוכן ששמרת.`],changed:["פרטי מוצר שמור השתנו",`עודכנו פרטים עבור ${title}.`],available:["מוצר שמור חזר לזמינות",`${title} זמין שוב להשאלה.`]};const [subject,body]=messages[event]||messages.changed;await env.DB.batch(rows.results.map(r=>notificationStatement(env,r.user_id,"system",subject,body,null)))}catch(error){console.error("saved follower notification failed",{itemId,event,error})}}
 
 function notificationStatement(env, userId, type, title, body, requestId = null) {
   if (!["request", "status", "message", "system"].includes(type)) type = "status";
