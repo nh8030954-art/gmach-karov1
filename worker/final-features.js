@@ -340,12 +340,12 @@ async function logicalBackup(request,env){
     const tables=["users","organizations","organization_branches","items","item_units","loan_requests","notifications","reviews","help_requests","support_tickets","categories","site_settings"];
     const dump={version:1,createdAt:started,tables:{}};
     for(const t of tables){const rows=await env.DB.prepare(`SELECT * FROM ${t}`).all();dump.tables[t]=rows.results}
-    const raw=JSON.stringify(dump),key=`_system-backups/${started.replace(/[:.]/g,"-")}-${id}.json`;
+    const raw=JSON.stringify(dump),checksum=await hash(raw),key=`_system-backups/${started.replace(/[:.]/g,"-")}-${id}.json`;
     if(!env.ITEM_IMAGES?.put)throw new Error("R2 unavailable");
     await env.ITEM_IMAGES.put(key,raw,{httpMetadata:{contentType:"application/json"}});
     await env.DB.batch([
-      env.DB.prepare("UPDATE backup_runs SET status='completed',completed_at=?,finished_at=?,manifest_json=? WHERE id=?").bind(new Date().toISOString(),new Date().toISOString(),JSON.stringify({storageKey:key,bytes:new TextEncoder().encode(raw).length,tables}),id),
-      env.DB.prepare("INSERT INTO backup_objects(backup_run_id,storage_key,object_type,size_bytes) VALUES(?,?,?,?)").bind(id,key,"database-json",new TextEncoder().encode(raw).length)
+      env.DB.prepare("UPDATE backup_runs SET status='completed',completed_at=?,finished_at=?,manifest_json=? WHERE id=?").bind(new Date().toISOString(),new Date().toISOString(),JSON.stringify({storageKey:key,bytes:new TextEncoder().encode(raw).length,checksum,tables}),id),
+      env.DB.prepare("INSERT INTO backup_objects(backup_run_id,storage_key,object_type,size_bytes,checksum) VALUES(?,?,?,?,?)").bind(id,key,"database-json",new TextEncoder().encode(raw).length,checksum)
     ]);
     await audit(env,a,"backup.manual","backup_run",id,{storageKey:key},null,null,null,request);
     return json({backup:{id,status:"completed",storageKey:key}});
