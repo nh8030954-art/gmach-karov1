@@ -408,6 +408,7 @@ async function routeApi(request, env, ctx, url) {
   if (method === "GET" && path === "/api/me/profile") return getProfile(request, env);
   if (method === "PATCH" && path === "/api/me/profile") return updateProfile(request, env);
   if (method === "GET" && path === "/api/me/sessions") return listSessions(request, env);
+  if (method === "GET" && path === "/api/me/security-events") return listMySecurityEvents(request, env);
   if (method === "GET" && path === "/api/me/notification-preferences") return getNotificationPreferences(request, env);
   if (method === "PUT" && path === "/api/me/notification-preferences") return saveNotificationPreferences(request, env);
   if (method === "GET" && path === "/api/me/saved-searches") return listSavedSearches(request, env);
@@ -856,6 +857,8 @@ async function listSessions(request, env) {
   return json({sessions:rows.results.map(row=>({id:row.token_hash,deviceLabel:row.device_label||"מכשיר לא מזוהה",lastSeenAt:row.last_seen_at||row.created_at,createdAt:row.created_at,expiresAt:row.expires_at,current:row.token_hash===tokenHash}))});
 }
 
+
+async function listMySecurityEvents(request,env){const user=await requireUser(request,env);const rows=await env.DB.prepare("SELECT id,event_type,severity,details_json,created_at FROM security_events WHERE user_id=? ORDER BY created_at DESC LIMIT 100").bind(user.id).all();return json({events:rows.results.map(x=>({...x,details:safeJsonObject(x.details_json)}))})}
 
 async function requestAccountDeletion(request,env){const user=await requireUser(request,env);const active=await env.DB.prepare("SELECT COUNT(*) AS n FROM loan_requests WHERE (borrower_id=? OR item_id IN (SELECT id FROM items WHERE organization_id IN (SELECT id FROM organizations WHERE owner_id=?))) AND status IN ('pending','approved','collected')").bind(user.id,user.id).first();const now=new Date().toISOString(),scheduled=new Date(Date.now()+7*86400000).toISOString();await env.DB.prepare("UPDATE users SET deletion_requested_at=?,updated_at=? WHERE id=?").bind(now,now,user.id).run();await env.DB.prepare("INSERT INTO security_events(id,user_id,event_type,severity,details_json) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),user.id,"account_deletion_requested","warning",JSON.stringify({scheduledAt:scheduled,activeLoans:Number(active?.n||0)})).run();return json({ok:true,scheduledAt:scheduled,blockedByActiveLoans:Number(active?.n||0)>0,activeLoans:Number(active?.n||0)});}
 
