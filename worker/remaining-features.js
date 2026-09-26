@@ -97,6 +97,25 @@ async function orgDashboard(request,env,orgId,url){
  const payload={newRequests:Number(newReq?.count||0),pickupsToday:Number(pickups?.count||0),returnsToday:Number(returns?.count||0),late:Number(late?.count||0),inventory:{total:Number(inventory?.total||0),available:Number(inventory?.available||0),loaned:Number(inventory?.loaned||0),repair:Number(inventory?.repair||0)},unreadMessages:Number(unread?.count||0),reviews30d:Number(reviews?.count||0),rating30d:Number(reviews?.avg||0),topItems:top.results};
  return json(payload);
 }
+async function orgInventoryCsv(request,env,orgId){
+ const user=await requireUser(request,env);
+ const organization=await env.DB.prepare("SELECT owner_id FROM organizations WHERE id=? AND deleted_at IS NULL").bind(orgId).first();
+ if(!organization)throw new RemainingError(404,"הגמ״ח לא נמצא");
+ if(user.role!=="admin"&&organization.owner_id!==user.id){
+   const member=await env.DB.prepare("SELECT role,branch_scope_json,category_scope_json,expires_at FROM organization_members WHERE organization_id=? AND user_id=?").bind(orgId,user.id).first();
+   if(!member||!["owner","reports"].includes(member.role)||member.expires_at&&member.expires_at<=new Date().toISOString())throw new RemainingError(403,"אין הרשאה לייצא דוחות");
+   if(safe(member.branch_scope_json,[]).length||safe(member.category_scope_json,[]).length)throw new RemainingError(403,"ייצוא דוח מלא זמין רק לבעל הגמ״ח");
+ }
+ const result=await env.DB.prepare(`SELECT i.id,i.title,i.category,i.condition,i.status,i.availability_status,i.quantity,
+ COUNT(lr.id) AS requests_total,SUM(CASE WHEN lr.status='returned' THEN 1 ELSE 0 END) AS completed,
+ SUM(CASE WHEN lr.status='cancelled' THEN 1 ELSE 0 END) AS cancelled
+ FROM items i LEFT JOIN loan_requests lr ON lr.item_id=i.id WHERE i.organization_id=?
+ GROUP BY i.id ORDER BY i.title LIMIT 5000`).bind(orgId).all();
+ const cell=value=>{const raw=String(value??"");const safeValue=/^[=+@\-\t\r]/.test(raw)?"'"+raw:raw;return '"'+safeValue.replaceAll('"','""')+'"'};
+ const rows=[["מזהה","פריט","קטגוריה","מצב","סטטוס","זמינות","כמות","בקשות","הושלמו","בוטלו"],...(result.results||[]).map(r=>[r.id,r.title,r.category,r.condition,r.status,r.availability_status,r.quantity,r.requests_total,r.completed,r.cancelled])];
+ const csv="\ufeff"+rows.map(row=>row.map(cell).join(",")).join("\r\n")+"\r\n";
+ return new Response(csv,{headers:{"Content-Type":"text/csv; charset=utf-8","Content-Disposition":`attachment; filename="gmach-inventory-${orgId.replace(/[^a-zA-Z0-9-]/g,"")}.csv"`,"Cache-Control":"no-store"}});
+}
 async function pageContent(request,env,url){
  const lang=url.searchParams.get("lang")==="en"?"en":"he";const key=clean(url.searchParams.get("key"),1,120,"מפתח");const row=await env.DB.prepare("SELECT content,status,publish_at,updated_at FROM page_content WHERE content_key=? AND language=? AND status='published'").bind(key,lang).first();return json({content:row||null});
 }
@@ -257,6 +276,7 @@ export async function handleRemainingFeatures(request,env,ctx,url){
   m=path.match(/^\/api\/reviews\/([^/]+)\/report$/);if(m&&method==="POST")return await reportReview(request,env,decodeURIComponent(m[1]));
   m=path.match(/^\/api\/reviews\/([^/]+)\/response$/);if(m&&method==="POST")return await respondReview(request,env,decodeURIComponent(m[1]));
   m=path.match(/^\/api\/organizations\/([^/]+)\/operations-dashboard$/);if(m&&method==="GET")return await orgDashboard(request,env,decodeURIComponent(m[1]),url);
+  m=path.match(/^\/api\/organizations\/([^/]+)\/inventory-export\.csv$/);if(m&&method==="GET")return await orgInventoryCsv(request,env,decodeURIComponent(m[1]));
   if(path==="/api/content"&&method==="GET")return await pageContent(request,env,url);
   if(path==="/api/admin/page-content"&&(method==="GET"||method==="PUT"))return await adminPageContent(request,env);
   m=path.match(/^\/api\/admin\/page-content\/([^/]+)\/versions$/);if(m&&method==="GET")return await adminPageVersions(request,env,decodeURIComponent(m[1]),url);
