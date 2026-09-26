@@ -345,6 +345,11 @@ async function ensureCompletePlatformSchema(env) {
     const platformStatements=PRODUCTION_PLATFORM_SQL.replace(/^\s*--.*$/gm,"").split(/;\s*(?:\r?\n|$)/).map(value=>value.trim()).filter(value=>value&&!/^PRAGMA\b/i.test(value));
     await env.DB.batch(platformStatements.map(statement=>env.DB.prepare(statement)));
   }
+  const relationReady=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='organization_categories'").first();
+  if(!relationReady) await env.DB.batch([
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS organization_categories (organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,PRIMARY KEY (organization_id,category_id))"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS item_categories (item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,category_id TEXT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,PRIMARY KEY (item_id,category_id))")
+  ]);
   const ready=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='security_events'").first();
   if(ready)return;
   const statements=COMPLETE_PLATFORM_SQL.replace(/^\s*--.*$/gm,"").split(/;\s*(?:\r?\n|$)/).map(value=>value.trim()).filter(value=>value&&!/^PRAGMA\b/i.test(value));
