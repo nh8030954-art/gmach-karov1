@@ -254,6 +254,12 @@ try {
   const secondCookie = await verifyLatestEmail("second@example.com");
   result = await request(`/api/organizations/${organizationId}/members`, { method:"POST",cookie:adminCookie,body:{email:"second@example.com",role:"inventory"} });
   assert.equal(result.response.status,201,JSON.stringify(result.data));
+  result = await request(`/api/organizations/${organizationId}/inventory-export.csv`, { cookie: secondCookie });
+  assert.equal(result.response.status, 403, "Inventory-only managers cannot export organization reports");
+  result = await request(`/api/organizations/${organizationId}/inventory-export.csv`, { cookie: adminCookie });
+  assert.equal(result.response.status, 200);
+  assert.match(result.response.headers.get("content-type"), /text\/csv/);
+  assert.ok(result.data.includes("ערכת קישוטים לבדיקה"));
   result = await request(`/api/loan-requests/${requestId}/messages`, { cookie: secondCookie });
   assert.equal(result.response.status, 403);
   result = await request("/api/loan-requests", { method: "POST", cookie: secondCookie, body: { itemId, requestedFrom: "2026-10-02T10:00", requestedUntil: "2026-10-04T10:00", quantity: 1, depositAccepted: true, phone: "054-1112233", note: "צריך לאירוע נוסף" } });
