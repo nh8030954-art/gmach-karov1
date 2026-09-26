@@ -2279,7 +2279,7 @@ async function updateBranch(request,env,id){
   ]);
   if(status==="temporarily_closed"&&branch.status!=="temporarily_closed"){
     const rows=await env.DB.prepare("SELECT DISTINCT borrower_id,id FROM loan_requests WHERE branch_id=? AND status IN ('pending','approved')").bind(id).all();
-    for(const row of rows.results||[]) await notify(env,row.borrower_id,"status","הסניף נסגר זמנית",reopensAt?"הסניף נסגר זמנית. פתיחה מתוכננת: "+reopensAt:"הסניף נסגר זמנית. נעדכן כשיחזור לפעילות.",row.id).run();
+    for(const row of rows.results||[]) await env.DB.prepare("INSERT INTO notifications(id,user_id,type,title,body,request_id) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),row.borrower_id,"status","הסניף נסגר זמנית",reopensAt?"הסניף נסגר זמנית. פתיחה מתוכננת: "+reopensAt:"הסניף נסגר זמנית. נעדכן כשיחזור לפעילות.",row.id).run();
   }
   return json({ok:true,branch:{id,name,city,address,phone,inventoryMode:mode,status,reopensAt}});
 }
