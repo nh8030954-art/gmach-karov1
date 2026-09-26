@@ -125,3 +125,5 @@ for(const token of ["manageLoanUnits","const loanUnits =","loan_unit_assignments
 for(const token of ["openPickupScreen","openReturnScreen","data-pickup-request","data-return-request","/units"])assert.ok(appClient.includes(token),token+" missing from pickup/return UI");
 
 for(const token of ["I18N_EXTRA","translateText","Ownership transfers","Needs your attention","Pickup screen","Return screen"])assert.ok(remainingClient.includes(token),token+" missing from full English localization");
+
+for(const token of ["newlyOverdue","ההשאלה באיחור","detectedAt"])assert.ok(worker.includes(token),token+" missing from overdue notification workflow");
