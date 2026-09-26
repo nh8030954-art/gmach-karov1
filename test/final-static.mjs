@@ -95,3 +95,17 @@ for(const token of ["function openAddressEditor","data-edit-address","/api/me/ad
 for(const token of ["dashboard-priority","ההשאלה הקרובה","פריטים שממתינים להחזרה","בקשות שממתינות לפעולה שלך","בקשות קהילה פתוחות"])assert.ok(appClient.includes(token),token+" missing from personal dashboard priorities");
 
 for(const token of ["f.branches.selectedOptions","f.categories.selectedOptions","ללא בחירה = כל הסניפים","ללא בחירה = כל הקטגוריות"])assert.ok(appClient.includes(token),token+" missing from manager permission scope UI");
+
+for(const token of ["openOrganizationAdvanced","data-org-advanced","ownership-transfer-form","branch-transfer-form","data-receive-transfer","request_delete","cancel_delete"])assert.ok(appClient.includes(token),token+" missing from organization lifecycle/transfer UI");
+
+for(const token of ["openBulkInventory","data-org-bulk","/inventory/bulk","/api/items/import","bulk-import-preview"])assert.ok(appClient.includes(token),token+" missing from bulk inventory/import UI");
+
+for(const token of ["data-remove-item","/remove","מחיקה לפי היסטוריה"])assert.ok(appClient.includes(token),token+" missing from history-aware item removal UI");
+
+for(const token of ["renderPrivacy","/api/me/export","/api/me/data-request","request-deletion"])assert.ok(platformClient.includes(token),token+" missing from privacy/data UI");
+
+for(const token of ["renderTransfers","/api/me/organization-transfers","data-transfer-accept","data-transfer-decline"])assert.ok(platformClient.includes(token),token+" missing from ownership transfer account UI");
+
+assert.ok(platformWorker.includes("/api/me/organization-transfers"),"ownership transfer listing route missing");
+
+assert.ok(worker.includes("requestAccountDeletion"),"account deletion request endpoint missing");
