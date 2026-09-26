@@ -2400,6 +2400,7 @@ async function enforcePublicRateLimit(env, identityValue, action, ctx, limit = 1
 async function runScheduledMaintenance(env) {
   await ensureProductionHardeningSchema(env);
   const now = new Date().toISOString();
+  const newlyOverdue=await env.DB.prepare(`SELECT lr.id,lr.borrower_id,i.title,o.owner_id FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.status='collected' AND lr.requested_until<? AND lr.workflow_status!='overdue'`).bind(now).all();
   await env.DB.batch([
     env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now),
     env.DB.prepare("DELETE FROM auth_challenges WHERE expires_at <= ?").bind(now),
@@ -2413,6 +2414,12 @@ async function runScheduledMaintenance(env) {
     env.DB.prepare("DELETE FROM analytics_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-395 days')"),
     env.DB.prepare("INSERT INTO operational_state(key,value,updated_at) VALUES ('last_maintenance_at',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(now,now)
   ]);
+  for(const row of newlyOverdue.results||[]) await env.DB.batch([
+    notificationStatement(env,row.borrower_id,"status","ההשאלה באיחור",`מועד ההחזרה של ${row.title} עבר. החזירו את הפריט בהקדם או בקשו הארכה מהאזור האישי.`,row.id),
+    notificationStatement(env,row.owner_id,"status","השאלה באיחור",`${row.title} עדיין לא סומן כהוחזר. ניתן ליצור קשר עם השואל דרך הבקשה.`,row.id),
+    env.DB.prepare("INSERT INTO loan_request_events(id,request_id,actor_id,event_type,details_json) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),row.id,null,"overdue",JSON.stringify({detectedAt:now}))
+  ]);
+
 }
 
 async function compatibleMemberRole(env) {
