@@ -85,3 +85,11 @@ assert.ok(appClient.includes("/api/category-suggestions"),"category suggestion U
 for(const token of ["/change/respond","/undo-cancel","/extension/respond","data-change-request","data-change-decision","data-extension-alternative","async function openLoanChange"])assert.ok(appClient.includes(token),token+" missing from completed loan workflow UI");
 
 assert.ok(!finalClient.includes('$("[data-template]",d).forEach'),"multi-element bindings regression in final features");
+
+for(const token of ["async function updateBranch","async function archiveBranch","const branchDetail = path.match","branch.update","branch.archive"])assert.ok(worker.includes(token),token+" missing from completed branch lifecycle");
+
+for(const token of ["data-branch-reopen","data-branch-reopen-now","הסניף נסגר זמנית והלווים הפעילים עודכנו"])assert.ok(appClient.includes(token),token+" missing from temporary branch closure UI");
+
+for(const token of ["function openAddressEditor","data-edit-address","/api/me/addresses/"])assert.ok(appClient.includes(token),token+" missing from address editing UI");
+
+for(const token of ["dashboard-priority","ההשאלה הקרובה","פריטים שממתינים להחזרה","בקשות שממתינות לפעולה שלך","בקשות קהילה פתוחות"])assert.ok(appClient.includes(token),token+" missing from personal dashboard priorities");
