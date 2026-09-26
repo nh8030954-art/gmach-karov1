@@ -81,6 +81,7 @@ export async function platformPreflight(request,env,url){
   const block=await currentSecurityBlock(request,env);
   if(block) return json({error:"הגישה הוגבלה זמנית בעקבות פעילות חריגה",blockedUntil:block.blocked_until},429);
   if(!["POST","PUT","PATCH","DELETE"].includes(request.method.toUpperCase())) return null;
+  await requireAdminActionChallenge(request,env,url);
   if(!env.TURNSTILE_SECRET_KEY||!["/api/auth/register","/api/support"].includes(url.pathname)) return null;
   let body={}; try{body=await request.clone().json();}catch{return null;}
   const token=String(body.turnstileToken||"").trim();
@@ -195,6 +196,7 @@ export async function handlePlatformCompletionApi(request,env,ctx,url){
   if(method==="GET"&&path==="/api/me/export") return exportMyData(request,env);
   if(method==="POST"&&path==="/api/me/data-request") return dataRequest(request,env);
 
+  if(method==="POST"&&path==="/api/admin/action-challenges") return createAdminActionChallenge(request,env);
   if(method==="GET"&&path==="/api/admin/operations/export.csv") return adminCsv(request,env);
   if(method==="GET"&&path==="/api/admin/backups") return listBackups(request,env);
   if(method==="POST"&&path==="/api/admin/backups/run") return runBackupNow(request,env,ctx);
@@ -389,6 +391,8 @@ async function exportMyData(request,env){const u=await requireUser(request,env);
 async function dataRequest(request,env){const u=await requireUser(request,env),b=await readJson(request),type=["export","access","correction"].includes(b.type)?b.type:"access",id=crypto.randomUUID();await qrun(env,"INSERT INTO user_data_requests(id,user_id,request_type,details) VALUES(?,?,?,?)",[id,u.id,type,optional(b.details,2000)]);return json({request:{id,type,status:"open"}},201);}
 
 /* ---------- admin / backup ---------- */
+async function createAdminActionChallenge(request,env){const admin=await requireAdmin(request,env),b=await readJson(request),action=clean(b.action,3,120,"פעולה"),code=String(100000+Math.floor(Math.random()*900000)),id=crypto.randomUUID(),expires=new Date(Date.now()+10*60000).toISOString();await qrun(env,"INSERT INTO admin_action_challenges(id,user_id,action,token_hash,expires_at) VALUES(?,?,?,?,?)",[id,admin.id,action,await sha256(code),expires]);await sendSecurityEmail(env,admin.id,"קוד אישור לפעולת מנהל",`קוד האישור לפעולה ${action} הוא ${code}. הקוד תקף ל-10 דקות.`);return json({challenge:{id,action,expiresAt:expires}})}
+async function requireAdminActionChallenge(request,env,url){const path=url.pathname,method=request.method.toUpperCase();if(!["POST","PUT","PATCH","DELETE"].includes(method))return;const sensitive=/^\/api\/admin\/(users|organizations|items|reports|backups|moderation)(\/|$)/.test(path);if(!sensitive||path==="/api/admin/action-challenges")return;const admin=await requireAdmin(request,env),id=request.headers.get("X-Admin-Challenge-Id"),code=request.headers.get("X-Admin-Challenge-Code");if(!id||!code)throw new HttpError(428,"נדרש קוד אישור נוסף לפעולה רגישה");const row=await qfirst(env,"SELECT * FROM admin_action_challenges WHERE id=? AND user_id=? AND action=? AND used_at IS NULL AND expires_at>?",[id,admin.id,method+" "+path,new Date().toISOString()]);if(!row||await sha256(code)!==row.token_hash)throw new HttpError(403,"קוד האישור אינו תקין או שפג תוקפו");await qrun(env,"UPDATE admin_action_challenges SET used_at=? WHERE id=?",[new Date().toISOString(),id]);await sendSecurityEmail(env,admin.id,"בוצעה פעולת מנהל רגישה",`בוצעה הפעולה ${method} ${path}. אם לא ביצעת אותה, יש להחליף סיסמה ולבדוק את מכשירי החשבון.`)}
 async function adminCsv(request,env){await requireAdmin(request,env);const rows=await qall(env,`SELECT lr.id,lr.status,lr.workflow_status,lr.requested_from,lr.requested_until,lr.created_at,i.title item,o.name organization,u.full_name borrower FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id JOIN users u ON u.id=lr.borrower_id ORDER BY lr.created_at DESC LIMIT 5000`,[]);const cols=["id","status","workflow_status","requested_from","requested_until","created_at","item","organization","borrower"];const csv=[cols.join(","),...rows.map(r=>cols.map(k=>csvCell(r[k])).join(","))].join("\n");return new Response("\uFEFF"+csv,{headers:{"Content-Type":"text/csv; charset=utf-8","Content-Disposition":'attachment; filename="gmach-operations.csv"'}});}
 async function listBackups(request,env){await requireAdmin(request,env);return json({backups:await qall(env,"SELECT * FROM backup_runs ORDER BY created_at DESC LIMIT 100",[])});}
 async function runBackupNow(request,env,ctx){const u=await requireAdmin(request,env);const id=crypto.randomUUID();await qrun(env,"INSERT INTO backup_runs(id,status) VALUES(?,'started')",[id]);const job=createBackup(env,id,u.id);ctx.waitUntil(job);return json({backup:{id,status:"started"}},202);}
