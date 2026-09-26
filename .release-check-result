@@ -1,19 +1,16 @@
-sha=72593505379c3b7f816530ebfde0bad0d73835cb
+sha=7b3fc17d58056aafaa9635a58431673777456d6a
 install=success
 syntax=success
-smoke=success
+smoke=failure
 live=success
-      at async cloudflare-internal:d1-api:374:41
-      ... 2 lines matching cause stack trace ...
-      at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:115:26) {
-    [cause]: Error: no such table: organization_categories: SQLITE_ERROR
-        at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:147:24)
-        at async cloudflare-internal:d1-api:374:41
-        at async Promise.allSettled (index 2)
-        at async getPublicOrganization (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:1224:56)
-        at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:115:26)
-  }
-}
-Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
-{"ok":true,"release":"complete-platform-2026-09-25.9","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-26T21:09:20.929Z"}
+Final completion static release gate passed.
+file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790457280071:109
+assert.ok(platformWorker.includes("/api/me/organization-transfers"),"ownership transfer listing route missing");
+          ^
+
+ReferenceError: platformWorker is not defined
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790457280071:109:11
+
+Node.js v24.21.0
+{"ok":true,"release":"complete-platform-2026-09-25.9","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-26T21:14:50.694Z"}
 platform_features={"release":"complete-platform-2026-09-25.9","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":false,"vapidPublicKey":null,"geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
