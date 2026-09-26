@@ -133,3 +133,7 @@ for(const token of ["org-invite-form","data-cancel-invite","invitationsData"])as
 for(const token of ["data-edit-search","notifyMatchingSavedSearches","פריט חדש מתאים לחיפוש שמור"])assert.ok((appClient+worker).includes(token),token+" missing from saved search completion");
 for(const token of ["listMySecurityEvents","/api/me/security-events","אירועי אבטחה אחרונים"])assert.ok((worker+appClient).includes(token),token+" missing from personal security center");
 for(const token of ['data-channel="push"','data-channel="digest"','data-channel="quietStart"'])assert.ok(appClient.includes(token),token+" missing from notification preference UI");
+for(const token of ["editRequestMessage","message_edited","data-edit-message","message.read_at"])assert.ok((worker+appClient).includes(token),token+" missing from chat edit/read workflow");
+for(const token of ["scheduledItems","publish_at IS NOT NULL","notifyMatchingSavedSearches"])assert.ok(worker.includes(token),token+" missing from scheduled publication workflow");
+for(const token of ["openHelpMatches","data-help-matches","data-select-offer"])assert.ok(appClient.includes(token),token+" missing from community match/offer workflow");
+for(const source of [appClient,finalClient,platformClient,remainingClient])assert.ok(!/(?<!\\$)\\$\\((?:'[^']*'|"[^"]*")(?:,[^)]*)?\\)\\.forEach/.test(source),"single-element selector used as collection");
