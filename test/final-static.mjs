@@ -70,3 +70,6 @@ for(const token of ["openOrganizationManager","data-manage-org","org-branch-form
 
 const indexHtml=await readFile("dist/index.html","utf8");
 for(const condition of ["חדש","כמו חדש","מצב טוב","מצב סביר","בלאי נראה לעין"])assert.ok(indexHtml.includes(condition),"condition taxonomy missing: "+condition);
+
+for(const token of ["openLoanFlow","pickup-proposal-form","openExtensionRequest","data-extension-request","data-delete-message"])assert.ok(appClient.includes(token),token+" missing from end-to-end loan UI");
+for(const token of ["deleteRequestMessage","/api/messages/","חמש הדקות הראשונות"])assert.ok(worker.includes(token),token+" missing from chat lifecycle backend");
