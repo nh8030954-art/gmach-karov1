@@ -495,6 +495,9 @@ async function routeApi(request, env, ctx, url) {
   const imageUpload = path.match(/^\/api\/items\/([^/]+)\/images$/);
   if (method === "POST" && imageUpload) return uploadImages(request, env, decodeURIComponent(imageUpload[1]));
   if (method === "POST" && path === "/api/loan-requests") return createLoanRequest(request, env);
+  const loanUnits = path.match(/^\/api\/loan-requests\/([^/]+)\/units$/);
+  if (method === "GET" && loanUnits) return manageLoanUnits(request, env, decodeURIComponent(loanUnits[1]), false);
+  if (method === "POST" && loanUnits) return manageLoanUnits(request, env, decodeURIComponent(loanUnits[1]), true);
   const loanTimeline = path.match(/^\/api\/loan-requests\/([^/]+)\/timeline$/);
   if (method === "GET" && loanTimeline) return getLoanTimeline(request, env, decodeURIComponent(loanTimeline[1]));
   const loanPickup = path.match(/^\/api\/loan-requests\/([^/]+)\/pickup-proposals$/);
