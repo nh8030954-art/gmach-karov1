@@ -1829,7 +1829,7 @@ async function updateRequestStatus(request, env, id) {
   const body = await readJson(request);
   const target = cleanText(body.status, 2, 20, "סטטוס");
   const row = await env.DB.prepare(`SELECT lr.status,lr.borrower_id,lr.item_id,lr.requested_from,lr.requested_until,lr.manager_note,lr.quantity AS requested_quantity,
-    i.title AS item_title,i.quantity,i.turnaround_minutes,o.owner_id FROM loan_requests lr
+    i.title AS item_title,i.category,i.quantity,i.turnaround_minutes,o.id AS organization_id,o.owner_id FROM loan_requests lr
     JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id WHERE lr.id = ?`).bind(id).first();
   if (!row) throw new HttpError(404, "הבקשה לא נמצאה");
   let allowed = false;
