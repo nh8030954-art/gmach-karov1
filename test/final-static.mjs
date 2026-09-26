@@ -81,3 +81,5 @@ for(const token of ["preparation_minutes","max_loan_days","מועד האיסוף
 
 for(const token of ["suggest-category-button","לא מצאתי קטגוריה"])assert.ok(html.includes(token),token+" missing from category suggestion entry point");
 assert.ok(appClient.includes("/api/category-suggestions"),"category suggestion UI is not connected");
+
+for(const token of ["/change/respond","/undo-cancel","/extension/respond","data-change-request","data-change-decision","data-extension-alternative","async function openLoanChange"])assert.ok(appClient.includes(token),token+" missing from completed loan workflow UI");
