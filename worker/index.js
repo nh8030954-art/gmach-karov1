@@ -1352,9 +1352,9 @@ async function updateOrganization(request, env, id) {
   const status = existing.status === "rejected" && user.role !== "admin" ? "rejected" : "approved";
   const now = new Date().toISOString();
   await env.DB.batch([
-    env.DB.prepare(`UPDATE organizations SET name = ?, primary_category = ?, city = ?, neighborhood = ?, description = ?,address=?,website_url=?,service_area=?,hours_json=?,pickup_options=?,last_active_at=?,
+    env.DB.prepare(`UPDATE organizations SET name = ?, primary_category = ?, city = ?, neighborhood = ?, description = ?,address=?,website_url=?,service_area=?,hours_json=?,pickup_options=?,last_active_at=?,organization_type=?,
       status = ?, verified = 0, updated_at = ? WHERE id = ?`)
-      .bind(values.name, category, values.city, values.neighborhood, values.description,values.address,null,values.serviceArea,values.hoursJson,values.pickupOptions,now,status, now, id),
+      .bind(values.name, category, values.city, values.neighborhood, values.description,values.address,null,values.serviceArea,values.hoursJson,values.pickupOptions,now,["private","family","community","nonprofit","business","authority"].includes(body.organizationType)?body.organizationType:(existing.organization_type||"private"),status, now, id),
     env.DB.prepare("UPDATE organization_contacts SET contact_phone = ? WHERE organization_id = ?").bind(values.phone, id)
   ]);
   return json({ organization: { id, ...values, primaryCategory: category, status, hidden: Boolean(existing.is_hidden) } });
