@@ -108,16 +108,40 @@ function enhanceChat(){
     });
   };new MutationObserver(apply).observe(document.body,{childList:true,subtree:true});apply();
 }
+function installPersonalFinalPanels(){
+  const apply=()=>{
+    const nav=$(".platform-console-nav");if(!nav||$("#final-personal-button"))return;
+    const b=document.createElement("button");b.id="final-personal-button";b.type="button";b.textContent="מועדפים ובקשות קבועות";b.onclick=async()=>{
+      try{
+        const [saved,recurring]=await Promise.all([api("/api/me/saved-entities"),api("/api/me/recurring-loans")]);
+        const labels={item:"מוצר",organization:"גמ״ח",category:"קטגוריה",help_request:"בקשת קהילה",search:"חיפוש"};
+        const d=modal("מועדפים ובקשות קבועות",`<h3>כל המועדפים</h3><div class="platform-list" id="saved-entities-list">${saved.saved.map(x=>`<div class="platform-row"><div><strong>${esc(labels[x.entity_type]||x.entity_type)}</strong><p>${esc(x.entity_id)} · ${x.notify?"התראות פעילות":"ללא התראות"}</p></div><button class="platform-action danger" data-remove-saved="${esc(x.entity_type)}" data-id="${esc(x.entity_id)}">הסרה</button></div>`).join("")||'<p class="platform-muted">אין מועדפים נוספים.</p>'}</div><h3>בקשות מחזוריות</h3><div class="platform-list">${recurring.rules.map(x=>`<div class="platform-row"><div><strong>${esc(x.title)}</strong><p>${esc(x.frequency)} · ${esc(x.starts_at)} · ${x.occurrences} מופעים · ${esc(x.status)}</p></div>${x.status==="active"?`<button class="platform-action danger" data-cancel-rule="${esc(x.id)}">ביטול</button>`:""}</div>`).join("")||'<p class="platform-muted">אין בקשות מחזוריות.</p>'}</div>`);
+        $("[data-remove-saved]",d).forEach(x=>x.onclick=async()=>{await api("/api/me/saved-entities/"+encodeURIComponent(x.dataset.removeSaved)+"/"+encodeURIComponent(x.dataset.id),{method:"DELETE"});x.closest(".platform-row")?.remove();notice("המועדף הוסר")});
+        $("[data-cancel-rule]",d).forEach(x=>x.onclick=async()=>{await api("/api/me/recurring-loans/"+encodeURIComponent(x.dataset.cancelRule),{method:"DELETE"});x.disabled=true;x.textContent="בוטל";notice("הבקשה המחזורית בוטלה")});
+      }catch(e){notice(e.message,true)}
+    };nav.append(b);
+  };new MutationObserver(apply).observe(document.body,{childList:true,subtree:true});apply();
+}
 function addAdminFinalPanels(){
   const apply=()=>{
     const nav=$(".platform-console-nav");if(!nav||$("#final-admin-button")||!nav.textContent.includes("ניהול־על"))return;
     const b=document.createElement("button");b.id="final-admin-button";b.textContent="תפעול מתקדם";b.onclick=async()=>{
       try{
-        const [analytics,audit,templates,holidays,mod,backups]=await Promise.all([
-          api("/api/admin/analytics/operations"),api("/api/admin/audit"),api("/api/admin/email-templates"),api("/api/admin/holiday-rules"),api("/api/admin/moderation"),api("/api/admin/backups")
-        ]);
-        const d=modal("תפעול מתקדם",`<div class="platform-kpis"><article><strong>${analytics.loans.total||0}</strong><span>השאלות</span></article><article><strong>${analytics.loans.completed||0}</strong><span>הושלמו</span></article><article><strong>${analytics.loans.cancelled||0}</strong><span>בוטלו</span></article><article><strong>${analytics.loans.late||0}</strong><span>איחורים</span></article></div><h3>גיבויים</h3><p><button class="platform-action" id="backup-now">יצירת גיבוי לוגי עכשיו</button> · ${backups.backups.length} גיבויים רשומים</p><h3>תבניות אימייל</h3><div class="platform-list">${templates.templates.slice(0,20).map(t=>`<div class="platform-row"><div><strong>${esc(t.template_key)} · ${esc(t.language)}</strong><p>${esc(t.subject)}</p></div></div>`).join("")}</div><h3>חגים</h3><div class="platform-list">${holidays.holidays.map(h=>`<div class="platform-row"><div><strong>${esc(h.title_he)}</strong><p>${esc(h.hebrew_day)} ${esc(h.hebrew_month)} · ${h.enabled?"פעיל":"כבוי"}</p></div></div>`).join("")}</div><h3>Moderation</h3><p>${mod.jobs.length} פריטים לבדיקה</p><h3>Audit</h3><p>${audit.entries.length} פעולות אחרונות זמינות לצפייה/ייצוא.</p>`);
+        const [analytics,audit,templates,holidays,mod,backups]=await Promise.all([api("/api/admin/analytics/operations"),api("/api/admin/audit"),api("/api/admin/email-templates"),api("/api/admin/holiday-rules"),api("/api/admin/moderation"),api("/api/admin/backups")]);
+        const d=modal("תפעול מתקדם",`<div class="platform-kpis"><article><strong>${analytics.loans.total||0}</strong><span>השאלות</span></article><article><strong>${analytics.loans.completed||0}</strong><span>הושלמו</span></article><article><strong>${analytics.loans.cancelled||0}</strong><span>בוטלו</span></article><article><strong>${analytics.loans.late||0}</strong><span>איחורים</span></article><article><strong>${analytics.users.active30||0}</strong><span>פעילים 30 יום</span></article></div>
+        <h3>גיבויים</h3><p><button class="platform-action" id="backup-now">יצירת גיבוי לוגי עכשיו</button> · ${backups.backups.length} גיבויים רשומים</p>
+        <h3>תבניות אימייל</h3><div class="platform-list" id="template-list">${templates.templates.map(t=>`<button type="button" class="platform-action secondary" data-template="${esc(t.template_key)}" data-lang="${esc(t.language)}">${esc(t.template_key)} · ${esc(t.language)} · ${esc(t.subject)}</button>`).join("")}</div>
+        <form id="template-editor" class="platform-form" hidden><input name="key" readonly><select name="language"><option value="he">עברית</option><option value="en">English</option></select><input name="subject" placeholder="נושא" required><textarea name="bodyText" rows="6" placeholder="תוכן" required></textarea><label><input type="checkbox" name="enabled"> פעיל</label><button class="platform-action">שמירת תבנית</button></form>
+        <h3>חגים</h3><div class="platform-list">${holidays.holidays.map(h=>`<div class="platform-row"><div><strong>${esc(h.title_he)}</strong><p>${esc(h.hebrew_day)} ${esc(h.hebrew_month)}</p></div><button class="platform-action secondary" data-holiday="${esc(h.id)}">${h.enabled?"השבתה":"הפעלה"}</button></div>`).join("")}</div>
+        <h3>Moderation</h3><div class="platform-list">${mod.jobs.slice(0,100).map(j=>`<div class="platform-row"><div><strong>${esc(j.entity_type||"דיווח")} · ${esc(j.severity||"")}</strong><p>${esc(j.reason||j.status||"")}</p></div><button class="platform-action" data-mod="${esc(j.id)}" data-status="reviewed">נבדק</button><button class="platform-action danger" data-mod="${esc(j.id)}" data-status="hidden">הסתרה</button></div>`).join("")||'<p>אין פריטים פתוחים.</p>'}</div>
+        <h3>Audit</h3><p>${audit.entries.length} פעולות אחרונות.</p><div class="platform-row-actions"><input id="audit-filter" placeholder="סינון לפי פעולה"><button class="platform-action secondary" id="audit-export">ייצוא CSV</button></div><div class="platform-list" id="audit-list">${audit.entries.slice(0,100).map(a=>`<div class="platform-row" data-audit-action="${esc(a.action||"")}"><div><strong>${esc(a.action||"")}</strong><p>${esc(a.actor_name||a.actor_id||"")} · ${esc(a.created_at||"")} · ${esc(a.ip_address||"")}</p></div></div>`).join("")}</div>`);
         $("#backup-now",d).onclick=async()=>{await api("/api/admin/backups",{method:"POST",body:{}});notice("הגיבוי נוצר")};
+        $("[data-template]",d).forEach(x=>x.onclick=()=>{const t=templates.templates.find(t=>t.template_key===x.dataset.template&&t.language===x.dataset.lang),f=$("#template-editor",d);f.hidden=false;f.key.value=t.template_key;f.language.value=t.language;f.subject.value=t.subject||"";f.bodyText.value=t.body_text||"";f.enabled.checked=t.enabled!==0;f.scrollIntoView({block:"nearest"})});
+        $("#template-editor",d).onsubmit=async e=>{e.preventDefault();const f=e.currentTarget;await api("/api/admin/email-templates/"+encodeURIComponent(f.key.value)+"/"+f.language.value,{method:"PUT",body:{subject:f.subject.value,bodyText:f.bodyText.value,enabled:f.enabled.checked}});notice("תבנית האימייל נשמרה")};
+        $("[data-holiday]",d).forEach(x=>x.onclick=async()=>{const h=holidays.holidays.find(h=>h.id===x.dataset.holiday);await api("/api/admin/holiday-rules/"+encodeURIComponent(h.id),{method:"PATCH",body:{titleHe:h.title_he,titleEn:h.title_en,enabled:!h.enabled,messageHe:h.message_he,messageEn:h.message_en}});h.enabled=h.enabled?0:1;x.textContent=h.enabled?"השבתה":"הפעלה";notice("הגדרת החג עודכנה")});
+        $("[data-mod]",d).forEach(x=>x.onclick=async()=>{await api("/api/admin/moderation/"+encodeURIComponent(x.dataset.mod),{method:"PATCH",body:{status:x.dataset.status}});x.closest(".platform-row")?.remove();notice("פעולת האכיפה נשמרה")});
+        $("#audit-filter",d).oninput=e=>{const q=e.target.value.toLowerCase();$("[data-audit-action]",d).forEach(x=>x.hidden=!x.dataset.auditAction.toLowerCase().includes(q))};
+        $("#audit-export",d).onclick=()=>{const rows=[["action","actor","created_at","ip"],...audit.entries.map(a=>[a.action,a.actor_name||a.actor_id||"",a.created_at||"",a.ip_address||""])],csv=rows.map(r=>r.map(v=>'"'+String(v??"").replaceAll('"','""')+'"').join(",")).join("\\n"),url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"})),a=document.createElement("a");a.href=url;a.download="gmach-audit.csv";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)};
       }catch(e){notice(e.message,true)}
     };nav.append(b);
   };new MutationObserver(apply).observe(document.body,{childList:true,subtree:true});apply();
@@ -135,7 +159,7 @@ function reportPerformance(){
   }catch{}
 }
 document.addEventListener("DOMContentLoaded",()=>{
-  installWizardEntry();installPush();installQrRoute();enhanceChat();addAdminFinalPanels();supportFaq();reportPerformance();
+  installWizardEntry();installPush();installQrRoute();enhanceChat();installPersonalFinalPanels();addAdminFinalPanels();supportFaq();reportPerformance();
   const watcher=new MutationObserver(()=>{if(!$("#dashboard-view")?.hidden)installTour()});watcher.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["hidden"]});
 });
 })();
