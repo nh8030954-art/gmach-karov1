@@ -1,6 +1,26 @@
 (()=>{
   const $=(s,r=document)=>r.querySelector(s);
   const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  function installAdminStepUp(){
+    if(window.__gmachStepUpInstalled)return;window.__gmachStepUpInstalled=true;
+    const nativeFetch=window.fetch.bind(window);
+    window.fetch=async(input,init={})=>{
+      let response=await nativeFetch(input,init);
+      const method=String(init?.method||(input instanceof Request?input.method:"GET")||"GET").toUpperCase();
+      const target=typeof input==="string"?input:input?.url||"";
+      if(response.status!==428||method==="GET"||target.includes("/api/admin/action-challenges"))return response;
+      let info={};try{info=await response.clone().json()}catch{}
+      if(!confirm(info.error||"הפעולה דורשת קוד אישור נוסף שיישלח למייל המנהל. להמשיך?"))return response;
+      const url=new URL(target,location.origin),action=method+" "+url.pathname;
+      const challenge=await nativeFetch("/api/admin/action-challenges",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({action})});
+      const challengeData=await challenge.json().catch(()=>({}));if(!challenge.ok)throw new Error(challengeData.error||"לא ניתן ליצור קוד אישור");
+      const code=prompt("הזינו את קוד האישור בן 6 הספרות שנשלח למייל:");if(!code)return response;
+      const headers=new Headers(init?.headers||(input instanceof Request?input.headers:undefined)||{});headers.set("X-Admin-Challenge-Id",challengeData.challenge.id);headers.set("X-Admin-Challenge-Code",code.trim());
+      const retryInit={...init,method,headers};
+      response=await nativeFetch(input,retryInit);return response;
+    };
+  }
+  installAdminStepUp();
   const turnstileState={enabled:false,siteKey:null,tokens:{register:null,support:null},widgets:{}};
   window.GmachTurnstile={token:scope=>turnstileState.tokens[scope]||null,reset:scope=>{const id=turnstileState.widgets[scope];if(window.turnstile&&id!==undefined)window.turnstile.reset(id);turnstileState.tokens[scope]=null;}};
   async function setupTurnstile(){
