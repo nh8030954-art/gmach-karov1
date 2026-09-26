@@ -122,6 +122,9 @@ try {
   assert.equal(result.data.status, "closed");
   result = await request(`/api/me/support-tickets/${ticketId}/status`, { method: "PATCH", cookie: firstCookie, body: { status: "open" } });
   assert.equal(result.data.status, "reopened");
+  await db.prepare("DELETE FROM support_ticket_messages WHERE ticket_id=?").bind(ticketId).run();
+  result = await request(`/api/me/support-tickets/${ticketId}/messages`, { cookie: firstCookie });
+  assert.equal(result.data.messages[0].body, "הודעת פתיחה לפנייה של המשתמש הראשון.", "Legacy tickets retain their initial message");
 
   const geocodeKey = createHash("sha256").update("ירושלים").digest("base64url").slice(0, 40);
   await db.prepare("INSERT INTO geocode_cache(query_key,query_text,result_json,expires_at) VALUES(?,?,?,?)")
