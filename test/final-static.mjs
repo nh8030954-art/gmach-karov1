@@ -152,3 +152,15 @@ for(const token of ["image/svg+xml","X-Gmach-QR-Payload","<metadata>"])assert.ok
 for(const token of ["lr.workflow_status","lr.extension_status","lr.change_pending_json","lr.cancellation_undo_until"])assert.ok(worker.includes(token),token+" missing from dashboard workflow state");
 
 for(const token of ["data-manager-cancel","ביטול מצד הגמ״ח","managerCancel"])assert.ok(appClient.includes(token),token+" missing from approved-loan manager cancellation UI");
+
+for(const token of ["pickup_expires_at=?","respondPickupExpiry","pickup_expired","pickup_expired_cancelled","pickup_expired_wait"])assert.ok(worker.includes(token),token+" missing from pickup expiry lifecycle");
+
+for(const token of ["expiredHolds","expiredPickups","שמירת המלאי פגה","זמן האיסוף פג"])assert.ok(platform.includes(token),token+" missing from automatic hold/no-show maintenance");
+
+for(const token of ["data-pickup-expiry","להמתין לתיאום חדש","לבטל את הבקשה"])assert.ok(appClient.includes(token),token+" missing from pickup expiry borrower UI");
+
+for(const token of ["myReviews","/api/me/reviews"])assert.ok(finalWorker.includes(token),token+" missing from review account backend");
+
+for(const token of ["installReviewPanel","data-edit-review","data-respond-review"])assert.ok(finalClient.includes(token),token+" missing from review edit/response UI");
+
+for(const token of ["notifySavedFollowers","מוצר שמור חזר לזמינות","נוסף מוצר שעשוי לעניין אותך"])assert.ok(worker.includes(token),token+" missing from saved-content notifications");
