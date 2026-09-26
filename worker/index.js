@@ -1235,7 +1235,7 @@ async function getPublicOrganization(env, id) {
       (SELECT COUNT(*) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_review_count,
       i.quantity AS available_count FROM items i JOIN organizations o ON o.id=i.organization_id
       WHERE i.organization_id=? AND i.status='active' ORDER BY i.availability_status,i.updated_at DESC`).bind(id),
-    env.DB.prepare(`SELECT r.id,r.rating,r.item_rating,r.service_rating,r.comment,r.created_at,r.updated_at,r.helpful_count,r.organization_response,r.organization_response_at,
+    env.DB.prepare(`SELECT r.id,r.rating,r.item_rating,r.service_rating,r.branch_rating,r.comment,r.created_at,r.updated_at,r.helpful_count,r.organization_response,r.organization_response_at,
       substr(u.full_name,1,instr(u.full_name||' ',' ')-1) AS author_name,
       i.title AS item_title,lr.requested_from,lr.returned_at,b.name AS branch_name
       FROM reviews r JOIN users u ON u.id=r.author_id
@@ -1291,13 +1291,14 @@ async function createHelpRequest(request, env) {
 async function createReview(request, env) {
   const user = await requireUser(request, env); const body = await readJson(request);
   const requestId = cleanText(body.requestId,1,100,"בקשה");
-  const rating = Number(body.organizationRating); const itemRating = Number(body.itemRating); const serviceRating = Number(body.serviceRating);
+  const rating = Number(body.organizationRating); const itemRating = Number(body.itemRating); const serviceRating = Number(body.serviceRating); const branchRating = body.branchRating==null?null:Number(body.branchRating);
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new HttpError(400, "דירוג הגמ״ח חייב להיות בין 1 ל־5");
   if (!Number.isInteger(itemRating) || itemRating < 1 || itemRating > 5) throw new HttpError(400, "דירוג הפריט חייב להיות בין 1 ל־5");
   if (!Number.isInteger(serviceRating) || serviceRating < 1 || serviceRating > 5) throw new HttpError(400, "דירוג השירות חייב להיות בין 1 ל־5");
+  if (branchRating!==null && (!Number.isInteger(branchRating)||branchRating<1||branchRating>5)) throw new HttpError(400,"דירוג הסניף חייב להיות בין 1 ל־5");
   const row = await env.DB.prepare(`SELECT lr.borrower_id,lr.status,lr.branch_id,i.id AS item_id,o.id AS organization_id FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.id=?`).bind(requestId).first();
   if (!row || row.borrower_id !== user.id || row.status !== "returned") throw new HttpError(403, "אפשר לדרג רק השאלה שהושלמה");
-  try { const id=crypto.randomUUID(),editedUntil=new Date(Date.now()+7*86400000).toISOString(); await env.DB.prepare("INSERT INTO reviews(id,request_id,author_id,organization_id,item_id,rating,item_rating,service_rating,branch_id,comment,edited_until) VALUES (?,?,?,?,?,?,?,?,?,?,?)").bind(id,requestId,user.id,row.organization_id,row.item_id,rating,itemRating,serviceRating,row.branch_id||null,cleanOptional(body.comment,800),editedUntil).run(); return json({ review:{id,organizationRating:rating,itemRating,serviceRating,branchId:row.branch_id||null,editedUntil}},201); }
+  try { const id=crypto.randomUUID(),editedUntil=new Date(Date.now()+7*86400000).toISOString(); await env.DB.prepare("INSERT INTO reviews(id,request_id,author_id,organization_id,item_id,rating,item_rating,service_rating,branch_id,branch_rating,comment,edited_until) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)").bind(id,requestId,user.id,row.organization_id,row.item_id,rating,itemRating,serviceRating,row.branch_id||null,row.branch_id?(branchRating||rating):null,cleanOptional(body.comment,800),editedUntil).run(); return json({ review:{id,organizationRating:rating,itemRating,serviceRating,branchId:row.branch_id||null,branchRating:row.branch_id?(branchRating||rating):null,editedUntil}},201); }
   catch (error) { if (String(error).toLowerCase().includes("unique")) throw new HttpError(409,"כבר דירגתם את ההשאלה הזו"); throw error; }
 }
 
