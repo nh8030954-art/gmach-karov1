@@ -499,6 +499,8 @@ async function routeApi(request, env, ctx, url) {
   if (method === "POST" && acceptPickup) return acceptPickupProposal(request, env, decodeURIComponent(acceptPickup[1]));
   const loanExtension = path.match(/^\/api\/loan-requests\/([^/]+)\/extension$/);
   if (method === "POST" && loanExtension) return requestLoanExtension(request, env, decodeURIComponent(loanExtension[1]));
+  const loanExtensionDecision = path.match(/^\/api\/loan-requests\/([^/]+)\/extension\/decision$/);
+  if (method === "PATCH" && loanExtensionDecision) return decideLoanExtension(request, env, decodeURIComponent(loanExtensionDecision[1]));
   const requestMessages = path.match(/^\/api\/loan-requests\/([^/]+)\/messages$/);
   if (method === "GET" && requestMessages) return listRequestMessages(request, env, decodeURIComponent(requestMessages[1]));
   if (method === "POST" && requestMessages) return createRequestMessage(request, env, decodeURIComponent(requestMessages[1]));
@@ -1919,6 +1921,8 @@ async function createRequestMessage(request, env, requestId) {
   ]);
   return json({ message: { id, request_id: requestId, sender_id: user.id, sender_name: user.full_name, body: message,message_type:messageType,metadata,isMine: true, created_at: createdAt } }, 201);
 }
+
+async function decideLoanExtension(request,env,requestId){const {user,loan}=await loanAccess(request,env,requestId);if(user.id===loan.borrower_id&&user.role!=="admin")throw new HttpError(403,"רק מנהל הגמ״ח יכול להחליט על הארכה");if(loan.extension_status!=="pending"||!loan.extension_until)throw new HttpError(409,"אין בקשת הארכה ממתינה");const body=await readJson(request),decision=String(body.decision||"");if(!["approved","declined"].includes(decision))throw new HttpError(400,"יש לבחור אישור או דחייה");const now=new Date().toISOString();if(decision==="approved"){const available=await availableQuantityForRange(env,loan.item_id,loan.requested_until,loan.extension_until,0,requestId);if(available<Number(loan.quantity||1))throw new HttpError(409,"לא ניתן לאשר את ההארכה כי קיימת התנגשות מלאי");await env.DB.batch([env.DB.prepare("UPDATE loan_requests SET requested_until=extension_until,extension_status='approved',workflow_status=CASE WHEN status='collected' THEN 'awaiting_return' ELSE workflow_status END,updated_at=? WHERE id=?").bind(now,requestId),env.DB.prepare("INSERT INTO loan_status_events(id,request_id,status,actor_id,note) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),requestId,"extension_approved",user.id,cleanOptional(body.note,500)),notificationStatement(env,loan.borrower_id,"status","בקשת ההארכה אושרה","מועד ההחזרה החדש אושר.",requestId)]);return json({ok:true,status:"approved"});}await env.DB.batch([env.DB.prepare("UPDATE loan_requests SET extension_status='declined',updated_at=? WHERE id=?").bind(now,requestId),env.DB.prepare("INSERT INTO loan_status_events(id,request_id,status,actor_id,note) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),requestId,"extension_declined",user.id,cleanOptional(body.note,500)),notificationStatement(env,loan.borrower_id,"status","בקשת ההארכה נדחתה","מועד ההחזרה המקורי נשאר בתוקף.",requestId)]);return json({ok:true,status:"declined"});}
 
 async function deleteRequestMessage(request,env,messageId){
   const user=await requireUser(request,env),row=await env.DB.prepare("SELECT id,request_id,sender_id,created_at,deleted_at FROM request_messages WHERE id=?").bind(messageId).first();
