@@ -105,6 +105,24 @@ try {
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
   const adminCookie = await verifyLatestEmail("admin@example.org");
 
+  result = await request("/api/support", { method: "POST", cookie: firstCookie, body: { name: "משתמש ראשון", email: "first@example.org", subject: "בדיקת שיחת תמיכה", message: "הודעת פתיחה לפנייה של המשתמש הראשון." } });
+  assert.equal(result.response.status, 201, JSON.stringify(result.data));
+  const ticketId = result.data.id;
+  result = await request(`/api/me/support-tickets/${ticketId}/messages`, { cookie: adminCookie });
+  assert.equal(result.response.status, 404, "Another account must not read a support conversation");
+  result = await request(`/api/me/support-tickets/${ticketId}/messages`, { cookie: firstCookie });
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  assert.equal(result.data.messages.length, 1);
+  assert.equal(result.data.messages[0].body, "הודעת פתיחה לפנייה של המשתמש הראשון.");
+  result = await request(`/api/me/support-tickets/${ticketId}/messages`, { method: "POST", cookie: firstCookie, body: { message: "הודעת המשך של המשתמש הראשון." } });
+  assert.equal(result.response.status, 201, JSON.stringify(result.data));
+  result = await request(`/api/me/support-tickets/${ticketId}/messages`, { cookie: firstCookie });
+  assert.equal(result.data.messages.length, 2);
+  result = await request(`/api/me/support-tickets/${ticketId}/status`, { method: "PATCH", cookie: firstCookie, body: { status: "closed" } });
+  assert.equal(result.data.status, "closed");
+  result = await request(`/api/me/support-tickets/${ticketId}/status`, { method: "PATCH", cookie: firstCookie, body: { status: "open" } });
+  assert.equal(result.data.status, "reopened");
+
   const geocodeKey = createHash("sha256").update("ירושלים").digest("base64url").slice(0, 40);
   await db.prepare("INSERT INTO geocode_cache(query_key,query_text,result_json,expires_at) VALUES(?,?,?,?)")
     .bind(geocodeKey, "ירושלים", JSON.stringify([{ displayName: "ירושלים", lat: 31.77, lon: 35.21 }]), new Date(Date.now() + 60000).toISOString()).run();

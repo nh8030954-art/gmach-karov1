@@ -41,7 +41,7 @@
     .pt-card{border:1px solid #e4e9ee;border-radius:14px;padding:14px;background:#fff}.pt-card h3{margin-top:0}
     .pt-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pt-form{display:grid;gap:10px}.pt-form[hidden]{display:none}.pt-form input,.pt-form select,.pt-form textarea{width:100%;padding:10px;border:1px solid #ccd5dc;border-radius:10px}
     .pt-btn{border:0;border-radius:10px;padding:9px 13px;cursor:pointer;background:#e9eef2}.pt-btn.primary{background:#173a4d;color:#fff}.pt-btn.danger{background:#fff0f0;color:#9f1d1d}
-    .pt-muted{color:#667681;font-size:.92rem}.pt-status{min-height:1.4em;margin-top:8px}.pt-list{display:grid;gap:10px}
+    .pt-muted{color:#667681;font-size:.92rem}.pt-status{min-height:1.4em;margin-top:8px}.pt-list{display:grid;gap:10px}.pt-list[hidden]{display:none}
     @media(max-width:700px){.platform-tools{width:100vw;max-width:100vw;border-radius:18px 18px 0 0;margin:auto 0 0}.pt-body{max-height:72vh}}
   `;
   document.head.appendChild(style);
@@ -153,7 +153,18 @@
   async function renderSupport(){
     const data=await api("/api/me/support-tickets");body.innerHTML=`<h3>הפניות שלי</h3><div class="pt-list" id="pt-ticket-list"></div><div class="pt-status"></div>`;const list=$("#pt-ticket-list",body);
     if(!data.tickets.length)list.innerHTML='<p class="pt-muted">אין פניות קודמות. ניתן לפתוח פנייה דרך "צור קשר".</p>';
-    for(const t of data.tickets){const d=document.createElement("div");d.className="pt-card";d.innerHTML=`<strong>#${esc(t.ticket_number)} · ${esc(t.subject)}</strong><div class="pt-muted">סטטוס: ${esc(t.status)} · ${esc(t.updated_at)}</div><form class="pt-form"><textarea name="message" maxlength="1500" placeholder="הודעה נוספת"></textarea><button class="pt-btn">שליחה</button></form>`;d.querySelector("form").onsubmit=async e=>{e.preventDefault();const msg=e.currentTarget.message.value.trim();if(!msg)return;await api("/api/me/support-tickets/"+encodeURIComponent(t.id)+"/messages",{method:"POST",body:{message:msg}});setStatus("ההודעה נוספה לפנייה.");e.currentTarget.reset()};list.appendChild(d)}
+    for(const t of data.tickets){
+      const d=document.createElement("div");d.className="pt-card";
+      const closed=t.status==="closed",path="/api/me/support-tickets/"+encodeURIComponent(t.id);
+      const label={open:"פתוחה",waiting:"ממתינה למענה",closed:"סגורה",reopened:"נפתחה מחדש"}[t.status]||t.status;
+      d.innerHTML=`<strong>#${esc(t.ticket_number)} · ${esc(t.subject)}</strong><div class="pt-muted">סטטוס: ${esc(label)} · ${esc(t.updated_at)}</div><div class="pt-row"><button class="pt-btn" type="button" data-messages>הצגת שיחה</button><button class="pt-btn ${closed?"":"danger"}" type="button" data-status>${closed?"פתיחה מחדש":"סגירת פנייה"}</button></div><div class="pt-list" data-thread hidden></div><form class="pt-form"><textarea name="message" maxlength="1500" placeholder="הודעה נוספת" required></textarea><button class="pt-btn">שליחה</button></form>`;
+      const thread=d.querySelector("[data-thread]");
+      async function loadThread(){const result=await api(path+"/messages");thread.innerHTML=result.messages.length?result.messages.map(message=>`<div class="pt-card"><strong>${message.fromSupport?"צוות התמיכה":"אני"}</strong><div>${esc(message.body)}</div><small class="pt-muted">${esc(message.createdAt)}</small></div>`).join(""):'<p class="pt-muted">אין הודעות נוספות בפנייה.</p>';thread.hidden=false}
+      d.querySelector("[data-messages]").onclick=async()=>{if(!thread.hidden){thread.hidden=true;return}try{await loadThread()}catch(error){setStatus(error.message,true)}};
+      d.querySelector("[data-status]").onclick=async event=>{const button=event.currentTarget;button.disabled=true;try{await api(path+"/status",{method:"PATCH",body:{status:closed?"open":"closed"}});await renderSupport();setStatus(closed?"הפנייה נפתחה מחדש.":"הפנייה נסגרה.")}catch(error){setStatus(error.message,true);button.disabled=false}};
+      d.querySelector("form").onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,msg=form.elements.namedItem("message").value.trim();if(!msg)return;const button=form.querySelector("button");button.disabled=true;try{await api(path+"/messages",{method:"POST",body:{message:msg}});form.reset();setStatus("ההודעה נוספה לפנייה.");if(!thread.hidden)await loadThread()}catch(error){setStatus(error.message,true)}finally{button.disabled=false}};
+      list.appendChild(d);
+    }
   }
 
   async function renderAdmin(){

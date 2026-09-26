@@ -430,6 +430,7 @@ async function routeApi(request, env, ctx, url) {
   if (method === "DELETE" && savedSearchDetail) return deleteSavedSearch(request, env, decodeURIComponent(savedSearchDetail[1]));
   if (method === "GET" && path === "/api/me/support-tickets") return listMySupportTickets(request, env);
   const supportTicketMessages = path.match(/^\/api\/me\/support-tickets\/([^/]+)\/messages$/);
+  if (method === "GET" && supportTicketMessages) return listSupportTicketMessages(request, env, decodeURIComponent(supportTicketMessages[1]));
   if (method === "POST" && supportTicketMessages) return addSupportTicketMessage(request, env, decodeURIComponent(supportTicketMessages[1]));
   const supportTicketStatus = path.match(/^\/api\/me\/support-tickets\/([^/]+)\/status$/);
   if (method === "PATCH" && supportTicketStatus) return updateSupportTicketStatus(request, env, decodeURIComponent(supportTicketStatus[1]));
@@ -904,6 +905,14 @@ async function listMySupportTickets(request,env){
   const user=await requireUser(request,env);
   const rows=await env.DB.prepare("SELECT id,ticket_number,subject,status,created_at,updated_at FROM support_tickets WHERE user_id=? OR email=? COLLATE NOCASE ORDER BY updated_at DESC LIMIT 100").bind(user.id,user.email).all();
   return json({tickets:rows.results});
+}
+
+async function listSupportTicketMessages(request,env,ticketId){
+  const user=await requireUser(request,env);
+  const ticket=await env.DB.prepare("SELECT id FROM support_tickets WHERE id=? AND (user_id=? OR email=? COLLATE NOCASE)").bind(ticketId,user.id,user.email).first();
+  if(!ticket)throw new HttpError(404,"הפנייה לא נמצאה");
+  const rows=await env.DB.prepare("SELECT m.id,m.body,m.created_at,m.sender_id,u.role AS sender_role FROM support_ticket_messages m LEFT JOIN users u ON u.id=m.sender_id WHERE m.ticket_id=? ORDER BY m.created_at ASC LIMIT 200").bind(ticketId).all();
+  return json({messages:rows.results.map(row=>({id:row.id,body:row.body,createdAt:row.created_at,fromSupport:row.sender_role==="admin"&&row.sender_id!==user.id}))});
 }
 
 async function addSupportTicketMessage(request,env,ticketId){
