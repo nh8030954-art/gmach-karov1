@@ -146,3 +146,5 @@ for(const token of ["deletionReminderUsers","תזכורת לפני מחיקת ה
 assert.ok(appClient.includes("button.dataset.orgBulk"),"bulk inventory dashboard button is not bound");
 
 for(const token of ["installFormErrorFocus","aria-invalid",":invalid","scrollIntoView"])assert.ok(appClient.includes(token),token+" missing from accessible form error focus");
+
+for(const token of ["image/svg+xml","X-Gmach-QR-Payload","<metadata>"])assert.ok(platform.includes(token),token+" missing from printable unit label endpoint");
