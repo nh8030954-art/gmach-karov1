@@ -142,3 +142,5 @@ for(const token of ["relationReady","CREATE TABLE IF NOT EXISTS organization_cat
 for(const token of ["const inviteMatch=","/accept","הצטרפת לצוות הניהול"])assert.ok(appClient.includes(token),token+" missing from manager invite acceptance UI");
 
 for(const token of ["deletionReminderUsers","תזכורת לפני מחיקת החשבון","-5 days"])assert.ok(worker.includes(token),token+" missing from account deletion reminder lifecycle");
+
+assert.ok(appClient.includes("button.dataset.orgBulk"),"bulk inventory dashboard button is not bound");
