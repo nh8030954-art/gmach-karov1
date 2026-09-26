@@ -499,6 +499,8 @@ async function routeApi(request, env, ctx, url) {
   const requestMessages = path.match(/^\/api\/loan-requests\/([^/]+)\/messages$/);
   if (method === "GET" && requestMessages) return listRequestMessages(request, env, decodeURIComponent(requestMessages[1]));
   if (method === "POST" && requestMessages) return createRequestMessage(request, env, decodeURIComponent(requestMessages[1]));
+  const requestMessage = path.match(/^\/api\/messages\/([^/]+)$/);
+  if (method === "DELETE" && requestMessage) return deleteRequestMessage(request, env, decodeURIComponent(requestMessage[1]));
   const helpOffers = path.match(/^\/api\/help-requests\/([^/]+)\/offers$/);
   if (method === "GET" && helpOffers) return listHelpOffers(request, env, decodeURIComponent(helpOffers[1]));
   if (method === "POST" && helpOffers) return createHelpOffer(request, env, decodeURIComponent(helpOffers[1]));
@@ -1909,6 +1911,13 @@ async function createRequestMessage(request, env, requestId) {
     notificationStatement(env, recipientId, "message", `הודעה חדשה על ${row.item_title}`, `${user.full_name}: ${message.slice(0, 120)}`, requestId)
   ]);
   return json({ message: { id, request_id: requestId, sender_id: user.id, sender_name: user.full_name, body: message,message_type:messageType,metadata,isMine: true, created_at: createdAt } }, 201);
+}
+
+async function deleteRequestMessage(request,env,messageId){
+  const user=await requireUser(request,env),row=await env.DB.prepare("SELECT id,request_id,sender_id,created_at,deleted_at FROM request_messages WHERE id=?").bind(messageId).first();
+  if(!row)throw new HttpError(404,"ההודעה לא נמצאה");if(row.sender_id!==user.id)throw new HttpError(403,"אפשר למחוק רק הודעה ששלחתם");if(row.deleted_at)throw new HttpError(409,"ההודעה כבר נמחקה");
+  if(Date.now()-Date.parse(row.created_at)>5*60*1000)throw new HttpError(409,"אפשר למחוק הודעה רק בחמש הדקות הראשונות");
+  const now=new Date().toISOString();await env.DB.batch([env.DB.prepare("UPDATE request_messages SET body='הודעה נמחקה',media_url=NULL,metadata_json='{}',deleted_at=? WHERE id=?").bind(now,messageId),env.DB.prepare("INSERT INTO loan_request_events(id,request_id,actor_id,event_type,details_json) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),row.request_id,user.id,"message_deleted",JSON.stringify({messageId}))]);return json({ok:true,deletedAt:now});
 }
 
 function assertSafeChatText(message){
