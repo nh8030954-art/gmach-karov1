@@ -119,3 +119,9 @@ for(const token of ["openHelpMatches","data-help-matches","data-offer-match"])as
 assert.ok(appClient.includes("data-counter-pickup"),"pickup counter proposal UI missing");
 
 for(const token of ["maps.apple.com","data-copy-map-address","navigator.geolocation","/api/maps/geocode"])assert.ok(remainingClient.includes(token),token+" missing from completed map/navigation UI");
+
+for(const token of ["manageLoanUnits","const loanUnits =","loan_unit_assignments"])assert.ok(worker.includes(token),token+" missing from pickup unit assignment backend");
+
+for(const token of ["openPickupScreen","openReturnScreen","data-pickup-request","data-return-request","/units"])assert.ok(appClient.includes(token),token+" missing from pickup/return UI");
+
+for(const token of ["I18N_EXTRA","translateText","Ownership transfers","Needs your attention","Pickup screen","Return screen"])assert.ok(remainingClient.includes(token),token+" missing from full English localization");
