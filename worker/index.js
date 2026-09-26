@@ -417,6 +417,7 @@ async function routeApi(request, env, ctx, url) {
   if (savedCategory && method === "PUT") return saveCategory(request, env, decodeURIComponent(savedCategory[1]));
   if (savedCategory && method === "DELETE") return removeSavedCategory(request, env, decodeURIComponent(savedCategory[1]));
 
+  if (method === "POST" && path === "/api/me/account/request-deletion") return requestAccountDeletion(request, env);
   if (method === "POST" && path === "/api/me/account/cancel-deletion") return cancelAccountDeletion(request, env);
   const sessionRevoke = path.match(/^\/api\/me\/sessions\/([^/]+)$/);
   if (method === "DELETE" && sessionRevoke) return revokeSession(request, env, decodeURIComponent(sessionRevoke[1]));
@@ -845,6 +846,8 @@ async function listSessions(request, env) {
   return json({sessions:rows.results.map(row=>({id:row.token_hash,deviceLabel:row.device_label||"מכשיר לא מזוהה",lastSeenAt:row.last_seen_at||row.created_at,createdAt:row.created_at,expiresAt:row.expires_at,current:row.token_hash===tokenHash}))});
 }
 
+
+async function requestAccountDeletion(request,env){const user=await requireUser(request,env);const active=await env.DB.prepare("SELECT COUNT(*) AS n FROM loan_requests WHERE (borrower_id=? OR item_id IN (SELECT id FROM items WHERE organization_id IN (SELECT id FROM organizations WHERE owner_id=?))) AND status IN ('pending','approved','collected')").bind(user.id,user.id).first();const now=new Date().toISOString(),scheduled=new Date(Date.now()+7*86400000).toISOString();await env.DB.prepare("UPDATE users SET deletion_requested_at=?,updated_at=? WHERE id=?").bind(now,now,user.id).run();await env.DB.prepare("INSERT INTO security_events(id,user_id,event_type,severity,details_json) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),user.id,"account_deletion_requested","warning",JSON.stringify({scheduledAt:scheduled,activeLoans:Number(active?.n||0)})).run();return json({ok:true,scheduledAt:scheduled,blockedByActiveLoans:Number(active?.n||0)>0,activeLoans:Number(active?.n||0)});}
 
 async function cancelAccountDeletion(request, env) {
   const user=await requireUser(request,env);
