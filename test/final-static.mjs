@@ -144,3 +144,5 @@ for(const token of ["const inviteMatch=","/accept","הצטרפת לצוות הנ
 for(const token of ["deletionReminderUsers","תזכורת לפני מחיקת החשבון","-5 days"])assert.ok(worker.includes(token),token+" missing from account deletion reminder lifecycle");
 
 assert.ok(appClient.includes("button.dataset.orgBulk"),"bulk inventory dashboard button is not bound");
+
+for(const token of ["installFormErrorFocus","aria-invalid",":invalid","scrollIntoView"])assert.ok(appClient.includes(token),token+" missing from accessible form error focus");
