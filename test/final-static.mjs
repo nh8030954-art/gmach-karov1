@@ -109,3 +109,10 @@ for(const token of ["renderTransfers","/api/me/organization-transfers","data-tra
 assert.ok(platformWorker.includes("/api/me/organization-transfers"),"ownership transfer listing route missing");
 
 assert.ok(worker.includes("requestAccountDeletion"),"account deletion request endpoint missing");
+
+for(const token of ["data-org-advanced","ownership-transfer-form","branch-transfer-form","data-receive-transfer"])assert.ok(appClient.includes(token),token+" missing from organization advanced UI");
+for(const token of ["data-org-bulk","openBulkInventory","bulk-import-preview"])assert.ok(appClient.includes(token),token+" missing from bulk inventory UI");
+for(const token of ["data-remove-item","data-report-message","data-block-user","chatWritable"])assert.ok(appClient.includes(token),token+" missing from completed user workflows");
+for(const token of ["renderPrivacy","pt-export-data","pt-data-access","pt-request-deletion","renderTransfers","data-transfer-accept"])assert.ok(platformClient.includes(token),token+" missing from account completion UI");
+for(const token of ["requestAccountDeletion"])assert.ok(worker.includes(token),token+" missing from account lifecycle backend");
+for(const token of ["listMyOrgTransfers"])assert.ok(platformWorker.includes(token),token+" missing from ownership transfer backend");
