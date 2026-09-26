@@ -524,8 +524,12 @@ async function routeApi(request, env, ctx, url) {
   if (method === "GET" && path === "/api/admin/analytics") return adminAnalytics(request, env);
   if (method === "GET" && path === "/api/admin/categories") return adminCategories(request, env);
   if (method === "POST" && path === "/api/admin/categories") return createAdminCategory(request, env);
+  const adminCategory = path.match(/^\/api\/admin\/categories\/([^/]+)$/);
+  if (method === "PATCH" && adminCategory) return updateAdminCategory(request, env, decodeURIComponent(adminCategory[1]));
   if (method === "GET" && path === "/api/admin/closures") return adminClosures(request, env);
   if (method === "POST" && path === "/api/admin/closures") return createAdminClosure(request, env);
+  const adminClosure = path.match(/^\/api\/admin\/closures\/([^/]+)$/);
+  if (method === "PATCH" && adminClosure) return updateAdminClosure(request, env, decodeURIComponent(adminClosure[1]));
   if (method === "GET" && path === "/api/admin/security-events") return adminSecurityEvents(request, env);
   if (method === "PUT" && path === "/api/admin/page-customizations") return savePageCustomization(request, env);
   if (method === "DELETE" && path === "/api/admin/page-customizations") return resetPageCustomizations(request, env);
@@ -958,6 +962,27 @@ async function createAdminCategory(request,env){
   return json({category:{id,nameHe,nameEn,parentId}},201);
 }
 
+async function updateAdminCategory(request,env,id){
+  const user=await requireAdmin(request,env),body=await readJson(request);
+  const current=await env.DB.prepare("SELECT * FROM categories WHERE id=?").bind(id).first();
+  if(!current)throw new HttpError(404,"הקטגוריה לא נמצאה");
+  const parentId=body.parentId===undefined?current.parent_id:cleanOptional(body.parentId,80);
+  if(parentId===id)throw new HttpError(400,"קטגוריה לא יכולה להיות קטגוריית אב של עצמה");
+  if(parentId){const parent=await env.DB.prepare("SELECT id FROM categories WHERE id=?").bind(parentId).first();if(!parent)throw new HttpError(400,"קטגוריית האב אינה קיימת");}
+  const status=["active","hidden"].includes(body.status)?body.status:current.status;
+  const nameHe=body.nameHe===undefined?current.name_he:cleanText(body.nameHe,2,80,"שם הקטגוריה");
+  const nameEn=body.nameEn===undefined?current.name_en:cleanOptional(body.nameEn,80);
+  const icon=body.icon===undefined?current.icon:cleanOptional(body.icon,50);
+  const imageUrl=body.imageUrl===undefined?current.image_url:validateAssetUrl(body.imageUrl);
+  const synonyms=Array.isArray(body.synonyms)?body.synonyms.slice(0,50).map(x=>String(x).trim()).filter(Boolean):parseJsonArray(current.synonyms_json);
+  const sortOrder=body.sortOrder===undefined?current.sort_order:Math.max(0,Math.min(9999,Number(body.sortOrder)||0));
+  await env.DB.batch([
+    env.DB.prepare("UPDATE categories SET parent_id=?,name_he=?,name_en=?,icon=?,image_url=?,synonyms_json=?,status=?,sort_order=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(parentId,nameHe,nameEn,icon,imageUrl,JSON.stringify(synonyms),status,sortOrder,id),
+    auditStatement(env,user.id,"category.update","category",id,{nameHe,parentId,status,sortOrder})
+  ]);
+  return json({category:{id,nameHe,nameEn,parentId,status,sortOrder}});
+}
+
 async function adminClosures(request,env){
   await requireAdmin(request,env);
   const rows=await env.DB.prepare("SELECT id,closure_type,title_he,title_en,starts_at,ends_at,active,created_at FROM platform_closures ORDER BY starts_at DESC LIMIT 200").all();
@@ -975,6 +1000,20 @@ async function createAdminClosure(request,env){
     auditStatement(env,user.id,"platform.closure.create","platform_closure",id,{type,start,end})
   ]);
   return json({closure:{id,type,startsAt:start,endsAt:end}},201);
+}
+
+async function updateAdminClosure(request,env,id){
+  const user=await requireAdmin(request,env),body=await readJson(request);
+  const current=await env.DB.prepare("SELECT * FROM platform_closures WHERE id=?").bind(id).first();
+  if(!current)throw new HttpError(404,"הסגירה לא נמצאה");
+  const active=body.active===undefined?Boolean(current.active):Boolean(body.active);
+  const titleHe=body.titleHe===undefined?current.title_he:cleanText(body.titleHe,2,120,"כותרת");
+  const titleEn=body.titleEn===undefined?current.title_en:cleanOptional(body.titleEn,120);
+  await env.DB.batch([
+    env.DB.prepare("UPDATE platform_closures SET title_he=?,title_en=?,active=? WHERE id=?").bind(titleHe,titleEn,active?1:0,id),
+    auditStatement(env,user.id,"platform.closure.update","platform_closure",id,{active,titleHe})
+  ]);
+  return json({closure:{id,active,titleHe,titleEn}});
 }
 
 async function adminSecurityEvents(request,env){
