@@ -81,3 +81,8 @@ for(const token of ["preparation_minutes","max_loan_days","מועד האיסוף
 
 for(const token of ["suggest-category-button","לא מצאתי קטגוריה"])assert.ok(html.includes(token),token+" missing from category suggestion entry point");
 assert.ok(appClient.includes("/api/category-suggestions"),"category suggestion UI is not connected");
+
+assert.ok(!finalClient.includes('$("[data-template]",d).forEach'),"multi-element bindings regression in final features");
+assert.ok(!finalClient.includes('$("[data-holiday]",d).forEach'),"multi-element bindings regression in final features");
+assert.ok(!remainingClient.includes('$("[data-mod-action]",d).forEach'),"multi-element bindings regression in moderation");
+assert.ok(remainingClient.includes('$$("input[placeholder],textarea[placeholder],[title],[aria-label]",root).forEach'),"translation must process all matching elements");
