@@ -93,3 +93,5 @@ for(const token of ["data-branch-reopen","data-branch-reopen-now","הסניף נ
 for(const token of ["function openAddressEditor","data-edit-address","/api/me/addresses/"])assert.ok(appClient.includes(token),token+" missing from address editing UI");
 
 for(const token of ["dashboard-priority","ההשאלה הקרובה","פריטים שממתינים להחזרה","בקשות שממתינות לפעולה שלך","בקשות קהילה פתוחות"])assert.ok(appClient.includes(token),token+" missing from personal dashboard priorities");
+
+for(const token of ["f.branches.selectedOptions","f.categories.selectedOptions","ללא בחירה = כל הסניפים","ללא בחירה = כל הקטגוריות"])assert.ok(appClient.includes(token),token+" missing from manager permission scope UI");
