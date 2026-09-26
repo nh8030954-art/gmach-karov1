@@ -85,3 +85,7 @@ assert.ok(appClient.includes("/api/category-suggestions"),"category suggestion U
 for(const token of ["/change/respond","/undo-cancel","/extension/respond","data-change-request","data-change-decision","data-extension-alternative","async function openLoanChange"])assert.ok(appClient.includes(token),token+" missing from completed loan workflow UI");
 
 assert.ok(!finalClient.includes('$("[data-template]",d).forEach'),"multi-element bindings regression in final features");
+
+assert.ok(html.includes("gmach-organization-type"),"organization type selector missing");
+assert.ok(appClient.includes("organizationType:$(\"#gmach-organization-type\").value"),"organization type not submitted");
+assert.ok(worker.includes("organization_type=?"),"organization type not persisted on edit");
