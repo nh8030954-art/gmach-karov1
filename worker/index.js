@@ -2344,38 +2344,10 @@ async function addOrganizationMember(request,env,organizationId){
   return json({member:{userId:member.id,role}},201);
 }
 
-async function listOrganizationInvitations(request,env,organizationId){await requireOrganizationRole(request,env,organizationId,["owner"]);const rows=await env.DB.prepare("SELECT id,role,branch_scope_json,category_scope_json,message,invited_email,expires_at,accepted_at,cancelled_at,created_at FROM organization_invitations WHERE organization_id=? ORDER BY created_at DESC LIMIT 100").bind(organizationId).all();return json({invitations:rows.results})}
-async function createOrganizationInvitation(request,env,organizationId,url){
-  const {user}=await requireOrganizationRole(request,env,organizationId,["owner"]),body=await readJson(request);
-  const role=["requests","inventory","reports"].includes(body.role)?body.role:null;if(!role)throw new HttpError(400,"תפקיד המנהל אינו תקין");
-  const invitedEmail=body.email?normalizeEmail(body.email):null,token=randomToken(32),tokenHash=await sha256(token),id=crypto.randomUUID(),expiresAt=new Date(Date.now()+7*86400000).toISOString(),inviteUrl=`${url.origin}/#/invite/${encodeURIComponent(token)}`;
-  await env.DB.batch([
-    env.DB.prepare("INSERT INTO organization_invitations(id,organization_id,token_hash,role,branch_scope_json,category_scope_json,message,invited_by,expires_at,invited_email) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(id,organizationId,tokenHash,role,JSON.stringify(Array.isArray(body.branchIds)?body.branchIds.slice(0,50):[]),JSON.stringify(Array.isArray(body.categoryIds)?body.categoryIds.slice(0,50):[]),cleanOptional(body.message,500),user.id,expiresAt,invitedEmail),
-    auditStatement(env,user.id,"organization.invitation.create","organization",organizationId,{invitationId:id,role,invitedEmail})
-  ]);
-  let emailSent=false;
-  if(invitedEmail&&env.RESEND_API_KEY){
-    try{
-      const org=await env.DB.prepare("SELECT name FROM organizations WHERE id=?").bind(organizationId).first(),deliver=env.RESEND_SERVICE?.fetch?env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE):fetch;
-      const res=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[invitedEmail],subject:`הזמנה לניהול ${org?.name||"גמ״ח"}`,text:`הוזמנת להצטרף כמנהל/ת. הקישור בתוקף לשבעה ימים: ${inviteUrl}`,html:`<div dir="rtl"><h2>הזמנה לניהול ${escapeHtml(org?.name||"גמ״ח")}</h2><p>הוזמנת להצטרף כמנהל/ת. הקישור בתוקף לשבעה ימים.</p><p><a href="${inviteUrl}">פתיחת ההזמנה</a></p></div>`})});
-      emailSent=res.ok;
-    }catch(error){console.error("manager invitation email failed",{organizationId,invitedEmail,error});}
-  }
-  return json({invitation:{id,role,expiresAt,url:inviteUrl,invitedEmail,emailSent}},201);
-}
+async function listOrganizationInvitations(request,env,organizationId){await requireOrganizationRole(request,env,organizationId,["owner"]);const rows=await env.DB.prepare("SELECT id,role,branch_scope_json,category_scope_json,message,expires_at,accepted_at,cancelled_at,created_at FROM organization_invitations WHERE organization_id=? ORDER BY created_at DESC LIMIT 100").bind(organizationId).all();return json({invitations:rows.results})}
+async function createOrganizationInvitation(request,env,organizationId,url){const {user}=await requireOrganizationRole(request,env,organizationId,["owner"]),body=await readJson(request),role=["requests","inventory","reports"].includes(body.role)?body.role:null;if(!role)throw new HttpError(400,"תפקיד המנהל אינו תקין");const token=randomToken(32),tokenHash=await sha256(token),id=crypto.randomUUID(),expiresAt=new Date(Date.now()+7*86400000).toISOString();await env.DB.batch([env.DB.prepare("INSERT INTO organization_invitations(id,organization_id,token_hash,role,branch_scope_json,category_scope_json,message,invited_by,expires_at) VALUES(?,?,?,?,?,?,?,?,?)").bind(id,organizationId,tokenHash,role,JSON.stringify(Array.isArray(body.branchIds)?body.branchIds.slice(0,50):[]),JSON.stringify(Array.isArray(body.categoryIds)?body.categoryIds.slice(0,50):[]),cleanOptional(body.message,500),user.id,expiresAt),auditStatement(env,user.id,"organization.invitation.create","organization",organizationId,{invitationId:id,role})]);return json({invitation:{id,role,expiresAt,url:`${url.origin}/#/invite/${encodeURIComponent(token)}`}},201)}
 async function cancelOrganizationInvitation(request,env,id){const inv=await env.DB.prepare("SELECT organization_id FROM organization_invitations WHERE id=?").bind(id).first();if(!inv)throw new HttpError(404,"ההזמנה לא נמצאה");const {user}=await requireOrganizationRole(request,env,inv.organization_id,["owner"]);const now=new Date().toISOString();await env.DB.batch([env.DB.prepare("UPDATE organization_invitations SET cancelled_at=? WHERE id=? AND accepted_at IS NULL").bind(now,id),auditStatement(env,user.id,"organization.invitation.cancel","organization",inv.organization_id,{invitationId:id})]);return json({ok:true})}
-async function acceptOrganizationInvitation(request,env,token){
-  const user=await requireUser(request,env),hash=await sha256(token),inv=await env.DB.prepare("SELECT * FROM organization_invitations WHERE token_hash=? AND accepted_at IS NULL AND cancelled_at IS NULL AND expires_at>?").bind(hash,new Date().toISOString()).first();
-  if(!inv)throw new HttpError(404,"ההזמנה אינה תקפה או שפג תוקפה");
-  if(inv.invited_email&&String(inv.invited_email).toLowerCase()!==String(user.email).toLowerCase())throw new HttpError(403,"ההזמנה נשלחה לכתובת אימייל אחרת");
-  const now=new Date().toISOString();
-  await env.DB.batch([
-    env.DB.prepare("INSERT INTO organization_members(organization_id,user_id,role,branch_scope_json,category_scope_json) VALUES(?,?,?,?,?) ON CONFLICT(organization_id,user_id) DO UPDATE SET role=excluded.role,branch_scope_json=excluded.branch_scope_json,category_scope_json=excluded.category_scope_json").bind(inv.organization_id,user.id,inv.role,inv.branch_scope_json,inv.category_scope_json),
-    env.DB.prepare("UPDATE organization_invitations SET accepted_by=?,accepted_at=? WHERE id=?").bind(user.id,now,inv.id),
-    auditStatement(env,user.id,"organization.invitation.accept","organization",inv.organization_id,{invitationId:inv.id})
-  ]);
-  return json({ok:true,organizationId:inv.organization_id,role:inv.role});
-}
+async function acceptOrganizationInvitation(request,env,token){const user=await requireUser(request,env),hash=await sha256(token),inv=await env.DB.prepare("SELECT * FROM organization_invitations WHERE token_hash=? AND accepted_at IS NULL AND cancelled_at IS NULL AND expires_at>?").bind(hash,new Date().toISOString()).first();if(!inv)throw new HttpError(404,"ההזמנה אינה תקפה או שפג תוקפה");const now=new Date().toISOString();await env.DB.batch([env.DB.prepare("INSERT INTO organization_members(organization_id,user_id,role,branch_scope_json,category_scope_json) VALUES(?,?,?,?,?) ON CONFLICT(organization_id,user_id) DO UPDATE SET role=excluded.role,branch_scope_json=excluded.branch_scope_json,category_scope_json=excluded.category_scope_json").bind(inv.organization_id,user.id,inv.role,inv.branch_scope_json,inv.category_scope_json),env.DB.prepare("UPDATE organization_invitations SET accepted_by=?,accepted_at=? WHERE id=?").bind(user.id,now,inv.id),auditStatement(env,user.id,"organization.invitation.accept","organization",inv.organization_id,{invitationId:inv.id})]);return json({ok:true,organizationId:inv.organization_id,role:inv.role})}
 
 async function removeOrganizationMember(request,env,organizationId,memberId){
   const {user}=await requireOrganizationRole(request,env,organizationId,["owner"]);
