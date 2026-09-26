@@ -472,6 +472,9 @@ async function routeApi(request, env, ctx, url) {
   const organizationBranches = path.match(/^\/api\/organizations\/([^/]+)\/branches$/);
   if (method === "GET" && organizationBranches) return listBranches(request, env, decodeURIComponent(organizationBranches[1]));
   if (method === "POST" && organizationBranches) return createBranch(request, env, decodeURIComponent(organizationBranches[1]));
+  const branchDetail = path.match(/^\/api\/branches\/([^/]+)$/);
+  if (method === "PATCH" && branchDetail) return updateBranch(request, env, decodeURIComponent(branchDetail[1]));
+  if (method === "DELETE" && branchDetail) return archiveBranch(request, env, decodeURIComponent(branchDetail[1]));
   const organizationMembers = path.match(/^\/api\/organizations\/([^/]+)\/members$/);
   if (method === "GET" && organizationMembers) return listOrganizationMembers(request, env, decodeURIComponent(organizationMembers[1]));
   if (method === "POST" && organizationMembers) return addOrganizationMember(request, env, decodeURIComponent(organizationMembers[1]));
@@ -2254,6 +2257,40 @@ async function createBranch(request,env,organizationId){
   const mode=["separate","shared","hybrid"].includes(body.inventoryMode)?body.inventoryMode:"separate";
   await env.DB.batch([env.DB.prepare("INSERT INTO organization_branches(id,organization_id,name,address,city,latitude,longitude,phone,hours_json,inventory_mode) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(id,organizationId,cleanText(body.name,2,80,"שם הסניף"),cleanText(body.address,5,180,"כתובת"),cleanText(body.city,2,80,"עיר"),Number.isFinite(Number(body.latitude))?Number(body.latitude):null,Number.isFinite(Number(body.longitude))?Number(body.longitude):null,validatePhone(body.phone),sanitizeHours(body.hours),mode),auditStatement(env,user.id,"branch.create","organization_branch",id,{organizationId})]);
   return json({branch:{id,organizationId,inventoryMode:mode}},201);
+}
+
+async function updateBranch(request,env,id){
+  const body=await readJson(request),branch=await env.DB.prepare("SELECT * FROM organization_branches WHERE id=?").bind(id).first();
+  if(!branch) throw new HttpError(404,"הסניף לא נמצא");
+  const {user}=await requireOrganizationRole(request,env,branch.organization_id,["owner"]);
+  const status=body.status===undefined?branch.status:(["active","temporarily_closed","archived"].includes(body.status)?body.status:null);
+  if(!status) throw new HttpError(400,"סטטוס הסניף אינו תקין");
+  const reopensAt=body.reopensAt===undefined?branch.reopens_at:(body.reopensAt?new Date(body.reopensAt).toISOString():null);
+  const name=body.name===undefined?branch.name:cleanText(body.name,2,80,"שם הסניף");
+  const city=body.city===undefined?branch.city:cleanText(body.city,2,80,"עיר");
+  const address=body.address===undefined?branch.address:cleanText(body.address,5,180,"כתובת");
+  const phone=body.phone===undefined?branch.phone:validatePhone(body.phone);
+  const mode=body.inventoryMode===undefined?branch.inventory_mode:(["separate","shared","hybrid"].includes(body.inventoryMode)?body.inventoryMode:null);
+  if(!mode) throw new HttpError(400,"מודל המלאי אינו תקין");
+  const now=new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE organization_branches SET name=?,address=?,city=?,phone=?,inventory_mode=?,status=?,reopens_at=?,updated_at=? WHERE id=?").bind(name,address,city,phone,mode,status,reopensAt,now,id),
+    auditStatement(env,user.id,"branch.update","organization_branch",id,{before:{status:branch.status,reopensAt:branch.reopens_at},after:{status,reopensAt}})
+  ]);
+  if(status==="temporarily_closed"&&branch.status!=="temporarily_closed"){
+    const rows=await env.DB.prepare("SELECT DISTINCT borrower_id,id FROM loan_requests WHERE branch_id=? AND status IN ('pending','approved')").bind(id).all();
+    for(const row of rows.results||[]) await notify(env,row.borrower_id,"status","הסניף נסגר זמנית",reopensAt?"הסניף נסגר זמנית. פתיחה מתוכננת: "+reopensAt:"הסניף נסגר זמנית. נעדכן כשיחזור לפעילות.",row.id).run();
+  }
+  return json({ok:true,branch:{id,name,city,address,phone,inventoryMode:mode,status,reopensAt}});
+}
+async function archiveBranch(request,env,id){
+  const branch=await env.DB.prepare("SELECT * FROM organization_branches WHERE id=?").bind(id).first();
+  if(!branch) throw new HttpError(404,"הסניף לא נמצא");
+  const {user}=await requireOrganizationRole(request,env,branch.organization_id,["owner"]);
+  const active=await env.DB.prepare("SELECT COUNT(*) AS n FROM loan_requests WHERE branch_id=? AND status IN ('pending','approved','collected')").bind(id).first();
+  if(Number(active?.n||0)>0) throw new HttpError(409,"לא ניתן לארכב סניף עם השאלות פעילות");
+  await env.DB.batch([env.DB.prepare("UPDATE organization_branches SET status='archived',updated_at=? WHERE id=?").bind(new Date().toISOString(),id),auditStatement(env,user.id,"branch.archive","organization_branch",id,{})]);
+  return json({ok:true});
 }
 
 async function listOrganizationMembers(request,env,organizationId){
