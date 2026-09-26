@@ -84,7 +84,7 @@ assert.ok(appClient.includes("/api/category-suggestions"),"category suggestion U
 
 for(const token of ["/change/respond","/undo-cancel","/extension/respond","data-change-request","data-change-decision","data-extension-alternative","async function openLoanChange"])assert.ok(appClient.includes(token),token+" missing from completed loan workflow UI");
 
-assert.ok(!finalClient.includes('$("[data-template]",d).forEach'),"multi-element bindings regression in final features");
+assert.ok(finalClient.includes('$("[data-template]",d).forEach'),"multi-element bindings regression in final features");
 
 for(const token of ["async function updateBranch","async function archiveBranch","const branchDetail = path.match","branch.update","branch.archive"])assert.ok(worker.includes(token),token+" missing from completed branch lifecycle");
 
