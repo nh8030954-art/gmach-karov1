@@ -345,7 +345,7 @@
     $("#notification-preferences-form").addEventListener("submit", async event => { event.preventDefault(); const form = event.currentTarget; const rows = types.map(t => ({type:t.key,inApp:Boolean(form.querySelector(`[data-pref="${t.key}"][data-channel="inApp"]`)?.checked),email:Boolean(form.querySelector(`[data-pref="${t.key}"][data-channel="email"]`)?.checked)})); try { await api("/api/me/notification-preferences", {method:"PUT",body:{preferences:rows}}); toast("ההעדפות נשמרו"); } catch(e){toast(e.message,"error");} });
   }
   function requestActions(row) {
-    let actions = `<button class="button button-secondary button-small" data-open-chat="${escapeHTML(row.id)}">שיחה</button>`;
+    let actions = `<button class="button button-secondary button-small" data-open-chat="${escapeHTML(row.id)}">שיחה</button><a class="button button-secondary button-small" href="/api/loan-requests/${encodeURIComponent(row.id)}/calendar.ics" download>הוספה ליומן</a>`;
     if (row.direction === "incoming" && row.status === "pending") actions += `<button class="button button-primary button-small" data-request-decision="approved" data-request-id="${escapeHTML(row.id)}">אישור</button><button class="button button-secondary button-small" data-request-decision="declined" data-request-id="${escapeHTML(row.id)}">דחייה</button>`;
     if (row.direction === "incoming" && row.status === "approved") actions += `<button class="button button-primary button-small" data-request-action="collected" data-request-id="${escapeHTML(row.id)}">סימון כנאסף</button>`;
     if (row.direction === "incoming" && row.status === "collected") actions += `<button class="button button-primary button-small" data-request-action="returned" data-request-id="${escapeHTML(row.id)}">סימון כהוחזר</button>`;
