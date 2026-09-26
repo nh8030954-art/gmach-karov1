@@ -1,11 +1,11 @@
-sha=bb2e9a46a23c414b6fbb8be04211e886929a83c9
+sha=cb6b439320e673e673db41213100cd91e6f3ccdd
 install=success
 syntax=success
 smoke=failure
 live=success
 
 AssertionError [ERR_ASSERTION]: /api/waitlist/ missing from waitlist/community lifecycle
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790456376024:74:119 {
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790456439817:74:119 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
@@ -15,5 +15,5 @@ AssertionError [ERR_ASSERTION]: /api/waitlist/ missing from waitlist/community l
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-25.9","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-26T20:59:50.014Z"}
+{"ok":true,"release":"complete-platform-2026-09-25.9","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-26T21:00:54.732Z"}
 platform_features={"release":"complete-platform-2026-09-25.9","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":false,"vapidPublicKey":null,"geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
