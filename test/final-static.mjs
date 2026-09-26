@@ -127,3 +127,9 @@ for(const token of ["openPickupScreen","openReturnScreen","data-pickup-request",
 for(const token of ["I18N_EXTRA","translateText","Ownership transfers","Needs your attention","Pickup screen","Return screen"])assert.ok(remainingClient.includes(token),token+" missing from full English localization");
 
 for(const token of ["newlyOverdue","ההשאלה באיחור","detectedAt"])assert.ok(worker.includes(token),token+" missing from overdue notification workflow");
+
+for(const token of ["createOrganizationInvitation","acceptOrganizationInvitation","cancelOrganizationInvitation","expiresAt"])assert.ok(worker.includes(token),token+" missing from manager invitation workflow");
+for(const token of ["org-invite-form","data-cancel-invite","invitationsData"])assert.ok(appClient.includes(token),token+" missing from manager invitation UI");
+for(const token of ["data-edit-search","notifyMatchingSavedSearches","פריט חדש מתאים לחיפוש שמור"])assert.ok((appClient+worker).includes(token),token+" missing from saved search completion");
+for(const token of ["listMySecurityEvents","/api/me/security-events","אירועי אבטחה אחרונים"])assert.ok((worker+appClient).includes(token),token+" missing from personal security center");
+for(const token of ['data-channel="push"','data-channel="digest"','data-channel="quietStart"'])assert.ok(appClient.includes(token),token+" missing from notification preference UI");
