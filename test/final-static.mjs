@@ -115,3 +115,5 @@ for(const token of ["saved-entity-form","recurring-loan-form","data-waitlist-acc
 for(const token of ["myWaitlistOffers","/api/me/waitlist-offers","const expiredOffers="])assert.ok(finalWorker.includes(token),token+" missing from actionable waitlist lifecycle");
 
 for(const token of ["openHelpMatches","data-help-matches","data-offer-match"])assert.ok(appClient.includes(token),token+" missing from community matching UI");
+
+assert.ok(appClient.includes("data-counter-pickup"),"pickup counter proposal UI missing");
