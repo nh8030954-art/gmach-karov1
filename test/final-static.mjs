@@ -78,3 +78,6 @@ for(const token of ["renderCalendar","preferredApp","data-k=\"push\"","reminderM
 for(const token of ["item-publish-at","item-max-per-user","item-preparation","item-max-loan-days","item-service-radius","עד 12 תמונות"])assert.ok(html.includes(token),token+" missing from advanced item form");
 for(const token of ["publishAt:$(\"#item-publish-at\")","maxPerUser:$(\"#item-max-per-user\")","serviceRadiusKm:$(\"#item-service-radius\")","data-review-helpful","data-review-report","עד 12 תמונות"])assert.ok(appClient.includes(token),token+" missing from advanced item/review UI");
 for(const token of ["preparation_minutes","max_loan_days","מועד האיסוף מוקדם מדי לפי זמן ההזמנה וההכנה","status:nextStatus"])assert.ok(worker.includes(token),token+" missing from advanced item enforcement");
+
+for(const token of ["suggest-category-button","לא מצאתי קטגוריה"])assert.ok(html.includes(token),token+" missing from category suggestion entry point");
+assert.ok(appClient.includes("/api/category-suggestions"),"category suggestion UI is not connected");
