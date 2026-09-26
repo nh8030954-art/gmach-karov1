@@ -1475,14 +1475,16 @@ async function updateItem(request, env, id) {
   const minLoanMinutes=positiveInt(body.minLoanMinutes,Number(existing.min_loan_minutes||60),1,525600,"משך מינימלי");
   const maxLoanMinutes=positiveInt(body.maxLoanMinutes,Number(existing.max_loan_minutes||10080),1,525600,"משך מקסימלי");
   if(maxLoanMinutes<minLoanMinutes) throw new HttpError(400,"משך ההשאלה המקסימלי חייב להיות גדול או שווה למינימלי");
+  const publishAt=body.publishAt?validateDateTime(body.publishAt,"מועד פרסום"):null,maxPerUser=body.maxPerUser?positiveInt(body.maxPerUser,1,1,999,"מגבלה למשתמש"):null,preparationMinutes=positiveInt(body.preparationMinutes,Number(existing.preparation_minutes||0),0,10080,"זמן הכנה"),maxLoanDays=body.maxLoanDays?positiveInt(body.maxLoanDays,1,1,3650,"ימי השאלה מרביים"):null,serviceRadiusKm=body.serviceRadiusKm?Math.max(0.1,Math.min(500,Number(body.serviceRadiusKm))):null;
+  const scheduled=publishAt&&Date.parse(publishAt)>Date.now(),nextStatus=existing.status==="archived"?"archived":scheduled?"pending":"active";
   await env.DB.prepare(`UPDATE items SET min_loan_minutes=?,max_loan_minutes=?,booking_notice_minutes=?,turnaround_minutes=?,
-    booking_horizon_days=?,approval_mode=?,deposit_required=?,deposit_amount_agorot=? WHERE id=?`).bind(
+    booking_horizon_days=?,approval_mode=?,deposit_required=?,deposit_amount_agorot=?,publish_at=?,max_per_user=?,preparation_minutes=?,max_loan_days=?,service_radius_km=?,status=? WHERE id=?`).bind(
     minLoanMinutes,maxLoanMinutes,
     positiveInt(body.bookingNoticeMinutes,Number(existing.booking_notice_minutes||0),0,525600,"זמן התראה"),
     positiveInt(body.turnaroundMinutes,Number(existing.turnaround_minutes||0),0,10080,"זמן התארגנות"),
     positiveInt(body.bookingHorizonDays,Number(existing.booking_horizon_days||365),1,1095,"טווח הזמנה"),
-    body.approvalMode==="automatic"?"automatic":"manual",body.depositRequired?1:0,body.depositRequired?moneyAgorot(body.depositAmount):0,id).run();
-  return json({ item: { id, status } });
+    body.approvalMode==="automatic"?"automatic":"manual",body.depositRequired?1:0,body.depositRequired?moneyAgorot(body.depositAmount):0,publishAt,maxPerUser,preparationMinutes,maxLoanDays,serviceRadiusKm,nextStatus,id).run();
+  return json({ item: { id, status:nextStatus,publishAt,maxPerUser,preparationMinutes,maxLoanDays,serviceRadiusKm } });
 }
 
 async function uploadImages(request, env, itemId) {
