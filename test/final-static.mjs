@@ -136,4 +136,4 @@ for(const token of ['data-channel="push"','data-channel="digest"','data-channel=
 for(const token of ["editRequestMessage","message_edited","data-edit-message","message.read_at"])assert.ok((worker+appClient).includes(token),token+" missing from chat edit/read workflow");
 for(const token of ["scheduledItems","publish_at IS NOT NULL","notifyMatchingSavedSearches"])assert.ok(worker.includes(token),token+" missing from scheduled publication workflow");
 for(const token of ["openHelpMatches","data-help-matches","data-select-offer"])assert.ok(appClient.includes(token),token+" missing from community match/offer workflow");
-for(const source of [appClient,finalClient,platformClient,remainingClient])assert.ok(!/(?<!\\$)\\$\\((?:'[^']*'|"[^"]*")(?:,[^)]*)?\\)\\.forEach/.test(source),"single-element selector used as collection");
+for(const source of [appClient,finalClient,platformClient,remainingClient])assert.ok(!/(?<!\$)\$\((?:'[^']*'|"[^"]*")(?:,[^)]*)?\)\.forEach/.test(source),"single-element selector used as collection");
