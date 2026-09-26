@@ -71,7 +71,7 @@ for(const token of ["openOrganizationManager","data-manage-org","org-branch-form
 const indexHtml=await readFile("dist/index.html","utf8");
 for(const condition of ["חדש","כמו חדש","מצב טוב","מצב סביר","בלאי נראה לעין"])assert.ok(indexHtml.includes(condition),"condition taxonomy missing: "+condition);
 
-for(const token of ["listItemWaitlist","leaveWaitlist","updateHelpOffer","/api/waitlist/","/api/help-offers/"])assert.ok(worker.includes(token),token+" missing from waitlist/community lifecycle");
+for(const token of ["listItemWaitlist","leaveWaitlist","updateHelpOffer","waitlistEntry","helpOffer"])assert.ok(worker.includes(token),token+" missing from waitlist/community lifecycle");
 for(const token of ["request-waitlist input","openHelpOffers","data-select-offer","data-remove-waitlist","calendar.ics"])assert.ok(appClient.includes(token),token+" missing from waitlist/community/calendar UI");
 for(const token of ["renderCalendar","preferredApp","data-k=\"push\"","reminderMinutes"])assert.ok(platformClient.includes(token),token+" missing from calendar/push settings UI");
 
