@@ -199,9 +199,25 @@ export async function handlePlatformCompletionApi(request,env,ctx,url){
 
 export async function runPlatformCompletionMaintenance(env){
   const now=new Date().toISOString();
+  const expiredHolds=await qall(env,`SELECT h.id,h.request_id,h.item_id,lr.borrower_id,o.owner_id,i.title FROM inventory_holds h JOIN loan_requests lr ON lr.id=h.request_id JOIN items i ON i.id=h.item_id JOIN organizations o ON o.id=i.organization_id WHERE h.status='active' AND h.expires_at<=? AND lr.status='pending' LIMIT 200`,[now]);
+  const expiredPickups=await qall(env,`SELECT lr.id,lr.borrower_id,o.owner_id,i.title FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.status='approved' AND lr.pickup_expires_at IS NOT NULL AND lr.pickup_expires_at<=? AND lr.workflow_status!='pickup_expired' LIMIT 200`,[now]);
   await qrun(env,"UPDATE items SET status='active',updated_at=? WHERE status!='active' AND publish_at IS NOT NULL AND publish_at<=? AND deleted_at IS NULL",[now,now]);
   await qrun(env,"UPDATE inventory_holds SET status='expired' WHERE status='active' AND expires_at<=?",[now]);
   await qrun(env,"UPDATE waitlist_entries SET status='waiting',offer_expires_at=NULL WHERE status='notified' AND offer_expires_at IS NOT NULL AND offer_expires_at<=?",[now]);
+  for(const row of expiredHolds){
+    await env.DB.batch([
+      env.DB.prepare("UPDATE loan_requests SET status='cancelled',workflow_status='hold_expired',cancelled_at=?,updated_at=? WHERE id=? AND status='pending'").bind(now,now,row.request_id),
+      notify(env,row.borrower_id,"status","שמירת המלאי פגה",`חלון שמירת המלאי עבור ${row.title} הסתיים. אפשר ליצור בקשה חדשה אם המוצר עדיין זמין.`,row.request_id),
+      notify(env,row.owner_id,"status","שמירת מלאי פגה",`בקשה ממתינה עבור ${row.title} שוחררה לאחר שחלון ה-Hold הסתיים.`,row.request_id)
+    ]);
+  }
+  for(const row of expiredPickups){
+    await env.DB.batch([
+      env.DB.prepare("UPDATE loan_requests SET workflow_status='pickup_expired',no_show_at=?,updated_at=? WHERE id=? AND status='approved'").bind(now,now,row.id),
+      notify(env,row.borrower_id,"status","זמן האיסוף פג",`חלון האיסוף של ${row.title} הסתיים. בחרו באזור האישי אם להמתין לתיאום חדש או לבטל.`,row.id),
+      notify(env,row.owner_id,"status","זמן האיסוף פג",`חלון האיסוף של ${row.title} הסתיים ללא סימון איסוף.`,row.id)
+    ]);
+  }
 
   const overdue=await qall(env,"SELECT lr.id,lr.borrower_id,o.owner_id,i.title FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.status='collected' AND lr.requested_until<? AND lr.workflow_status!='overdue' LIMIT 200",[now]);
   for(const row of overdue){
