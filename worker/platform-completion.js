@@ -131,6 +131,7 @@ export async function handlePlatformCompletionApi(request,env,ctx,url){
   if(m&&method==="PATCH") return orgLifecycle(request,env,decodeURIComponent(m[1]));
   m=path.match(/^\/api\/organizations\/([^/]+)\/transfer$/);
   if(m&&method==="POST") return createOrgTransfer(request,env,decodeURIComponent(m[1]));
+  if(method==="GET"&&path==="/api/me/organization-transfers") return listMyOrgTransfers(request,env);
   m=path.match(/^\/api\/organization-transfers\/([^/]+)\/respond$/);
   if(m&&method==="POST") return respondOrgTransfer(request,env,decodeURIComponent(m[1]));
   m=path.match(/^\/api\/branches\/([^/]+)$/);
@@ -310,6 +311,7 @@ async function createOrgTransfer(request,env,id){
   const tid=crypto.randomUUID(),expires=new Date(Date.now()+7*86400000).toISOString(),now=new Date().toISOString();
   await env.DB.batch([env.DB.prepare("UPDATE organization_transfers SET status='cancelled',responded_at=? WHERE organization_id=? AND status='pending'").bind(now,id),env.DB.prepare("INSERT INTO organization_transfers(id,organization_id,from_user_id,to_user_id,expires_at) VALUES(?,?,?,?,?)").bind(tid,id,user.id,target.id,expires),env.DB.prepare("UPDATE organizations SET transfer_pending_to=? WHERE id=?").bind(target.id,id),notify(env,target.id,"status","העברת בעלות ממתינה","הוזמנת לקבל בעלות על גמ״ח.",null)]);return json({transfer:{id:tid,expiresAt:expires}},201);
 }
+async function listMyOrgTransfers(request,env){const user=await requireUser(request,env),now=new Date().toISOString();await qrun(env,"UPDATE organization_transfers SET status='expired',responded_at=? WHERE status='pending' AND expires_at<=?",[now,now]);const incoming=await qall(env,"SELECT t.*,o.name organization_name,u.full_name from_name FROM organization_transfers t JOIN organizations o ON o.id=t.organization_id JOIN users u ON u.id=t.from_user_id WHERE t.to_user_id=? ORDER BY t.created_at DESC",[user.id]);const outgoing=await qall(env,"SELECT t.*,o.name organization_name,u.full_name to_name,u.email to_email FROM organization_transfers t JOIN organizations o ON o.id=t.organization_id JOIN users u ON u.id=t.to_user_id WHERE t.from_user_id=? ORDER BY t.created_at DESC",[user.id]);return json({incoming,outgoing});}
 async function respondOrgTransfer(request,env,id){
   const user=await requireUser(request,env),b=await readJson(request),now=new Date().toISOString(),row=await qfirst(env,"SELECT * FROM organization_transfers WHERE id=? AND to_user_id=? AND status='pending' AND expires_at>?",[id,user.id,now]);if(!row)throw new HttpError(404,"העברת הבעלות אינה זמינה");
   if(b.accept===true)await env.DB.batch([env.DB.prepare("UPDATE organization_transfers SET status='accepted',responded_at=? WHERE id=?").bind(now,id),env.DB.prepare("UPDATE organizations SET owner_id=?,transfer_pending_to=NULL,updated_at=? WHERE id=?").bind(user.id,now,row.organization_id),env.DB.prepare("INSERT OR REPLACE INTO organization_members(organization_id,user_id,role) VALUES(?,?,'owner')").bind(row.organization_id,user.id),notify(env,row.from_user_id,"status","העברת הבעלות הושלמה","הבעלות על הגמ״ח הועברה.",null)]);
