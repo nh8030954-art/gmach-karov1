@@ -322,11 +322,29 @@ async function updateAdminCategory(request,env,id){
 /* ---------- organizations / branches ---------- */
 async function orgLifecycle(request,env,id){
   const {user}=await requireOrg(request,env,id,["owner"]),b=await readJson(request),a=String(b.action||""),now=new Date().toISOString();
-  if(a==="close") await qrun(env,"UPDATE organizations SET temporarily_closed=1,reopens_at=?,updated_at=? WHERE id=?",[b.reopensAt?iso(b.reopensAt,"מועד פתיחה"):null,now,id]);
-  else if(a==="reopen") await qrun(env,"UPDATE organizations SET temporarily_closed=0,reopens_at=NULL,updated_at=? WHERE id=?",[now,id]);
-  else if(a==="request_delete") await qrun(env,"UPDATE organizations SET deletion_requested_at=?,is_hidden=1,updated_at=? WHERE id=?",[now,now,id]);
-  else if(a==="cancel_delete") await qrun(env,"UPDATE organizations SET deletion_requested_at=NULL,deletion_cancelled_at=?,is_hidden=0,updated_at=? WHERE id=?",[now,now,id]);
-  else throw new HttpError(400,"פעולת גמ״ח אינה תקינה");await audit(env,user.id,"organization.lifecycle",id,{action:a});return json({ok:true});
+  if(a==="close"){
+    const reopens=b.reopensAt?iso(b.reopensAt,"מועד פתיחה"):null;
+    await qrun(env,"UPDATE organizations SET temporarily_closed=1,reopens_at=?,updated_at=? WHERE id=?",[reopens,now,id]);
+    const requests=await qall(env,`SELECT lr.id,lr.borrower_id,lr.item_id,lr.status,i.title FROM loan_requests lr JOIN items i ON i.id=lr.item_id WHERE i.organization_id=? AND lr.status IN ('pending','approved','collected')`,[id]);
+    for(const row of requests){
+      if(b.cancelFutureRequests===true&&row.status!=="collected"){
+        await env.DB.batch([
+          env.DB.prepare("UPDATE loan_requests SET status='cancelled',workflow_status='cancelled',cancelled_at=?,manager_note=?,updated_at=? WHERE id=?").bind(now,"הגמ״ח נסגר זמנית",now,row.id),
+          env.DB.prepare("UPDATE inventory_holds SET status='released' WHERE request_id=? AND status IN ('active','converted')").bind(row.id),
+          notify(env,row.borrower_id,"status","הבקשה בוטלה עקב סגירה זמנית",`${row.title} בוטל עקב סגירה זמנית של הגמ״ח.${reopens?" פתיחה צפויה: "+reopens:""}`,row.id)
+        ]);
+      }else{
+        await notify(env,row.borrower_id,"status","הגמ״ח נסגר זמנית",`${row.title}: הגמ״ח נסגר זמנית.${reopens?" פתיחה צפויה: "+reopens:""} בקשות שכבר נאספו נשארות פעילות עד להחזרה.`,row.id).run();
+      }
+    }
+  }else if(a==="reopen"){
+    await qrun(env,"UPDATE organizations SET temporarily_closed=0,reopens_at=NULL,updated_at=? WHERE id=?",[now,id]);
+  }else if(a==="request_delete"){
+    await qrun(env,"UPDATE organizations SET deletion_requested_at=?,is_hidden=1,updated_at=? WHERE id=?",[now,now,id]);
+  }else if(a==="cancel_delete"){
+    await qrun(env,"UPDATE organizations SET deletion_requested_at=NULL,deletion_cancelled_at=?,is_hidden=0,updated_at=? WHERE id=?",[now,now,id]);
+  }else throw new HttpError(400,"פעולת גמ״ח אינה תקינה");
+  await audit(env,user.id,"organization.lifecycle",id,{action:a,cancelFutureRequests:b.cancelFutureRequests===true});return json({ok:true});
 }
 async function createOrgTransfer(request,env,id){
   const {user}=await requireOrg(request,env,id,["owner"]),b=await readJson(request),target=await qfirst(env,"SELECT id FROM users WHERE email=? COLLATE NOCASE AND account_status='active'",[String(b.email||"").trim().toLowerCase()]);
