@@ -1111,16 +1111,17 @@ async function discovery(env, url) {
 }
 
 async function getPublicOrganization(env, id) {
-  // Public review fields were introduced after the original organization
-  // endpoint. Ensure the additive schema before querying them on live D1.
-  await ensureFinalFeaturesSchema(env);
   const organization = await env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,
     o.address,o.website_url,o.hours_json,o.service_area,o.pickup_options,o.last_active_at,o.verified_phone,o.verified_address,c.contact_phone,
     ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
     FROM organizations o LEFT JOIN organization_contacts c ON c.organization_id=o.id LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
     WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 AND EXISTS (SELECT 1 FROM items pi WHERE pi.organization_id=o.id AND pi.status='active' AND pi.deleted_at IS NULL) GROUP BY o.id`).bind(id).first();
   if (!organization) throw new HttpError(404, "הגמ״ח לא נמצא");
-  const [items, reviews, orgCategories] = await env.DB.batch([
+  const schemaReady = await ensureFinalFeaturesSchema(env).then(() => true).catch(error => {
+    console.error("Optional public organization schema unavailable", { organizationId: id, error });
+    return false;
+  });
+  const queries = [
     env.DB.prepare(`SELECT i.*,o.id AS org_id,o.name AS org_name,o.last_active_at AS org_last_active_at,
       NULL AS org_rating,0 AS org_review_count,
       (SELECT ROUND(AVG(r.item_rating),1) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_rating,
@@ -1136,8 +1137,15 @@ async function getPublicOrganization(env, id) {
       LEFT JOIN organization_branches b ON b.id=r.branch_id
       WHERE r.organization_id=? AND r.status='published' ORDER BY r.created_at DESC LIMIT 30`).bind(id),
     env.DB.prepare(`SELECT c.id,c.name_he,c.name_en,c.icon,c.image_url FROM organization_categories oc JOIN categories c ON c.id=oc.category_id WHERE oc.organization_id=? AND c.status='active' ORDER BY c.sort_order,c.name_he`).bind(id)
-  ]);
-  return json({ organization: { ...organization, verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options), categories: orgCategories.results }, items: items.results.map(mapItem), reviews: reviews.results });
+  ];
+  const [itemsResult,reviewsResult,categoriesResult] = await Promise.allSettled(queries.map(query => query.all()));
+  for (const [section,result] of [["items",itemsResult],["reviews",reviewsResult],["categories",categoriesResult]]) {
+    if (result.status === "rejected") console.error("Public organization section unavailable", { organizationId: id, section, error: result.reason });
+  }
+  const items = itemsResult.status === "fulfilled" ? itemsResult.value.results.map(mapItem) : [];
+  const reviews = reviewsResult.status === "fulfilled" ? reviewsResult.value.results : [];
+  const categories = categoriesResult.status === "fulfilled" ? categoriesResult.value.results : [];
+  return json({ organization: { ...organization, verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options), categories }, items, reviews, partial: !schemaReady || [itemsResult,reviewsResult,categoriesResult].some(result => result.status === "rejected") });
 }
 
 async function toggleSavedOrganization(request, env, organizationId, save) {
