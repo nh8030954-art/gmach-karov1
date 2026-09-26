@@ -54,7 +54,7 @@
   $(".pt-close",dialog).onclick=()=>dialog.close();
 
   const tabs=[
-    ["profile","פרופיל"],["addresses","כתובות"],["devices","מכשירים"],["notifications","התראות"],["calendar","יומן"],["searches","חיפושים שמורים"],["categories","קטגוריות שמורות"],["support","תמיכה"],["admin","ניהול־על"]
+    ["profile","פרופיל"],["privacy","פרטיות ונתונים"],["addresses","כתובות"],["devices","מכשירים"],["notifications","התראות"],["calendar","יומן"],["searches","חיפושים שמורים"],["categories","קטגוריות שמורות"],["support","תמיכה"],["admin","ניהול־על"]
   ];
   let profile=null, active="profile";
   const tabbar=$(".pt-tabs",dialog), body=$(".pt-body",dialog);
@@ -68,7 +68,7 @@
     try{
       if(!profile) profile=(await api("/api/me/profile")).profile;
       if(id==="admin" && profile.role!=="admin"){body.innerHTML="<p>המסך זמין למנהל האתר בלבד.</p>";return;}
-      await ({profile:renderProfile,addresses:renderAddresses,devices:renderDevices,notifications:renderNotifications,calendar:renderCalendar,searches:renderSearches,categories:renderSavedCategories,support:renderSupport,admin:renderAdmin}[id])();
+      await ({profile:renderProfile,privacy:renderPrivacy,addresses:renderAddresses,devices:renderDevices,notifications:renderNotifications,calendar:renderCalendar,searches:renderSearches,categories:renderSavedCategories,support:renderSupport,admin:renderAdmin}[id])();
     }catch(e){body.innerHTML=`<p role="alert">${esc(e.message)}</p>`;}
   }
 
@@ -86,6 +86,8 @@
     f.onsubmit=async e=>{e.preventDefault();try{profile=(await api("/api/me/profile",{method:"PATCH",body:{fullName:f.fullName.value,phone:f.phone.value,city:f.city.value,preferredLanguage:f.preferredLanguage.value,operationalEmails:f.operationalEmails.checked,communityEmails:f.communityEmails.checked}})).profile;setStatus("הפרטים נשמרו.");}catch(err){setStatus(err.message,true)}};
     $("#pt-cancel-deletion",body)?.addEventListener("click",async()=>{try{await api("/api/me/account/cancel-deletion",{method:"POST",body:{}});profile.deletionRequestedAt=null;await renderProfile();setStatus("בקשת המחיקה בוטלה.");}catch(err){setStatus(err.message,true)}});
   }
+
+  async function renderPrivacy(){body.innerHTML=`<div class="pt-grid"><section class="pt-card"><h3>הנתונים שלי</h3><p>אפשר לייצא עותק של הנתונים האישיים או לפתוח בקשת עיון ותיקון.</p><div class="pt-row"><button class="pt-btn" id="pt-export-data">ייצוא הנתונים שלי</button><button class="pt-btn" id="pt-data-access">בקשת עיון</button><button class="pt-btn" id="pt-data-correct">בקשת תיקון</button></div></section><section class="pt-card"><h3>מחיקת חשבון</h3><p>בקשת מחיקה מתחילה תקופת המתנה של שבעה ימים. אם יש השאלות פעילות, הטיפול ימתין לסגירתן.</p><button class="pt-btn danger" id="pt-request-deletion">בקשת מחיקת חשבון</button></section></div><div class="pt-status"></div>`;$("#pt-export-data",body).onclick=async()=>{try{const response=await fetch("/api/me/export",{credentials:"same-origin"});if(!response.ok)throw new Error("הייצוא נכשל");const blob=await response.blob(),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="gmach-my-data.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setStatus("קובץ הנתונים נוצר.")}catch(e){setStatus(e.message,true)}};const request=async type=>{const details=prompt(type==="access"?"מה תרצו לקבל בבקשת העיון?":"איזה מידע תרצו לתקן?")||"";if(!details)return;try{await api("/api/me/data-request",{method:"POST",body:{type,details}});setStatus("הבקשה נשלחה ותופיע במערכת התמיכה.")}catch(e){setStatus(e.message,true)}};$("#pt-data-access",body).onclick=()=>request("access");$("#pt-data-correct",body).onclick=()=>request("correction");$("#pt-request-deletion",body).onclick=async()=>{if(!confirm("להתחיל תהליך מחיקת חשבון? ניתן לבטל במשך שבעה ימים."))return;try{await api("/api/me/account/request-deletion",{method:"POST",body:{}});setStatus("בקשת המחיקה נקלטה. אפשר לבטל אותה דרך לשונית הפרופיל.")}catch(e){setStatus(e.message,true)}}}
 
   async function renderAddresses(){
     const data=await api("/api/me/addresses");
