@@ -1771,7 +1771,7 @@ async function dashboard(request, env) {
       i.status,i.availability_status,i.created_at,o.name AS org_name,i.item_type,i.subcategory,i.tags_json,i.pickup_method,i.inventory_updated_at,
       i.min_loan_minutes,i.max_loan_minutes,i.booking_notice_minutes,i.turnaround_minutes,i.booking_horizon_days,i.approval_mode,i.deposit_required,i.deposit_amount_agorot
       FROM items i JOIN organizations o ON o.id = i.organization_id WHERE o.owner_id = ? ORDER BY i.created_at DESC`).bind(user.id),
-    env.DB.prepare(`SELECT lr.id,lr.item_id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,lr.manager_note,lr.created_at,lr.quantity,lr.deposit_required_snapshot,lr.deposit_amount_agorot_snapshot,
+    env.DB.prepare(`SELECT lr.id,lr.item_id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,lr.manager_note,lr.created_at,lr.quantity,lr.deposit_required_snapshot,lr.deposit_amount_agorot_snapshot,lr.workflow_status,lr.extension_status,lr.extension_until,lr.change_pending_json,lr.cancellation_undo_until,
       i.title AS item_title,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,
       CASE WHEN o.owner_id = ? THEN 'incoming' ELSE 'outgoing' END AS direction,
       CASE WHEN lr.borrower_id = ? AND lr.status IN ('approved','collected') THEN c.contact_phone ELSE NULL END AS contact_phone
@@ -1794,6 +1794,11 @@ async function dashboard(request, env) {
     quantity: Number(row.quantity || 1),
     deposit_required: Boolean(row.deposit_required_snapshot),
     deposit_amount_agorot: Number(row.deposit_amount_agorot_snapshot || 0),
+    workflow_status: row.workflow_status || null,
+    extension_status: row.extension_status || null,
+    extension_until: row.extension_until || null,
+    change_pending_json: row.change_pending_json || null,
+    cancellation_undo_until: row.cancellation_undo_until || null,
     direction: row.direction,
     borrower_name: row.direction === "incoming" ? row.borrower_name : undefined,
     borrower_phone: row.direction === "incoming" ? row.phone : undefined,
