@@ -18,6 +18,8 @@ assert.match(worker,/complete-platform-2026-09-25\.9/);
 assert.match(worker,/finalFeaturesSchema/);
 assert.match(worker,/\/sitemap\.xml/);
 assert.match(worker,/\/robots\.txt/);
+assert.ok(worker.includes("updateAdminCategory"));
+assert.ok(worker.includes("updateAdminClosure"));
 
 for(const table of [
   "organization_drafts","organization_onboarding","branch_inventory_policies","pickup_branch_proposals",
@@ -46,6 +48,10 @@ assert.ok(finalClient.includes("pushManager"));
 assert.ok(platform.includes("verifyTurnstile"));
 assert.ok(platform.includes("processWaitlist"));
 assert.ok(platform.includes("createBackup"));
+const platformClient=await readFile("dist/platform-completion.js","utf8");
+assert.ok(platformClient.includes("pt-admin-categories"));
+assert.ok(platformClient.includes("/api/admin/categories/"));
+assert.ok(platformClient.includes("/api/admin/closures/"));
 
 console.log("Final completion static release gate passed.");
 
