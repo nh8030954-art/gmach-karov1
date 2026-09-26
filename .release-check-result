@@ -1,10 +1,10 @@
-sha=ef171d18a8fd27815b0080f3889b6b70c44f420e
+sha=8fef3b22a41bffa71604e0695685cba0f571eda8
 install=success
 syntax=success
 smoke=failure
 live=success
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790461345761:148:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790461408550:148:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
@@ -15,5 +15,5 @@ live=success
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-25.9","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-26T22:22:38.974Z"}
+{"ok":true,"release":"complete-platform-2026-09-25.9","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-26T22:23:46.176Z"}
 platform_features={"release":"complete-platform-2026-09-25.9","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":false,"vapidPublicKey":null,"geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
