@@ -352,6 +352,7 @@
     if (["pending","approved"].includes(row.status)) actions += `<button class="button button-secondary button-small" data-loan-flow="${escapeHTML(row.id)}" data-direction="${escapeHTML(row.direction)}">תיאום וציר זמן</button>`;
     if (row.direction === "outgoing" && ["pending","approved"].includes(row.status)) actions += `<button class="button button-secondary button-small" data-request-action="cancelled" data-request-id="${escapeHTML(row.id)}">ביטול בקשה</button>`;
     if (row.direction === "outgoing" && ["approved","collected"].includes(row.status)) actions += `<button class="button button-secondary button-small" data-extension-request="${escapeHTML(row.id)}">בקשת הארכה</button>`;
+    if (row.direction === "incoming" && row.extension_status === "pending") actions += `<button class="button button-primary button-small" data-extension-decision="approved" data-request-id="${escapeHTML(row.id)}">אישור הארכה</button><button class="button button-secondary button-small" data-extension-decision="declined" data-request-id="${escapeHTML(row.id)}">דחיית הארכה</button>`;
     if (row.direction === "outgoing" && row.status === "returned") actions += `<button class="button button-primary button-small" data-review-request="${escapeHTML(row.id)}">כתיבת ביקורת</button>`;
     return actions;
   }
