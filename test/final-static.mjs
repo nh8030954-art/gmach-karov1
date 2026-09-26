@@ -140,3 +140,5 @@ for(const source of [appClient,finalClient,platformClient,remainingClient])asser
 for(const token of ["relationReady","CREATE TABLE IF NOT EXISTS organization_categories","CREATE TABLE IF NOT EXISTS item_categories"])assert.ok(worker.includes(token),token+" missing from production schema repair");
 
 for(const token of ["const inviteMatch=","/accept","הצטרפת לצוות הניהול"])assert.ok(appClient.includes(token),token+" missing from manager invite acceptance UI");
+
+for(const token of ["deletionReminderUsers","תזכורת לפני מחיקת החשבון","-5 days"])assert.ok(worker.includes(token),token+" missing from account deletion reminder lifecycle");
