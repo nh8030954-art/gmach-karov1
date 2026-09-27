@@ -183,6 +183,15 @@ for(const token of ["branch-proposal","data-branch-proposal","data-branch-respon
 for(const token of ["editDistance","fuzzyQueryMatch"])assert.ok(appClient.includes(token),token+" missing from typo-tolerant search fallback");
 
 
+for(const token of ["recentlyViewedOrganizations","recordOrganizationView","recently_viewed_organizations"])assert.ok((worker+appClient).includes(token),token+" missing from recent gmach workflow");
+for(const token of ["requestedFrom","requestedUntil","distanceKm","help-distance","help-until"])assert.ok((worker+appClient).includes(token),token+" missing from extended community request fields");
+for(const token of ["preferredNavigation","preferred_navigation","navigation_preferences"])assert.ok((worker+platform+appClient+platformClient).includes(token),token+" missing from navigation preference persistence");
+for(const token of ["TERMS_VERSION","PRIVACY_VERSION","legal_consents"])assert.ok(worker.includes(token),token+" missing from versioned legal consent history");
+for(const token of ["organizationOnboarding","previewSeen","tipsDismissed","showOrganizationOnboarding","openOrganizationOnboardingPreview"])assert.ok((finalWorker+finalClient).includes(token),token+" missing from post-creation gmach onboarding");
+for(const token of ["branch-proposal","data-branch-proposal","data-branch-response","toBranchName"])assert.ok((finalWorker+appClient).includes(token),token+" missing from alternate pickup branch workflow");
+for(const token of ["editDistance","fuzzyQueryMatch"])assert.ok(appClient.includes(token),token+" missing from typo-tolerant search fallback");
+
+
 for(const token of ["analyticsAcquisition","searchScore","openNearbyGmachs","account-start-nearby","/api/admin/analytics/export.csv"])assert.ok((appClient+worker).includes(token),token+" missing from discovery/analytics completion");
 for(const token of ["source","referrer","page_path","adminAnalyticsCsv"])assert.ok(worker.includes(token),token+" missing from acquisition analytics backend");
 for(const token of ["מקורות הגעה","אתרים מפנים","ייצוא נתוני שימוש CSV"])assert.ok((appClient+remainingClient).includes(token),token+" missing from analytics UI/localization");
