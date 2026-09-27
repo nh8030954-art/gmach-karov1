@@ -32,7 +32,7 @@
     visibleCount: 8, activeCategory: "", compareIds: new Set(), pendingAction: null, dashboardTab: "requests", myOrganizations: [], dashboard: null, authMode: "login",
     editingOrganizationId: null, editingItemId: null, chatRequestId: null, chatTimer: null, notifications: [],
     customizations: new Map(), visualEditMode: false, selectedEditable: null, pendingVerificationEmail: "", supportEmail: "",
-    discovery: { categories: [], cities: [], suggestions: [], organizations: [] }, viewMode: "list"
+    discovery: { categories: [], cities: [], suggestions: [], organizations: [] }, categoryAliases: [], pendingCommunityItem: null, viewMode: "list"
   };
 
   const SEARCH_ALIASES = Object.freeze({
@@ -99,8 +99,15 @@
     try { const data = await api(`/api/discovery${query ? `?q=${encodeURIComponent(query)}` : ""}`); state.discovery = data; renderDiscovery(); state.serverAvailable = true; $("#connection-banner").hidden = true; }
     catch (error) { console.warn("Discovery unavailable", error); }
   }
+  async function loadCategoryAliases(){
+    try{
+      const data=await api("/api/categories");
+      state.categoryAliases=(data.categories||[]).map(row=>({nameHe:row.name_he||"",nameEn:row.name_en||"",synonyms:Array.isArray(row.synonyms)?row.synonyms:[]}));
+      renderDiscovery();
+    }catch(error){console.warn("Category aliases unavailable",error)}
+  }
   function renderDiscovery() {
-    $("#search-suggestions").innerHTML = (state.discovery.suggestions || []).map(value => `<option value="${escapeHTML(value)}"></option>`).join("");
+    const suggestionValues=[...new Set([...(state.discovery.suggestions||[]),...state.categoryAliases.flatMap(row=>[row.nameHe,row.nameEn,...row.synonyms]).filter(Boolean)])].slice(0,120);\n    $("#search-suggestions").innerHTML = suggestionValues.map(value => `<option value="${escapeHTML(value)}"></option>`).join("");
     $$("[data-category]").forEach(button => { const count = state.discovery.categories?.find(row => row.category === button.dataset.category)?.count; const small = $("small", button); if (small && button.dataset.category && count) small.textContent = `${count} פריטים`; });
     $("#organizations-grid").innerHTML = (state.discovery.organizations || []).map(org => `<article class="organization-card"><div><span class="verification-chip">דירוג הקהילה</span><h3>${escapeHTML(org.name)}</h3><p>${escapeHTML(org.description)}</p></div><ul><li>📍 ${escapeHTML(org.city)}</li><li>📦 ${Number(org.item_count || 0)} פריטים</li><li>${org.rating ? `⭐ ${escapeHTML(org.rating)} (${Number(org.review_count || 0)} דירוגים)` : "חדש — ללא דירוגים"}</li></ul><button class="button button-secondary button-small" type="button" data-open-organization="${escapeHTML(org.id)}">צפייה בגמ״ח</button></article>`).join("") || '<div class="dashboard-empty"><strong>עדיין אין גמ״חים</strong><p>הקהילה נבנית בימים אלה.</p></div>';
     $$('[data-open-organization]').forEach(button => button.addEventListener("click", () => openOrganization(button.dataset.openOrganization)));
@@ -138,7 +145,7 @@
   function applyFilters({ resetVisible = true } = {}) {
     if (resetVisible) state.visibleCount = 8;
     const query = normalize($("#search-input").value), city = $("#city-filter").value, category = $("#category-filter").value, condition = $("#condition-filter").value, availableOnly = $("#available-only").checked, type = $("#type-filter").value, pickup = $("#pickup-filter").value;
-    const queryTerms = [query, ...Object.entries(SEARCH_ALIASES).flatMap(([key, values]) => query.includes(normalize(key)) || normalize(key).includes(query) || values.some(value => query.includes(normalize(value)) || normalize(value).includes(query)) ? [key, ...values] : [])].map(normalize).filter(Boolean);
+    const dynamicAliases=state.categoryAliases.flatMap(row=>{const values=[row.nameHe,row.nameEn,...row.synonyms].filter(Boolean);return values.some(value=>query.includes(normalize(value))||normalize(value).includes(query))?values:[];});\n    const queryTerms = [query, ...Object.entries(SEARCH_ALIASES).flatMap(([key, values]) => query.includes(normalize(key)) || normalize(key).includes(query) || values.some(value => query.includes(normalize(value)) || normalize(value).includes(query)) ? [key, ...values] : []),...dynamicAliases].map(normalize).filter(Boolean);
     const baseMatch=item=>(!city || item.city === city) && (!category || item.category === category) && (!condition || item.condition === condition) && (!type || item.item_type === type) && (!pickup || item.pickup_method === pickup) && (!availableOnly || item.availability_status === "available");
     state.filteredItems = state.items.filter(item => { const haystack = normalize([item.title, item.description, item.category, item.subcategory, ...(item.tags || []), item.city, item.neighborhood, item.organizations?.name].join(" ")); return baseMatch(item) && (!query || queryTerms.some(term => haystack.includes(term))); });
     if(query&&state.filteredItems.length===0) state.filteredItems=state.items.filter(item=>baseMatch(item)&&fuzzyQueryMatch(item,query));
@@ -760,11 +767,11 @@
       .finally(() => document.documentElement.classList.remove("site-copy-pending"));
     await detectServer();
     document.documentElement.classList.remove("app-booting");
-    await Promise.allSettled([siteCopyReady, loadPublicConfig(), loadDiscovery(), refreshUser(), loadItems()]);
+    await Promise.allSettled([siteCopyReady, loadPublicConfig(), loadDiscovery(), loadCategoryAliases(), refreshUser(), loadItems()]);
     window.setInterval(async () => {
       if (state.serverAvailable || document.visibilityState !== "visible") return;
       await detectServer();
-      if (state.serverAvailable) await Promise.allSettled([loadPublicConfig(), loadDiscovery(), loadItems(), refreshUser()]);
+      if (state.serverAvailable) await Promise.allSettled([loadPublicConfig(), loadDiscovery(), loadCategoryAliases(), loadItems(), refreshUser()]);
     }, 30000);
     const seoRoute=document.body.dataset.seoRoute||""; if(seoRoute.startsWith("item:")) await openItem(seoRoute.slice(5)); else if(seoRoute.startsWith("organization:")) await openOrganization(seoRoute.slice(13)); else if(seoRoute.startsWith("category:")) { const id=seoRoute.slice(9); const cat=(state.discovery?.categories||[]).find(x=>x.id===id); const label=cat?.name_he||id; $("#category-filter").value=label; state.activeCategory=label; applyFilters(); window.setTimeout(()=>$("#catalog").scrollIntoView(),0); } else if(seoRoute.startsWith("area:")) { const city=seoRoute.slice(5); $("#city-filter").value=city; applyFilters(); window.setTimeout(()=>$("#catalog").scrollIntoView(),0); } registerWebMCP();
     window.setInterval(() => { if (state.user && document.visibilityState === "visible") refreshNotifications(true); }, 30000);
