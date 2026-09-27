@@ -156,25 +156,34 @@ export default {
         if (expansionPreflight) return withSecurityHeaders(expansionPreflight);
         const completionResponse = await handlePlatformCompletionApi(request, env, ctx, url);
         if (completionResponse) return withSecurityHeaders(completionResponse);
-        const publicCacheTtl = request.method === "GET" ? ({
-          "/api/items": 45,
-          "/api/categories": 300,
-          "/api/discovery": 120
+        const publicSnapshotTtl = request.method === "GET" ? ({
+          "/api/items": 86400,
+          "/api/categories": 86400,
+          "/api/discovery": 86400
         })[url.pathname] : 0;
-        if (publicCacheTtl && typeof caches !== "undefined") {
+        if (publicSnapshotTtl && typeof caches !== "undefined") {
           const cache = caches.default;
           const cacheKey = new Request(url.toString(), { method:"GET", headers:{ "Accept":"application/json" } });
-          const cached = await cache.match(cacheKey);
-          if (cached) return withSecurityHeaders(cached);
-          const response = await routeApi(request, env, ctx, url);
-          if (response.ok) {
-            const headers = new Headers(response.headers);
-            headers.set("Cache-Control", `public, max-age=${publicCacheTtl}, stale-while-revalidate=${Math.max(300, publicCacheTtl * 10)}`);
-            const cacheable = new Response(response.body, { status:response.status, statusText:response.statusText, headers });
-            try { ctx.waitUntil(cache.put(cacheKey, cacheable.clone())); } catch {}
-            return withSecurityHeaders(cacheable);
+          try {
+            const response = await routeApi(request, env, ctx, url);
+            if (response.ok) {
+              const storedHeaders = new Headers(response.headers);
+              storedHeaders.set("Cache-Control", `public, max-age=${publicSnapshotTtl}`);
+              const stored = new Response(response.clone().body, { status:response.status, statusText:response.statusText, headers:storedHeaders });
+              try { ctx.waitUntil(cache.put(cacheKey, stored)); } catch {}
+            }
+            return withSecurityHeaders(response);
+          } catch (error) {
+            const snapshot = await cache.match(cacheKey);
+            if (snapshot) {
+              const headers = new Headers(snapshot.headers);
+              headers.set("Cache-Control", "no-store");
+              headers.set("X-Data-Stale", "1");
+              headers.set("Warning", '110 - "Response is a cached snapshot because the live database is temporarily unavailable"');
+              return withSecurityHeaders(new Response(snapshot.body, { status:snapshot.status, statusText:snapshot.statusText, headers }));
+            }
+            throw error;
           }
-          return withSecurityHeaders(response);
         }
         const response = await routeApi(request, env, ctx, url);
         return withSecurityHeaders(response);
