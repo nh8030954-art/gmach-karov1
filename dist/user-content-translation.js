@@ -30,4 +30,16 @@
     }catch(error){for(const [node,original] of translated){if(node.isConnected)node.nodeValue=original}translated.clear();button.textContent=error.message;setTimeout(()=>button.textContent='Translate user content',4000)}
     finally{button.disabled=false}
   };
+  const itemDialog=document.querySelector('#item-dialog');
+  if(itemDialog){
+    const attach=()=>{
+      const description=itemDialog.querySelector('.item-detail-description');
+      if(!description||itemDialog.querySelector('#translate-item-description'))return;
+      const local=document.createElement('button');local.type='button';local.id='translate-item-description';local.className='button button-secondary';local.textContent='Translate item description';
+      local.onclick=async()=>{await button.onclick();local.textContent=button.textContent};
+      description.insertAdjacentElement('afterend',local);
+    };
+    new MutationObserver(attach).observe(itemDialog,{childList:true,subtree:true});
+    attach();
+  }
 })();

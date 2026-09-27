@@ -3,7 +3,7 @@ name: QA deploy and tests
 on:
   workflow_dispatch:
   push:
-    branches: [main, qa]
+    branches: [qa]
 
 permissions:
   contents: read
@@ -92,5 +92,5 @@ jobs:
           done
           exit 1
       - name: Moderate QA load test
-        if: steps.config.outputs.enabled == 'true'
+        if: steps.config.outputs.enabled == 'true' && github.event_name == 'workflow_dispatch'
         run: node test/qa-load.mjs

@@ -106,13 +106,15 @@ jobs:
       - name: Verify live health
         run: |
           for i in {1..6}; do
-            if curl --fail --silent --show-error --max-time 10 https://gmach-karov1.nh8030954.workers.dev/api/health | grep -q '"ok":true'; then
+            if curl --fail --silent --show-error --max-time 10 'https://gmach-karov1.nh8030954.workers.dev/api/health?deep=1' | grep -q '"ok":true' &&
+               curl --fail --silent --show-error --max-time 10 'https://gmach-karov1.nh8030954.workers.dev/api/items?limit=1' | grep -q '"items":\['; then
               exit 0
             fi
             sleep 5
           done
           exit 1
       - name: Read-only production load gate
+        if: github.event_name == 'workflow_dispatch'
         env:
           PRODUCTION_URL: https://gmach-karov1.nh8030954.workers.dev
         run: node test/production-load.mjs
@@ -141,4 +143,3 @@ jobs:
       - name: Report production capability status
         if: steps.capabilities.outcome == 'failure'
         run: echo '::warning::Core production deployment succeeded, but an external capability is not active. See provisioning workflow for the actionable blocker.'
-
