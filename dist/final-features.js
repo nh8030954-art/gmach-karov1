@@ -126,7 +126,7 @@ function enhanceChat(){
       try{
         if(b.dataset.chatMedia==="location"){navigator.geolocation.getCurrentPosition(async p=>{await api("/api/loan-requests/"+requestId+"/chat-rich",{method:"POST",body:{type:"location",metadata:{lat:p.coords.latitude,lon:p.coords.longitude}}});notice("המיקום נשלח")},()=>notice("לא ניתנה הרשאת מיקום",true));return}
         if(b.dataset.chatMedia==="item"){const itemId=translatedPrompt("מזהה המוצר לשיתוף:");if(itemId)await api("/api/loan-requests/"+requestId+"/chat-rich",{method:"POST",body:{type:"item",metadata:{itemId}}});return}
-        const input=document.createElement("input");input.type="file";input.accept=b.dataset.chatMedia==="audio"?"audio/*":"image/*";if(b.dataset.chatMedia==="image")input.capture="environment";input.onchange=async()=>{const fd=new FormData();fd.set("file",input.files[0]);fd.set("type",b.dataset.chatMedia);const r=await fetch("/api/loan-requests/"+requestId+"/chat-attachment",{method:"POST",credentials:"same-origin",body:fd,headers:{"Origin":location.origin}});if(!r.ok){const j=await r.json();throw new Error(j.error)}notice("הקובץ נשלח")};input.click();
+        const input=document.createElement("input");input.type="file";input.accept=b.dataset.chatMedia==="audio"?"audio/*":"image/*";if(b.dataset.chatMedia==="image")input.capture="environment";input.onchange=async()=>{const fd=new FormData();fd.set("file",input.files[0]);fd.set("type",b.dataset.chatMedia);const r=await fetch("/api/loan-requests/"+requestId+"/chat-attachment",{method:"POST",credentials:"same-origin",body:fd,headers:{"Origin":location.origin}});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||"הקובץ לא נשלח");if(j.moderation?.reviewRequired)notice("התמונה נשלחה לבדיקת תוכן נוספת לפני טיפול מנהל.");else notice("הקובץ נשלח")};input.click();
       }catch(e){notice(e.message,true)}
     });
   };new MutationObserver(apply).observe(document.body,{childList:true,subtree:true});apply();
@@ -162,7 +162,9 @@ function addAdminFinalPanels(){
     const b=document.createElement("button");b.id="final-admin-button";b.textContent="תפעול מתקדם";b.onclick=async()=>{
       try{
         const [analytics,audit,templates,holidays,mod,backups]=await Promise.all([api("/api/admin/analytics/operations"),api("/api/admin/audit"),api("/api/admin/email-templates"),api("/api/admin/holiday-rules"),api("/api/admin/moderation"),api("/api/admin/backups")]);
+        const perfRows=analytics.performance||[],perfLabel={LCP:"LCP",CLS:"CLS",INP:"INP",PAGE_LOAD:"טעינת עמוד",JS_ERROR:"שגיאות JavaScript"},perfValue=p=>p.metric==="JS_ERROR"?Number(p.samples||0):(p.metric==="CLS"?Number(p.avg_value||0).toFixed(3):Math.round(Number(p.avg_value||0)));
         const d=modal("תפעול מתקדם",`<div class="platform-kpis"><article><strong>${analytics.loans.total||0}</strong><span>השאלות</span></article><article><strong>${analytics.loans.completed||0}</strong><span>הושלמו</span></article><article><strong>${analytics.loans.cancelled||0}</strong><span>בוטלו</span></article><article><strong>${analytics.loans.late||0}</strong><span>איחורים</span></article><article><strong>${analytics.users.active30||0}</strong><span>פעילים 30 יום</span></article></div>
+        <h3>ביצועים - 7 ימים</h3><div class="platform-kpis">${perfRows.map(p=>`<article><strong>${perfValue(p)}${["LCP","INP","PAGE_LOAD"].includes(p.metric)?" ms":""}</strong><span>${esc(perfLabel[p.metric]||p.metric)} · ממוצע ${p.metric==="CLS"?Number(p.avg_value||0).toFixed(3):Math.round(Number(p.avg_value||0))} · מקסימום ${p.metric==="CLS"?Number(p.max_value||0).toFixed(3):Math.round(Number(p.max_value||0))} · ${Number(p.samples||0)} דגימות</span></article>`).join("")||"<p>אין עדיין נתוני ביצועים.</p>"}</div>
         <h3>גיבויים</h3><p><button class="platform-action" id="backup-now">יצירת גיבוי לוגי עכשיו</button> · ${backups.backups.length} גיבויים רשומים</p>
         <h3>תבניות אימייל</h3><div class="platform-list" id="template-list">${templates.templates.map(t=>`<button type="button" class="platform-action secondary" data-template="${esc(t.template_key)}" data-lang="${esc(t.language)}">${esc(t.template_key)} · ${esc(t.language)} · ${esc(t.subject)}</button>`).join("")}</div>
         <form id="template-editor" class="platform-form" hidden><input name="key" readonly><select name="language"><option value="he">עברית</option><option value="en">English</option></select><input name="subject" placeholder="נושא" required><textarea name="bodyText" rows="6" placeholder="תוכן" required></textarea><label><input type="checkbox" name="enabled"> פעיל</label><button class="platform-action">שמירת תבנית</button></form>
@@ -185,11 +187,15 @@ async function supportFaq(){
   try{const data=await api("/api/faqs");const box=document.createElement("div");box.id="support-faq-suggestions";box.className="platform-note";box.innerHTML="<strong>לפני פתיחת פנייה — אולי זה יעזור:</strong>"+data.articles.slice(0,4).map(a=>`<details><summary>${esc(a.title)}</summary><p>${esc(a.body)}</p></details>`).join("");form.prepend(box)}catch{}
 }
 function reportPerformance(){
+  const send=(metric,value)=>{if(!Number.isFinite(Number(value)))return;navigator.sendBeacon?.("/api/performance",new Blob([JSON.stringify({metric,value:Number(value),path:location.pathname+location.hash})],{type:"application/json"}))};
+  window.addEventListener("load",()=>{const nav=performance.getEntriesByType("navigation")[0];if(nav?.duration)send("PAGE_LOAD",nav.duration)},{once:true});
+  window.addEventListener("error",()=>send("JS_ERROR",1));
+  window.addEventListener("unhandledrejection",()=>send("JS_ERROR",1));
   if(!("PerformanceObserver" in window))return;
   try{
-    const send=(metric,value)=>navigator.sendBeacon?.("/api/performance",new Blob([JSON.stringify({metric,value,path:location.pathname+location.hash})],{type:"application/json"}));
     new PerformanceObserver(list=>{for(const e of list.getEntries())if(e.entryType==="largest-contentful-paint")send("LCP",e.startTime)}).observe({type:"largest-contentful-paint",buffered:true});
     new PerformanceObserver(list=>{let total=0;for(const e of list.getEntries())if(!e.hadRecentInput)total+=e.value;send("CLS",total)}).observe({type:"layout-shift",buffered:true});
+    let maxInp=0;new PerformanceObserver(list=>{for(const e of list.getEntries())if(e.duration>maxInp){maxInp=e.duration;send("INP",maxInp)}}).observe({type:"event",buffered:true,durationThreshold:40});
   }catch{}
 }
 document.addEventListener("DOMContentLoaded",()=>{

@@ -1608,6 +1608,30 @@ async function updateItem(request, env, id) {
   return json({ item: { id, status:nextStatus,publishAt,maxPerUser,preparationMinutes,maxLoanDays,serviceRadiusKm } });
 }
 
+function bytesToBase64(bytes){
+  let binary="";const chunk=0x8000;
+  for(let i=0;i<bytes.length;i+=chunk)binary+=String.fromCharCode(...bytes.subarray(i,i+chunk));
+  return btoa(binary);
+}
+async function moderateItemImage(env,file){
+  if(!env.AI?.run)return{action:"unavailable",confidence:0,reason:"Workers AI binding unavailable"};
+  try{
+    const bytes=new Uint8Array(await file.arrayBuffer());
+    const image=`data:${file.type};base64,${bytesToBase64(bytes)}`;
+    const result=await env.AI.run("@cf/moondream/moondream3.1-9B-A2B",{
+      task:"query",image,
+      question:"Classify this image for a family-friendly community equipment lending marketplace. Return JSON only as {\"action\":\"allow|review|block\",\"confidence\":0.0,\"reason\":\"short reason\"}. Block only clearly explicit sexual content, graphic gore, extremist or hate propaganda, illegal drug promotion, or clear weapons intended to harm people. Review uncertain borderline cases. Ordinary household items, tools, medical equipment, toys, books, event equipment and people in normal clothing are allowed.",
+      reasoning:false,stream:false,temperature:0,max_tokens:160
+    });
+    const raw=String(result?.answer||result?.response||"").trim(),match=raw.match(/\{[\s\S]*\}/);
+    if(!match)return{action:"review",confidence:.5,reason:"AI moderation returned an unstructured result"};
+    const parsed=JSON.parse(match[0]),action=["allow","review","block"].includes(parsed.action)?parsed.action:"review";
+    return{action,confidence:Math.max(0,Math.min(1,Number(parsed.confidence)||0)),reason:String(parsed.reason||"AI image moderation").slice(0,300)};
+  }catch(error){
+    console.warn("Image moderation unavailable",error);
+    return{action:"unavailable",confidence:0,reason:String(error?.message||error).slice(0,300)};
+  }
+}
 async function uploadImages(request, env, itemId) {
   const user = await requireUser(request, env);
   const item = await env.DB.prepare(`
@@ -1621,7 +1645,7 @@ async function uploadImages(request, env, itemId) {
   const existing = parseJsonArray(item.image_urls);
   if (!files.length) throw new HttpError(400, "לא נבחרו תמונות");
   if (files.length + existing.length > 12) throw new HttpError(400, "אפשר להעלות עד 12 תמונות לפריט");
-  const uploadedKeys = [];
+  const uploadedKeys = [],moderationFindings=[];
   try {
     for (const file of files) {
       const extension = IMAGE_TYPES.get(file.type);
@@ -1632,14 +1656,24 @@ async function uploadImages(request, env, itemId) {
       const validPng=file.type==="image/png"&&[0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a].every((byte,index)=>signature[index]===byte);
       const validWebp=file.type==="image/webp"&&String.fromCharCode(...signature.slice(0,4))==="RIFF"&&String.fromCharCode(...signature.slice(8,12))==="WEBP";
       if(!validJpeg&&!validPng&&!validWebp)throw new HttpError(400,"קובץ התמונה פגום או שסוגו אינו תואם לתוכן");
+      const scan=await moderateItemImage(env,file);
       const key = `items/${user.id}/${itemId}/${crypto.randomUUID()}.${extension}`;
       await env.ITEM_IMAGES.put(key, file.stream(), { httpMetadata: { contentType: file.type, cacheControl: "public, max-age=31536000, immutable" } });
       uploadedKeys.push(key);
+      if(scan.action!=="allow")moderationFindings.push({...scan,key,fileName:file.name||"image"});
     }
-    const urls = [...existing, ...uploadedKeys.map(key => `/media/${key}`)];
+    const urls = [...existing, ...uploadedKeys.map(key => `/media/${key}`)],autoHidden=moderationFindings.some(x=>x.action==="block"&&x.confidence>=.85);
+    const now=new Date().toISOString();
     await env.DB.prepare("UPDATE items SET image_urls = ?, updated_at = ? WHERE id = ?")
-      .bind(JSON.stringify(urls), new Date().toISOString(), itemId).run();
-    return json({ imageUrls: urls }, 201);
+      .bind(JSON.stringify(urls), now, itemId).run();
+    if(moderationFindings.length){
+      await ensureFinalFeaturesSchema(env);
+      const statements=moderationFindings.map(f=>env.DB.prepare("INSERT INTO moderation_jobs(id,entity_type,entity_id,reason,severity,status,auto_hidden) VALUES(?,?,?,?,?,'pending',?)")
+        .bind(crypto.randomUUID(),"item_image",itemId,`${f.reason} | image=${f.key} | confidence=${f.confidence.toFixed(2)}`,f.action==="block"?"critical":f.action==="review"?"high":"normal",f.action==="block"&&f.confidence>=.85?1:0));
+      if(autoHidden)statements.push(env.DB.prepare("UPDATE items SET status='pending',updated_at=? WHERE id=?").bind(now,itemId));
+      await env.DB.batch(statements);
+    }
+    return json({ imageUrls: urls,moderation:{reviewRequired:moderationFindings.length>0,autoHidden} }, 201);
   } catch (error) {
     await Promise.all(uploadedKeys.map(key => env.ITEM_IMAGES.delete(key)));
     throw error;
