@@ -327,3 +327,16 @@ assert.ok(worker.includes("blockedByOwnedOrganizations"),"account deletion owner
 assert.ok(platform.includes("privacy-retention"),"privacy retention admin operations are not step-up protected");
 assert.ok(indexHtml.includes("./privacy-purge.js"),"privacy purge client not loaded");
 console.log("Privacy purge static release gate passed.");
+
+
+const communityChatWorker=await readFile("worker/community-chat.js","utf8");
+const communityChatMigration=await readFile("migrations/0025_community_chat_retention.sql","utf8");
+for(const token of ["community_offer_messages","community_offer_message_reports","chat_retention_runs","/api/help-offers/","archiveOldChats","365 days"]) assert.ok(communityChatWorker.includes(token),token+" missing from community chat backend");
+for(const token of ["community_offer_messages","community_offer_message_reports","chat_retention_runs"]) assert.ok(communityChatMigration.includes(token),token+" missing from community chat migration");
+assert.ok(worker.includes("handleCommunityChat"),"community chat handler not wired");
+assert.ok(worker.includes("runCommunityChatMaintenance"),"community chat maintenance not wired");
+assert.ok(worker.includes("chatWritableUntil"),"exact loan chat write deadline missing");
+assert.ok(appClient.includes("openCommunityOfferChat"),"community offer chat UI missing");
+assert.ok(appClient.includes("chat-retention-note"),"loan chat retention notice missing");
+assert.ok(finalClient.includes("קריאה בלבד"),"chat media readonly guard missing");
+console.log("Community chat retention static release gate passed.");
