@@ -73,6 +73,11 @@ jobs:
       - name: Apply QA migrations
         if: steps.config.outputs.enabled == 'true'
         run: npx wrangler d1 migrations apply DB --remote --config wrangler.qa.jsonc
+      - name: Add fictional QA catalog
+        if: steps.config.outputs.enabled == 'true'
+        run: |
+          node test/qa-demo-seed.mjs /tmp/qa-demo-seed.sql
+          npx wrangler d1 execute DB --remote --config wrangler.qa.jsonc --file /tmp/qa-demo-seed.sql
       - name: Deploy QA Worker
         if: steps.config.outputs.enabled == 'true'
         run: npx wrangler deploy --config wrangler.qa.jsonc
