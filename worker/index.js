@@ -1230,6 +1230,7 @@ async function listItems(env, url) {
   // from health/scheduled maintenance; the compatible query below keeps older
   // databases readable while that maintenance catches up.
   const params = [];
+  const catalogLimit = env.QA_CATALOG_LIMIT === "300" ? 300 : 100;
   const where = ["i.status = 'active'", "i.is_free = 1", "o.status = 'approved'", "o.is_hidden = 0"];
   const query = cleanOptional(url.searchParams.get("q"), 120);
   const category = cleanOptional(url.searchParams.get("category"), 40);
@@ -1274,7 +1275,7 @@ async function listItems(env, url) {
       FROM items i JOIN organizations o ON o.id = i.organization_id
       WHERE ${where.join(" AND ")}
       ORDER BY CASE i.availability_status WHEN 'available' THEN 0 ELSE 1 END, i.created_at DESC
-      LIMIT 100
+      LIMIT ${catalogLimit}
     `).bind(...params).all();
   } catch (error) {
     console.error("Enhanced catalog query failed; serving compatible catalog", error);
@@ -1296,7 +1297,7 @@ async function listItems(env, url) {
       FROM items i JOIN organizations o ON o.id = i.organization_id
       WHERE ${fallbackWhere.join(" AND ")}
       ORDER BY CASE i.availability_status WHEN 'available' THEN 0 ELSE 1 END, i.created_at DESC
-      LIMIT 100
+      LIMIT ${catalogLimit}
     `).bind(...fallbackParams).all();
   }
   return json({ items: result.results.map(mapItem) });
