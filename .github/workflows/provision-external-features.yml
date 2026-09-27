@@ -7,7 +7,7 @@ on:
     paths:
       - ".github/workflows/provision-external-features.yml"
 
-# Re-run provisioning whenever this workflow changes.
+# Re-run provisioning whenever this workflow changes. 2026-09-27 final Turnstile attempt.
 permissions:
   contents: write
 
