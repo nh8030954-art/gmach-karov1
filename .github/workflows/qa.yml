@@ -3,7 +3,7 @@ name: QA deploy and tests
 on:
   workflow_dispatch:
   push:
-    branches: [qa]
+    branches: [main, qa]
 
 permissions:
   contents: read
