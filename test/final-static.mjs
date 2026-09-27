@@ -437,3 +437,5 @@ assert.ok(catalogWorker.includes("ib.starts_at <= strftime('%Y-%m-%dT%H:%M','now
 assert.ok(worker.includes("bulkInventoryAction"),"bulk inventory backend missing");
 assert.ok(worker.includes('path==="/api/items/import"'),"item import backend missing");
 assert.ok(worker.includes("bulk_inventory_jobs"),"bulk inventory audit/job record missing");
+
+for(const token of ["openItemImageEditor","data-images-item","/image-edits","blurRegions","rotation"])assert.ok(appClient.includes(token),token+" missing from product image editor UI");
