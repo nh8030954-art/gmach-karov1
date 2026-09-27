@@ -417,6 +417,8 @@ async function routeApi(request, env, ctx, url) {
     return json({ user: user ? publicUser(user) : null });
   }
   if (method === "GET" && path === "/api/public-config") return json({ supportEmail: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL), pushPublicKey: String(env.VAPID_PUBLIC_KEY || "") });
+  if (method === "GET" && path === "/api/me/calendar-feed") return myCalendarFeed(request,env);
+  const calendarFeed=path.match(/^\/calendar\/([A-Za-z0-9_-]{20,})\.ics$/); if(method==="GET"&&calendarFeed)return publicCalendarFeed(env,calendarFeed[1]);
   if (method === "GET" && path === "/api/unsubscribe/community") return unsubscribeCommunity(env,url.searchParams.get("token"));
   if (method === "GET" && path === "/api/categories") return listCategories(env, url);
   if (method === "POST" && path === "/api/support") return createSupportRequest(request, env, ctx);
@@ -2707,6 +2709,20 @@ async function unsubscribeCommunity(env,token){
   const expected=await communityUnsubscribeToken(env,userId);if(!expected||expected!==token)throw new HttpError(403,"קישור ההסרה אינו תקף");
   await env.DB.prepare("UPDATE users SET community_emails_accepted=0,updated_at=? WHERE id=?").bind(new Date().toISOString(),userId).run();
   return new Response("<!doctype html><meta charset=utf-8><title>גמ״ח ברגע</title><main dir=rtl style='font-family:Arial;max-width:600px;margin:60px auto'><h1>העדכונים הופסקו</h1><p>הוסרת בהצלחה עדכוני קהילה באימייל. הודעות תפעוליות חיוניות לחשבון אינן מושפעות.</p></main>",{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
+}
+function icsEscape(v){return String(v||"").replaceAll("\\","\\\\").replaceAll(";","\\;").replaceAll(",","\\,").replace(/\r?\n/g,"\\n")}
+function icsUtc(v){const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z")}
+async function myCalendarFeed(request,env){
+  const user=await requireUser(request,env);let token=user.calendar_feed_token;
+  if(!token){token=toBase64Url(crypto.getRandomValues(new Uint8Array(24)));await env.DB.prepare("UPDATE users SET calendar_feed_token=?,updated_at=? WHERE id=?").bind(token,new Date().toISOString(),user.id).run()}
+  return json({url:"https://gmach-karov1.nh8030954.workers.dev/calendar/"+token+".ics"});
+}
+async function publicCalendarFeed(env,token){
+  const user=await env.DB.prepare("SELECT id FROM users WHERE calendar_feed_token=? AND deleted_at IS NULL").bind(token).first();if(!user)return new Response("Not found",{status:404});
+  const rows=await env.DB.prepare(`SELECT lr.id,lr.requested_from,lr.requested_until,lr.status,i.title,o.name organization_name FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE (lr.borrower_id=? OR o.owner_id=?) AND lr.status IN ('pending','approved','collected') ORDER BY lr.requested_from LIMIT 300`).bind(user.id,user.id).all();
+  const events=[];for(const x of rows.results||[]){for(const [kind,when,label] of [["pickup",x.requested_from,"איסוף"],["return",x.requested_until,"החזרה"]]){const dt=icsUtc(when);if(!dt)continue;events.push(["BEGIN:VEVENT","UID:"+x.id+"-"+kind+"@gmach-berega","DTSTAMP:"+icsUtc(new Date()),"DTSTART:"+dt,"SUMMARY:"+icsEscape(label+" · "+x.title),"DESCRIPTION:"+icsEscape(x.organization_name+" · "+x.status),"URL:https://gmach-karov1.nh8030954.workers.dev/#/account","END:VEVENT"].join("\r\n"))}}
+  const body=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Gmach Berega//Calendar Feed//HE","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:גמ״ח ברגע",...events,"END:VCALENDAR",""].join("\r\n");
+  return new Response(body,{headers:{"Content-Type":"text/calendar; charset=utf-8","Cache-Control":"private, max-age=300","Content-Disposition":'inline; filename="gmach-berega.ics"'}});
 }
 async function vapidJwt(env,endpoint){
   const pub=fromBase64Url(env.VAPID_PUBLIC_KEY||""),priv=fromBase64Url(env.VAPID_PRIVATE_KEY||"");
