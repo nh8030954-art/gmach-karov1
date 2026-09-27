@@ -416,3 +416,14 @@ assert.ok(appClient.includes("navigator.share"),"native share with clipboard fal
 assert.ok(platform.includes('path==="/api/compare"'),"comparison backend route is missing");
 assert.ok(worker.includes('/api/unsubscribe/community'),"community email unsubscribe route is missing");
 for (const token of ['messageType:"location"','uploadRequestChatAttachment','reportRequestMessage','blockChatUser']) assert.ok(worker.includes(token),token+" missing from request chat backend");
+
+
+/* Acceptance coverage for account/privacy and advanced user workflows. */
+for (const token of [
+  "/api/me/sessions","/api/me/addresses","/api/me/account/request-deletion","/api/me/account/cancel-deletion",
+  "/api/me/organization-transfers","/api/me/notification-preferences","/api/me/export","/api/me/data-request"
+]) assert.ok((appClient+platformClient).includes(token),token+" missing from account UI");
+for (const token of [
+  "/api/me/sessions","/api/me/addresses","/api/me/account/request-deletion","/api/me/account/cancel-deletion",
+  "/api/me/organization-transfers","/api/me/notification-preferences"
+]) assert.ok((worker+platform).includes(token),token+" missing from account backend");
