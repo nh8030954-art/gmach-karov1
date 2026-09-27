@@ -423,9 +423,10 @@ try {
   await db.prepare("DROP TABLE organization_categories").run();
   result = await request(`/api/organizations/${organizationId}/public`);
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
-  assert.equal(result.data.partial, true);
+  assert.equal(result.data.partial, false);
   assert.equal(result.data.organization.id, organizationId);
   assert.equal(result.data.items.length, 1);
+  assert.ok(await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='organization_categories'").first());
 
   result = await request("/api/auth/logout", { method: "POST", cookie: borrowerCookie });
   assert.equal(result.response.status, 200);
