@@ -1,13 +1,9 @@
-sha=cb0904d57f98215ee09dcb15c791b2359a55e346
+sha=949607e965e39e960904b9eee0e27031e6e91314
 install=success
 syntax=success
 tests=success
 smoke=success
 live=success
-Distribution completion static release gate passed.
-Navigation admin static release gate passed.
-Privacy availability static release gate passed.
-Release hardening static gate passed.
 Release experience static release gate passed.
 Admin control center static release gate passed.
 Privacy purge static release gate passed.
@@ -24,6 +20,10 @@ remaining-features Error: Backup checksum mismatch
     at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:645:37)
     at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:159:26)
 Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
+{"users":250,"organizations":50,"items":500,"concurrency":10,"requests":50,"success":50,"durationMs":406}
+{"users":250,"organizations":50,"items":500,"concurrency":25,"requests":125,"success":125,"durationMs":935}
+{"users":250,"organizations":50,"items":500,"concurrency":50,"requests":250,"success":250,"durationMs":1758}
+{"users":250,"organizations":50,"items":500,"concurrency":100,"requests":500,"success":500,"durationMs":3683}
 Community chat retention static release gate passed.
 QR scanning, structured SEO and accessibility shell gate passed.
 Excel export and QR image scanner gate passed.
@@ -36,5 +36,5 @@ remaining-features Error: Backup checksum mismatch
     at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:645:37)
     at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:159:26)
 Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
-{"ok":true,"release":"complete-platform-2026-09-27.10","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":false,"timestamp":"2026-09-27T13:10:44.706Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.10","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":false,"timestamp":"2026-09-27T13:27:58.957Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":true,"turnstileSiteKey":"0x4AAAAAAFFH6u5mz0ZekN2Q","pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
