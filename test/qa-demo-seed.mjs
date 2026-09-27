@@ -14,12 +14,18 @@ const groups = [
 ];
 const quote = value => `'${String(value).replaceAll("'", "''")}'`;
 const sql = ["-- QA only: fictional organizations and products for visual review."];
+for (let user = 0; user < 250; user++) {
+  const userId = `qa-demo-user-${String(user + 1).padStart(3, "0")}`;
+  sql.push(`INSERT OR IGNORE INTO users (id, email, password_hash, password_salt, full_name) VALUES (${quote(userId)}, ${quote(`qa-demo-${user + 1}@example.invalid`)}, 'unusable-qa-demo-hash', 'unusable-qa-demo-salt', ${quote(`משתמש הדגמה ${user + 1}`)});`);
+}
 for (let org = 0; org < 36; org++) {
   const [category, products] = groups[org % groups.length];
   const city = cities[org % cities.length];
   const organizationId = `qa-demo-organization-${String(org + 1).padStart(2, "0")}`;
   const name = `גמ״ח הדגמה ${category} ${city} ${org + 1}`;
-  sql.push(`INSERT OR IGNORE INTO organizations (id, name, primary_category, city, description, status) VALUES (${quote(organizationId)}, ${quote(name)}, ${quote(category)}, ${quote(city)}, ${quote("נתוני הדגמה בלבד בסביבת הבדיקות. אין לפנות לגמ״ח זה לצורך השאלה אמיתית.")}, 'approved');`);
+  const ownerId = `qa-demo-user-${String(org + 1).padStart(3, "0")}`;
+  sql.push(`INSERT OR IGNORE INTO organizations (id, owner_id, name, primary_category, city, description, status) VALUES (${quote(organizationId)}, ${quote(ownerId)}, ${quote(name)}, ${quote(category)}, ${quote(city)}, ${quote("נתוני הדגמה בלבד בסביבת הבדיקות. אין לפנות לגמ״ח זה לצורך השאלה אמיתית.")}, 'approved');`);
+  sql.push(`UPDATE organizations SET owner_id=${quote(ownerId)} WHERE id=${quote(organizationId)} AND owner_id IS NULL;`);
   for (let index = 0; index < 6; index++) {
     const product = products[(index + Math.floor(org / groups.length)) % products.length];
     const itemId = `qa-demo-item-${String(org + 1).padStart(2, "0")}-${index + 1}`;
@@ -28,4 +34,4 @@ for (let org = 0; org < 36; org++) {
   }
 }
 await writeFile(destination, sql.join("\n") + "\n");
-console.log("Prepared 36 fictional QA organizations and 216 example items");
+console.log("Prepared 250 fictional QA users, 36 organizations and 216 example items");
