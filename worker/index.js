@@ -1510,6 +1510,7 @@ async function createItem(request, env) {
   const publishStatus=publishAt&&Date.parse(publishAt)>Date.now()?"pending":"active";
   if(publishStatus!=="active") await env.DB.prepare("UPDATE items SET status='pending' WHERE id=?").bind(id).run();
   else await env.DB.prepare("UPDATE organizations SET is_hidden=0,updated_at=? WHERE id=?").bind(new Date().toISOString(),organizationId).run();
+  await env.DB.prepare("INSERT INTO organization_onboarding(organization_id,first_item_added) VALUES(?,1) ON CONFLICT(organization_id) DO UPDATE SET first_item_added=1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')").bind(organizationId).run().catch(()=>{});
   if(publishStatus==="active"){await notifyMatchingSavedSearches(env,{id,title,description:body.description,organizationName:organization.name,city:organization.city,category,condition});await notifySavedFollowers(env,{itemId:id,organizationId,category,title,event:"created"});}
   return json({ item: { id, status: publishStatus,publishAt } }, 201);
 }
