@@ -1,6 +1,7 @@
 import { handleRemainingFeatures, runRemainingMaintenance, ensureRemainingFeaturesSchema } from "./remaining-features.js";
 import { handleRequirementsExpansion, requirementsExpansionPreflight, runRequirementsExpansionMaintenance, ensureRequirementsExpansionSchema } from "./requirements-expansion.js";
 import { handleLaunchReadiness, runLaunchReadinessMaintenance, ensureLaunchReadinessSchema } from "./launch-readiness.js";
+import { handleDistributionCompletion, runDistributionCompletionMaintenance, ensureDistributionCompletionSchema, recordDistributionError } from "./distribution-completion.js";
 import { handleFinalFeatures, runFinalMaintenance, ensureFinalFeaturesSchema } from "./final-features.js";
 import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata, ensurePlatformCompletionSchema, recordSecurityFailure } from "./platform-completion.js";
 const SESSION_COOKIE = "gmach_session";
@@ -138,12 +139,12 @@ export default {
     } catch (error) {
       const status = error instanceof HttpError ? error.status : 500;
       const requestId = crypto.randomUUID();
-      if (status >= 500) console.error("Request failed", { requestId, path: url.pathname, error });
+      if (status >= 500) { console.error("Request failed", { requestId, path: url.pathname, error }); try { ctx.waitUntil(recordDistributionError(env,request,error,requestId)); } catch {} }
       return withSecurityHeaders(json({ error: error instanceof HttpError ? error.message : "אירעה תקלה זמנית בשרת", requestId }, status, { "X-Request-Id": requestId }));
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), runLaunchReadinessMaintenance(env)]); })());
+    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env),ensureDistributionCompletionSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env)]); })());
   }
 };
 
@@ -597,6 +598,8 @@ async function routeApi(request, env, ctx, url) {
   if (requirementsExpansionResponse) return requirementsExpansionResponse;
   const launchReadinessResponse = await handleLaunchReadiness(request, env, ctx, url);
   if (launchReadinessResponse) return launchReadinessResponse;
+  const distributionCompletionResponse = await handleDistributionCompletion(request, env, ctx, url);
+  if (distributionCompletionResponse) return distributionCompletionResponse;
 
   throw new HttpError(404, "הכתובת לא נמצאה");
 }
