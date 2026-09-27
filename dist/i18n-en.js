@@ -456,5 +456,5 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
   "לא מצאתי קטגוריה":"I could not find a category","פרסום עתידי":"Scheduled publication",
   "מקסימום יחידות למשתמש":"Maximum units per user","זמן הכנה נוסף (דקות)":"Additional preparation time (minutes)",
   "מקסימום ימי השאלה":"Maximum loan days","רדיוס שירות בקילומטרים":"Service radius in kilometers",
-  "תמונות הפריט":"Item photos","(אפשר עד 12 תמונות, כל תמונה עד 5MB)":"(Up to 12 photos, 5 MB each)","דירוג הסניף":"Branch rating"
+  "תמונות הפריט":"Item photos","(אפשר עד 12 תמונות, כל תמונה עד 5MB)":"(Up to 12 photos, 5 MB each)","דירוג הסניף":"Branch rating","מתי צריך?":"When do you need it?","עד מתי?":"Until when?","טווח חיפוש בק\"מ":"Search radius in km","למשל 20":"For example, 20"
 });
