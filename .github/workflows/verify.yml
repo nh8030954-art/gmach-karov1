@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: verify-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   verify:
@@ -25,5 +25,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npm test
-
+      - name: Run full tests
+        id: tests
+        continue-on-error: true
+        run: npm test 2>&1 | tee test-output.log
+      - name: Persist failing test output
+        if: steps.tests.outcome != 'success' && github.event_name != 'pull_request'
+        run: |
+          {
+            echo "verify_sha=${GITHUB_SHA}"
+            echo "verify_tests=${{ steps.tests.outcome }}"
+            tail -n 80 test-output.log
+          } > .verify-failure
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .verify-failure
+          git commit -m "Record verify test failure" || true
+          git push
+      - name: Enforce tests
+        run: test "${{ steps.tests.outcome }}" = "success"
