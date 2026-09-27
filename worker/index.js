@@ -1281,7 +1281,7 @@ async function getPublicOrganization(env, id) {
     FROM organizations o LEFT JOIN organization_contacts c ON c.organization_id=o.id LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
     WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 AND EXISTS (SELECT 1 FROM items pi WHERE pi.organization_id=o.id AND pi.status='active' AND pi.deleted_at IS NULL) GROUP BY o.id`).bind(id).first();
   if (!organization) throw new HttpError(404, "הגמ״ח לא נמצא");
-  const schemaReady = await ensureFinalFeaturesSchema(env).then(() => true).catch(error => {
+  const schemaReady = await Promise.all([ensureCompletePlatformSchema(env),ensureFinalFeaturesSchema(env)]).then(() => true).catch(error => {
     console.error("Optional public organization schema unavailable", { organizationId: id, error });
     return false;
   });
