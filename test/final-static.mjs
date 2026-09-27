@@ -427,3 +427,8 @@ for (const token of [
   "/api/me/sessions","/api/me/addresses","/api/me/account/request-deletion","/api/me/account/cancel-deletion",
   "/api/me/organization-transfers","/api/me/notification-preferences"
 ]) assert.ok((worker+platform).includes(token),token+" missing from account backend");
+
+// Regression: catalog availability must only subtract inventory that overlaps now.
+const catalogWorker = await readFile(new URL("../worker/index.js", import.meta.url), "utf8");
+assert.ok(catalogWorker.includes("lq.requested_from <= strftime('%Y-%m-%dT%H:%M','now')"),"catalog minimum quantity must use overlapping loans");
+assert.ok(catalogWorker.includes("ib.starts_at <= strftime('%Y-%m-%dT%H:%M','now')"),"catalog availability must subtract overlapping inventory blocks");
