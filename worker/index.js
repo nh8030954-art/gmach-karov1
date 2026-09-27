@@ -374,7 +374,7 @@ async function routeApi(request, env, ctx, url) {
   if (method === "OPTIONS") return new Response(null, { status: 204 });
 
   if (method === "GET" && path === "/api/health") {
-    // Keep the liveness endpoint intentionally lightweight. Schema reconciliation and
+    // Keep the production liveness endpoint intentionally lightweight. Schema reconciliation and
     // deep operational checks run in migrations, scheduled maintenance and the
     // authenticated admin health endpoint; doing them here can make deploy probes
     // time out while D1 is busy.
