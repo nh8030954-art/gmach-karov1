@@ -255,5 +255,5 @@ assert.ok(finalClient.includes("התמונה נשלחה לבדיקת תוכן נ
 assert.ok(finalWorker.includes('new Set(["LCP","CLS","INP","PAGE_LOAD","JS_ERROR"])'),"performance telemetry allowlist missing");
 
 for(const token of ["/api/admin/entities","patchAdminEntity","adminSupportDetail","adminSupportReply","branchManagement"])assert.ok(launchWorker.includes(token),token+" missing from admin entity/support operations");
-for(const token of ["מרכז ישויות","openAdminEntities","openAdminSupport","openBranchEdit","data-branch-edit"])assert.ok(launchClient.includes(token),token+" missing from branch/admin support UI");
+for(const token of ["מרכז ישויות","openAdminEntities","openAdminSupport","openBranchEdit","dataset.branchEdit"])assert.ok(launchClient.includes(token),token+" missing from branch/admin support UI");
 assert.ok(platform.includes("entities|support-tickets"),"admin entity/support step-up authentication missing");
