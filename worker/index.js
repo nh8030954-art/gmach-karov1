@@ -2129,6 +2129,7 @@ async function uploadRequestChatAttachment(request,env,requestId){
   const types=kind==="audio"?audioTypes:imageTypes,ext=types.get(file.type);
   if(!ext)throw new HttpError(400,kind==="audio"?"סוג קובץ הקול אינו נתמך":"סוג התמונה אינו נתמך");
   const max=kind==="audio"?10*1024*1024:5*1024*1024;if(file.size>max)throw new HttpError(400,"הקובץ גדול מדי");
+  let moderation=null;if(kind==="image"){moderation=await moderateItemImage(env,file);if(moderation.action==="block"&&moderation.confidence>=.85)throw new HttpError(400,"התמונה נחסמה בבדיקת בטיחות");}
   const key=`chat/${user.id}/${requestId}/${crypto.randomUUID()}.${ext}`;
   await env.ITEM_IMAGES.put(key,file.stream(),{httpMetadata:{contentType:file.type,cacheControl:"private, max-age=86400"}});
   const id=crypto.randomUUID(),recipientId=row.borrower_id===user.id?row.owner_id:row.borrower_id,now=new Date().toISOString();
@@ -2138,7 +2139,8 @@ async function uploadRequestChatAttachment(request,env,requestId){
       notificationStatement(env,recipientId,"message",`הודעה חדשה על ${row.item_title}`,kind==="audio"?"נשלחה הודעה קולית":"נשלחה תמונה",requestId)
     ]);
   }catch(e){await env.ITEM_IMAGES.delete(key);throw e}
-  return json({ok:true,message:{id,request_id:requestId,sender_id:user.id,message_type:kind,media_url:"/media/"+key,created_at:now}},201);
+  if(kind==="image"&&moderation&&moderation.action!=="allow"){try{await ensureFinalFeaturesSchema(env);await env.DB.prepare("INSERT INTO moderation_jobs(id,entity_type,entity_id,reason,severity,status,auto_hidden) VALUES(?,?,?,?,?,\'pending\',0)").bind(crypto.randomUUID(),"chat_image",id,moderation.reason||"Image requires review",moderation.action==="review"?"high":"normal").run()}catch{}}
+  return json({ok:true,moderation:{reviewRequired:Boolean(moderation&&moderation.action!=="allow")},message:{id,request_id:requestId,sender_id:user.id,message_type:kind,media_url:"/media/"+key,created_at:now}},201);
 }
 async function reportRequestMessage(request,env,messageId){
   const user=await requireUser(request,env),b=await readJson(request),reason=cleanText(b.reason,2,500,"סיבת הדיווח");
