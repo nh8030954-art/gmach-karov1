@@ -42,3 +42,5 @@ for(const language of ['he','en']){
 assert.match(runtime,/characterData:true/,'Translate updated text nodes');
 assert.match(runtime,/attributeFilter:\["placeholder","title","aria-label","value"\]/,'Translate dynamically changed controls');
 console.log(`Static English interface coverage ${(coverage*100).toFixed(1)}% (${hebrew.length-missing.length}/${hebrew.length})`);
+
+assert.ok(html.includes("user-content-translation.js"),"Offer optional translation for user written content");

@@ -391,6 +391,7 @@ async function routeApi(request, env, ctx, url) {
     return json({ ok:true,release:"complete-platform-2026-09-25.9",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady&&completionReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at"),completionReady},finalFeaturesSchema:{ready:finalFeaturesReady},timestamp:new Date().toISOString() });
   }
 
+  if (method === "POST" && path === "/api/translate/user-content") return translateUserContent(request, env, ctx);
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
   if (method === "POST" && path === "/api/auth/verify-email") return verifyEmail(request, env, url);
   if (method === "POST" && path === "/api/auth/resend-verification") return resendVerification(request, env, ctx);
@@ -2535,6 +2536,25 @@ async function enforceAuthRateLimit(env, email, action, ctx, limit = 10) {
   if (Number(row?.count || 0) >= limit) throw new HttpError(429, "יותר מדי ניסיונות. נסו שוב בעוד 15 דקות");
   await env.DB.prepare("INSERT INTO auth_events (identity_hash,action) VALUES (?,?)").bind(identity, action).run();
   ctx?.waitUntil(env.DB.prepare("DELETE FROM auth_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')").run());
+}
+
+export async function translateUserContent(request,env,ctx){
+  if(!env.AI?.run)throw new HttpError(503,"שירות התרגום אינו זמין כרגע");
+  const body=await readJson(request),texts=body?.texts;
+  if(!Array.isArray(texts)||texts.length<1||texts.length>12||texts.some(text=>typeof text!=="string"||text.length<2||text.length>500)||texts.reduce((sum,text)=>sum+text.length,0)>4500)throw new HttpError(400,"יש לשלוח עד 12 קטעי טקסט, באורך כולל של עד 4,500 תווים");
+  const identity=request.headers.get("CF-Connecting-IP")||request.headers.get("X-Forwarded-For")||"unknown";
+  await enforcePublicRateLimit(env,identity,"content_translation",ctx,20);
+  const translated=[];
+  for(const text of texts){
+    if(!/[\u0590-\u05ff]/.test(text)){translated.push(text);continue}
+    try{
+      const result=await env.AI.run("@cf/meta/m2m100-1.2b",{text,source_lang:"he",target_lang:"en"});
+      const value=result?.translated_text||result?.translation||result?.response;
+      if(typeof value!=="string"||!value.trim())throw new Error("Empty translation");
+      translated.push(value.trim());
+    }catch(error){console.error("user content translation failed",{error});throw new HttpError(503,"התרגום אינו זמין כרגע. אפשר לנסות שוב מאוחר יותר")}
+  }
+  return json({translations:translated},200,{"Cache-Control":"no-store"});
 }
 
 async function enforcePublicRateLimit(env, identityValue, action, ctx, limit = 10) {
