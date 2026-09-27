@@ -146,7 +146,7 @@
       try{
         const data=await api("/api/discovery?"+params.toString()),rows=data.organizations||[];
         results.innerHTML=rows.map(org=>`<article class="organization-card"><div><span class="verification-chip">${org.rating?`⭐ ${escapeHTML(org.rating)}`:"חדש"}</span><h3>${escapeHTML(org.name)}</h3><p>${escapeHTML(org.description||"")}</p></div><ul><li>📍 ${escapeHTML(org.city||"")}</li><li>📦 ${Number(org.item_count||0)} פריטים</li><li>✅ ${Number(org.available_items||0)} זמינים</li></ul><button class="button button-primary button-small" type="button" data-advanced-org="${escapeHTML(org.id)}">צפייה בגמ״ח</button></article>`).join("")||'<div class="dashboard-empty"><strong>לא נמצאו גמ״חים מתאימים</strong><p>נסו להסיר מסנן או להרחיב את החיפוש.</p></div>';
-        $("[data-advanced-org]",results).forEach(button=>button.onclick=()=>{closeDialog(d);openOrganization(button.dataset.advancedOrg)});
+        $$("[data-advanced-org]",results).forEach(button=>button.onclick=()=>{closeDialog(d);openOrganization(button.dataset.advancedOrg)});
       }catch(error){results.innerHTML=`<p role="alert">${escapeHTML(error.message||"לא הצלחנו להשלים את החיפוש")}</p>`}
     };
     openDialog(d);form.querySelector('[name="query"]')?.focus();
