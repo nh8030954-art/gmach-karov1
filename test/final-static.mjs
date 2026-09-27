@@ -282,12 +282,12 @@ assert.ok(indexHtml.includes("./navigation-admin.js"),"navigation admin client n
 console.log("Navigation admin static release gate passed.");
 
 
-const distributionWorker=await readFile("worker/distribution-completion.js","utf8");
-const distributionClient=await readFile("dist/distribution-completion.js","utf8");
+const hardeningWorker=await readFile("worker/distribution-completion.js","utf8");
+const hardeningClient=await readFile("dist/distribution-completion.js","utf8");
 const productionDeploy=await readFile(".github/workflows/production-deploy.yml","utf8");
 const wranglerConfig=await readFile("wrangler.jsonc","utf8");
-for(const token of ["release-readiness","restore-drill","system_alert_deliveries","deliverOpenAlerts","performRestoreDrill","backup_stale","backup_not_separate"])assert.ok(distributionWorker.includes(token),token+" missing from release hardening backend");
-for(const token of ["מוכנות להפצה","Release readiness","data-run-restore-drill","data-test-alert"])assert.ok(distributionClient.includes(token),token+" missing from release hardening UI");
+for(const token of ["release-readiness","restore-drill","system_alert_deliveries","deliverOpenAlerts","performRestoreDrill","backup_stale","backup_not_separate"])assert.ok(hardeningWorker.includes(token),token+" missing from release hardening backend");
+for(const token of ["מוכנות להפצה","Release readiness","data-run-restore-drill","data-test-alert"])assert.ok(hardeningClient.includes(token),token+" missing from release hardening UI");
 assert.ok(productionDeploy.includes("Ensure dedicated backup R2 bucket"),"production deploy must provision backup bucket");
 assert.ok(wranglerConfig.includes('"binding": "BACKUP_STORAGE"'),"dedicated backup R2 binding missing");
 assert.ok(remainingWorker.includes("system_alerts")&&!remainingWorker.includes("INSERT INTO operational_alerts"),"backup failure alert must use system_alerts");
