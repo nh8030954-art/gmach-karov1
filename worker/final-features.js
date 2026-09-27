@@ -289,11 +289,24 @@ async function helpOffers(request,env,id){
 }
 async function communityMatches(request,env,id){
   const hr=await env.DB.prepare("SELECT * FROM help_requests WHERE id=?").bind(id).first();if(!hr)throw new FinalError(404,"הבקשה לא נמצאה");
-  const rows=await env.DB.prepare(`SELECT i.id AS item_id,i.title,i.category,i.city,i.availability_status,o.id AS organization_id,o.name AS organization_name
-    FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.status='active' AND i.deleted_at IS NULL AND o.deleted_at IS NULL AND o.is_hidden=0 LIMIT 500`).all();
+  const rows=await env.DB.prepare(`SELECT i.id AS item_id,i.title,i.category,i.city,i.availability_status,i.quantity,i.service_radius_km,o.id AS organization_id,o.name AS organization_name,
+    (SELECT COUNT(*) FROM loan_requests lr WHERE lr.item_id=i.id AND lr.status IN ('pending','approved','collected') AND (? IS NULL OR lr.requested_until>?) AND (? IS NULL OR lr.requested_from<?)) AS overlapping_requests
+    FROM items i JOIN organizations o ON o.id=i.organization_id
+    WHERE i.status='active' AND i.deleted_at IS NULL AND (i.publish_at IS NULL OR i.publish_at<=strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      AND o.status='approved' AND o.deleted_at IS NULL AND o.is_hidden=0 AND o.temporarily_closed=0 LIMIT 500`)
+    .bind(hr.requested_from,hr.requested_from,hr.requested_until,hr.requested_until).all();
   const q=(hr.title+" "+hr.description+" "+(hr.category||"")).toLowerCase();
-  const out=rows.results.map(x=>{let score=0;if(hr.category&&x.category===hr.category)score+=50;if(hr.city&&x.city===hr.city)score+=25;for(const w of q.split(/\s+/).filter(x=>x.length>2))if((x.title+" "+x.category).toLowerCase().includes(w))score+=4;if(x.availability_status==="available")score+=20;return{...x,score}}).filter(x=>x.score>10).sort((a,b)=>b.score-a.score).slice(0,50);
-  return json({matches:out});
+  const out=rows.results.map(x=>{
+    let score=0;
+    if(hr.category&&x.category===hr.category)score+=50;
+    if(hr.city&&x.city===hr.city)score+=30;
+    for(const w of q.split(/\s+/).filter(x=>x.length>2))if((x.title+" "+x.category).toLowerCase().includes(w))score+=4;
+    if(x.availability_status==="available")score+=20;
+    if(Number(x.overlapping_requests||0)===0)score+=20;else score-=Math.min(20,Number(x.overlapping_requests||0)*5);
+    if(hr.distance_km&&x.service_radius_km&&Number(x.service_radius_km)>=Number(hr.distance_km))score+=8;
+    return{...x,score,dateCompatible:Number(x.overlapping_requests||0)===0};
+  }).filter(x=>x.score>10).sort((a,b)=>b.score-a.score||Number(b.dateCompatible)-Number(a.dateCompatible)).slice(0,50);
+  return json({matches:out,criteria:{category:hr.category||null,city:hr.city||null,requestedFrom:hr.requested_from||null,requestedUntil:hr.requested_until||null,distanceKm:hr.distance_km||null}});
 }
 async function reviewAction(request,env,id,action){
   const u=await requireUser(request,env),r=await env.DB.prepare("SELECT * FROM reviews WHERE id=?").bind(id).first();if(!r)throw new FinalError(404,"הביקורת לא נמצאה");
