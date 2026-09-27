@@ -125,6 +125,8 @@ const I18N_FINAL_EN={
   "מעבר לניהול הגמ\"ח": "Go to gmach management",
   "שלושה דברים שכדאי לעשות עכשיו": "Three useful next steps",
   "הבנתי, לא להציג שוב": "Got it, do not show again",
+  "אפשר לייצא עותק מקיף של נתוני החשבון, ההשאלות, ההודעות, ההסכמות, המועדפים, החיפושים, האבטחה והתמיכה, או לפתוח בקשת עיון ותיקון.": "Export a comprehensive copy of your account, loans, messages, consents, saved content, searches, security and support data, or submit an access or correction request.",
+  
 
   "דירוג הקהילה": "Community rating",
   "פריטים": "Items",
