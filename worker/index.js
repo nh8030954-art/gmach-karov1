@@ -418,6 +418,9 @@ async function routeApi(request, env, ctx, url) {
   if (method === "PUT" && path === "/api/me/notification-preferences") return saveNotificationPreferences(request, env);
   if (method === "GET" && path === "/api/me/saved-searches") return listSavedSearches(request, env);
   if (method === "POST" && path === "/api/me/saved-searches") return createSavedSearch(request, env);
+  if (method === "GET" && path === "/api/me/favorites-overview") return favoritesOverview(request, env);
+  const favoriteOverviewDetail=path.match(/^\/api\/me\/favorites-overview\/([^/]+)\/([^/]+)$/);
+  if (method === "DELETE" && favoriteOverviewDetail) return removeFromFavoritesOverview(request, env, decodeURIComponent(favoriteOverviewDetail[1]), decodeURIComponent(favoriteOverviewDetail[2]));
   if (method === "GET" && path === "/api/me/saved-categories") return listSavedCategories(request, env);
   const savedCategory = path.match(/^\/api\/me\/saved-categories\/([^/]+)$/);
   if (savedCategory && method === "PUT") return saveCategory(request, env, decodeURIComponent(savedCategory[1]));
@@ -589,6 +592,7 @@ async function register(request, env, ctx, url) {
   if (body.termsAccepted !== true) throw new HttpError(400, "יש לאשר את תנאי השימוש ומדיניות הפרטיות");
   if (body.operationalEmailsAccepted !== true) throw new HttpError(400, "יש לאשר קבלת הודעות תפעוליות הנחוצות להפעלת החשבון");
   const email = normalizeEmail(body.email);
+  const preferredLanguage = body.preferredLanguage === "en" ? "en" : "he";
   const fullName = cleanText(body.fullName, 2, 80, "שם מלא");
   const phone = validatePhone(body.phone);
   const city = cleanText(body.city, 2, 80, "עיר או יישוב");
@@ -616,14 +620,14 @@ async function register(request, env, ctx, url) {
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
   try {
-    await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role,phone,city,address_cipher,terms_accepted_at,privacy_accepted_at,operational_emails_accepted,community_emails_accepted) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-      .bind(id, email, passwordHash, salt, PASSWORD_ITERATIONS, fullName, role, phone, city, addressCipher, new Date().toISOString(), new Date().toISOString(), 1, body.communityEmailsAccepted===true?1:0).run();
+    await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role,phone,city,address_cipher,terms_accepted_at,privacy_accepted_at,operational_emails_accepted,community_emails_accepted,preferred_language) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      .bind(id, email, passwordHash, salt, PASSWORD_ITERATIONS, fullName, role, phone, city, addressCipher, new Date().toISOString(), new Date().toISOString(), 1, body.communityEmailsAccepted===true?1:0,preferredLanguage).run();
   } catch (error) {
     const message=String(error).toLowerCase();
     if (message.includes("unique")) throw new HttpError(409, "כבר קיים חשבון עם כתובת האימייל הזו");
     const fallbackRole=role==="member"?"borrower":role==="borrower"?"member":null;
     if (!fallbackRole) { console.error("Registration user write failed",error); throw new HttpError(503,"לא הצלחנו ליצור את החשבון במסד הנתונים"); }
-    try { await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role,phone,city,address_cipher,terms_accepted_at,privacy_accepted_at,operational_emails_accepted,community_emails_accepted) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id,email,passwordHash,salt,PASSWORD_ITERATIONS,fullName,fallbackRole,phone,city,addressCipher,new Date().toISOString(),new Date().toISOString(),1,body.communityEmailsAccepted===true?1:0).run(); }
+    try { await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role,phone,city,address_cipher,terms_accepted_at,privacy_accepted_at,operational_emails_accepted,community_emails_accepted,preferred_language) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id,email,passwordHash,salt,PASSWORD_ITERATIONS,fullName,fallbackRole,phone,city,addressCipher,new Date().toISOString(),new Date().toISOString(),1,body.communityEmailsAccepted===true?1:0,preferredLanguage).run(); }
     catch (fallbackError) { console.error("Registration user fallback failed",fallbackError); throw new HttpError(503,"לא הצלחנו ליצור את החשבון במסד הנתונים"); }
   }
   try {
@@ -635,7 +639,7 @@ async function register(request, env, ctx, url) {
   }
 
   try {
-    await sendVerificationEmail(env, email, fullName, code);
+    await sendVerificationEmail(env, email, fullName, code, preferredLanguage);
   } catch (error) {
     console.error("Verification email delivery failed", error);
     try { await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id).run(); }
@@ -671,7 +675,7 @@ async function resendVerification(request, env, ctx) {
   const email = normalizeEmail(body.email);
   await enforceAuthRateLimit(env, email, "register", ctx);
   assertEmailDeliveryConfigured(env);
-  const user = await env.DB.prepare("SELECT id,email,full_name,email_verified FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
+  const user = await env.DB.prepare("SELECT id,email,full_name,email_verified,preferred_language FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
   if (!user || Number(user.email_verified || 0) === 1) return json({ ok: true });
   const code = verificationCode();
   await env.DB.batch([
@@ -679,7 +683,7 @@ async function resendVerification(request, env, ctx) {
     env.DB.prepare("INSERT INTO auth_challenges (token_hash,user_id,purpose,expires_at) VALUES (?,?, 'email_verify', ?)")
       .bind(await sha256(`${user.id}:${code}`), user.id, new Date(Date.now() + 10 * 60 * 1000).toISOString())
   ]);
-  await sendVerificationEmail(env, user.email, user.full_name, code);
+  await sendVerificationEmail(env, user.email, user.full_name, code, user.preferred_language);
   return json({ ok: true });
 }
 
@@ -688,7 +692,7 @@ async function forgotPassword(request, env, ctx) {
   const email = normalizeEmail(body.email);
   await enforcePublicRateLimit(env, email, "password_reset", ctx, 5);
   assertEmailDeliveryConfigured(env);
-  const user = await env.DB.prepare("SELECT id,email,full_name,email_verified FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
+  const user = await env.DB.prepare("SELECT id,email,full_name,email_verified,preferred_language FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
   if (!user || Number(user.email_verified || 0) !== 1) return json({ ok: true });
   const recent = await env.DB.prepare("SELECT token_hash FROM auth_challenges WHERE user_id = ? AND purpose = 'email_verify' AND created_at > ? LIMIT 1")
     .bind(user.id, new Date(Date.now() - 60 * 1000).toISOString()).first();
@@ -696,7 +700,7 @@ async function forgotPassword(request, env, ctx) {
   const code = verificationCode();
   await env.DB.prepare("INSERT INTO auth_challenges (token_hash,user_id,purpose,expires_at) VALUES (?,?, 'email_verify', ?)")
     .bind(await sha256(`${user.id}:password_reset:${code}`), user.id, new Date(Date.now() + 10 * 60 * 1000).toISOString()).run();
-  await sendPasswordResetEmail(env, user.email, user.full_name, code);
+  await sendPasswordResetEmail(env, user.email, user.full_name, code, user.preferred_language);
   return json({ ok: true });
 }
 
@@ -1086,6 +1090,36 @@ async function listSavedCategories(request,env){
   const rows=await env.DB.prepare("SELECT c.id,c.name_he,c.name_en FROM saved_categories s JOIN categories c ON c.id=s.category_id WHERE s.user_id=? AND c.status='active' ORDER BY c.sort_order,c.name_he").bind(user.id).all();
   return json({categories:rows.results});
 }
+async function favoritesOverview(request,env){
+  const user=await requireUser(request,env);
+  const queries=[
+    env.DB.prepare("SELECT 'item' AS type,f.item_id AS id,i.title AS label,i.city AS detail FROM favorites f LEFT JOIN items i ON i.id=f.item_id WHERE f.user_id=? ORDER BY f.item_id LIMIT 100").bind(user.id),
+    env.DB.prepare("SELECT 'organization' AS type,s.organization_id AS id,o.name AS label,o.city AS detail FROM saved_organizations s LEFT JOIN organizations o ON o.id=s.organization_id WHERE s.user_id=? ORDER BY s.created_at DESC LIMIT 100").bind(user.id),
+    env.DB.prepare("SELECT 'category' AS type,s.category_id AS id,c.name_he AS label,c.name_en AS labelEn,NULL AS detail FROM saved_categories s LEFT JOIN categories c ON c.id=s.category_id WHERE s.user_id=? ORDER BY s.created_at DESC LIMIT 100").bind(user.id),
+    env.DB.prepare("SELECT 'search' AS type,id,name AS label,filters_json AS detail FROM saved_searches WHERE user_id=? ORDER BY created_at DESC LIMIT 100").bind(user.id),
+    env.DB.prepare(`SELECT s.entity_type AS type,s.entity_id AS id,
+      CASE s.entity_type WHEN 'item' THEN i.title WHEN 'organization' THEN o.name WHEN 'category' THEN c.name_he WHEN 'help_request' THEN h.title WHEN 'search' THEN z.name END AS label,
+      NULL AS detail FROM saved_entities s
+      LEFT JOIN items i ON s.entity_type='item' AND i.id=s.entity_id
+      LEFT JOIN organizations o ON s.entity_type='organization' AND o.id=s.entity_id
+      LEFT JOIN categories c ON s.entity_type='category' AND c.id=s.entity_id
+      LEFT JOIN help_requests h ON s.entity_type='help_request' AND h.id=s.entity_id
+      LEFT JOIN saved_searches z ON s.entity_type='search' AND z.id=s.entity_id AND z.user_id=s.user_id
+      WHERE s.user_id=? ORDER BY s.created_at DESC LIMIT 100`).bind(user.id)
+  ];
+  const results=await env.DB.batch(queries),seen=new Set(),saved=[];
+  for(const group of results)for(const row of group.results){const key=`${row.type}:${row.id}`;if(seen.has(key))continue;seen.add(key);saved.push({...row,label:row.label||"פריט שאינו זמין"});}
+  return json({saved});
+}
+async function removeFromFavoritesOverview(request,env,type,id){
+  const user=await requireUser(request,env);
+  const columns={item:["favorites","item_id"],organization:["saved_organizations","organization_id"],category:["saved_categories","category_id"],search:["saved_searches","id"]};
+  if(![...Object.keys(columns),"help_request"].includes(type))throw new HttpError(400,"סוג המועדף אינו תקין");
+  const statements=[env.DB.prepare("DELETE FROM saved_entities WHERE user_id=? AND entity_type=? AND entity_id=?").bind(user.id,type,id)];
+  if(columns[type]){const [table,column]=columns[type];statements.push(env.DB.prepare(`DELETE FROM ${table} WHERE user_id=? AND ${column}=?`).bind(user.id,id));}
+  await env.DB.batch(statements);
+  return json({ok:true});
+}
 async function saveCategory(request,env,id){
   const user=await requireUser(request,env);
   const category=await env.DB.prepare("SELECT id FROM categories WHERE id=? AND status='active'").bind(id).first();
@@ -1267,12 +1301,16 @@ async function toggleSavedOrganization(request, env, organizationId, save) {
 async function listHelpRequests(env, url) {
   const city = cleanOptional(url.searchParams.get("city"), 80);
   const category = cleanOptional(url.searchParams.get("category"), 40);
+  const page = Math.max(1,Math.min(1000,Number.parseInt(url.searchParams.get("page")||"1",10)||1)),limit=12;
   const where = ["h.status='open'"]; const params = [];
   if (city) { where.push("h.city=?"); params.push(city); }
   if (category) { where.push("h.category=?"); params.push(category); }
-  const result = await env.DB.prepare(`SELECT h.id,h.title,h.description,h.category,h.city,h.urgency,h.created_at,u.full_name AS requester_name
-    FROM help_requests h JOIN users u ON u.id=h.requester_id WHERE ${where.join(" AND ")} ORDER BY h.urgency='urgent' DESC,h.created_at DESC LIMIT 100`).bind(...params).all();
-  return json({ requests: result.results });
+  const [count,result]=await env.DB.batch([
+    env.DB.prepare(`SELECT COUNT(*) AS total FROM help_requests h WHERE ${where.join(" AND ")}`).bind(...params),
+    env.DB.prepare(`SELECT h.id,h.title,h.description,h.category,h.city,h.urgency,h.created_at,substr(u.full_name,1,instr(u.full_name||' ',' ')-1) AS requester_name
+      FROM help_requests h JOIN users u ON u.id=h.requester_id WHERE ${where.join(" AND ")} ORDER BY h.urgency='urgent' DESC,h.created_at DESC LIMIT ? OFFSET ?`).bind(...params,limit,(page-1)*limit)
+  ]);
+  return json({ requests: result.results,page,total:Number(count.results[0]?.total||0),pageSize:limit });
 }
 
 async function createHelpRequest(request, env) {
@@ -2614,7 +2652,7 @@ function verificationCode() {
   return String(100000 + (bytes[0] % 900000));
 }
 
-async function sendVerificationEmail(env, email, fullName, code) {
+async function sendVerificationEmail(env, email, fullName, code, language="he") {
   assertEmailDeliveryConfigured(env);
   const deliver = env.RESEND_SERVICE?.fetch ? env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE) : fetch;
   const response = await deliver("https://api.resend.com/emails", {
@@ -2623,25 +2661,25 @@ async function sendVerificationEmail(env, email, fullName, code) {
     body: JSON.stringify({
       from: String(env.RESEND_FROM_EMAIL || DEFAULT_FROM_EMAIL),
       to: [email],
-      subject: "קוד האימות שלך לגמ״ח ברגע",
-      text: `שלום ${fullName}, קוד האימות שלך הוא ${code}. הקוד תקף ל-10 דקות. אם לא ביקשת להירשם, אפשר להתעלם מהמייל.`,
-      html: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#15313a"><h1 style="color:#243f75">גמ״ח ברגע</h1><p>שלום ${escapeHtmlEmail(fullName)},</p><p>קוד האימות שלך:</p><p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#243f75" dir="ltr">${code}</p><p>הקוד תקף ל־10 דקות. אם לא ביקשת להירשם, אפשר להתעלם מהמייל.</p></div>`,
+      subject: language==="en"?"Your Gmach Berega verification code":"קוד האימות שלך לגמ״ח ברגע",
+      text: language==="en"?`Hello ${fullName}, your verification code is ${code}. It expires in 10 minutes. If you did not sign up, you can ignore this email.`:`שלום ${fullName}, קוד האימות שלך הוא ${code}. הקוד תקף ל-10 דקות. אם לא ביקשת להירשם, אפשר להתעלם מהמייל.`,
+      html: language==="en"?`<div dir="ltr" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#15313a"><h1 style="color:#243f75">Gmach Berega</h1><p>Hello ${escapeHtmlEmail(fullName)},</p><p>Your verification code:</p><p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#243f75">${code}</p><p>The code expires in 10 minutes. If you did not sign up, you can ignore this email.</p></div>`:`<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#15313a"><h1 style="color:#243f75">גמ״ח ברגע</h1><p>שלום ${escapeHtmlEmail(fullName)},</p><p>קוד האימות שלך:</p><p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#243f75" dir="ltr">${code}</p><p>הקוד תקף ל־10 דקות. אם לא ביקשת להירשם, אפשר להתעלם מהמייל.</p></div>`,
       reply_to: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL)
     })
   });
   if (!response.ok) throw new Error(`Resend returned ${response.status}`);
 }
 
-async function sendPasswordResetEmail(env, email, fullName, code) {
+async function sendPasswordResetEmail(env, email, fullName, code, language="he") {
   assertEmailDeliveryConfigured(env);
   const deliver = env.RESEND_SERVICE?.fetch ? env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE) : fetch;
   const response = await deliver("https://api.resend.com/emails", {
     method: "POST",
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${env.RESEND_API_KEY}` },
     body: JSON.stringify({
-      from: String(env.RESEND_FROM_EMAIL || DEFAULT_FROM_EMAIL), to: [email], subject: "איפוס סיסמה בגמ״ח ברגע",
-      text: `שלום ${fullName}, קוד איפוס הסיסמה שלך הוא ${code}. הקוד תקף ל-10 דקות. אם לא ביקשת זאת, אפשר להתעלם מהמייל.`,
-      html: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#15313a"><h1 style="color:#243f75">גמ״ח ברגע</h1><p>שלום ${escapeHtmlEmail(fullName)},</p><p>קוד איפוס הסיסמה שלך:</p><p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#243f75" dir="ltr">${code}</p><p>הקוד תקף ל־10 דקות. אם לא ביקשת זאת, אפשר להתעלם מהמייל.</p></div>`,
+      from: String(env.RESEND_FROM_EMAIL || DEFAULT_FROM_EMAIL), to: [email], subject: language==="en"?"Reset your Gmach Berega password":"איפוס סיסמה בגמ״ח ברגע",
+      text: language==="en"?`Hello ${fullName}, your password reset code is ${code}. It expires in 10 minutes. If you did not request this, you can ignore this email.`:`שלום ${fullName}, קוד איפוס הסיסמה שלך הוא ${code}. הקוד תקף ל-10 דקות. אם לא ביקשת זאת, אפשר להתעלם מהמייל.`,
+      html: language==="en"?`<div dir="ltr" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#15313a"><h1 style="color:#243f75">Gmach Berega</h1><p>Hello ${escapeHtmlEmail(fullName)},</p><p>Your password reset code:</p><p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#243f75">${code}</p><p>The code expires in 10 minutes. If you did not request this, you can ignore this email.</p></div>`:`<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#15313a"><h1 style="color:#243f75">גמ״ח ברגע</h1><p>שלום ${escapeHtmlEmail(fullName)},</p><p>קוד איפוס הסיסמה שלך:</p><p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#243f75" dir="ltr">${code}</p><p>הקוד תקף ל־10 דקות. אם לא ביקשת זאת, אפשר להתעלם מהמייל.</p></div>`,
       reply_to: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL)
     })
   });
