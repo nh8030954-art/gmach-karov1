@@ -94,3 +94,6 @@ jobs:
       - name: Moderate QA load test
         if: steps.config.outputs.enabled == 'true'
         run: node test/qa-load.mjs
+      - name: Live multi-user activity simulation
+        if: steps.config.outputs.enabled == 'true'
+        run: node test/qa-activity-load.mjs
