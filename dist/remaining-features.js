@@ -469,6 +469,33 @@ function installCategoryButtons(){
   $$("[data-edit-org]").forEach(edit=>{const row=edit.closest(".dashboard-row");if(!row||row.querySelector("[data-extra-categories]"))return;const b=document.createElement("button");b.type="button";b.className="button button-secondary button-small";b.dataset.extraCategories="organization";b.textContent=lang==="en"?"Categories":"קטגוריות";b.onclick=()=>openCategoryManager("organization",edit.dataset.editOrg);(row.querySelector(".dashboard-row-actions")||row).appendChild(b)});
 }
 function renderOrgCategoryTiles(){const host=$("#organization-dialog-content"),id=host?.dataset.organizationId;if(!id||host.querySelector(".remaining-category-tiles"))return;api("/api/organizations/"+encodeURIComponent(id)+"/public").then(data=>{const cats=data.organization?.categories||[];if(!cats.length)return;const section=document.createElement("section");section.className="remaining-category-tiles";const h=document.createElement("h3");h.textContent=lang==="en"?"Categories":"קטגוריות";const grid=document.createElement("div");grid.style.cssText="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px";cats.forEach(x=>{const a=document.createElement("article");a.style.cssText="border:1px solid #e5e7eb;border-radius:12px;padding:12px;text-align:center";a.textContent=lang==="en"?(x.name_en||x.name_he):x.name_he;grid.append(a)});section.append(h,grid);host.append(section)}).catch(()=>{})}
+Object.assign(I18N.en,{
+"סניף איסוף חלופי":"Alternative pickup branch",
+"אפשר להציע סניף אחר. ההחלפה תיכנס לתוקף רק לאחר אישור הצד השני.":"You can propose another branch. The change takes effect only after the other side approves.",
+"הצעות קודמות":"Previous proposals",
+"סניף חלופי":"Alternative branch",
+"אישור":"Approve",
+"דחייה":"Decline",
+"בחירת סניף":"Choose branch",
+"בחירת סניף חלופי":"Choose an alternative branch",
+"שליחת הצעה":"Send proposal",
+"אין כרגע סניף חלופי פעיל שאפשר להציע.":"There is currently no active alternative branch to propose.",
+"עדיין לא הוצע סניף חלופי.":"No alternative branch has been proposed yet.",
+"הצעת הסניף נשלחה לצד השני":"The branch proposal was sent to the other side",
+"סניף האיסוף החלופי אושר":"The alternative pickup branch was approved",
+"הצעת הסניף נדחתה":"The branch proposal was declined",
+"מתחילים מכאן":"Start here",
+"אפשר למצוא ציוד, לפרסם בקשת עזרה או לפתוח גמ\"ח ראשון.":"Find equipment, post a community request, or create your first gmach.",
+"חיפוש ציוד":"Search equipment",
+"פרסום בקשת עזרה":"Post a community request",
+"גמ\"חים שנצפו לאחרונה":"Recently viewed gmachs",
+"תיאום וציר זמן":"Coordination and timeline",
+"הצעות איסוף":"Pickup proposals",
+"עדיין לא הוצע חלון איסוף.":"No pickup window has been proposed yet.",
+"הצעת חלון איסוף":"Propose pickup window",
+"ציר זמן":"Timeline",
+"אין אירועים עדיין.":"No events yet."
+});
 function init(){installLanguage();if(lang==="en")api("/api/categories?locale=en").then(data=>{for(const category of data.categories||[])if(category.name_en)I18N.en[category.name_he]=category.name_en;translate(document.body)}).catch(()=>{});installMapEntry();installImageEditor();installAdminRemaining();installA11y();const obs=new MutationObserver(()=>{enhanceItemDialog();enhanceOrganizationDialog();installCategoryButtons();renderOrgCategoryTiles();if(lang==="en")translate(document.body);installImageEditor()});obs.observe(document.body,{subtree:true,childList:true});enhanceItemDialog();enhanceOrganizationDialog();installCategoryButtons();renderOrgCategoryTiles()}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
 })();

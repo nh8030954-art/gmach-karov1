@@ -44,3 +44,5 @@ assert.match(runtime,/attributeFilter:\["placeholder","title","aria-label","valu
 console.log(`Static English interface coverage ${(coverage*100).toFixed(1)}% (${hebrew.length-missing.length}/${hebrew.length})`);
 
 assert.ok(html.includes("user-content-translation.js"),"Offer optional translation for user written content");
+
+for(const phrase of ["Alternative pickup branch","Start here","Recently viewed gmachs","Coordination and timeline","Pickup proposals"]) assert.ok(runtime.includes(phrase),`Missing recent workflow translation: ${phrase}`);
