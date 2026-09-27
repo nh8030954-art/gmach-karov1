@@ -130,9 +130,27 @@ jobs:
           echo "Turnstile provisioned."
 
       - name: Verify feature state
+        id: verify_features
         if: steps.cf.outputs.enabled == 'true'
+        continue-on-error: true
         run: |
           sleep 10
           FEATURES="$(curl -fsS --max-time 30 https://gmach-karov1.nh8030954.workers.dev/api/platform/features)"
-          echo "$FEATURES"
+          echo "$FEATURES" | tee "$RUNNER_TEMP/features-after.json"
           printf '%s' "$FEATURES" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s);if(!x.turnstileEnabled||!x.turnstileSiteKey)throw new Error('Turnstile provisioning did not become active');if(!x.pushConfigured||!x.vapidPublicKey)throw new Error('VAPID provisioning did not become active')})"
+      - name: Persist feature verification state
+        if: steps.cf.outputs.enabled == 'true' && steps.verify_features.outcome != 'success'
+        run: |
+          {
+            echo "provision_sha=${GITHUB_SHA}"
+            echo "verify_features=${{ steps.verify_features.outcome }}"
+            cat "$RUNNER_TEMP/features-after.json" 2>/dev/null || true
+          } > .provision-feature-failure
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .provision-feature-failure
+          git commit -m "Record external feature provisioning failure" || true
+          git push
+      - name: Enforce feature verification
+        if: steps.cf.outputs.enabled == 'true'
+        run: test "${{ steps.verify_features.outcome }}" = "success"
