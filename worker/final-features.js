@@ -167,12 +167,31 @@ async function branchPolicies(request,env,branchId){
   return json({ok:true});
 }
 async function proposeBranch(request,env,requestId){
-  const {user,row}=await requestAccess(request,env,requestId),b=await body(request),to=clean(b.toBranchId,1,100,"סניף");
-  const branch=await env.DB.prepare("SELECT id,organization_id FROM organization_branches WHERE id=? AND organization_id=? AND status='active'").bind(to,row.organization_id).first();
+  const {user,row}=await requestAccess(request,env,requestId);
+  if(request.method==="GET"){
+    const [branches,proposals]=await Promise.all([
+      env.DB.prepare("SELECT id,name,address,city,status FROM organization_branches WHERE organization_id=? AND status='active' ORDER BY name").bind(row.organization_id).all(),
+      env.DB.prepare(`SELECT p.*,fb.name AS from_branch_name,tb.name AS to_branch_name,u.full_name AS proposed_by_name
+        FROM pickup_branch_proposals p
+        LEFT JOIN organization_branches fb ON fb.id=p.from_branch_id
+        JOIN organization_branches tb ON tb.id=p.to_branch_id
+        JOIN users u ON u.id=p.proposed_by
+        WHERE p.request_id=? ORDER BY p.created_at DESC LIMIT 30`).bind(requestId).all()
+    ]);
+    return json({currentBranchId:row.branch_id||null,branches:branches.results,proposals:proposals.results.map(p=>({...p,canRespond:p.status==="pending"&&p.proposed_by!==user.id&&Date.parse(p.expires_at)>Date.now()}))});
+  }
+  const b=await body(request),to=clean(b.toBranchId,1,100,"סניף");
+  if(to===row.branch_id)throw new FinalError(400,"יש לבחור סניף חלופי");
+  const branch=await env.DB.prepare("SELECT id,organization_id,name FROM organization_branches WHERE id=? AND organization_id=? AND status='active'").bind(to,row.organization_id).first();
   if(!branch)throw new FinalError(404,"סניף חלופי לא נמצא");
-  const id=crypto.randomUUID(),expires=new Date(Date.now()+24*3600000).toISOString();
-  await env.DB.prepare("INSERT INTO pickup_branch_proposals(id,request_id,from_branch_id,to_branch_id,proposed_by,expires_at) VALUES(?,?,?,?,?,?)").bind(id,requestId,row.branch_id||null,to,user.id,expires).run();
-  return json({proposal:{id,expiresAt:expires}},201);
+  const existing=await env.DB.prepare("SELECT id FROM pickup_branch_proposals WHERE request_id=? AND status='pending' AND expires_at>? LIMIT 1").bind(requestId,new Date().toISOString()).first();
+  if(existing)throw new FinalError(409,"כבר קיימת הצעת סניף שממתינה לתגובה");
+  const id=crypto.randomUUID(),expires=new Date(Date.now()+24*3600000).toISOString(),recipient=user.id===row.borrower_id?row.owner_id:row.borrower_id;
+  await env.DB.batch([
+    env.DB.prepare("INSERT INTO pickup_branch_proposals(id,request_id,from_branch_id,to_branch_id,proposed_by,expires_at) VALUES(?,?,?,?,?,?)").bind(id,requestId,row.branch_id||null,to,user.id,expires),
+    env.DB.prepare("INSERT INTO notifications(id,user_id,type,title,body,request_id) VALUES(?,?,'status',?,?,?)").bind(crypto.randomUUID(),recipient,"הוצע סניף איסוף חלופי","הוצע לעבור לאיסוף בסניף "+branch.name+".",requestId)
+  ]);
+  return json({proposal:{id,expiresAt:expires,toBranchId:to,toBranchName:branch.name}},201);
 }
 async function respondBranch(request,env,id){
   const u=await requireUser(request,env),b=await body(request),p=await env.DB.prepare(`SELECT p.*,lr.borrower_id,i.organization_id,o.owner_id FROM pickup_branch_proposals p JOIN loan_requests lr ON lr.id=p.request_id JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE p.id=?`).bind(id).first();
@@ -182,6 +201,7 @@ async function respondBranch(request,env,id){
   const accept=b.accept===true,now=new Date().toISOString();
   await env.DB.prepare("UPDATE pickup_branch_proposals SET status=?,responded_at=? WHERE id=?").bind(accept?"accepted":"rejected",now,id).run();
   if(accept)await env.DB.prepare("UPDATE loan_requests SET branch_id=?,updated_at=? WHERE id=?").bind(p.to_branch_id,now,p.request_id).run();
+  await env.DB.prepare("INSERT INTO notifications(id,user_id,type,title,body,request_id) VALUES(?,?,'status',?,?,?)").bind(crypto.randomUUID(),p.proposed_by,accept?"הצעת הסניף אושרה":"הצעת הסניף נדחתה",accept?"סניף האיסוף החלופי אושר.":"הצעת סניף האיסוף החלופי נדחתה.",p.request_id).run();
   return json({ok:true,accepted:accept});
 }
 async function unitHistory(request,env,id){
@@ -418,7 +438,7 @@ export async function handleFinalFeatures(request,env,ctx,url){
     m=path.match(/^\/api\/organizations\/([^/]+)\/categories$/);if(m&&(method==="GET"||method==="PUT"))return await entityCategories(request,env,"organization",decodeURIComponent(m[1]));
     m=path.match(/^\/api\/items\/([^/]+)\/categories$/);if(m&&(method==="GET"||method==="PUT"))return await entityCategories(request,env,"item",decodeURIComponent(m[1]));
     m=path.match(/^\/api\/branches\/([^/]+)\/inventory-policies$/);if(m&&(method==="GET"||method==="PUT"))return await branchPolicies(request,env,decodeURIComponent(m[1]));
-    m=path.match(/^\/api\/loan-requests\/([^/]+)\/branch-proposal$/);if(m&&method==="POST")return await proposeBranch(request,env,decodeURIComponent(m[1]));
+    m=path.match(/^\/api\/loan-requests\/([^/]+)\/branch-proposal$/);if(m&&(method==="GET"||method==="POST"))return await proposeBranch(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/branch-proposals\/([^/]+)\/respond$/);if(m&&method==="POST")return await respondBranch(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/item-units\/([^/]+)\/history$/);if(m&&method==="GET")return await unitHistory(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/item-units\/scan\/([^/]+)$/);if(m&&method==="GET")return await scanSerial(request,env,decodeURIComponent(m[1]));
