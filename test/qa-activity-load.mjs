@@ -12,7 +12,7 @@ const failures = [];
 async function api(path, { user, method = "GET", body } = {}) {
   const started = performance.now();
   try {
-    const headers = { "User-Agent": "gmach-qa-activity/1.0" };
+    const headers = { "User-Agent": "gmach-qa-activity/1.0", "Origin": base, "Sec-Fetch-Site": "same-origin" };
     if (user) {
       headers.Cookie = cookie(user);
       headers["Accept-Language"] = user % 2 === 0 ? "en" : "he";
