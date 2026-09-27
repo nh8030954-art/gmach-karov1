@@ -411,4 +411,8 @@ for (const token of [
   '/block$/'
 ]) assert.ok((worker+platform).includes(token), token+" missing from server wiring");
 assert.ok(!finalClient.includes('/api/me/push-subscriptions'),"stale Web Push endpoint must not remain in client");
+assert.ok(appClient.includes("function openComparison"),"comparison client must expose a complete comparison dialog");
+assert.ok(appClient.includes("navigator.share"),"native share with clipboard fallback is missing");
+assert.ok(platform.includes('path==="/api/compare"'),"comparison backend route is missing");
+assert.ok(worker.includes('/api/unsubscribe/community'),"community email unsubscribe route is missing");
 for (const token of ['messageType:"location"','uploadRequestChatAttachment','reportRequestMessage','blockChatUser']) assert.ok(worker.includes(token),token+" missing from request chat backend");
