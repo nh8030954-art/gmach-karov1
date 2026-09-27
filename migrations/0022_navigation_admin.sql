@@ -23,4 +23,7 @@ INSERT INTO navigation_links(id,link_key,label_he,label_en,href,location,sort_or
 ('nav-safety','safety','כללי השאלה בטוחה','Safe borrowing rules','#info:safety','footer_info',10),
 ('nav-terms','terms','תנאי שימוש','Terms of use','#info:terms','footer_info',20),
 ('nav-privacy','privacy','פרטיות','Privacy','#info:privacy','footer_info',30),
-('nav-support','support','יצירת קשר ותמיכה','Contact and support','#support','footer_info',50);
+('nav-accessibility','accessibility','הצהרת נגישות','Accessibility statement','#action:accessibility','footer_info',40),
+('nav-support','support','יצירת קשר ותמיכה','Contact and support','#action:support','footer_info',50),
+('nav-add-gmach','add-gmach','פרסום גמ״ח','Publish a gmach','#action:add-gmach','footer_share',10),
+('nav-add-item','add-item','הוספת פריט','Add an item','#action:add-item','footer_share',20);
