@@ -5,6 +5,17 @@ const html=readFileSync('dist/index.html','utf8');
 const dictionaryCode=readFileSync('dist/i18n-en.js','utf8');
 const context={window:{}};vm.runInNewContext(dictionaryCode,context);
 const keys=new Set(Object.keys(context.window.GmachEnglish));
+const runtime=readFileSync('dist/remaining-features.js','utf8');
+const app=readFileSync('dist/app.js','utf8');
+const worker=readFileSync('worker/index.js','utf8');
+const operational=readFileSync('worker/platform-completion.js','utf8');
+assert.match(runtime,/I18N_FINAL_EN/,'Dynamic English completion dictionary must be loaded');
+assert.match(runtime,/replaceTranslatedPhrase/,'English runtime must avoid translating inside Hebrew words');
+assert.match(runtime,/document\.title=translateText\(document\.title\)/,'English mode must localize the document title');
+assert.match(app,/preferredLanguage/,'Authenticated UI must receive the saved language preference');
+assert.match(worker,/preferredLanguage:\s*user\.preferred_language/,'Authenticated user response must expose saved language preference');
+for(const phrase of ['New device sign-in','Inventory hold expired','Ownership transfer pending','Extension approved','New results found']) assert.ok(operational.includes(phrase),`Missing operational email translation: ${phrase}`);
+
 const legacy=readFileSync('dist/remaining-features.js','utf8').split('Object.assign(I18N.en')[0];
 for(const match of legacy.matchAll(/"([^"\n]*[\u0590-\u05ff][^"\n]*)"\s*:/g))keys.add(match[1]);
 const decode=s=>s.replaceAll('&amp;','&').replaceAll('&quot;','"').replaceAll('&#39;',"'").replaceAll('&nbsp;',' ');

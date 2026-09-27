@@ -2581,7 +2581,7 @@ function assertSameOrigin(request, url) {
 }
 
 function publicUser(user) {
-  return { id: user.id, email: user.email, fullName: user.full_name, role: user.role, emailVerified: Boolean(user.email_verified), twoFactorEnabled: Boolean(user.totp_enabled) };
+  return { id: user.id, email: user.email, fullName: user.full_name, role: user.role, emailVerified: Boolean(user.email_verified), twoFactorEnabled: Boolean(user.totp_enabled), preferredLanguage: user.preferred_language || "he" };
 }
 
 function mapItem(row) {
