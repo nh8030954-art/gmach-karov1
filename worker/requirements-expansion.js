@@ -110,16 +110,20 @@ async function multiRangeRequest(request,env,itemId){
   }
 }
 
+async function optionalReportQuery(env,sql,args=[]){
+  try{const r=await env.DB.prepare(sql).bind(...args).all();return r.results||[]}
+  catch(error){console.warn("Optional report source unavailable",String(error?.message||error).slice(0,240));return []}
+}
 async function myReports(request,env){
   const user=await requireUser(request,env);
-  const [items,reviews,messages,content]=await env.DB.batch([
-    env.DB.prepare("SELECT 'item' AS type,r.id,r.item_id AS entity_id,i.title AS entity_title,r.reason,r.details,r.status,r.created_at FROM reports r LEFT JOIN items i ON i.id=r.item_id WHERE r.reporter_id=? ORDER BY r.created_at DESC LIMIT 100").bind(user.id),
-    env.DB.prepare("SELECT 'review' AS type,rr.id,rr.review_id AS entity_id,COALESCE(i.title,o.name,'ביקורת') AS entity_title,rr.reason,NULL AS details,rr.status,rr.created_at FROM review_reports rr JOIN reviews rv ON rv.id=rr.review_id LEFT JOIN items i ON i.id=rv.item_id LEFT JOIN organizations o ON o.id=rv.organization_id WHERE rr.reporter_id=? ORDER BY rr.created_at DESC LIMIT 100").bind(user.id),
-    env.DB.prepare("SELECT 'message' AS type,mr.id,mr.message_id AS entity_id,'הודעה בצ׳אט' AS entity_title,mr.reason,NULL AS details,mr.status,mr.created_at FROM message_reports mr WHERE mr.reporter_id=? ORDER BY mr.created_at DESC LIMIT 100").bind(user.id),
-    env.DB.prepare("SELECT entity_type AS type,id,entity_id,entity_type AS entity_title,reason,NULL AS details,status,created_at FROM content_reports WHERE reporter_id=? ORDER BY created_at DESC LIMIT 100").bind(user.id)
+  const [items,reviews,messages,content]=await Promise.all([
+    optionalReportQuery(env,"SELECT 'item' AS type,r.id,r.item_id AS entity_id,i.title AS entity_title,r.reason,r.details,r.status,r.created_at FROM reports r LEFT JOIN items i ON i.id=r.item_id WHERE r.reporter_id=? ORDER BY r.created_at DESC LIMIT 100",[user.id]),
+    optionalReportQuery(env,"SELECT 'review' AS type,rr.id,rr.review_id AS entity_id,COALESCE(i.title,o.name,'ביקורת') AS entity_title,rr.reason,NULL AS details,rr.status,rr.created_at FROM review_reports rr JOIN reviews rv ON rv.id=rr.review_id LEFT JOIN items i ON i.id=rv.item_id LEFT JOIN organizations o ON o.id=rv.organization_id WHERE rr.reporter_id=? ORDER BY rr.created_at DESC LIMIT 100",[user.id]),
+    optionalReportQuery(env,"SELECT 'message' AS type,mr.id,mr.message_id AS entity_id,'הודעה בצ׳אט' AS entity_title,mr.reason,NULL AS details,mr.status,mr.created_at FROM message_reports mr WHERE mr.reporter_id=? ORDER BY mr.created_at DESC LIMIT 100",[user.id]),
+    optionalReportQuery(env,"SELECT entity_type AS type,id,entity_id,entity_type AS entity_title,reason,NULL AS details,status,created_at FROM content_reports WHERE reporter_id=? ORDER BY created_at DESC LIMIT 100",[user.id])
   ]);
-  const all=[...(items.results||[]),...(reviews.results||[]),...(messages.results||[]),...(content.results||[])].sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,250);
-  return json({reports:all});
+  const all=[...items,...reviews,...messages,...content].sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,250);
+  return json({reports:all,sources:{items:items.length,reviews:reviews.length,messages:messages.length,content:content.length}});
 }
 
 async function adminUserDetail(request,env,userId){
