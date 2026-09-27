@@ -562,6 +562,7 @@ async function routeApi(request, env, ctx, url) {
   if (method === "GET" && path === "/api/admin/users") return adminUsers(request, env);
   if (method === "GET" && path === "/api/admin/content") return adminContent(request, env);
   if (method === "GET" && path === "/api/admin/analytics") return adminAnalytics(request, env);
+  if (method === "GET" && path === "/api/admin/analytics/export.csv") return adminAnalyticsCsv(request, env);
   if (method === "GET" && path === "/api/admin/categories") return adminCategories(request, env);
   if (method === "POST" && path === "/api/admin/categories") return createAdminCategory(request, env);
   const adminCategory = path.match(/^\/api\/admin\/categories\/([^/]+)$/);
@@ -1373,8 +1374,9 @@ async function recordAnalytics(request, env) {
   const body = await readJson(request); const allowed = new Set(["search","no_results","item_view","request_created","share"]);
   if (!allowed.has(body.eventType)) throw new HttpError(400,"אירוע אינו תקין");
   const user = await currentUser(request, env);
-  await env.DB.prepare("INSERT INTO analytics_events(id,user_id,event_type,query,city,category,entity_id) VALUES (?,?,?,?,?,?,?)")
-    .bind(crypto.randomUUID(),user?.id||null,body.eventType,cleanOptional(body.query,120),cleanOptional(body.city,80),cleanOptional(body.category,40),cleanOptional(body.entityId,100)).run();
+  const source=cleanOptional(body.source,80),referrer=cleanOptional(body.referrer,180),pagePath=cleanOptional(body.pagePath,180);
+  await env.DB.prepare("INSERT INTO analytics_events(id,user_id,event_type,query,city,category,entity_id,source,referrer,page_path) VALUES (?,?,?,?,?,?,?,?,?,?)")
+    .bind(crypto.randomUUID(),user?.id||null,body.eventType,cleanOptional(body.query,120),cleanOptional(body.city,80),cleanOptional(body.category,40),cleanOptional(body.entityId,100),source,referrer,pagePath).run();
   return json({ok:true},201);
 }
 
@@ -2135,14 +2137,25 @@ async function adminOverview(request, env) {
 
 async function adminAnalytics(request, env) {
   await requireAdmin(request, env);
-  const [events, searches, cities, categories, success] = await env.DB.batch([
+  const [events, searches, cities, categories, sources, referrers, success] = await env.DB.batch([
     env.DB.prepare(`SELECT event_type,COUNT(*) AS count FROM analytics_events WHERE created_at>=datetime('now','-30 days') GROUP BY event_type`),
     env.DB.prepare(`SELECT query,COUNT(*) AS count FROM analytics_events WHERE event_type IN ('search','no_results') AND query IS NOT NULL GROUP BY query ORDER BY count DESC LIMIT 30`),
     env.DB.prepare(`SELECT city,COUNT(*) AS count FROM analytics_events WHERE city IS NOT NULL GROUP BY city ORDER BY count DESC LIMIT 20`),
     env.DB.prepare(`SELECT category,COUNT(*) AS count FROM analytics_events WHERE category IS NOT NULL GROUP BY category ORDER BY count DESC LIMIT 20`),
+    env.DB.prepare(`SELECT COALESCE(source,'direct') AS source,COUNT(*) AS count FROM analytics_events WHERE created_at>=datetime('now','-30 days') GROUP BY COALESCE(source,'direct') ORDER BY count DESC LIMIT 20`),
+    env.DB.prepare(`SELECT referrer,COUNT(*) AS count FROM analytics_events WHERE created_at>=datetime('now','-30 days') AND referrer IS NOT NULL GROUP BY referrer ORDER BY count DESC LIMIT 20`),
     env.DB.prepare(`SELECT COUNT(*) AS total,SUM(CASE WHEN status IN ('approved','collected','returned') THEN 1 ELSE 0 END) AS successful FROM loan_requests`)
   ]);
-  return json({ events:events.results, searches:searches.results, cities:cities.results, categories:categories.results, matching:{ total:Number(success.results[0]?.total||0), successful:Number(success.results[0]?.successful||0) } });
+  return json({ events:events.results, searches:searches.results, cities:cities.results, categories:categories.results, sources:sources.results, referrers:referrers.results, matching:{ total:Number(success.results[0]?.total||0), successful:Number(success.results[0]?.successful||0) } });
+}
+
+async function adminAnalyticsCsv(request,env){
+  await requireAdmin(request,env);
+  const rows=await env.DB.prepare(`SELECT created_at,event_type,query,city,category,entity_id,source,referrer,page_path FROM analytics_events ORDER BY created_at DESC LIMIT 10000`).all();
+  const cols=["created_at","event_type","query","city","category","entity_id","source","referrer","page_path"];
+  const cell=value=>{const s=String(value??"");return /[",\\n]/.test(s)?'"'+s.replaceAll('"','""')+'"':s};
+  const csv=[cols.join(","),...(rows.results||[]).map(row=>cols.map(key=>cell(row[key])).join(","))].join("\n");
+  return new Response("\uFEFF"+csv,{headers:{"Content-Type":"text/csv; charset=utf-8","Content-Disposition":'attachment; filename="gmach-analytics.csv"',"Cache-Control":"no-store"}});
 }
 
 async function adminSiteSettings(request, env) {
