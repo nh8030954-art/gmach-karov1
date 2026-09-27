@@ -2486,6 +2486,8 @@ async function addOrganizationMember(request,env,organizationId){
 
 async function listOrganizationInvitations(request,env,organizationId){await requireOrganizationRole(request,env,organizationId,["owner"]);const rows=await env.DB.prepare("SELECT id,role,branch_scope_json,category_scope_json,message,invited_email,expires_at,accepted_at,cancelled_at,created_at FROM organization_invitations WHERE organization_id=? ORDER BY created_at DESC LIMIT 100").bind(organizationId).all();return json({invitations:rows.results})}
 async function createOrganizationInvitation(request,env,organizationId,url){
+  const invitationColumns=await env.DB.prepare("PRAGMA table_info(organization_invitations)").all();
+  if(!(invitationColumns.results||[]).some(column=>column.name==="invited_email")) await env.DB.prepare("ALTER TABLE organization_invitations ADD COLUMN invited_email TEXT").run();
   const {user}=await requireOrganizationRole(request,env,organizationId,["owner"]),body=await readJson(request),role=["requests","inventory","reports"].includes(body.role)?body.role:null;
   if(!role)throw new HttpError(400,"תפקיד המנהל אינו תקין");
   const invitedEmail=body.email?normalizeEmail(body.email):null,token=randomToken(32),tokenHash=await sha256(token),id=crypto.randomUUID(),expiresAt=new Date(Date.now()+7*86400000).toISOString(),inviteUrl=`${url.origin}/#/invite/${encodeURIComponent(token)}`;
