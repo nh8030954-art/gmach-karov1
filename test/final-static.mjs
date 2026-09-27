@@ -304,3 +304,12 @@ assert.ok(productionDeploy.includes("Ensure dedicated backup R2 bucket"),"produc
 assert.ok(wranglerConfig.includes('"binding": "BACKUP_STORAGE"'),"dedicated backup R2 binding missing");
 assert.ok(remainingWorker.includes("system_alerts")&&!remainingWorker.includes("INSERT INTO operational_alerts"),"backup failure alert must use system_alerts");
 console.log("Release hardening static gate passed.");
+
+
+const releaseExperience=await readFile("dist/release-experience.js","utf8");
+for(const token of ["Loan terms and availability","My support requests","support-faq-suggestions","Branch map","data-branch-visual-map","/api/me/support-tickets","/api/faqs?lang="]) assert.ok(releaseExperience.includes(token),token+" missing from release experience");
+for(const token of ["minLoanMinutes","bookingNoticeMinutes","turnaroundMinutes","depositAmountAgorot","recurringAllowed"]) assert.ok(worker.includes(token),token+" missing from public item policy payload");
+assert.ok(indexHtml.includes("./release-experience.js"),"release experience client not loaded");
+assert.ok(expansionClient.includes("שעות פעילות"),"branch hours missing from public branch UI");
+assert.ok(expansionClient.includes("data-copy-branch"),"branch copy-address action missing");
+console.log("Release experience static release gate passed.");
