@@ -499,3 +499,13 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
   "התמונה נחסמה משום שסומנה כתוכן שאינו מתאים לפלטפורמה.":"The image was blocked because it was flagged as unsuitable for the platform.",
   "התמונה נשלחה לבדיקת תוכן נוספת לפני טיפול מנהל.":"The image was sent for additional content review."
 });
+
+window.GmachEnglish = Object.freeze({...window.GmachEnglish,
+  "חיפוש גמ״חים מתקדם":"Advanced gmach search",
+  "חיפוש גמחים מתקדם":"Advanced gmach search",
+  "חיפוש גמ״חים":"Search gmach organizations",
+  "חיפוש גמחים":"Search gmach organizations",
+  "חיפוש מתקדם":"Advanced search",
+  "מה תרצו לקבל היום?":"What would you like to borrow today?",
+  "מה תרצו לשאול היום?":"What would you like to borrow today?"
+});
