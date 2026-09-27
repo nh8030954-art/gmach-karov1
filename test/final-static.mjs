@@ -246,3 +246,10 @@ assert.ok(worker.includes("handleLaunchReadiness"),"launch readiness handler not
 assert.ok(worker.includes("runLaunchReadinessMaintenance"),"launch readiness maintenance not wired");
 assert.ok(indexHtml.includes("./launch-readiness.js"),"launch readiness client not loaded");
 console.log("Launch readiness static release gate passed.");
+
+for(const token of ["moderateItemImage","@cf/moondream/moondream3.1-9B-A2B","moderationFindings","autoHidden"])assert.ok(worker.includes(token),token+" missing from automatic item image moderation");
+for(const token of ["PAGE_LOAD","JS_ERROR","INP","ביצועים - 7 ימים","analytics.performance"])assert.ok(finalClient.includes(token),token+" missing from performance monitoring dashboard");
+for(const token of ["moderation?.autoHidden","moderation?.reviewRequired"])assert.ok(appClient.includes(token),token+" missing from item image moderation upload feedback");
+for(const token of ["moderateChatImage","validJpeg","validPng","validWebp","chat_image","reviewRequired"])assert.ok(platform.includes(token),token+" missing from chat image validation/moderation");
+assert.ok(finalClient.includes("התמונה נשלחה לבדיקת תוכן נוספת לפני טיפול מנהל."),"chat moderation feedback missing");
+assert.ok(finalWorker.includes('new Set(["LCP","CLS","INP","PAGE_LOAD","JS_ERROR"])'),"performance telemetry allowlist missing");
