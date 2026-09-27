@@ -84,7 +84,7 @@ try {
     await db.batch(statements.map(statement => db.prepare(statement)));
   }
 
-  let result = await request("/api/health");
+  let result = await request("/api/health?deep=1");
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(result.data.database, "D1");
   assert.equal(result.data.email, true);
