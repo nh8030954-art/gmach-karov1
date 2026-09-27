@@ -6,7 +6,7 @@ class HttpError extends Error{constructor(status,message){super(message);this.st
 export async function ensurePlatformCompletionSchema(env){
   const alters={
     sessions:[["user_agent_hash","TEXT"],["trusted","INTEGER NOT NULL DEFAULT 0 CHECK (trusted IN (0,1))"]],
-    users:[["consent_version","TEXT NOT NULL DEFAULT '2026-09-25'"],["deletion_reminder_sent_at","TEXT"],["preferred_navigation","TEXT NOT NULL DEFAULT 'google'"]],
+    users:[["consent_version","TEXT NOT NULL DEFAULT '2026-09-24'"],["deletion_reminder_sent_at","TEXT"],["preferred_navigation","TEXT NOT NULL DEFAULT 'google'"]],
     organizations:[["deletion_cancelled_at","TEXT"],["transfer_pending_to","TEXT"],["draft_json","TEXT NOT NULL DEFAULT '{}'"]],
     items:[["primary_image_url","TEXT"],["material_version","INTEGER NOT NULL DEFAULT 1"],["last_material_change_at","TEXT"]],
     loan_requests:[["hold_expires_at","TEXT"],["pickup_expires_at","TEXT"],["no_show_at","TEXT"],["cancellation_undo_until","TEXT"],["change_pending_json","TEXT"]],
