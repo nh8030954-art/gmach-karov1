@@ -6,7 +6,7 @@ class HttpError extends Error{constructor(status,message){super(message);this.st
 export async function ensurePlatformCompletionSchema(env){
   const alters={
     sessions:[["user_agent_hash","TEXT"],["trusted","INTEGER NOT NULL DEFAULT 0 CHECK (trusted IN (0,1))"]],
-    users:[["consent_version","TEXT NOT NULL DEFAULT '2026-09-25'"],["deletion_reminder_sent_at","TEXT"]],
+    users:[["consent_version","TEXT NOT NULL DEFAULT '2026-09-25'"],["deletion_reminder_sent_at","TEXT"],["preferred_navigation","TEXT NOT NULL DEFAULT 'google'"]],
     organizations:[["deletion_cancelled_at","TEXT"],["transfer_pending_to","TEXT"],["draft_json","TEXT NOT NULL DEFAULT '{}'"]],
     items:[["primary_image_url","TEXT"],["material_version","INTEGER NOT NULL DEFAULT 1"],["last_material_change_at","TEXT"]],
     loan_requests:[["hold_expires_at","TEXT"],["pickup_expires_at","TEXT"],["no_show_at","TEXT"],["cancellation_undo_until","TEXT"],["change_pending_json","TEXT"]],
@@ -23,6 +23,10 @@ export async function ensurePlatformCompletionSchema(env){
     for(const [name,def] of defs) if(!cols.has(name)) await env.DB.prepare(`ALTER TABLE ${table} ADD COLUMN ${name} ${def}`).run();
   }
   const statements=[
+    "CREATE TABLE IF NOT EXISTS legal_consents (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,document_type TEXT NOT NULL CHECK(document_type IN ('terms','privacy')),version TEXT NOT NULL,accepted_at TEXT NOT NULL,source TEXT NOT NULL DEFAULT 'registration',PRIMARY KEY(user_id,document_type,version))",
+    "CREATE TABLE IF NOT EXISTS recently_viewed_organizations (user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,viewed_at TEXT NOT NULL,PRIMARY KEY(user_id,organization_id))",
+    "CREATE INDEX IF NOT EXISTS recent_organizations_user_time_idx ON recently_viewed_organizations(user_id,viewed_at DESC)",
+    "CREATE INDEX IF NOT EXISTS legal_consents_user_time_idx ON legal_consents(user_id,accepted_at DESC)",
     "CREATE TABLE IF NOT EXISTS organization_transfers (id TEXT PRIMARY KEY,organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,from_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,to_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','declined','cancelled','expired')),expires_at TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),responded_at TEXT)",
     "CREATE TABLE IF NOT EXISTS branch_transfers (id TEXT PRIMARY KEY,organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,unit_id TEXT REFERENCES item_units(id) ON DELETE SET NULL,from_branch_id TEXT REFERENCES organization_branches(id) ON DELETE SET NULL,to_branch_id TEXT NOT NULL REFERENCES organization_branches(id) ON DELETE CASCADE,status TEXT NOT NULL DEFAULT 'in_transit' CHECK (status IN ('in_transit','received','cancelled')),quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 999),created_by TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),received_at TEXT)",
     "CREATE TABLE IF NOT EXISTS inventory_holds (id TEXT PRIMARY KEY,item_id TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,request_id TEXT REFERENCES loan_requests(id) ON DELETE CASCADE,quantity INTEGER NOT NULL CHECK (quantity BETWEEN 1 AND 999),starts_at TEXT NOT NULL,ends_at TEXT NOT NULL,expires_at TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','converted','released','expired')),created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
