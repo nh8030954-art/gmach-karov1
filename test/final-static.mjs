@@ -181,3 +181,8 @@ for(const token of ["TERMS_VERSION","PRIVACY_VERSION","legal_consents"])assert.o
 for(const token of ["organizationOnboarding","previewSeen","tipsDismissed","showOrganizationOnboarding","openOrganizationOnboardingPreview"])assert.ok((finalWorker+finalClient).includes(token),token+" missing from post-creation gmach onboarding");
 for(const token of ["branch-proposal","data-branch-proposal","data-branch-response","toBranchName"])assert.ok((finalWorker+appClient).includes(token),token+" missing from alternate pickup branch workflow");
 for(const token of ["editDistance","fuzzyQueryMatch"])assert.ok(appClient.includes(token),token+" missing from typo-tolerant search fallback");
+
+
+for(const token of ["analyticsAcquisition","searchScore","openNearbyGmachs","account-start-nearby","/api/admin/analytics/export.csv"])assert.ok((appClient+worker).includes(token),token+" missing from discovery/analytics completion");
+for(const token of ["source","referrer","page_path","adminAnalyticsCsv"])assert.ok(worker.includes(token),token+" missing from acquisition analytics backend");
+for(const token of ["מקורות הגעה","אתרים מפנים","ייצוא נתוני שימוש CSV"])assert.ok((appClient+remainingClient).includes(token),token+" missing from analytics UI/localization");
