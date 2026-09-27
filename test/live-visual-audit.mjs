@@ -30,6 +30,7 @@ async function auditPage(browser,{target,base,device,lang,route,label,auth=false
     }]);
   }
   const page=await ctx.newPage();
+  page.setDefaultTimeout(5000);
   const consoleErrors=[], pageErrors=[], requestFailures=[];
   page.on("console",m=>{if(m.type()==="error")consoleErrors.push(m.text())});
   page.on("pageerror",e=>pageErrors.push(String(e)));
@@ -39,7 +40,7 @@ async function auditPage(browser,{target,base,device,lang,route,label,auth=false
   try{
     const response=await page.goto(url,{waitUntil:"domcontentloaded",timeout:30000});
     status=response?.status()||null;
-    await page.waitForTimeout(1800);
+    await page.waitForTimeout(1200);
     if(afterLoad) await afterLoad(page);
     await page.waitForTimeout(500);
     const diag=await page.evaluate(()=>{
@@ -92,7 +93,8 @@ try{
       await auditPage(browser,{target:"production",base:PROD,device,lang,route:"#/community",label:"community"});
       await auditPage(browser,{target:"production",base:PROD,device,lang,route:"#/",label:"auth-dialog",afterLoad:async page=>{
         const b=page.locator("#dashboard-button");
-        if(await b.count()) await b.click();
+        if(await b.count() && await b.isVisible()) await b.click();
+        else await page.evaluate(()=>{const d=document.querySelector("#auth-dialog"); if(d && !d.open) d.showModal();});
       }});
       if(device==="mobile"){
         await auditPage(browser,{target:"production",base:PROD,device,lang,route:"#/",label:"mobile-menu",afterLoad:async page=>{
