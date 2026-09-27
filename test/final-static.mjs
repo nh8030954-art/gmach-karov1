@@ -206,3 +206,6 @@ assert.ok(platform.includes("turnstileRequired:true"),"repeated suspicious login
 assert.ok(platformClient.includes("requireLogin"),"the UI should render a login Turnstile only when required");
 assert.ok(appClient.includes('location.hash === "#/community"'),"community board should have a direct route");
 for(const token of ["events-stages","medical-ramps","community-projectors"])assert.ok(platform.includes(token),token+" missing from expanded category catalog");
+
+for(const token of ["overlapping_requests","dateCompatible","requestedFrom:hr.requested_from","distanceKm:hr.distance_km"])assert.ok(finalWorker.includes(token),token+" missing from date-aware community matching");
+assert.ok(platform.includes("2026-09-24"),"legal consent default version is not aligned");
