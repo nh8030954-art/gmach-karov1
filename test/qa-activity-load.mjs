@@ -90,7 +90,7 @@ const created = await pool(actors, 10, async actor => {
       requestedUntil: actor.requestedUntil,
       quantity: 1,
       depositAccepted: true,
-      phone: `050-77${pad(actor.borrower, 4)}`,
+      phone: `050-7${pad(actor.borrower, 6)}`,
       note: actor.borrower % 2 === 0 ? "QA activity request" : "בקשת QA לבדיקת פעילות"
     }
   });
@@ -162,7 +162,7 @@ const collisionCreates = await pool(collisionBorrowers, 12, async borrower => {
       requestedUntil: "2027-03-02T10:00",
       quantity: 1,
       depositAccepted: true,
-      phone: `052-88${pad(borrower, 4)}`,
+      phone: `052-8${pad(borrower, 6)}`,
       note: "QA collision test"
     }
   });
