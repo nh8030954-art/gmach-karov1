@@ -1251,18 +1251,27 @@ async function getItem(env, id) {
 async function discovery(env, url) {
   const query = cleanOptional(url.searchParams.get("q"), 80);
   const like = `%${String(query || "").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
+  const orgCity=cleanOptional(url.searchParams.get("orgCity"),80),orgCategory=cleanOptional(url.searchParams.get("orgCategory"),80),orgQuery=cleanOptional(url.searchParams.get("orgQuery"),100);
+  const minRating=Math.max(0,Math.min(5,Number(url.searchParams.get("minRating"))||0)),availableOnly=url.searchParams.get("orgAvailable")==="1";
+  const orgWhere=["o.status='approved'","o.is_hidden=0","o.deleted_at IS NULL"],orgBind=[];
+  if(orgCity){orgWhere.push("o.city=?");orgBind.push(orgCity)}
+  if(orgCategory){orgWhere.push("EXISTS (SELECT 1 FROM items ci WHERE ci.organization_id=o.id AND ci.status='active' AND ci.deleted_at IS NULL AND ci.category=?)");orgBind.push(orgCategory)}
+  if(orgQuery){const oq=`%${orgQuery.replaceAll("%","\\%").replaceAll("_","\\_")}%`;orgWhere.push("(o.name LIKE ? ESCAPE '\\' OR o.description LIKE ? ESCAPE '\\' OR o.city LIKE ? ESCAPE '\\')");orgBind.push(oq,oq,oq)}
+  if(availableOnly)orgWhere.push("EXISTS (SELECT 1 FROM items ai WHERE ai.organization_id=o.id AND ai.status='active' AND ai.deleted_at IS NULL AND ai.availability_status='available')");
+  if(minRating>0){orgWhere.push("COALESCE((SELECT AVG(rr.rating) FROM reviews rr WHERE rr.organization_id=o.id AND rr.status='published'),0)>=?");orgBind.push(minRating)}
   const [categories, cities, suggestions, organizations] = await env.DB.batch([
     env.DB.prepare(`SELECT category,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY category ORDER BY count DESC`),
     env.DB.prepare(`SELECT city,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY city ORDER BY count DESC LIMIT 80`),
     env.DB.prepare(`SELECT DISTINCT title FROM items WHERE status='active' AND (?='' OR title LIKE ?) ORDER BY updated_at DESC LIMIT 8`).bind(query || "", like),
     env.DB.prepare(`SELECT o.id,o.name,o.city,o.description,o.last_active_at,
       COUNT(DISTINCT i.id) AS item_count,
-      ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
-      FROM organizations o LEFT JOIN items i ON i.organization_id=o.id AND i.status='active'
+      ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count,
+      SUM(CASE WHEN i.availability_status='available' THEN 1 ELSE 0 END) AS available_items
+      FROM organizations o LEFT JOIN items i ON i.organization_id=o.id AND i.status='active' AND i.deleted_at IS NULL
       LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
-      WHERE o.status='approved' AND o.is_hidden=0 GROUP BY o.id ORDER BY rating DESC,item_count DESC LIMIT 100`)
+      WHERE ${orgWhere.join(" AND ")} GROUP BY o.id ORDER BY rating DESC,available_items DESC,item_count DESC LIMIT 100`).bind(...orgBind)
   ]);
-  return json({ categories: categories.results, cities: cities.results, suggestions: suggestions.results.map(row => row.title), organizations: organizations.results });
+  return json({ categories: categories.results, cities: cities.results, suggestions: suggestions.results.map(row => row.title), organizations: organizations.results,organizationFilters:{city:orgCity||"",category:orgCategory||"",query:orgQuery||"",minRating,availableOnly} });
 }
 
 async function getPublicOrganization(env, id) {

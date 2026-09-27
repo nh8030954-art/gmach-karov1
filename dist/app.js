@@ -88,6 +88,15 @@
     } finally { window.clearTimeout(timeout); }
   }
 
+  function openSupportForError(error,context="תקלה באתר"){
+    const dialog=$("#support-dialog"),form=$("#support-form");if(!dialog||!form)return;
+    const requestId=String(error?.requestId||"").trim();
+    if(state.user?.fullName||state.user?.full_name)form.elements.name.value=state.user.fullName||state.user.full_name;
+    if(state.user?.email)form.elements.email.value=state.user.email;
+    form.elements.subject.value=context.slice(0,120);
+    form.elements.message.value=[context,error?.message||"",requestId?"מספר תקלה: "+requestId:"","עמוד: "+location.pathname+location.hash].filter(Boolean).join("\n").slice(0,2000);
+    openDialog(dialog);form.elements.message.focus();
+  }
   async function detectServer() {
     try { const result = await api("/api/health", { timeoutMs: 4000 }); state.serverAvailable = result?.ok === true; } catch { state.serverAvailable = false; }
     $("#connection-banner").hidden = state.serverAvailable;
@@ -105,6 +114,42 @@
       state.categoryAliases=(data.categories||[]).map(row=>({nameHe:row.name_he||"",nameEn:row.name_en||"",synonyms:Array.isArray(row.synonyms)?row.synonyms:[]}));
       renderDiscovery();
     }catch(error){console.warn("Category aliases unavailable",error)}
+  }
+  function installAdvancedGmachSearch(){
+    const section=$("#gmachim"),heading=section?.querySelector(".section-heading");
+    if(!heading||$("#advanced-gmach-search"))return;
+    const button=document.createElement("button");
+    button.id="advanced-gmach-search";button.type="button";button.className="button button-secondary";button.textContent="חיפוש גמ״חים מתקדם";
+    button.addEventListener("click",openAdvancedGmachSearch);heading.append(button);
+  }
+  async function openAdvancedGmachSearch(){
+    let d=$("#advanced-gmach-dialog");if(!d){d=document.createElement("dialog");d.id="advanced-gmach-dialog";d.className="modal modal-wide";document.body.append(d)}
+    const categories=[...new Set((state.discovery.categories||[]).map(row=>row.category).filter(Boolean))];
+    const cities=[...new Set((state.discovery.cities||[]).map(row=>row.city).filter(Boolean))];
+    d.innerHTML=`<button class="dialog-close" type="button" aria-label="סגירה">×</button><h2>חיפוש גמ״חים מתקדם</h2>
+      <form id="advanced-gmach-form" class="form-grid">
+        <label class="wide">שם, תיאור או עיר<input name="query" type="search" maxlength="100" autocomplete="off"></label>
+        <label>עיר<select name="city"><option value="">כל הארץ</option>${cities.map(value=>`<option value="${escapeHTML(value)}">${escapeHTML(value)}</option>`).join("")}</select></label>
+        <label>קטגוריה<select name="category"><option value="">כל הקטגוריות</option>${categories.map(value=>`<option value="${escapeHTML(value)}">${escapeHTML(value)}</option>`).join("")}</select></label>
+        <label>דירוג מינימלי<select name="rating"><option value="0">ללא סינון</option><option value="3">3+</option><option value="4">4+</option><option value="4.5">4.5+</option></select></label>
+        <label class="check"><input name="available" type="checkbox">רק גמ״חים עם פריט זמין</label>
+        <button class="button button-primary" type="submit">חיפוש</button>
+      </form>
+      <div id="advanced-gmach-results" class="organizations-grid" aria-live="polite"></div>`;
+    $(".dialog-close",d).onclick=()=>closeDialog(d);
+    const form=$("#advanced-gmach-form",d),results=$("#advanced-gmach-results",d);
+    form.onsubmit=async e=>{
+      e.preventDefault();results.innerHTML='<div class="dashboard-empty">מחפשים גמ״חים…</div>';
+      const fd=new FormData(form),params=new URLSearchParams();
+      const query=String(fd.get("query")||"").trim(),city=String(fd.get("city")||""),category=String(fd.get("category")||""),rating=String(fd.get("rating")||"0");
+      if(query)params.set("orgQuery",query);if(city)params.set("orgCity",city);if(category)params.set("orgCategory",category);if(Number(rating)>0)params.set("minRating",rating);if(fd.has("available"))params.set("orgAvailable","1");
+      try{
+        const data=await api("/api/discovery?"+params.toString()),rows=data.organizations||[];
+        results.innerHTML=rows.map(org=>`<article class="organization-card"><div><span class="verification-chip">${org.rating?`⭐ ${escapeHTML(org.rating)}`:"חדש"}</span><h3>${escapeHTML(org.name)}</h3><p>${escapeHTML(org.description||"")}</p></div><ul><li>📍 ${escapeHTML(org.city||"")}</li><li>📦 ${Number(org.item_count||0)} פריטים</li><li>✅ ${Number(org.available_items||0)} זמינים</li></ul><button class="button button-primary button-small" type="button" data-advanced-org="${escapeHTML(org.id)}">צפייה בגמ״ח</button></article>`).join("")||'<div class="dashboard-empty"><strong>לא נמצאו גמ״חים מתאימים</strong><p>נסו להסיר מסנן או להרחיב את החיפוש.</p></div>';
+        $$("[data-advanced-org]",results).forEach(button=>button.onclick=()=>{closeDialog(d);openOrganization(button.dataset.advancedOrg)});
+      }catch(error){results.innerHTML=`<p role="alert">${escapeHTML(error.message||"לא הצלחנו להשלים את החיפוש")}</p>`}
+    };
+    openDialog(d);form.querySelector('[name="query"]')?.focus();
   }
   function renderDiscovery() {
     const suggestionValues=[...new Set([...(state.discovery.suggestions||[]),...state.categoryAliases.flatMap(row=>[row.nameHe,row.nameEn,...row.synonyms]).filter(Boolean)])].slice(0,120);
@@ -255,8 +300,8 @@
       $('[data-org-item]', $("#organization-dialog-content")).forEach(button => button.addEventListener("click", () => { closeDialog($("#organization-dialog")); openItem(button.dataset.orgItem); })); $('[data-review-helpful]', $("#organization-dialog-content")).forEach(button=>button.addEventListener("click",()=>requireAuth(async()=>{try{await api("/api/reviews/"+encodeURIComponent(button.dataset.reviewHelpful)+"/helpful",{method:"POST",body:{}});button.disabled=true;toast("תודה על המשוב")}catch(e){toast(e.message,"error")}}))); $('[data-review-report]', $("#organization-dialog-content")).forEach(button=>button.addEventListener("click",()=>requireAuth(async()=>{const reason=translatedPrompt("מה הבעיה בביקורת?");if(!reason)return;try{await api("/api/reviews/"+encodeURIComponent(button.dataset.reviewReport)+"/report",{method:"POST",body:{reason}});button.disabled=true;toast("הדיווח נשלח לבדיקה")}catch(e){toast(e.message,"error")}}))); openDialog($("#organization-dialog"));
     } catch (error) {
       const content = $("#organization-dialog-content");
-      content.innerHTML = `<div class="dashboard-empty" role="alert"><h2 id="organization-title">לא הצלחנו לטעון את עמוד הגמ״ח</h2><p>${escapeHTML(error.message)}</p>${error.requestId ? `<small>מספר תקלה לתמיכה: ${escapeHTML(error.requestId)}</small>` : ""}<button class="button button-secondary" type="button" data-retry-organization>ניסיון חוזר</button></div>`;
-      $("[data-retry-organization]", content).addEventListener("click", () => openOrganization(id));
+      content.innerHTML = `<div class="dashboard-empty" role="alert"><h2 id="organization-title">לא הצלחנו לטעון את עמוד הגמ״ח</h2><p>${escapeHTML(error.message)}</p>${error.requestId ? `<small>מספר תקלה לתמיכה: ${escapeHTML(error.requestId)}</small>` : ""}<div class="dashboard-row-actions"><button class="button button-secondary" type="button" data-retry-organization>ניסיון חוזר</button><button class="button button-secondary" type="button" data-support-organization>פנייה לתמיכה עם פרטי התקלה</button></div></div>`;
+      $("[data-retry-organization]", content).addEventListener("click", () => openOrganization(id));$("[data-support-organization]",content).addEventListener("click",()=>openSupportForError(error,"תקלה בטעינת עמוד גמ״ח"));
       openDialog($("#organization-dialog"));
     }
   }
@@ -347,7 +392,7 @@
   async function showDashboard(tab = state.dashboardTab) {
     if (!state.user) { requireAuth(() => showDashboard(tab)); return; } if (tab === "admin" && state.user.role !== "admin") tab = "requests"; state.dashboardTab = tab; $("#home-view").hidden = true; $("#dashboard-view").hidden = false; window.scrollTo({ top: 0, behavior: "smooth" }); history.replaceState(null, "", "#/dashboard"); $$('[data-dashboard-tab]').forEach(button => button.setAttribute("aria-selected", String(button.dataset.dashboardTab === tab))); $("#dashboard-content").innerHTML = '<div class="skeleton-card" aria-hidden="true"></div>';
     try { const data = await refreshAccountSnapshot(); $("#stat-requests").textContent = data.stats.activeRequests; $("#stat-items").textContent = data.stats.items; $("#stat-completed").textContent = data.stats.completed; if (tab === "requests") renderDashboardRequests(data.requests || []); if (tab === "items") renderDashboardItems(data.items || []); if (tab === "gmachim") renderDashboardOrganizations(data.organizations || []); if (tab === "addresses") await renderAddresses(); if (tab === "sessions") await renderSessions(); if (tab === "searches") await renderSavedSearches(); if (tab === "profile") await renderProfile(); if (tab === "notifications") await renderNotificationPreferences(); if (tab === "admin") await renderAdmin(); }
-    catch (error) { console.error("Dashboard error", error); $("#dashboard-content").innerHTML = `<div class="dashboard-empty">${escapeHTML(error.message || "לא הצלחנו לטעון את האזור האישי")}</div>`; }
+    catch (error) { console.error("Dashboard error", error); $("#dashboard-content").innerHTML = `<div class="dashboard-empty"><p>${escapeHTML(error.message || "לא הצלחנו לטעון את האזור האישי")}</p>${error.requestId?`<small>מספר תקלה לתמיכה: ${escapeHTML(error.requestId)}</small>`:""}<button class="button button-secondary" type="button" id="dashboard-support-error">פנייה לתמיכה עם פרטי התקלה</button></div>`;$("#dashboard-support-error")?.addEventListener("click",()=>openSupportForError(error,"תקלה בטעינת האזור האישי")); }
   }
   async function renderSessions() {
     const [{sessions = []},{events = []}] = await Promise.all([api("/api/me/sessions"),api("/api/me/security-events")]);
@@ -765,7 +810,7 @@
 
   function installFormErrorFocus(){document.addEventListener("invalid",event=>{const el=event.target;if(!(el instanceof HTMLElement))return;el.setAttribute("aria-invalid","true");el.addEventListener("input",()=>el.removeAttribute("aria-invalid"),{once:true});requestAnimationFrame(()=>{el.focus({preventScroll:true});el.scrollIntoView({behavior:"smooth",block:"center"})})},true);document.addEventListener("submit",event=>{const form=event.target;if(!(form instanceof HTMLFormElement)||form.checkValidity())return;const first=form.querySelector(":invalid");if(first){first.setAttribute("aria-invalid","true");first.focus({preventScroll:true});first.scrollIntoView({behavior:"smooth",block:"center"})}},true)}
   async function init() {
-    setupEvents(); installFormErrorFocus(); setAuthMode("login"); updateAuthUI();
+    setupEvents(); installFormErrorFocus(); setAuthMode("login"); updateAuthUI(); installAdvancedGmachSearch();
     const siteCopyReady = Promise.allSettled([loadSiteSettings(), loadPageCustomizations()])
       .finally(() => document.documentElement.classList.remove("site-copy-pending"));
     await detectServer();
