@@ -105,7 +105,7 @@
       <label><input type="checkbox" name="communityEmails" ${profile.communityEmails?"checked":""}> עדכוני קהילה</label>
       <div class="pt-row"><button class="pt-btn primary">שמירה</button>${profile.deletionRequestedAt?'<button type="button" class="pt-btn danger" id="pt-cancel-deletion">ביטול בקשת מחיקה</button>':""}</div></form><div class="pt-status"></div>`;
     const f=$("#pt-profile",body); f.preferredLanguage.value=profile.preferredLanguage||"he";
-    f.onsubmit=async e=>{e.preventDefault();try{profile=(await api("/api/me/profile",{method:"PATCH",body:{fullName:f.fullName.value,phone:f.phone.value,city:f.city.value,preferredLanguage:f.preferredLanguage.value,operationalEmails:f.operationalEmails.checked,communityEmails:f.communityEmails.checked}})).profile;setStatus("הפרטים נשמרו.");}catch(err){setStatus(err.message,true)}};
+    f.onsubmit=async e=>{e.preventDefault();try{const chosenLanguage=f.preferredLanguage.value;profile=(await api("/api/me/profile",{method:"PATCH",body:{fullName:f.fullName.value,phone:f.phone.value,city:f.city.value,preferredLanguage:chosenLanguage,operationalEmails:f.operationalEmails.checked,communityEmails:f.communityEmails.checked}})).profile;const previousLanguage=localStorage.getItem("gmach-language")||document.documentElement.lang||"he";localStorage.setItem("gmach-language",chosenLanguage);setStatus("הפרטים נשמרו.");if(previousLanguage!==chosenLanguage)location.reload();}catch(err){setStatus(err.message,true)}};
     $("#pt-cancel-deletion",body)?.addEventListener("click",async()=>{try{await api("/api/me/account/cancel-deletion",{method:"POST",body:{}});profile.deletionRequestedAt=null;await renderProfile();setStatus("בקשת המחיקה בוטלה.");}catch(err){setStatus(err.message,true)}});
   }
 
