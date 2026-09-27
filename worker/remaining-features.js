@@ -81,21 +81,49 @@ async function respondReview(request,env,id){
  const r=await env.DB.prepare("SELECT organization_id FROM reviews WHERE id=?").bind(id).first();if(!r)throw new RemainingError(404,"הביקורת לא נמצאה");await orgAccess(request,env,r.organization_id);const b=await body(request),text=clean(b.response,2,1000,"תגובה");await env.DB.prepare("UPDATE reviews SET organization_response=?,organization_response_at=? WHERE id=?").bind(text,new Date().toISOString(),id).run();return json({ok:true});
 }
 async function orgDashboard(request,env,orgId,url){
- await orgAccess(request,env,orgId);const branch=url.searchParams.get("branch"),category=url.searchParams.get("category");const now=new Date(),today=dayKey(now);
+ await orgAccess(request,env,orgId);
+ const branch=url.searchParams.get("branch"),category=url.searchParams.get("category"),now=new Date(),today=dayKey(now);
+ const parseRange=(raw,fallback,endOfDay=false)=>{if(!raw)return fallback;const d=new Date(/^\d{4}-\d{2}-\d{2}$/.test(raw)?raw+(endOfDay?"T23:59:59.999Z":"T00:00:00.000Z"):raw);return Number.isNaN(d.getTime())?fallback:d.toISOString()};
+ const rangeFrom=parseRange(url.searchParams.get("from"),new Date(Date.now()-30*86400000).toISOString());
+ const rangeTo=parseRange(url.searchParams.get("to"),now.toISOString(),true);
+ if(Date.parse(rangeTo)<Date.parse(rangeFrom))throw new RemainingError(400,"טווח התאריכים אינו תקין");
  const where=["i.organization_id=?"],bind=[orgId];if(branch){where.push("lr.branch_id=?");bind.push(branch)}if(category){where.push("i.category=?");bind.push(category)}
- const q=where.join(" AND ");
- const [newReq,pickups,returns,late,inventory,unread,reviews,top]=await Promise.all([
+ const q=where.join(" AND "),rangeQ=q+" AND lr.created_at>=? AND lr.created_at<=?",rangeBind=[...bind,rangeFrom,rangeTo];
+ const invWhere=["i.organization_id=?"],invBind=[orgId];if(branch){invWhere.push("iu.branch_id=?");invBind.push(branch)}if(category){invWhere.push("i.category=?");invBind.push(category)}
+ const [newReq,pickups,returns,late,inventory,unread,reviews,top,rangeStats,daily,upcoming,branches,categories]=await Promise.all([
   env.DB.prepare(`SELECT COUNT(*) count FROM loan_requests lr JOIN items i ON i.id=lr.item_id WHERE ${q} AND lr.status='pending'`).bind(...bind).first(),
   env.DB.prepare(`SELECT COUNT(*) count FROM loan_requests lr JOIN items i ON i.id=lr.item_id WHERE ${q} AND substr(COALESCE(lr.pickup_window_start,lr.requested_from),1,10)=?`).bind(...bind,today).first(),
   env.DB.prepare(`SELECT COUNT(*) count FROM loan_requests lr JOIN items i ON i.id=lr.item_id WHERE ${q} AND substr(lr.requested_until,1,10)=?`).bind(...bind,today).first(),
   env.DB.prepare(`SELECT COUNT(*) count FROM loan_requests lr JOIN items i ON i.id=lr.item_id WHERE ${q} AND lr.status='collected' AND lr.requested_until<?`).bind(...bind,now.toISOString()).first(),
-  env.DB.prepare("SELECT COUNT(*) total,SUM(CASE WHEN status='available' THEN 1 ELSE 0 END) available,SUM(CASE WHEN status='loaned' THEN 1 ELSE 0 END) loaned,SUM(CASE WHEN status='repair' THEN 1 ELSE 0 END) repair FROM item_units iu JOIN items i ON i.id=iu.item_id WHERE i.organization_id=?").bind(orgId).first(),
-  env.DB.prepare(`SELECT COUNT(*) count FROM request_messages rm JOIN loan_requests lr ON lr.id=rm.request_id JOIN items i ON i.id=lr.item_id WHERE i.organization_id=? AND rm.read_at IS NULL AND rm.sender_id<>?`).bind(orgId,(await requireUser(request,env)).id).first(),
+  env.DB.prepare(`SELECT COUNT(*) total,SUM(CASE WHEN iu.status='available' THEN 1 ELSE 0 END) available,SUM(CASE WHEN iu.status='loaned' THEN 1 ELSE 0 END) loaned,SUM(CASE WHEN iu.status='repair' THEN 1 ELSE 0 END) repair FROM item_units iu JOIN items i ON i.id=iu.item_id WHERE ${invWhere.join(" AND ")}`).bind(...invBind).first(),
+  env.DB.prepare(`SELECT COUNT(*) count FROM request_messages rm JOIN loan_requests lr ON lr.id=rm.request_id JOIN items i ON i.id=lr.item_id WHERE ${q} AND rm.read_at IS NULL AND rm.sender_id<>?`).bind(...bind,(await requireUser(request,env)).id).first(),
   env.DB.prepare("SELECT COUNT(*) count,AVG(rating) avg FROM reviews WHERE organization_id=? AND status='published' AND created_at>=datetime('now','-30 days')").bind(orgId).first(),
-  env.DB.prepare("SELECT i.id,i.title,COUNT(lr.id) loans FROM items i LEFT JOIN loan_requests lr ON lr.item_id=i.id WHERE i.organization_id=? GROUP BY i.id ORDER BY loans DESC LIMIT 8").bind(orgId).all()
+  env.DB.prepare("SELECT i.id,i.title,COUNT(lr.id) loans FROM items i LEFT JOIN loan_requests lr ON lr.item_id=i.id WHERE i.organization_id=? GROUP BY i.id ORDER BY loans DESC LIMIT 8").bind(orgId).all(),
+  env.DB.prepare(`SELECT COUNT(*) total,SUM(CASE WHEN lr.status IN ('approved','collected','returned') THEN 1 ELSE 0 END) successful,SUM(CASE WHEN lr.status='returned' THEN 1 ELSE 0 END) completed,SUM(CASE WHEN lr.status='cancelled' THEN 1 ELSE 0 END) cancelled FROM loan_requests lr JOIN items i ON i.id=lr.item_id WHERE ${rangeQ}`).bind(...rangeBind).first(),
+  env.DB.prepare(`SELECT substr(lr.created_at,1,10) day,COUNT(*) total,SUM(CASE WHEN lr.status='returned' THEN 1 ELSE 0 END) completed FROM loan_requests lr JOIN items i ON i.id=lr.item_id WHERE ${rangeQ} GROUP BY substr(lr.created_at,1,10) ORDER BY day`).bind(...rangeBind).all(),
+  env.DB.prepare(`SELECT lr.id,lr.status,lr.requested_from,lr.requested_until,i.title,b.name branch_name,u.full_name borrower_name FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN users u ON u.id=lr.borrower_id LEFT JOIN organization_branches b ON b.id=lr.branch_id WHERE ${q} AND lr.status IN ('pending','approved','collected') AND lr.requested_until>=? ORDER BY lr.requested_from LIMIT 100`).bind(...bind,now.toISOString()).all(),
+  env.DB.prepare("SELECT id,name,city FROM organization_branches WHERE organization_id=? AND status!='archived' ORDER BY name").bind(orgId).all(),
+  env.DB.prepare("SELECT DISTINCT category FROM items WHERE organization_id=? AND deleted_at IS NULL AND category IS NOT NULL ORDER BY category").bind(orgId).all()
  ]);
- const payload={newRequests:Number(newReq?.count||0),pickupsToday:Number(pickups?.count||0),returnsToday:Number(returns?.count||0),late:Number(late?.count||0),inventory:{total:Number(inventory?.total||0),available:Number(inventory?.available||0),loaned:Number(inventory?.loaned||0),repair:Number(inventory?.repair||0)},unreadMessages:Number(unread?.count||0),reviews30d:Number(reviews?.count||0),rating30d:Number(reviews?.avg||0),topItems:top.results};
+ const payload={
+  newRequests:Number(newReq?.count||0),pickupsToday:Number(pickups?.count||0),returnsToday:Number(returns?.count||0),late:Number(late?.count||0),
+  inventory:{total:Number(inventory?.total||0),available:Number(inventory?.available||0),loaned:Number(inventory?.loaned||0),repair:Number(inventory?.repair||0)},
+  unreadMessages:Number(unread?.count||0),reviews30d:Number(reviews?.count||0),rating30d:Number(reviews?.avg||0),topItems:top.results,
+  range:{from:rangeFrom,to:rangeTo,total:Number(rangeStats?.total||0),successful:Number(rangeStats?.successful||0),completed:Number(rangeStats?.completed||0),cancelled:Number(rangeStats?.cancelled||0)},
+  daily:daily.results||[],upcoming:upcoming.results||[],filters:{branches:branches.results||[],categories:(categories.results||[]).map(x=>x.category),branch:branch||"",category:category||""}
+ };
  return json(payload);
+}
+async function orgOperationsCsv(request,env,orgId,url){
+ await orgAccess(request,env,orgId);
+ const branch=url.searchParams.get("branch"),category=url.searchParams.get("category"),from=url.searchParams.get("from"),to=url.searchParams.get("to");
+ const where=["i.organization_id=?"],bind=[orgId];if(branch){where.push("lr.branch_id=?");bind.push(branch)}if(category){where.push("i.category=?");bind.push(category)}
+ if(from){where.push("lr.created_at>=?");bind.push(new Date(from+"T00:00:00.000Z").toISOString())}if(to){where.push("lr.created_at<=?");bind.push(new Date(to+"T23:59:59.999Z").toISOString())}
+ const rows=await env.DB.prepare(`SELECT lr.id,lr.status,lr.workflow_status,lr.quantity,lr.requested_from,lr.requested_until,lr.created_at,i.title,i.category,u.full_name borrower,b.name branch FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN users u ON u.id=lr.borrower_id LEFT JOIN organization_branches b ON b.id=lr.branch_id WHERE ${where.join(" AND ")} ORDER BY lr.created_at DESC LIMIT 10000`).bind(...bind).all();
+ const columns=["id","status","workflow_status","quantity","requested_from","requested_until","created_at","title","category","borrower","branch"];
+ const cell=v=>{const raw=String(v??""),safeValue=/^[=+@\-\t\r]/.test(raw)?"'"+raw:raw;return '"'+safeValue.replaceAll('"','""')+'"'};
+ const csv="\ufeff"+[columns,...(rows.results||[]).map(row=>columns.map(k=>row[k]))].map(row=>row.map(cell).join(",")).join("\r\n")+"\r\n";
+ return new Response(csv,{headers:{"Content-Type":"text/csv; charset=utf-8","Content-Disposition":`attachment; filename="gmach-operations-${orgId.replace(/[^a-zA-Z0-9-]/g,"")}.csv"`,"Cache-Control":"no-store"}});
 }
 async function orgInventoryCsv(request,env,orgId){
  const user=await requireUser(request,env);
@@ -276,6 +304,7 @@ export async function handleRemainingFeatures(request,env,ctx,url){
   m=path.match(/^\/api\/reviews\/([^/]+)\/report$/);if(m&&method==="POST")return await reportReview(request,env,decodeURIComponent(m[1]));
   m=path.match(/^\/api\/reviews\/([^/]+)\/response$/);if(m&&method==="POST")return await respondReview(request,env,decodeURIComponent(m[1]));
   m=path.match(/^\/api\/organizations\/([^/]+)\/operations-dashboard$/);if(m&&method==="GET")return await orgDashboard(request,env,decodeURIComponent(m[1]),url);
+  m=path.match(/^\/api\/organizations\/([^/]+)\/operations-export\.csv$/);if(m&&method==="GET")return await orgOperationsCsv(request,env,decodeURIComponent(m[1]),url);
   m=path.match(/^\/api\/organizations\/([^/]+)\/inventory-export\.csv$/);if(m&&method==="GET")return await orgInventoryCsv(request,env,decodeURIComponent(m[1]));
   if(path==="/api/content"&&method==="GET")return await pageContent(request,env,url);
   if(path==="/api/admin/page-content"&&(method==="GET"||method==="PUT"))return await adminPageContent(request,env);
