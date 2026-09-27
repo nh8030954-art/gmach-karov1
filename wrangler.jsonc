@@ -21,6 +21,10 @@
     {
       "binding": "ITEM_IMAGES",
       "bucket_name": "gmach-karov-images"
+    },
+    {
+      "binding": "BACKUP_STORAGE",
+      "bucket_name": "gmach-karov-backups"
     }
   ],
   "ai": {"binding":"AI"},
