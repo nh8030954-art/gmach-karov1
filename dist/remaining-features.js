@@ -125,6 +125,9 @@ const I18N_FINAL_EN={
   "מעבר לניהול הגמ\"ח": "Go to gmach management",
   "שלושה דברים שכדאי לעשות עכשיו": "Three useful next steps",
   "הבנתי, לא להציג שוב": "Got it, do not show again",
+  "אם נתקלתם בקושי, ספרו לנו מה ניסיתם לעשות, באיזה עמוד, באיזה מכשיר ובאיזו טכנולוגיה מסייעת השתמשתם. ניתן לפנות באמצעות טופס \"יצירת קשר ותמיכה\" באתר. נעשה מאמץ להשיב בהקדם ולספק חלופה נגישה.": "If you encounter an accessibility difficulty, tell us what you tried to do, which page and device you used, and which assistive technology you used. You can contact us through the Contact and Support form on the site. We will make every effort to respond promptly and provide an accessible alternative.",
+  "טווח חיפוש בק\"מ": "Search radius in km",
+  "למשל 20": "For example, 20",
   "אפשר לייצא עותק מקיף של נתוני החשבון, ההשאלות, ההודעות, ההסכמות, המועדפים, החיפושים, האבטחה והתמיכה, או לפתוח בקשת עיון ותיקון.": "Export a comprehensive copy of your account, loans, messages, consents, saved content, searches, security and support data, or submit an access or correction request.",
   
 
