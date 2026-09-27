@@ -603,6 +603,10 @@ async function routeApi(request, env, ctx, url) {
   const adminReport = path.match(/^\/api\/admin\/reports\/([^/]+)$/);
   if (method === "PATCH" && adminReport) return moderateReport(request, env, decodeURIComponent(adminReport[1]));
 
+  const bulkRoute=path.match(/^\\/api\\/organizations\\/([^/]+)\\/inventory\\/bulk$/);
+  if(method==="POST"&&bulkRoute)return bulkInventoryAction(request,env,decodeURIComponent(bulkRoute[1]));
+  if(method==="POST"&&path==="/api/items/import")return importItems(request,env);
+
   const finalFeaturesResponse = await handleFinalFeatures(request, env, ctx, url);
   if (finalFeaturesResponse) return finalFeaturesResponse;
   const remainingFeaturesResponse = await handleRemainingFeatures(request, env, ctx, url);
@@ -3214,4 +3218,37 @@ function withSecurityHeaders(response) {
   headers.set("Cross-Origin-Opener-Policy", "same-origin");
   headers.set("Cross-Origin-Resource-Policy", "same-origin");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+
+async function bulkInventoryAction(request,env,organizationId){
+  const user=await requireUser(request,env),body=await readJson(request);
+  const access=await env.DB.prepare("SELECT o.owner_id,m.role FROM organizations o LEFT JOIN organization_members m ON m.organization_id=o.id AND m.user_id=? WHERE o.id=?").bind(user.id,organizationId).first();
+  if(!access||(access.owner_id!==user.id&&user.role!=="admin"&&!["owner","inventory"].includes(access.role)))throw new HttpError(403,"אין הרשאה לניהול המלאי");
+  const ids=[...new Set((Array.isArray(body.itemIds)?body.itemIds:[]).map(String))].slice(0,200);if(!ids.length)throw new HttpError(400,"יש לבחור לפחות מוצר אחד");
+  const allowed=new Set(["activate","deactivate","availability","quantity","category"]);if(!allowed.has(body.action))throw new HttpError(400,"פעולת המלאי אינה תקינה");
+  let affected=0;
+  for(const id of ids){
+    const item=await env.DB.prepare("SELECT id FROM items WHERE id=? AND organization_id=? AND deleted_at IS NULL").bind(id,organizationId).first();if(!item)continue;
+    if(body.action==="activate")affected+=(await env.DB.prepare("UPDATE items SET status='active',updated_at=? WHERE id=?").bind(new Date().toISOString(),id).run()).meta.changes||0;
+    else if(body.action==="deactivate")affected+=(await env.DB.prepare("UPDATE items SET status='pending',updated_at=? WHERE id=?").bind(new Date().toISOString(),id).run()).meta.changes||0;
+    else if(body.action==="availability"){const v=body.availability==="unavailable"?"unavailable":"available";affected+=(await env.DB.prepare("UPDATE items SET availability_status=?,updated_at=? WHERE id=?").bind(v,new Date().toISOString(),id).run()).meta.changes||0;}
+    else if(body.action==="quantity"){const q=positiveInt(body.quantity,1,1,999,"כמות");affected+=(await env.DB.prepare("UPDATE items SET quantity=?,inventory_updated_at=?,updated_at=? WHERE id=?").bind(q,new Date().toISOString(),new Date().toISOString(),id).run()).meta.changes||0;}
+    else {const cat=cleanText(body.category,2,80,"קטגוריה");affected+=(await env.DB.prepare("UPDATE items SET category=?,updated_at=? WHERE id=?").bind(cat,new Date().toISOString(),id).run()).meta.changes||0;}
+  }
+  const jobId=crypto.randomUUID();await env.DB.prepare("INSERT INTO bulk_inventory_jobs(id,organization_id,actor_id,action,payload_json,status,affected_count,completed_at) VALUES(?,?,?,?,?,'completed',?,?)").bind(jobId,organizationId,user.id,body.action,JSON.stringify(body).slice(0,4000),affected,new Date().toISOString()).run().catch(()=>{});
+  return json({job:{id:jobId,affected,action:body.action}});
+}
+async function importItems(request,env){
+  const user=await requireUser(request,env),body=await readJson(request),organizationId=cleanText(body.organizationId,1,100,"גמ״ח");
+  const org=await env.DB.prepare("SELECT o.*,m.role member_role FROM organizations o LEFT JOIN organization_members m ON m.organization_id=o.id AND m.user_id=? WHERE o.id=?").bind(user.id,organizationId).first();
+  if(!org||(org.owner_id!==user.id&&user.role!=="admin"&&!["owner","inventory"].includes(org.member_role)))throw new HttpError(403,"אין הרשאה לייבא מוצרים לגמ״ח הזה");
+  const rows=Array.isArray(body.items)?body.items.slice(0,500):[];if(!rows.length)throw new HttpError(400,"לא נמצאו שורות לייבוא");
+  const created=[],errors=[];
+  for(let n=0;n<rows.length;n++){const x=rows[n];try{
+    const title=cleanText(x.title,2,120,"שם הפריט"),category=cleanText(x.category||org.primary_category||"כללי",2,80,"קטגוריה"),description=cleanText(x.description||("פריט "+title+" להשאלה"),10,1200,"תיאור"),condition=normalizeProductCondition(String(x.condition||"טוב")).base,quantity=positiveInt(x.quantity,1,1,999,"כמות"),id=crypto.randomUUID();
+    await env.DB.prepare("INSERT INTO items(id,organization_id,title,category,description,condition,quantity,city,neighborhood,status,availability_status,is_free,icon,cover_color,inventory_updated_at) VALUES(?,?,?,?,?,?,?,?,?,'active','available',1,'box','#e6f2ef',?)").bind(id,organizationId,title,category,description,condition,quantity,cleanOptional(x.city,80)||org.city,cleanOptional(x.neighborhood,80)||org.neighborhood,new Date().toISOString()).run();created.push(id);
+  }catch(e){errors.push({row:n+2,error:e.message||"שורה לא תקינה"})}}
+  if(created.length)await env.DB.prepare("UPDATE organizations SET is_hidden=0,updated_at=? WHERE id=?").bind(new Date().toISOString(),organizationId).run();
+  return json({created,errors},created.length?201:400);
 }
