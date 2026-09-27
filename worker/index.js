@@ -128,6 +128,16 @@ async function importItems(request,env){
 }
 
 
+async function invalidatePublicSnapshotRoots(origin) {
+  if (typeof caches === "undefined") return;
+  const cache = caches.default;
+  await Promise.all([
+    "/api/items",
+    "/api/categories",
+    "/api/discovery"
+  ].map(path => cache.delete(new Request(origin + path, { method:"GET", headers:{ "Accept":"application/json" } })).catch(() => false)));
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -155,30 +165,49 @@ export default {
         const expansionPreflight = await requirementsExpansionPreflight(request, env, url);
         if (expansionPreflight) return withSecurityHeaders(expansionPreflight);
         const completionResponse = await handlePlatformCompletionApi(request, env, ctx, url);
-        if (completionResponse) return withSecurityHeaders(completionResponse);
-        const publicSnapshotTtl = request.method === "GET" ? ({
-          "/api/items": 86400,
-          "/api/categories": 86400,
-          "/api/discovery": 86400
-        })[url.pathname] : 0;
-        if (publicSnapshotTtl && typeof caches !== "undefined") {
+        if (completionResponse) {
+          if (!["GET","HEAD","OPTIONS"].includes(request.method) && completionResponse.ok) await invalidatePublicSnapshotRoots(url.origin);
+          return withSecurityHeaders(completionResponse);
+        }
+        const publicSnapshotPolicy = request.method === "GET" ? ({
+          "/api/items": { fresh:30, stale:86400 },
+          "/api/categories": { fresh:1800, stale:86400 },
+          "/api/discovery": { fresh:60, stale:86400 }
+        })[url.pathname] : null;
+        if (publicSnapshotPolicy && typeof caches !== "undefined") {
           const cache = caches.default;
           const cacheKey = new Request(url.toString(), { method:"GET", headers:{ "Accept":"application/json" } });
+          const snapshot = await cache.match(cacheKey);
+          if (snapshot) {
+            const cachedAt = Date.parse(snapshot.headers.get("X-Data-Cached-At") || "");
+            if (Number.isFinite(cachedAt) && Date.now() - cachedAt < publicSnapshotPolicy.fresh * 1000) {
+              const headers = new Headers(snapshot.headers);
+              headers.set("Cache-Control", `public, max-age=${publicSnapshotPolicy.fresh}`);
+              headers.set("X-Data-Cache", "HIT");
+              return withSecurityHeaders(new Response(snapshot.body, { status:snapshot.status, statusText:snapshot.statusText, headers }));
+            }
+          }
           try {
             const response = await routeApi(request, env, ctx, url);
             if (response.ok) {
+              const cachedAt = new Date().toISOString();
               const storedHeaders = new Headers(response.headers);
-              storedHeaders.set("Cache-Control", `public, max-age=${publicSnapshotTtl}`);
+              storedHeaders.set("Cache-Control", `public, max-age=${publicSnapshotPolicy.stale}`);
+              storedHeaders.set("X-Data-Cached-At", cachedAt);
               const stored = new Response(response.clone().body, { status:response.status, statusText:response.statusText, headers:storedHeaders });
               try { ctx.waitUntil(cache.put(cacheKey, stored)); } catch {}
+              const liveHeaders = new Headers(response.headers);
+              liveHeaders.set("Cache-Control", `public, max-age=${publicSnapshotPolicy.fresh}`);
+              liveHeaders.set("X-Data-Cache", "MISS");
+              return withSecurityHeaders(new Response(response.body, { status:response.status, statusText:response.statusText, headers:liveHeaders }));
             }
             return withSecurityHeaders(response);
           } catch (error) {
-            const snapshot = await cache.match(cacheKey);
             if (snapshot) {
               const headers = new Headers(snapshot.headers);
               headers.set("Cache-Control", "no-store");
               headers.set("X-Data-Stale", "1");
+              headers.set("X-Data-Cache", "STALE");
               headers.set("Warning", '110 - "Response is a cached snapshot because the live database is temporarily unavailable"');
               return withSecurityHeaders(new Response(snapshot.body, { status:snapshot.status, statusText:snapshot.statusText, headers }));
             }
@@ -186,6 +215,7 @@ export default {
           }
         }
         const response = await routeApi(request, env, ctx, url);
+        if (!["GET","HEAD","OPTIONS"].includes(request.method) && response.ok) await invalidatePublicSnapshotRoots(url.origin);
         return withSecurityHeaders(response);
       }
       if (url.pathname === "/sitemap.xml") {
@@ -209,8 +239,19 @@ export default {
       return withSecurityHeaders(json({ error: error instanceof HttpError ? error.message : "אירעה תקלה זמנית בשרת", requestId }, status, { "X-Request-Id": requestId }));
     }
   },
-  async scheduled(_event, env, ctx) {
-    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env),ensureDistributionCompletionSchema(env),ensureNavigationAdminSchema(env),ensurePrivacyAvailabilitySchema(env),ensurePrivacyPurgeSchema(env),ensureCommunityChatSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env), runPrivacyPurgeMaintenance(env), runCommunityChatMaintenance(env)]); })());
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil((async()=>{
+      // Schema reconciliation is intentionally daily. Running every ensure
+      // function every few minutes was a large, unnecessary source of D1 reads.
+      if (event.cron === "17 2 * * *") {
+        await ensureAdvancedBookingSchema(env);
+        await ensureProductionHardeningSchema(env);
+        await ensureCompletePlatformSchema(env);
+        await ensureReviewBranchRatingSchema(env);
+        await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env),ensureDistributionCompletionSchema(env),ensureNavigationAdminSchema(env),ensurePrivacyAvailabilitySchema(env),ensurePrivacyPurgeSchema(env),ensureCommunityChatSchema(env)]);
+      }
+      await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env), runPrivacyPurgeMaintenance(env), runCommunityChatMaintenance(env)]);
+    })());
   }
 };
 
@@ -436,27 +477,31 @@ async function routeApi(request, env, ctx, url) {
   if (method === "OPTIONS") return new Response(null, { status: 204 });
 
   if (method === "GET" && path === "/api/health") {
-    // Keep the normal production liveness probe lightweight. Deep schema
-    // reconciliation is explicit so deploy probes never pay its D1 cost.
+    // Health probes must verify availability without mutating schema or doing
+    // expensive reconciliation. Migrations and the daily maintenance cron own
+    // schema repair so release checks cannot consume the D1 daily allowance.
+    const deep = url.searchParams.get("deep") === "1";
     await env.DB.prepare("SELECT 1 AS ok").first();
-    if (url.searchParams.get("deep")==="1") {
-      await ensureAdvancedBookingSchema(env);
-      await ensureProductionHardeningSchema(env);
-      await ensureCompletePlatformSchema(env);
-      await Promise.all([
-        ensurePlatformCompletionSchema(env),
-        ensureFinalFeaturesSchema(env),
-        ensureRemainingFeaturesSchema(env),
-        ensureRequirementsExpansionSchema(env),
-        ensureLaunchReadinessSchema(env),
-        ensureDistributionCompletionSchema(env),
-        ensureNavigationAdminSchema(env),
-        ensurePrivacyAvailabilitySchema(env),
-        ensurePrivacyPurgeSchema(env),
-        ensureCommunityChatSchema(env)
-      ]);
+    let catalog = null, categories = null;
+    if (deep) {
+      await env.DB.prepare(`SELECT i.id FROM items i JOIN organizations o ON o.id=i.organization_id
+        WHERE i.status='active' AND i.is_free=1 AND o.status='approved' AND o.is_hidden=0 LIMIT 1`).first();
+      catalog = true;
+      await env.DB.prepare("SELECT id FROM categories WHERE status='active' LIMIT 1").first();
+      categories = true;
     }
-    return json({ ok:true, release:"complete-platform-2026-09-27.10", database:"D1", storage:"R2", email:Boolean(env.RESEND_API_KEY), privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY), deep:url.searchParams.get("deep")==="1", timestamp:new Date().toISOString() });
+    return json({
+      ok:true,
+      release:"complete-platform-2026-09-27.15",
+      database:"D1",
+      storage:"R2",
+      email:Boolean(env.RESEND_API_KEY),
+      privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),
+      deep,
+      catalog,
+      categories,
+      timestamp:new Date().toISOString()
+    });
   }
 
   if (method === "POST" && path === "/api/translate/user-content") return translateUserContent(request, env, ctx);
@@ -968,10 +1013,11 @@ async function updateProfile(request, env) {
   const fullName=cleanText(body.fullName,2,80,"שם מלא"), phone=validatePhone(body.phone), city=cleanText(body.city,2,80,"עיר או יישוב");
   const language=body.preferredLanguage==="en"?"en":"he", navigation=["google","waze","apple"].includes(body.preferredNavigation)?body.preferredNavigation:(user.preferred_navigation||"google"), operational=body.operationalEmails===false?0:1, community=body.communityEmails===true?1:0;
   const now=new Date().toISOString();
-  await env.DB.batch([
-    env.DB.prepare("UPDATE users SET full_name=?,phone=?,city=?,preferred_language=?,preferred_navigation=?,operational_emails_accepted=?,community_emails_accepted=?,updated_at=? WHERE id=?").bind(fullName,phone,city,language,navigation,operational,community,now,user.id),
-    env.DB.prepare("INSERT INTO navigation_preferences(user_id,preferred_app) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET preferred_app=excluded.preferred_app,updated_at=?").bind(user.id,navigation,now)
-  ]);
+  // preferred_navigation on users is the canonical navigation preference.
+  // Do not depend on the obsolete navigation_preferences table, which was
+  // never part of the migration ledger and made profile updates schema-order dependent.
+  await env.DB.prepare("UPDATE users SET full_name=?,phone=?,city=?,preferred_language=?,preferred_navigation=?,operational_emails_accepted=?,community_emails_accepted=?,updated_at=? WHERE id=?")
+    .bind(fullName,phone,city,language,navigation,operational,community,now,user.id).run();
   return json({ profile:{...publicUser({...user,full_name:fullName}),phone,city,preferredLanguage:language,preferredNavigation:navigation,operationalEmails:Boolean(operational),communityEmails:Boolean(community)} });
 }
 
@@ -1259,7 +1305,11 @@ async function listItems(env, url) {
   // from health/scheduled maintenance; the compatible query below keeps older
   // databases readable while that maintenance catches up.
   const params = [];
-  const catalogLimit = env.QA_CATALOG_LIMIT === "300" ? 300 : 100;
+  const maximumCatalogLimit = env.QA_CATALOG_LIMIT === "300" ? 300 : 100;
+  const requestedCatalogLimit = Number.parseInt(url.searchParams.get("limit") || "", 10);
+  const catalogLimit = Number.isFinite(requestedCatalogLimit)
+    ? Math.max(1, Math.min(maximumCatalogLimit, requestedCatalogLimit))
+    : maximumCatalogLimit;
   const where = ["i.status = 'active'", "i.is_free = 1", "o.status = 'approved'", "o.is_hidden = 0"];
   const query = cleanOptional(url.searchParams.get("q"), 120);
   const category = cleanOptional(url.searchParams.get("category"), 40);
@@ -1490,8 +1540,28 @@ async function createHelpRequest(request, env) {
   return json({ request: { id, status: "open",requestedFrom,requestedUntil,distanceKm } }, 201);
 }
 
+let reviewBranchRatingSchemaPromise = null;
+async function ensureReviewBranchRatingSchema(env) {
+  if (reviewBranchRatingSchemaPromise) return reviewBranchRatingSchemaPromise;
+  reviewBranchRatingSchemaPromise = (async () => {
+    const columns = await env.DB.prepare("PRAGMA table_info(reviews)").all();
+    if ((columns.results || []).some(column => column.name === "branch_rating")) return true;
+    try {
+      await env.DB.prepare("ALTER TABLE reviews ADD COLUMN branch_rating INTEGER CHECK (branch_rating BETWEEN 1 AND 5)").run();
+    } catch (error) {
+      if (!/duplicate column name/i.test(String(error))) throw error;
+    }
+    return true;
+  })().catch(error => {
+    reviewBranchRatingSchemaPromise = null;
+    throw error;
+  });
+  return reviewBranchRatingSchemaPromise;
+}
+
 async function createReview(request, env) {
   const user = await requireUser(request, env); const body = await readJson(request);
+  await ensureReviewBranchRatingSchema(env);
   const requestId = cleanText(body.requestId,1,100,"בקשה");
   const rating = Number(body.organizationRating); const itemRating = Number(body.itemRating); const serviceRating = Number(body.serviceRating); const branchRating = body.branchRating==null?null:Number(body.branchRating);
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new HttpError(400, "דירוג הגמ״ח חייב להיות בין 1 ל־5");
