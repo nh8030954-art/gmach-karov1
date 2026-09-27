@@ -102,6 +102,25 @@ async function drafts(request,env,id=null){
   }
   return json({draft:{id,step,payload}});
 }
+async function organizationOnboarding(request,env,orgId){
+  await orgAccess(request,env,orgId);
+  const now=new Date().toISOString();
+  await env.DB.prepare("INSERT OR IGNORE INTO organization_onboarding(organization_id) VALUES(?)").bind(orgId).run();
+  if(request.method==="GET"){
+    const row=await env.DB.prepare("SELECT * FROM organization_onboarding WHERE organization_id=?").bind(orgId).first();
+    const readinessResponse=await publishReadiness(request,env,orgId),readiness=await readinessResponse.json();
+    return json({onboarding:row,readiness});
+  }
+  const b=await body(request),allowed=["first_item_added","management_tour_done","preview_seen","tips_dismissed"],sets=[],args=[];
+  for(const key of allowed){
+    const camel={first_item_added:"firstItemAdded",management_tour_done:"managementTourDone",preview_seen:"previewSeen",tips_dismissed:"tipsDismissed"}[key];
+    if(b[camel]===undefined)continue;
+    sets.push(key+"=?");args.push(b[camel]===true?1:0);
+  }
+  if(sets.length){sets.push("updated_at=?");args.push(now,orgId);await env.DB.prepare("UPDATE organization_onboarding SET "+sets.join(",")+" WHERE organization_id=?").bind(...args).run();}
+  const row=await env.DB.prepare("SELECT * FROM organization_onboarding WHERE organization_id=?").bind(orgId).first();
+  return json({onboarding:row});
+}
 async function publishReadiness(request,env,orgId){
   await orgAccess(request,env,orgId);
   const org=await env.DB.prepare("SELECT id,name,description,city,address,phone,organization_type,temporarily_closed,deletion_requested_at FROM organizations WHERE id=?").bind(orgId).first();
@@ -394,6 +413,7 @@ export async function handleFinalFeatures(request,env,ctx,url){
     m=path.match(/^\/api\/me\/tours\/([^/]+)$/);if(m&&(method==="GET"||method==="PATCH"))return await tour(request,env,decodeURIComponent(m[1]));
     if(path==="/api/me/organization-drafts"&&(method==="GET"||method==="POST"))return await drafts(request,env);
     m=path.match(/^\/api\/me\/organization-drafts\/([^/]+)$/);if(m&&(method==="PATCH"||method==="DELETE"))return await drafts(request,env,decodeURIComponent(m[1]));
+    m=path.match(/^\/api\/organizations\/([^/]+)\/onboarding$/);if(m&&(method==="GET"||method==="PATCH"))return await organizationOnboarding(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/organizations\/([^/]+)\/publish-readiness$/);if(m&&method==="GET")return await publishReadiness(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/organizations\/([^/]+)\/categories$/);if(m&&(method==="GET"||method==="PUT"))return await entityCategories(request,env,"organization",decodeURIComponent(m[1]));
     m=path.match(/^\/api\/items\/([^/]+)\/categories$/);if(m&&(method==="GET"||method==="PUT"))return await entityCategories(request,env,"item",decodeURIComponent(m[1]));
