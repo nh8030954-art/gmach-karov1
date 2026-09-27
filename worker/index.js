@@ -875,6 +875,7 @@ async function updateProfile(request, env) {
   const fullName=cleanText(body.fullName,2,80,"שם מלא"), phone=validatePhone(body.phone), city=cleanText(body.city,2,80,"עיר או יישוב");
   const language=body.preferredLanguage==="en"?"en":"he", navigation=["google","waze","apple"].includes(body.preferredNavigation)?body.preferredNavigation:(user.preferred_navigation||"google"), operational=body.operationalEmails===false?0:1, community=body.communityEmails===true?1:0;
   const now=new Date().toISOString();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS navigation_preferences (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,preferred_app TEXT NOT NULL DEFAULT 'google' CHECK (preferred_app IN ('google','waze','apple')),updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))").run();
   await env.DB.batch([
     env.DB.prepare("UPDATE users SET full_name=?,phone=?,city=?,preferred_language=?,preferred_navigation=?,operational_emails_accepted=?,community_emails_accepted=?,updated_at=? WHERE id=?").bind(fullName,phone,city,language,navigation,operational,community,now,user.id),
     env.DB.prepare("INSERT INTO navigation_preferences(user_id,preferred_app) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET preferred_app=excluded.preferred_app,updated_at=?").bind(user.id,navigation,now)
