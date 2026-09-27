@@ -1,40 +1,40 @@
-sha=f5aed32df977ee41386406f8a49a1eb4af48e51e
+sha=3cb30ef7c7967ad4d9a406db557fe0587b27d61a
 install=success
 syntax=success
-tests=failure
-smoke=failure
+tests=success
+smoke=success
 live=success
-}
-node:internal/modules/run_main:107
-    triggerUncaughtException(
-    ^
-
-AssertionError [ERR_ASSERTION]: {"error":"אירעה תקלה זמנית בשרת","requestId":"c830b86d-b2ff-4b79-a879-71f0180312ee"}
-
-500 !== 200
-
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:264:10
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: 500,
-  expected: 200,
-  operator: 'strictEqual',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
-
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790506049847:264:10
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: 500,
-  expected: 200,
-  operator: 'strictEqual',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.10","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"timestamp":"2026-09-27T10:47:33.102Z"}
+Launch readiness static release gate passed.
+Distribution completion static release gate passed.
+Navigation admin static release gate passed.
+Privacy availability static release gate passed.
+Release hardening static gate passed.
+Release experience static release gate passed.
+Admin control center static release gate passed.
+Privacy purge static release gate passed.
+Community chat retention static release gate passed.
+QR scanning, structured SEO and accessibility shell gate passed.
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+Static English interface coverage 100.0% (411/411)
+remaining-features Error: Backup checksum mismatch
+    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
+    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:314:91)
+    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:596:37)
+    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:126:26)
+Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
+Privacy purge static release gate passed.
+Community chat retention static release gate passed.
+QR scanning, structured SEO and accessibility shell gate passed.
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+remaining-features Error: Backup checksum mismatch
+    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
+    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:314:91)
+    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:596:37)
+    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:126:26)
+Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
+{"ok":true,"release":"complete-platform-2026-09-27.10","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":false,"timestamp":"2026-09-27T10:48:22.907Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
