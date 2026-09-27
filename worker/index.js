@@ -374,30 +374,12 @@ async function routeApi(request, env, ctx, url) {
   if (method === "OPTIONS") return new Response(null, { status: 204 });
 
   if (method === "GET" && path === "/api/health") {
+    // Keep the liveness endpoint intentionally lightweight. Schema reconciliation and
+    // deep operational checks run in migrations, scheduled maintenance and the
+    // authenticated admin health endpoint; doing them here can make deploy probes
+    // time out while D1 is busy.
     await env.DB.prepare("SELECT 1 AS ok").first();
-    await ensureAdvancedBookingSchema(env);
-    await ensureProductionHardeningSchema(env);
-    await ensureCompletePlatformSchema(env);
-    await ensurePlatformCompletionSchema(env);
-    const [usersTable,challengesTable,itemsTable,waitlistTable,blocksTable,securityTable,sessionsTable]=await Promise.all([
-      env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").first(),
-      env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='auth_challenges'").first(),
-      env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='items'").first(),
-      env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='waitlist_entries'").first(),
-      env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='inventory_blocks'").first(),
-      env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='security_events'").first(),
-      env.DB.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='sessions'").first()
-    ]);
-    const userSql=String(usersTable?.sql||"").toLowerCase(),itemSql=String(itemsTable?.sql||"").toLowerCase();
-    const bookingReady=itemSql.includes("min_loan_minutes")&&itemSql.includes("deposit_required")&&Boolean(waitlistTable)&&Boolean(blocksTable);
-    const seededAdmin=await env.DB.prepare("SELECT password_hash FROM users WHERE id='admin-netanel-hirsh'").first();
-    const adminCredentialRotated=!seededAdmin||seededAdmin.password_hash!=="5cSI6TEtFyH-uPzoGKFhS2ioqI9z-0NlihqSNTPgT5U";
-    const completeReady=Boolean(securityTable)&&String(sessionsTable?.sql||"").includes("device_label")&&userSql.includes("terms_accepted_at");
-    const categoriesReady=Boolean(await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='categories'").first());
-    const completionTables=await Promise.all(["inventory_holds","branch_transfers","notification_queue","backup_runs","geo_cache"].map(name=>env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").bind(name).first()));
-    const completionReady=completionTables.every(Boolean);
-    const finalFeaturesReady=await ensureFinalFeaturesSchema(env).then(()=>true).catch(()=>false);
-    return json({ ok:true,release:"complete-platform-2026-09-27.10",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady&&completionReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at"),completionReady},finalFeaturesSchema:{ready:finalFeaturesReady},timestamp:new Date().toISOString() });
+    return json({ ok:true, release:"complete-platform-2026-09-27.11", database:"D1", storage:"R2", timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/translate/user-content") return translateUserContent(request, env, ctx);
