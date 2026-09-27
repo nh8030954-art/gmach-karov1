@@ -207,3 +207,4 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,...{
   "תוכן הבקשה אינו תקין": "Invalid request content",
   "תפקיד המנהל אינו תקין": "Invalid manager role"
 }});
+window.GmachEnglish = Object.freeze({...window.GmachEnglish,"שירות התרגום אינו זמין כרגע":"Translation service is currently unavailable","יש לשלוח עד 12 קטעי טקסט, באורך כולל של עד 4,500 תווים":"Send up to 12 text excerpts with a combined length of 4,500 characters","התרגום אינו זמין כרגע. אפשר לנסות שוב מאוחר יותר":"Translation is currently unavailable. Try again later"});
