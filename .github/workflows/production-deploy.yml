@@ -116,7 +116,24 @@ jobs:
           done
           exit 1
       - name: Verify external security and notification configuration
+        id: capabilities
+        continue-on-error: true
         run: |
-          FEATURES="$(curl --fail --silent --show-error https://gmach-karov1.nh8030954.workers.dev/api/platform/features)"
-          echo "$FEATURES"
+          FEATURES="$(curl --fail --silent --show-error --max-time 30 https://gmach-karov1.nh8030954.workers.dev/api/platform/features)"
+          echo "$FEATURES" | tee production-features.json
           printf '%s' "$FEATURES" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s);if(!x.turnstileEnabled||!x.turnstileSiteKey)throw new Error('Turnstile is not active in production');if(!x.pushConfigured||!x.vapidPublicKey)throw new Error('Web Push VAPID is not active in production');if(!x.backups||!x.calendar||!x.chatMedia||!x.geocoding)throw new Error('One or more required platform capabilities are inactive')})"
+      - name: Persist production capability failure
+        if: steps.capabilities.outcome != 'success'
+        run: |
+          {
+            echo "deploy_sha=${GITHUB_SHA}"
+            echo "capabilities=${{ steps.capabilities.outcome }}"
+            cat production-features.json 2>/dev/null || true
+          } > .deploy-capability-failure
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .deploy-capability-failure
+          git commit -m "Record production capability failure" || true
+          git push
+      - name: Enforce production capabilities
+        run: test "${{ steps.capabilities.outcome }}" = "success"
