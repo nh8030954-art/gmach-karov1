@@ -274,6 +274,22 @@ async function adminExportCsv(request,env,url){
   return new Response("\ufeff"+csv,{headers:{"Content-Type":"text/csv; charset=utf-8","Content-Disposition":'attachment; filename="gmach-'+type+'-'+now.slice(0,10)+'.csv"',"Cache-Control":"no-store"}});
 }
 
+function xmlCell(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&apos;")}
+async function adminExportXls(request,env,url){
+  await requireAdmin(request,env);
+  const type=String(url.searchParams.get("type")||"users"),now=new Date().toISOString();
+  let columns=[],rows=[];
+  if(type==="users"){columns=["id","email","full_name","role","account_status","email_verified","created_at","last_login_at"];rows=(await env.DB.prepare("SELECT id,email,full_name,role,account_status,email_verified,created_at,last_login_at FROM users WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 10000").all()).results||[]}
+  else if(type==="organizations"){columns=["id","name","city","status","owner_id","created_at","updated_at"];rows=(await env.DB.prepare("SELECT id,name,city,status,owner_id,created_at,updated_at FROM organizations WHERE deleted_at IS NULL ORDER BY updated_at DESC LIMIT 10000").all()).results||[]}
+  else if(type==="items"){columns=["id","organization_id","title","category","condition","quantity","status","availability_status","city","created_at","updated_at"];rows=(await env.DB.prepare("SELECT id,organization_id,title,category,condition,quantity,status,availability_status,city,created_at,updated_at FROM items WHERE deleted_at IS NULL ORDER BY updated_at DESC LIMIT 20000").all()).results||[]}
+  else if(type==="loans"){columns=["id","item_id","borrower_id","status","workflow_status","quantity","requested_from","requested_until","branch_id","created_at","updated_at"];rows=(await env.DB.prepare("SELECT id,item_id,borrower_id,status,workflow_status,quantity,requested_from,requested_until,branch_id,created_at,updated_at FROM loan_requests ORDER BY created_at DESC LIMIT 20000").all()).results||[]}
+  else if(type==="support"){columns=["id","ticket_number","user_id","name","email","subject","status","priority","assigned_to","created_at","updated_at"];rows=(await env.DB.prepare("SELECT id,ticket_number,user_id,name,email,subject,status,priority,assigned_to,created_at,updated_at FROM support_tickets ORDER BY updated_at DESC LIMIT 10000").all()).results||[]}
+  else throw new LaunchError(400,"סוג הייצוא אינו נתמך");
+  const row=x=>"<Row>"+x.map(v=>"<Cell><Data ss:Type=\"String\">"+xmlCell(v)+"</Data></Cell>").join("")+"</Row>";
+  const xml='<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="'+xmlCell(type)+'"><Table>'+row(columns)+rows.map(r=>row(columns.map(k=>r[k]))).join("")+"</Table></Worksheet></Workbook>";
+  return new Response(xml,{headers:{"Content-Type":"application/vnd.ms-excel; charset=utf-8","Content-Disposition":'attachment; filename="gmach-'+type+'-'+now.slice(0,10)+'.xls"',"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});
+}
+
 export async function runLaunchReadinessMaintenance(env){
   await ensureLaunchReadinessSchema(env);
   await periodicRestoreDrill(env);
@@ -290,6 +306,7 @@ export async function handleLaunchReadiness(request,env,ctx,url){
     if(method==="GET"&&(m=path.match(/^\/api\/branches\/([^/]+)\/management$/)))return branchManagement(request,env,decodeURIComponent(m[1]));
     if(method==="GET"&&path==="/api/admin/entities")return adminEntities(request,env,url);
     if(method==="GET"&&path==="/api/admin/export.csv")return adminExportCsv(request,env,url);
+    if(method==="GET"&&path==="/api/admin/export.xls")return adminExportXls(request,env,url);
     if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/entities\/(users|organizations|items|support)\/([^/]+)$/)))return patchAdminEntity(request,env,m[1],decodeURIComponent(m[2]));
     if(method==="GET"&&path==="/api/admin/operations/health")return operationalHealth(request,env);
     if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/operations\/alerts\/([^/]+)\/resolve$/)))return resolveAlert(request,env,decodeURIComponent(m[1]));
