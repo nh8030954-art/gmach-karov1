@@ -799,3 +799,26 @@ html.a11y-high-contrast :focus-visible { outline-color: #ffdf00 !important; }
 @media (max-width: 700px) {
   .header-actions #translate-user-content { display: inline-flex; position: fixed; right: 16px; bottom: 82px; z-index: 1090; max-width: 155px; padding: 9px 11px; background: #fff; box-shadow: 0 5px 18px rgba(18,42,76,.17); }
 }
+
+
+/* Live visual QA fixes: English desktop header and dialog title clearance. */
+html[dir="ltr"] .header-inner {
+  grid-template-columns: minmax(210px, .8fr) minmax(0, 1.4fr) auto;
+  gap: 16px;
+}
+html[dir="ltr"] .header-inner > * { min-width: 0; }
+html[dir="ltr"] .desktop-nav { gap: 17px; justify-content: center; }
+html[dir="ltr"] .desktop-nav a,
+html[dir="ltr"] .desktop-nav .nav-button { white-space: nowrap; font-size: .88rem; }
+html[dir="ltr"] .header-actions { gap: 7px; white-space: nowrap; }
+html[dir="ltr"] .header-actions .button { padding-inline: 14px; }
+.dialog-heading { padding-inline: 54px; }
+@media (max-width: 1180px) {
+  html[dir="ltr"] .header-inner { grid-template-columns: 1fr auto; }
+  html[dir="ltr"] .desktop-nav { display: none; }
+  html[dir="ltr"] .mobile-menu-button { display: inline-grid; }
+}
+@media (max-width: 590px) {
+  .dialog-heading { padding-inline: 46px; }
+  .dialog-heading h2 { overflow-wrap: anywhere; }
+}
