@@ -4,6 +4,7 @@ import vm from 'node:vm';
 const html=readFileSync('dist/index.html','utf8');
 const dictionaryCode=readFileSync('dist/i18n-en.js','utf8');
 const context={window:{}};vm.runInNewContext(dictionaryCode,context);
+vm.runInNewContext(readFileSync('dist/i18n-errors.js','utf8'),context);
 const keys=new Set(Object.keys(context.window.GmachEnglish));
 const runtime=readFileSync('dist/remaining-features.js','utf8');
 const app=readFileSync('dist/app.js','utf8');
@@ -23,6 +24,10 @@ const withoutScripts=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,'').repl
 const texts=[...withoutScripts.replace(/<[^>]+>/g,'\n').split('\n').map(s=>decode(s.trim()))];
 for(const match of withoutScripts.matchAll(/(?:placeholder|aria-label|title)="([^"]+)"/g))texts.push(decode(match[1].trim()));
 const hebrew=[...new Set(texts.filter(s=>/[\u0590-\u05ff]/.test(s)))];
+const errors=[...new Set([...readFileSync('worker/index.js','utf8'),readFileSync('worker/platform-completion.js','utf8'),readFileSync('worker/final-features.js','utf8'),readFileSync('worker/remaining-features.js','utf8')].flatMap(source=>[...source.matchAll(/(?:new HttpError|throw new Error)\(\s*\d+\s*,\s*["']([^"']*[\u0590-\u05ff][^"']*)/g)].map(match=>match[1])))]
+  .filter(message=>!keys.has(message));
+assert.deepEqual(errors,[],'Every literal server error shown to English users requires an English translation');
+assert.ok(html.indexOf('i18n-errors.js')<html.indexOf('remaining-features.js'),'Load server error translations before runtime');
 const missing=hebrew.filter(s=>!keys.has(s));
 const coverage=1-missing.length/hebrew.length;
 assert.ok(coverage>=0.97,`English coverage for static UI is ${(coverage*100).toFixed(1)}%; missing: ${missing.join(' | ')}`);
