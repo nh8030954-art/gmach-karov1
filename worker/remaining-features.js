@@ -250,7 +250,7 @@ async function automaticDailyBackup(env){
     return id;
   }catch(e){
     await env.DB.prepare("UPDATE backup_runs SET status='failed',completed_at=?,finished_at=?,error=? WHERE id=?").bind(new Date().toISOString(),new Date().toISOString(),String(e?.message||e).slice(0,1000),id).run();
-    try{await env.DB.prepare("INSERT INTO operational_alerts(id,alert_type,severity,details_json) VALUES(?,'backup_failed','critical',?)").bind(crypto.randomUUID(),JSON.stringify({error:String(e?.message||e)})).run()}catch{}
+    try{await env.DB.prepare("INSERT INTO system_alerts(id,alert_type,severity,details_json) VALUES(?,'backup_failed','critical',?)").bind(crypto.randomUUID(),JSON.stringify({error:String(e?.message||e)})).run()}catch{}
     throw e;
   }
 }
