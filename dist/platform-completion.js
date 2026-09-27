@@ -74,13 +74,14 @@
   $(".pt-close",dialog).onclick=()=>dialog.close();
 
   const tabs=[
-    ["profile","פרופיל"],["transfers","העברות בעלות"],["privacy","פרטיות ונתונים"],["addresses","כתובות"],["devices","מכשירים"],["notifications","התראות"],["calendar","יומן"],["searches","חיפושים שמורים"],["categories","קטגוריות שמורות"],["support","תמיכה"],["admin","ניהול־על"]
+    ["profile","פרופיל"],["transfers","העברות בעלות"],["privacy","פרטיות ונתונים"],["addresses","כתובות"],["devices","מכשירים"],["notifications","התראות"],["favorites","מועדפים"],["calendar","יומן"],["searches","חיפושים שמורים"],["categories","קטגוריות שמורות"],["support","תמיכה"],["admin","ניהול־על"]
+
   ];
   let profile=null, active="profile";
   const tabbar=$(".pt-tabs",dialog), body=$(".pt-body",dialog);
   tabs.forEach(([id,label])=>{const b=document.createElement("button");b.textContent=label;b.dataset.tab=id;b.onclick=()=>render(id);tabbar.appendChild(b);});
 
-  function setStatus(msg,error=false){let el=$(".pt-status",body);if(!el){el=document.createElement("div");el.className="pt-status";body.appendChild(el)}el.textContent=msg||"";el.style.color=error?"#a11":"inherit";}
+  function setStatus(msg,error=false){let el=$(".pt-status",body);if(!el){el=document.createElement("div");el.className="pt-status";body.appendChild(el)}el.textContent=window.GmachTranslate?.(msg)||msg||"";el.style.color=error?"#a11":"inherit";}
   async function render(id){
     active=id;
     [...tabbar.children].forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===id)));
@@ -88,7 +89,8 @@
     try{
       if(!profile) profile=(await api("/api/me/profile")).profile;
       if(id==="admin" && profile.role!=="admin"){body.innerHTML="<p>המסך זמין למנהל האתר בלבד.</p>";return;}
-      await ({profile:renderProfile,transfers:renderTransfers,privacy:renderPrivacy,addresses:renderAddresses,devices:renderDevices,notifications:renderNotifications,calendar:renderCalendar,searches:renderSearches,categories:renderSavedCategories,support:renderSupport,admin:renderAdmin}[id])();
+      await ({profile:renderProfile,transfers:renderTransfers,privacy:renderPrivacy,addresses:renderAddresses,devices:renderDevices,notifications:renderNotifications,favorites:renderFavorites,calendar:renderCalendar,searches:renderSearches,categories:renderSavedCategories,support:renderSupport,admin:renderAdmin}[id])();
+
     }catch(e){body.innerHTML=`<p role="alert">${esc(e.message)}</p>`;}
   }
 
@@ -147,27 +149,41 @@
   }
 
   async function renderCalendar(){const data=await api("/api/me/calendar-preferences"),p=data.preferences||{};body.innerHTML=`<form id="pt-calendar" class="pt-form"><h3>יומן ותזכורות</h3><label>אפליקציית יומן מועדפת<select name="preferredApp"><option value="ics">קובץ יומן (ICS)</option><option value="google">Google Calendar</option><option value="apple">Apple Calendar</option><option value="outlook">Outlook</option></select></label><label>תזכורת לפני האירוע<select name="reminderMinutes"><option value="60">שעה</option><option value="360">6 שעות</option><option value="720">12 שעות</option><option value="1440">24 שעות</option><option value="2880">48 שעות</option><option value="10080">שבוע</option></select></label><p class="pt-muted">לכל השאלה נוצר אירוע איסוף ואירוע החזרה. אפשר להוריד אותם מכרטיס ההשאלה.</p><button class="pt-btn primary">שמירת העדפות יומן</button></form><div class="pt-status"></div>`;const form=$("#pt-calendar",body);form.preferredApp.value=p.preferred_app||"ics";form.reminderMinutes.value=String(p.reminder_minutes||1440);form.onsubmit=async e=>{e.preventDefault();try{await api("/api/me/calendar-preferences",{method:"PUT",body:{preferredApp:form.preferredApp.value,reminderMinutes:Number(form.reminderMinutes.value)}});setStatus("העדפות היומן נשמרו.")}catch(err){setStatus(err.message,true)}}}
+  async function renderFavorites(){
+    const data=await api("/api/me/favorites-overview"),names={item:"מוצר",organization:"גמ״ח",category:"קטגוריה",help_request:"בקשת קהילה",search:"חיפוש שמור"};
+    body.innerHTML='<h3>המועדפים שלי</h3><p class="pt-muted">מוצרים, גמ״חים, קטגוריות, בקשות קהילה וחיפושים שמורים במקום אחד.</p><div class="pt-list" id="pt-favorites-list"></div><div class="pt-status" role="status"></div>';
+    const list=$("#pt-favorites-list",body);
+    if(!data.saved?.length){list.innerHTML='<p class="pt-muted">עדיין אין תוכן שמור.</p>';return}
+    for(const entry of data.saved){
+      const row=document.createElement("div");row.className="pt-card pt-row";
+      const label=document.createElement("span"),localizedLabel=document.documentElement.lang==="en"&&entry.type==="category"?entry.labelEn||entry.label:entry.label;label.innerHTML=`<strong>${esc(localizedLabel)}</strong> <small class="pt-muted">${esc(names[entry.type]||entry.type)}</small>`;
+      const remove=document.createElement("button");remove.type="button";remove.className="pt-btn danger";remove.textContent="הסרה מהמועדפים";remove.setAttribute("aria-label",`הסרה מהמועדפים: ${entry.label}`);
+      remove.onclick=async()=>{remove.disabled=true;try{await api("/api/me/favorites-overview/"+encodeURIComponent(entry.type)+"/"+encodeURIComponent(entry.id),{method:"DELETE"});row.remove();if(!list.children.length)list.innerHTML='<p class="pt-muted">עדיין אין תוכן שמור.</p>';setStatus("הפריט הוסר מהמועדפים.")}catch(error){setStatus(error.message,true);remove.disabled=false}};
+      row.append(label,remove);list.append(row);
+    }
+  }
+
 
   async function renderSearches(){
-    const data=await api("/api/me/saved-searches");body.innerHTML=`<div class="pt-grid"><section class="pt-card"><h3>חיפושים שמורים</h3><div class="pt-list" id="pt-search-list"></div></section><section class="pt-card"><h3>שמירת חיפוש</h3><form class="pt-form" id="pt-search-form"><input name="name" placeholder="שם לחיפוש" required><input name="q" placeholder="מילות חיפוש"><input name="city" placeholder="עיר"><input name="category" placeholder="קטגוריה"><label><input type="checkbox" name="notify" checked> להודיע על תוצאות חדשות</label><button class="pt-btn primary">שמירה</button></form></section></div><div class="pt-status"></div>`;const list=$("#pt-search-list",body);
+    const data=await api("/api/me/saved-searches");body.innerHTML=`<div class="pt-grid"><section class="pt-card"><h3>חיפושים שמורים</h3><div class="pt-list" id="pt-search-list"></div></section><section class="pt-card"><h3>שמירת חיפוש</h3><form class="pt-form" id="pt-search-form"><input name="name" placeholder="שם לחיפוש" required><input name="q" placeholder="מילות חיפוש"><input name="city" placeholder="עיר"><input name="category" placeholder="קטגוריה"><label>מצב הפריט<select name="condition"><option value="">כל המצבים</option><option>כמו חדש</option><option>מצוין</option><option>טוב</option></select></label><label><input type="checkbox" name="availableOnly"> רק פריטים זמינים</label><label><input type="checkbox" name="notify" checked> להודיע על תוצאות חדשות</label><button class="pt-btn primary">שמירה</button></form></section></div><div class="pt-status"></div>`;const list=$("#pt-search-list",body);
     if(!data.searches.length)list.innerHTML='<p class="pt-muted">אין חיפושים שמורים.</p>';
     const form=$("#pt-search-form",body),status=$(".pt-status",body);let editingId=null;
-    for(const s of data.searches){const d=document.createElement("div");d.className="pt-card";const summary=[["חיפוש",s.filters?.q||s.filters?.query],["עיר",s.filters?.city],["קטגוריה",s.filters?.category]].filter(([,value])=>value).map(([label,value])=>`${label}: ${value}`).join(" · ")||"כל הפריטים";d.innerHTML=`<strong>${esc(s.name)}</strong><div class="pt-muted">${esc(summary)}</div><button class="pt-btn primary" type="button" data-open>הצגת תוצאות</button> <button class="pt-btn" type="button" data-edit>עריכה</button> <button class="pt-btn danger" type="button" data-del>מחיקה</button>`;
+    for(const s of data.searches){const d=document.createElement("div");d.className="pt-card";const summary=[["חיפוש",s.filters?.q||s.filters?.query],["עיר",s.filters?.city],["קטגוריה",s.filters?.category],["מצב",s.filters?.condition]].filter(([,value])=>value).map(([label,value])=>`${label}: ${value}`).join(" · ")+(s.filters?.availableOnly?" · רק זמינים":"")||"כל הפריטים";d.innerHTML=`<strong>${esc(s.name)}</strong><div class="pt-muted">${esc(summary)}</div><button class="pt-btn primary" type="button" data-open>הצגת תוצאות</button> <button class="pt-btn" type="button" data-edit>עריכה</button> <button class="pt-btn danger" type="button" data-del>מחיקה</button>`;
       d.querySelector("[data-open]").onclick=()=>{const form=document.getElementById("search-form"),search=document.getElementById("search-input"),city=document.getElementById("city-filter"),category=document.getElementById("category-filter");if(!form||!search||!city||!category){setStatus("החיפוש אינו זמין כרגע.",true);return}search.value=s.filters?.q||s.filters?.query||"";city.value=s.filters?.city||"";category.value=s.filters?.category||"";const condition=document.getElementById("condition-filter"),available=document.getElementById("available-only");if(condition)condition.value=s.filters?.condition||"";if(available&&typeof s.filters?.availableOnly==="boolean")available.checked=s.filters.availableOnly;category.dispatchEvent(new Event("change",{bubbles:true}));form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));dialog.close();};
-      d.querySelector("[data-edit]").onclick=()=>{editingId=s.id;for(const key of ["name","q","city","category"])form.elements.namedItem(key).value=key==="name"?s.name:key==="q"?s.filters?.q||s.filters?.query||"":s.filters?.[key]||"";form.elements.namedItem("notify").checked=Boolean(s.notify);form.querySelector('[type="submit"]').textContent="שמירת שינויים";form.scrollIntoView({block:"nearest"});form.elements.namedItem("name").focus()};
+      d.querySelector("[data-edit]").onclick=()=>{editingId=s.id;for(const key of ["name","q","city","category","condition"])form.elements.namedItem(key).value=key==="name"?s.name:key==="q"?s.filters?.q||s.filters?.query||"":s.filters?.[key]||"";form.elements.namedItem("availableOnly").checked=Boolean(s.filters?.availableOnly);form.elements.namedItem("notify").checked=Boolean(s.notify);form.querySelector('[type="submit"]').textContent="שמירת שינויים";form.scrollIntoView({block:"nearest"});form.elements.namedItem("name").focus()};
       d.querySelector("[data-del]").onclick=async()=>{try{await api("/api/me/saved-searches/"+encodeURIComponent(s.id),{method:"DELETE"});await renderSearches()}catch(e){status.textContent=e.message}};list.appendChild(d)}
-    form.onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,field=key=>f.elements.namedItem(key);const payload={name:field("name").value,filters:{q:field("q").value,city:field("city").value,category:field("category").value},notify:field("notify").checked};const button=f.querySelector('[type="submit"]');button.disabled=true;status.textContent="";
+    form.onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,field=key=>f.elements.namedItem(key);const payload={name:field("name").value,filters:{q:field("q").value,city:field("city").value,category:field("category").value,condition:field("condition").value,availableOnly:field("availableOnly").checked},notify:field("notify").checked};const button=f.querySelector('[type="submit"]');button.disabled=true;status.textContent="";
       try{await api(editingId?"/api/me/saved-searches/"+encodeURIComponent(editingId):"/api/me/saved-searches",{method:editingId?"PATCH":"POST",body:payload});await renderSearches()}catch(error){status.textContent=error.message;button.disabled=false}};
   }
 
   async function renderSavedCategories(){
-    const [all,saved]=await Promise.all([api("/api/categories"),api("/api/me/saved-categories")]);
+    const [all,saved]=await Promise.all([api("/api/categories?locale="+(document.documentElement.lang==="en"?"en":"he")),api("/api/me/saved-categories")]);
     const savedIds=new Set((saved.categories||[]).map(category=>category.id));
     body.innerHTML='<h3>קטגוריות שמורות</h3><p class="pt-muted">בחרו קטגוריות שתרצו למצוא בקלות.</p><div class="pt-list" id="pt-category-list"></div><div class="pt-status" role="status"></div>';
     const list=$("#pt-category-list",body);
     for(const category of all.categories||[]){
       const row=document.createElement("div");row.className="pt-card pt-row";
-      const title=document.createElement("strong");title.textContent=category.name_he||category.name;
+      const title=document.createElement("strong");title.textContent=document.documentElement.lang==="en"?category.name_en||category.name_he:category.name_he||category.name;
       const button=document.createElement("button");button.type="button";button.className="pt-btn";
       const refresh=()=>{button.textContent=savedIds.has(category.id)?"הסרה מהשמורים":"שמירת קטגוריה";button.setAttribute("aria-pressed",String(savedIds.has(category.id)))};refresh();
       button.onclick=async()=>{button.disabled=true;try{const remove=savedIds.has(category.id);await api("/api/me/saved-categories/"+encodeURIComponent(category.id),{method:remove?"DELETE":"PUT"});if(remove)savedIds.delete(category.id);else savedIds.add(category.id);refresh();setStatus(remove?"הקטגוריה הוסרה.":"הקטגוריה נשמרה.")}catch(error){setStatus(error.message,true)}finally{button.disabled=false}};
