@@ -2695,6 +2695,53 @@ async function enforcePublicRateLimit(env, identityValue, action, ctx, limit = 1
   ctx?.waitUntil(env.DB.prepare("DELETE FROM abuse_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')").run());
 }
 
+async function vapidJwt(env,endpoint){
+  const pub=fromBase64Url(env.VAPID_PUBLIC_KEY||""),priv=fromBase64Url(env.VAPID_PRIVATE_KEY||"");
+  if(pub.length!==65||pub[0]!==4||priv.length!==32)throw new Error("Invalid VAPID key material");
+  const enc=v=>toBase64Url(new TextEncoder().encode(JSON.stringify(v))),aud=new URL(endpoint).origin;
+  const header=enc({typ:"JWT",alg:"ES256"}),payload=enc({aud,exp:Math.floor(Date.now()/1000)+3600,sub:"mailto:"+(env.SUPPORT_EMAIL||DEFAULT_SUPPORT_EMAIL)});
+  const key=await crypto.subtle.importKey("jwk",{kty:"EC",crv:"P-256",x:toBase64Url(pub.slice(1,33)),y:toBase64Url(pub.slice(33,65)),d:toBase64Url(priv),ext:true}, {name:"ECDSA",namedCurve:"P-256"},false,["sign"]);
+  const sig=new Uint8Array(await crypto.subtle.sign({name:"ECDSA",hash:"SHA-256"},key,new TextEncoder().encode(header+"."+payload)));
+  return header+"."+payload+"."+toBase64Url(sig);
+}
+async function sendEmptyWebPush(env,subscription){
+  const token=await vapidJwt(env,subscription.endpoint),response=await fetch(subscription.endpoint,{method:"POST",headers:{TTL:"120",Urgency:"normal",Authorization:`vapid t=${token}, k=${env.VAPID_PUBLIC_KEY}`},body:null});
+  if(response.status===404||response.status===410){await env.DB.prepare("DELETE FROM push_subscriptions WHERE id=?").bind(subscription.id).run();return false}
+  if(!response.ok)throw new Error("Push endpoint returned "+response.status);return true;
+}
+function israelClock(){
+  const p=Object.fromEntries(new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Jerusalem",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date()).filter(x=>x.type!=="literal").map(x=>[x.type,x.value]));
+  return String(p.hour||"00")+":"+String(p.minute||"00");
+}
+function inQuietHours(now,start,end){if(!start||!end||start===end)return false;return start<end?now>=start&&now<end:now>=start||now<end}
+async function sendOperationalNotificationEmail(env,user,notification){
+  if(!env.RESEND_API_KEY||!user.email)return false;
+  const en=user.preferred_language==="en",subject=en?"Gmach Berega update":notification.title,plain=en?`You have a new update in Gmach Berega. Open your account for details.\n\n${notification.title}\n${notification.body}`:`${notification.title}\n\n${notification.body}`;
+  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],subject,text:plain,html:`<div dir="${en?"ltr":"rtl"}" style="font-family:Arial,sans-serif;max-width:560px;margin:auto"><h2>${escapeHtmlEmail(subject)}</h2><p>${escapeHtmlEmail(en?"You have a new update in your account.":notification.body)}</p><p><a href="https://gmach-karov1.nh8030954.workers.dev/#/account">${en?"Open account":"פתיחת האזור האישי"}</a></p></div>`,reply_to:String(env.SUPPORT_EMAIL||DEFAULT_SUPPORT_EMAIL)})});
+  if(!response.ok)throw new Error("Email provider returned "+response.status);return true;
+}
+async function deliverNotificationChannels(env){
+  const nowIso=new Date().toISOString(),clock=israelClock();
+  const rows=await env.DB.prepare(`SELECT n.id,n.user_id,n.type,n.title,n.body,n.request_id,n.created_at,u.email,u.preferred_language,
+    COALESCE(p.email,CASE WHEN n.type IN ('request','status') THEN 1 ELSE 0 END) pref_email,
+    COALESCE(p.push,0) pref_push,COALESCE(p.digest,'immediate') digest,p.quiet_start,p.quiet_end
+    FROM notifications n JOIN users u ON u.id=n.user_id
+    LEFT JOIN notification_preferences p ON p.user_id=n.user_id AND p.notification_type=n.type
+    WHERE n.created_at>=datetime(?,'-2 days') AND u.deleted_at IS NULL
+      AND NOT EXISTS(SELECT 1 FROM notification_delivery_log l WHERE l.notification_id=n.id AND l.channel='email' AND l.status='sent')
+    ORDER BY n.created_at LIMIT 100`).bind(nowIso).all().catch(()=>({results:[]}));
+  for(const n of rows.results||[]){
+    if(inQuietHours(clock,n.quiet_start,n.quiet_end)||n.digest==="daily")continue;
+    if(Number(n.pref_email)){
+      try{const sent=await sendOperationalNotificationEmail(env,n,n);await env.DB.prepare("INSERT OR REPLACE INTO notification_delivery_log(notification_id,channel,status,attempted_at,error) VALUES(?, 'email', ?, ?, NULL)").bind(n.id,sent?"sent":"skipped",nowIso).run()}catch(e){await env.DB.prepare("INSERT OR REPLACE INTO notification_delivery_log(notification_id,channel,status,attempted_at,error) VALUES(?, 'email','failed',?,?)").bind(n.id,nowIso,String(e?.message||e).slice(0,500)).run()}
+    }
+    if(Number(n.pref_push)&&env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY){
+      const subs=await env.DB.prepare("SELECT id,endpoint,p256dh,auth FROM push_subscriptions WHERE user_id=?").bind(n.user_id).all();
+      let sent=false,error=null;for(const sub of subs.results||[]){try{sent=(await sendEmptyWebPush(env,sub))||sent}catch(e){error=String(e?.message||e).slice(0,500)}}
+      await env.DB.prepare("INSERT OR REPLACE INTO notification_delivery_log(notification_id,channel,status,attempted_at,error) VALUES(?, 'push', ?, ?, ?)").bind(n.id,sent?"sent":error?"failed":"skipped",nowIso,error).run();
+    }
+  }
+}
 async function runScheduledMaintenance(env) {
   await ensureProductionHardeningSchema(env);
   const now = new Date().toISOString();
@@ -2736,6 +2783,7 @@ async function runScheduledMaintenance(env) {
     notificationStatement(env,row.owner_id,"status","אי הגעה לאיסוף",`חלון האיסוף של ${row.title} הסתיים ללא סימון איסוף.`,row.id),
     env.DB.prepare("INSERT INTO loan_request_events(id,request_id,actor_id,event_type,details_json) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),row.id,null,"pickup_expired",JSON.stringify({expiredAt:now}))
   ]);
+  await deliverNotificationChannels(env);
 
 }
 
