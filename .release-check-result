@@ -1,19 +1,19 @@
-sha=808c1f145d69e160e4c6aee5ac89e09e572b27ea
+sha=7799fbd5761bd1bfa61f70745c17260e60c91239
 install=success
 syntax=success
-smoke=success
+smoke=failure
 live=success
-      at async cloudflare-internal:d1-api:374:41
-      ... 2 lines matching cause stack trace ...
-      at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:115:26) {
-    [cause]: Error: no such table: organization_categories: SQLITE_ERROR
-        at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:147:24)
-        at async cloudflare-internal:d1-api:374:41
-        at async Promise.allSettled (index 2)
-        at async getPublicOrganization (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:1282:56)
-        at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:115:26)
-  }
+
+AssertionError [ERR_ASSERTION]: single-element selector used as collection
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790484851905:139:83 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
 }
-Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
-{"ok":true,"release":"complete-platform-2026-09-25.9","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-27T04:51:13.224Z"}
+
+Node.js v24.21.0
+{"ok":true,"release":"complete-platform-2026-09-25.9","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-27T04:54:24.977Z"}
 platform_features={"release":"complete-platform-2026-09-25.9","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":false,"vapidPublicKey":null,"geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
