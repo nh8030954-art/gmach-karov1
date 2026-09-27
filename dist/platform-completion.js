@@ -26,8 +26,8 @@
     };
   }
   installAdminStepUp();
-  const turnstileState={enabled:false,siteKey:null,tokens:{register:null,support:null},widgets:{}};
-  window.GmachTurnstile={token:scope=>turnstileState.tokens[scope]||null,reset:scope=>{const id=turnstileState.widgets[scope];if(window.turnstile&&id!==undefined)window.turnstile.reset(id);turnstileState.tokens[scope]=null;}};
+  const turnstileState={enabled:false,siteKey:null,tokens:{register:null,support:null,login:null},widgets:{},loginRequired:false};
+  window.GmachTurnstile={token:scope=>turnstileState.tokens[scope]||null,reset:scope=>{const id=turnstileState.widgets[scope];if(window.turnstile&&id!==undefined)window.turnstile.reset(id);turnstileState.tokens[scope]=null;},requireLogin:()=>{turnstileState.loginRequired=true;const form=document.getElementById("auth-form");if(form&&window.turnstile){const existing=form.querySelector('[data-turnstile-scope="login"]');if(existing){existing.hidden=false;return}const host=document.createElement("div");host.dataset.turnstileScope="login";host.style.minHeight="66px";host.setAttribute("aria-label","אימות אנושי");const submit=form.querySelector('[type="submit"]');submit?.parentNode?.insertBefore(host,submit);turnstileState.widgets.login=window.turnstile.render(host,{sitekey:turnstileState.siteKey,theme:"auto",callback:t=>turnstileState.tokens.login=t,"expired-callback":()=>turnstileState.tokens.login=null,"error-callback":()=>turnstileState.tokens.login=null});}}};
   async function setupTurnstile(){
     let features;try{features=await fetch("/api/platform/features",{credentials:"same-origin"}).then(r=>r.json());}catch{return;}
     if(!features?.turnstileEnabled||!features.turnstileSiteKey)return;
@@ -42,8 +42,8 @@
       const host=document.createElement("div");host.dataset.turnstileScope=scope;host.style.minHeight="66px";host.setAttribute("aria-label","אימות אנושי");const submit=form.querySelector('[type="submit"]');submit?.parentNode?.insertBefore(host,submit);
       turnstileState.widgets[scope]=window.turnstile.render(host,{sitekey:turnstileState.siteKey,theme:"auto",callback:t=>turnstileState.tokens[scope]=t,"expired-callback":()=>turnstileState.tokens[scope]=null,"error-callback":()=>turnstileState.tokens[scope]=null});
     };
-    add("register",document.getElementById("auth-form"));add("support",document.getElementById("support-form"));
-    const sync=()=>{const reg=document.querySelector('[data-turnstile-scope="register"]');if(reg)reg.hidden=document.querySelector('[data-auth-mode="register"]')?.getAttribute("aria-selected")!=="true";};
+    add("register",document.getElementById("auth-form"));add("support",document.getElementById("support-form"));if(turnstileState.loginRequired)window.GmachTurnstile.requireLogin();
+    const sync=()=>{const registering=document.querySelector('[data-auth-mode="register"]')?.getAttribute("aria-selected")==="true";const reg=document.querySelector('[data-turnstile-scope="register"]');if(reg)reg.hidden=!registering;const login=document.querySelector('[data-turnstile-scope="login"]');if(login)login.hidden=registering||!turnstileState.loginRequired;};
     new MutationObserver(sync).observe(document.getElementById("auth-dialog")||document.body,{subtree:true,attributes:true,attributeFilter:["aria-selected"]});sync();
   }
   const api=async(path,opts={})=>{
