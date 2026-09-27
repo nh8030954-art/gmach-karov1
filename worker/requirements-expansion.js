@@ -41,7 +41,7 @@ function audit(env,actorId,action,entityType,entityId,metadata={}){return env.DB
 async function publicBranches(env,orgId){
   const org=await env.DB.prepare("SELECT id,name,status,is_hidden,temporarily_closed,reopens_at FROM organizations WHERE id=? AND deleted_at IS NULL").bind(orgId).first();
   if(!org||org.status!=="approved"||Number(org.is_hidden))throw new ExpansionError(404,"הגמ״ח לא נמצא");
-  const rows=await env.DB.prepare(\`
+  const rows=await env.DB.prepare(`
     SELECT b.id,b.name,b.address,b.city,b.latitude,b.longitude,b.phone,b.hours_json,b.status,b.reopens_at,b.inventory_mode,
       ROUND(AVG(r.branch_rating),1) AS rating,COUNT(r.branch_rating) AS review_count,
       (SELECT COUNT(*) FROM item_units iu JOIN items i ON i.id=iu.item_id WHERE iu.branch_id=b.id AND i.status='active' AND iu.status='available') AS available_units
@@ -49,7 +49,7 @@ async function publicBranches(env,orgId){
     LEFT JOIN reviews r ON r.branch_id=b.id AND r.status='published' AND r.branch_rating IS NOT NULL
     WHERE b.organization_id=? AND b.status!='archived'
     GROUP BY b.id ORDER BY CASE b.status WHEN 'active' THEN 0 ELSE 1 END,b.name
-  \`).bind(orgId).all();
+  `).bind(orgId).all();
   return json({organization:{id:org.id,name:org.name,temporarilyClosed:Boolean(org.temporarily_closed),reopensAt:org.reopens_at},branches:(rows.results||[]).map(x=>({...x,hours:safeJson(x.hours_json,{}),rating:x.rating===null?null:Number(x.rating),reviewCount:Number(x.review_count||0),availableUnits:Number(x.available_units||0)}))});
 }
 
@@ -89,9 +89,9 @@ async function multiRangeRequest(request,env,itemId){
   try{
     for(const range of ranges){
       const id=crypto.randomUUID();
-      const result=await env.DB.prepare(\`INSERT INTO loan_requests(id,item_id,borrower_id,requested_from,requested_until,phone,note,status,quantity,workflow_status,multi_range_batch_id,updated_at)
+      const result=await env.DB.prepare(`INSERT INTO loan_requests(id,item_id,borrower_id,requested_from,requested_until,phone,note,status,quantity,workflow_status,multi_range_batch_id,updated_at)
         SELECT ?,?,?,?,?,?,?,?,?,?,?,?
-        WHERE (SELECT COALESCE(SUM(quantity),0) FROM loan_requests WHERE item_id=? AND status IN ('pending','approved','collected') AND requested_from<? AND requested_until>?) + ? <= ?\`)
+        WHERE (SELECT COALESCE(SUM(quantity),0) FROM loan_requests WHERE item_id=? AND status IN ('pending','approved','collected') AND requested_from<? AND requested_until>?) + ? <= ?`)
         .bind(id,itemId,user.id,range.from,range.until,phone,optional(body.note,500),status,quantity,status==="approved"?"approved_ready_for_pickup":"inventory_held",batchId,now,itemId,range.until,range.from,quantity,Number(item.quantity)).run();
       if(!result.meta.changes)throw new ExpansionError(409,"המלאי נתפס בזמן שליחת קבוצת הטווחים");
       created.push(id);
@@ -127,10 +127,10 @@ async function adminUserDetail(request,env,userId){
   const [sessions,security,loans,reviews,reports,memberships,controls,auditRows]=await env.DB.batch([
     env.DB.prepare("SELECT token_hash AS id,device_label,last_seen_at,created_at,expires_at FROM sessions WHERE user_id=? ORDER BY COALESCE(last_seen_at,created_at) DESC LIMIT 50").bind(userId),
     env.DB.prepare("SELECT id,event_type,severity,device_label,created_at FROM security_events WHERE user_id=? ORDER BY created_at DESC LIMIT 100").bind(userId),
-    env.DB.prepare(\`SELECT lr.id,lr.status,lr.workflow_status,lr.requested_from,lr.requested_until,lr.created_at,i.title,o.name AS organization_name,
+    env.DB.prepare(`SELECT lr.id,lr.status,lr.workflow_status,lr.requested_from,lr.requested_until,lr.created_at,i.title,o.name AS organization_name,
       CASE WHEN lr.borrower_id=? THEN 'borrower' ELSE 'owner' END AS relation
       FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id
-      WHERE lr.borrower_id=? OR o.owner_id=? ORDER BY lr.created_at DESC LIMIT 150\`).bind(userId,userId,userId),
+      WHERE lr.borrower_id=? OR o.owner_id=? ORDER BY lr.created_at DESC LIMIT 150`).bind(userId,userId,userId),
     env.DB.prepare("SELECT id,rating,item_rating,service_rating,status,created_at FROM reviews WHERE author_id=? ORDER BY created_at DESC LIMIT 100").bind(userId),
     env.DB.prepare("SELECT id,item_id,reason,status,created_at FROM reports WHERE reporter_id=? ORDER BY created_at DESC LIMIT 100").bind(userId),
     env.DB.prepare("SELECT m.organization_id,m.role,m.branch_scope_json,m.category_scope_json,o.name FROM organization_members m JOIN organizations o ON o.id=m.organization_id WHERE m.user_id=? ORDER BY o.name").bind(userId),
@@ -160,7 +160,7 @@ async function adminLoanControl(request,env,requestId){
 async function auditCsv(request,env,url){
   await requireAdmin(request,env);const action=optional(url.searchParams.get("action"),120),entityType=optional(url.searchParams.get("entity_type"),80),actor=optional(url.searchParams.get("actor_id"),100),from=optional(url.searchParams.get("from"),40),to=optional(url.searchParams.get("to"),40),where=["1=1"],args=[];
   if(action){where.push("a.action LIKE ?");args.push("%"+action+"%")}if(entityType){where.push("a.entity_type=?");args.push(entityType)}if(actor){where.push("a.actor_id=?");args.push(actor)}if(from){where.push("a.created_at>=?");args.push(iso(from,"מתאריך"))}if(to){where.push("a.created_at<=?");args.push(iso(to,"עד תאריך"))}
-  const rows=await env.DB.prepare(\`SELECT a.id,a.created_at,a.action,a.entity_type,a.entity_id,a.branch_id,a.actor_id,u.email AS actor_email,a.device_label,a.old_value_json,a.new_value_json,a.metadata_json FROM audit_log a LEFT JOIN users u ON u.id=a.actor_id WHERE \${where.join(" AND ")} ORDER BY a.created_at DESC LIMIT 20000\`).bind(...args).all();
+  const rows=await env.DB.prepare(`SELECT a.id,a.created_at,a.action,a.entity_type,a.entity_id,a.branch_id,a.actor_id,u.email AS actor_email,a.device_label,a.old_value_json,a.new_value_json,a.metadata_json FROM audit_log a LEFT JOIN users u ON u.id=a.actor_id WHERE ${where.join(" AND ")} ORDER BY a.created_at DESC LIMIT 20000`).bind(...args).all();
   const cols=["id","created_at","action","entity_type","entity_id","branch_id","actor_id","actor_email","device_label","old_value_json","new_value_json","metadata_json"],csv="\ufeff"+[cols,...(rows.results||[]).map(r=>cols.map(k=>r[k]))].map(row=>row.map(csvCell).join(",")).join("\r\n")+"\r\n";
   return new Response(csv,{headers:{"Content-Type":"text/csv; charset=utf-8","Content-Disposition":'attachment; filename="gmach-audit.csv"',"Cache-Control":"no-store"}});
 }
