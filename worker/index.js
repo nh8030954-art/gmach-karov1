@@ -5,6 +5,7 @@ import { handleDistributionCompletion, runDistributionCompletionMaintenance, ens
 import { handleNavigationAdmin, ensureNavigationAdminSchema } from "./navigation-admin.js";
 import { handlePrivacyAvailability, ensurePrivacyAvailabilitySchema, checkAvailabilityRules } from "./privacy-availability.js";
 import { handlePrivacyPurge, runPrivacyPurgeMaintenance, ensurePrivacyPurgeSchema } from "./privacy-purge.js";
+import { handleCommunityChat, runCommunityChatMaintenance, ensureCommunityChatSchema } from "./community-chat.js";
 import { handleFinalFeatures, runFinalMaintenance, ensureFinalFeaturesSchema } from "./final-features.js";
 import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata, ensurePlatformCompletionSchema, recordSecurityFailure } from "./platform-completion.js";
 const SESSION_COOKIE = "gmach_session";
@@ -147,7 +148,7 @@ export default {
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env),ensureDistributionCompletionSchema(env),ensureNavigationAdminSchema(env),ensurePrivacyAvailabilitySchema(env),ensurePrivacyPurgeSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env), runPrivacyPurgeMaintenance(env)]); })());
+    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env),ensureDistributionCompletionSchema(env),ensureNavigationAdminSchema(env),ensurePrivacyAvailabilitySchema(env),ensurePrivacyPurgeSchema(env),ensureCommunityChatSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env), runPrivacyPurgeMaintenance(env), runCommunityChatMaintenance(env)]); })());
   }
 };
 
@@ -609,6 +610,8 @@ async function routeApi(request, env, ctx, url) {
   if (privacyAvailabilityResponse) return privacyAvailabilityResponse;
   const privacyPurgeResponse = await handlePrivacyPurge(request, env, ctx, url);
   if (privacyPurgeResponse) return privacyPurgeResponse;
+  const communityChatResponse = await handleCommunityChat(request, env, ctx, url);
+  if (communityChatResponse) return communityChatResponse;
 
   throw new HttpError(404, "הכתובת לא נמצאה");
 }
@@ -2064,7 +2067,7 @@ async function listRequestMessages(request, env, requestId) {
   await env.DB.prepare("UPDATE request_messages SET read_at=? WHERE request_id=? AND sender_id<>? AND read_at IS NULL")
     .bind(new Date().toISOString(),requestId,user.id).run();
   return json({
-    request: { id: row.id, status: row.status, itemTitle: row.item_title, organizationName: row.org_name, chatWritable: !(row.returned_at && Date.now()-Date.parse(row.returned_at)>14*86400000) },
+    request: { id: row.id, status: row.status, itemTitle: row.item_title, organizationName: row.org_name, chatWritable: !(row.returned_at && Date.now()-Date.parse(row.returned_at)>14*86400000), chatWritableUntil: row.returned_at ? new Date(Date.parse(row.returned_at)+14*86400000).toISOString() : null, chatRetainUntil: row.returned_at ? new Date(Date.parse(row.returned_at)+365*86400000).toISOString() : null },
     messages: result.results.map(message => ({ ...message, metadata:safeJsonObject(message.metadata_json),isMine: message.sender_id === user.id }))
   });
 }
