@@ -1,6 +1,7 @@
-sha=fbae03c02244860ff63ec6d184e35b4927ba7544
-install=success
-syntax=failure
+sha=cea3b0016b97c82590f867a46b4353ddc53b0b7a
+install=cancelled
+syntax=skipped
+tests=skipped
 smoke=skipped
 live=skipped
-platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":false,"vapidPublicKey":null,"geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
+platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
