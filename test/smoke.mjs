@@ -260,6 +260,16 @@ try {
   assert.equal(result.response.status, 201);
   assert.equal(result.data.verificationRequired, true);
   const borrowerCookie = await verifyLatestEmail("borrower@example.com");
+  result = await request("/api/me/profile", { method:"PATCH", cookie:borrowerCookie, body:{fullName:"שואלת ציוד",phone:"052-7654321",city:"ירושלים",preferredLanguage:"en",operationalEmails:true} });
+  assert.equal(result.response.status,200,JSON.stringify(result.data));
+  result = await request(`/api/organizations/${organizationId}/invitations`,{method:"POST",cookie:adminCookie,body:{email:"borrower@example.com",role:"reports"}});
+  assert.equal(result.response.status,201,JSON.stringify(result.data));
+  assert.equal(sentEmails.at(-1).subject.startsWith("Invitation to manage"),true,"English members receive an English manager invitation");
+  assert.ok(sentEmails.at(-1).html.includes('dir="ltr"'));
+  result = await request(`/api/organizations/${organizationId}/invitations`,{method:"POST",cookie:adminCookie,body:{email:"new-manager@example.com",role:"reports"}});
+  assert.equal(result.response.status,201,JSON.stringify(result.data));
+  assert.ok(sentEmails.at(-1).text.includes("הוזמנת")&&sentEmails.at(-1).text.includes("You were invited"),"Invites to unregistered recipients include both languages");
+
   result = await request("/api/me/profile", { cookie:borrowerCookie });
   assert.equal(result.data.profile.city,"ירושלים");
   result = await request("/api/me/notification-preferences", { method:"PUT",cookie:borrowerCookie,body:{preferences:[{type:"loan_status",inApp:true,email:true,push:false,digest:"immediate"}]} });
