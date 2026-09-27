@@ -137,3 +137,19 @@ jobs:
           git push
       - name: Enforce production capabilities
         run: test "${{ steps.capabilities.outcome }}" = "success"
+
+      - name: Persist external capability failure
+        if: steps.external.outcome != 'success'
+        run: |
+          {
+            echo "deploy_sha=${GITHUB_SHA}"
+            echo "external_capabilities=${{ steps.external.outcome }}"
+            cat platform-features-live.log 2>/dev/null || true
+          } > .deploy-external-failure
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .deploy-external-failure
+          git commit -m "Record production external capability failure" || true
+          git push
+      - name: Enforce external capabilities
+        run: test "${{ steps.external.outcome }}" = "success"
