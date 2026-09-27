@@ -1,0 +1,78 @@
+name: Production runtime hotfix
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/production-runtime-hotfix.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-runtime-hotfix
+  cancel-in-progress: true
+
+jobs:
+  hotfix:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TARGET_URL: https://gmach-karov1.nh8030954.workers.dev
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - name: Run full tests
+        run: npm test
+      - name: Publish runtime hotfix without D1 operations
+        run: npx wrangler deploy
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Verify production visual hotfix
+        run: |
+          node - <<'NODE'
+          const {chromium}=require('playwright');
+          (async()=>{
+            const browser=await chromium.launch({headless:true});
+            try{
+              for(const viewport of [{width:1440,height:1000},{width:390,height:844}]){
+                const mobile=viewport.width<600;
+                const ctx=await browser.newContext({viewport,locale:'en-US',isMobile:mobile,hasTouch:mobile});
+                await ctx.addInitScript(()=>localStorage.setItem('gmach-language','en'));
+                const p=await ctx.newPage();
+                p.setDefaultTimeout(5000);
+                await p.goto(process.env.TARGET_URL+'/#/',{waitUntil:'domcontentloaded',timeout:30000});
+                await p.waitForTimeout(1400);
+                const d=await p.evaluate(()=>({w:innerWidth,sw:document.documentElement.scrollWidth,lang:document.documentElement.lang,dir:document.documentElement.dir}));
+                console.log('LAYOUT',viewport,d);
+                if(d.sw>d.w+1)throw new Error('Horizontal overflow remains: '+JSON.stringify({viewport,d}));
+                if(d.lang!=='en'||d.dir!=='ltr')throw new Error('English LTR mode failed');
+                await ctx.close();
+              }
+              const ctx=await browser.newContext({viewport:{width:390,height:844},locale:'en-US',isMobile:true,hasTouch:true});
+              await ctx.addInitScript(()=>localStorage.setItem('gmach-language','en'));
+              const p=await ctx.newPage();
+              await p.goto(process.env.TARGET_URL+'/#/community',{waitUntil:'domcontentloaded',timeout:30000});
+              await p.waitForTimeout(1400);
+              const result=await p.evaluate(()=>{
+                const d=document.querySelector('#community-board-dialog'),x=d?.querySelector('.dialog-close'),h=d?.querySelector('.dialog-heading h2');
+                if(!d?.open||!x||!h)return {open:false};
+                const a=x.getBoundingClientRect(),b=h.getBoundingClientRect();
+                return {open:true,intersects:!(a.right<=b.left||a.left>=b.right||a.bottom<=b.top||a.top>=b.bottom),overflow:Math.max(0,document.documentElement.scrollWidth-innerWidth)};
+              });
+              console.log('COMMUNITY',result);
+              if(!result.open||result.intersects||result.overflow>1)throw new Error('Community visual regression: '+JSON.stringify(result));
+              await ctx.close();
+            } finally {await browser.close();}
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
