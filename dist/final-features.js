@@ -121,7 +121,7 @@ function enhanceChat(){
     const form=$("#chat-form");if(!form||$("#chat-media-tools"))return;
     const tools=document.createElement("div");tools.id="chat-media-tools";tools.className="platform-row-actions";tools.innerHTML='<button type="button" class="platform-action secondary" data-chat-media="image">📷 תמונה</button><button type="button" class="platform-action secondary" data-chat-media="audio">🎤 קול</button><button type="button" class="platform-action secondary" data-chat-media="location">📍 מיקום</button><button type="button" class="platform-action secondary" data-chat-media="item">כרטיס מוצר</button>';
     form.prepend(tools);
-    $$("[data-chat-media]",tools).forEach(b=>b.onclick=async()=>{
+    $("[data-chat-media]",tools).forEach(b=>b.onclick=async()=>{if(form.dataset.chatWritable==="false")return notice("הצ'אט נמצא במצב קריאה בלבד",true);
       const requestId=$("#chat-request-id")?.value||form.dataset.requestId||document.querySelector("[data-chat-request]")?.dataset.chatRequest;if(!requestId)return notice("לא נמצא מזהה השאלה",true);
       try{
         if(b.dataset.chatMedia==="location"){navigator.geolocation.getCurrentPosition(async p=>{await api("/api/loan-requests/"+requestId+"/chat-rich",{method:"POST",body:{type:"location",metadata:{lat:p.coords.latitude,lon:p.coords.longitude}}});notice("המיקום נשלח")},()=>notice("לא ניתנה הרשאת מיקום",true));return}
