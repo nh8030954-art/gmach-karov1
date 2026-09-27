@@ -379,3 +379,17 @@ for(const token of ["/api/admin/export.xls?type=","ייצוא Excel","aria-live"
 for(const token of ["unit-qr-image","createImageBitmap(file)","capture="])assert.ok(appClient.includes(token),token+" missing from QR image scanning");
 assert.ok((await readFile("worker/launch-readiness.js","utf8")).includes("/api/admin/export.xls"),"Excel-compatible export backend missing");
 console.log("Excel export, accessible admin status and QR image scanning gate passed.");
+
+
+// Full-list completion regressions added after line-by-line acceptance review.
+for(const token of ["uploadRequestChatAttachment","reportRequestMessage","blockChatUser","/chat-attachment","/chat-rich","/report","/block"]) assert.ok(worker.includes(token),token+" missing from complete loan chat runtime");
+for(const token of ["data-chat-media=\"location\"","voice-message.webm","data-chat-media=\"item\""]) assert.ok(finalClient.includes(token),token+" missing from rich chat controls");
+for(const token of ["dataset.requestId","data-open-chat-item","chat-media-image"]) assert.ok(appClient.includes(token),token+" missing from rich chat rendering/binding");
+for(const token of ["deliverNotificationChannels","sendEmptyWebPush","vapidJwt","deliverDailyDigests","inQuietHours","communityUnsubscribeToken","/api/unsubscribe/community"]) assert.ok(worker.includes(token),token+" missing from real notification delivery runtime");
+const qaWorkflow=await readFile(".github/workflows/qa.yml","utf8"),prodWorkflow=await readFile(".github/workflows/production-deploy.yml","utf8");
+for(const token of ["Provision isolated QA resources","gmach-karov-db-qa","gmach-karov-images-qa","Moderate QA load test"]) assert.ok(qaWorkflow.includes(token),token+" missing from isolated QA gate");
+assert.ok(prodWorkflow.includes("Read-only production load gate"),"real production load gate missing");
+await access("test/production-load.mjs");
+await access("migrations/0026_notification_delivery_runtime.sql");
+await access("migrations/0027_notification_templates.sql");
+console.log("Full requirements regression extensions passed.");
