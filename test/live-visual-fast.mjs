@@ -41,8 +41,11 @@ try{
   await shot({name:"mobile-he-menu",viewport:{width:390,height:844},action:async p=>{const b=p.locator("#mobile-menu-button");if(await b.isVisible())await b.click();}});
   await shot({name:"mobile-en-menu",lang:"en",viewport:{width:390,height:844},action:async p=>{const b=p.locator("#mobile-menu-button");if(await b.isVisible())await b.click();}});
   await shot({name:"mobile-en-community",lang:"en",viewport:{width:390,height:844},route:"#/community",action:async p=>{
-    const menu=p.locator("#mobile-menu-button"); if(await menu.count()&&await menu.isVisible())await menu.click();
-    const b=p.locator("#mobile-community-board"); if(await b.count()&&await b.isVisible())await b.click();
+    const alreadyOpen=await p.evaluate(()=>Boolean(document.querySelector("#community-board-dialog")?.open));
+    if(!alreadyOpen){
+      const menu=p.locator("#mobile-menu-button"); if(await menu.count()&&await menu.isVisible())await menu.click();
+      const b=p.locator("#mobile-community-board"); if(await b.count()&&await b.isVisible())await b.click();
+    }
     const overlap=await p.evaluate(()=>{
       const d=document.querySelector("#community-board-dialog"),x=d?.querySelector(".dialog-close"),h=d?.querySelector(".dialog-heading h2");
       if(!d?.open||!x||!h)return {open:false};
