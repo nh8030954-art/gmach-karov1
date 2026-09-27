@@ -4,6 +4,7 @@ import { handleLaunchReadiness, runLaunchReadinessMaintenance, ensureLaunchReadi
 import { handleDistributionCompletion, runDistributionCompletionMaintenance, ensureDistributionCompletionSchema, recordDistributionError } from "./distribution-completion.js";
 import { handleNavigationAdmin, ensureNavigationAdminSchema } from "./navigation-admin.js";
 import { handlePrivacyAvailability, ensurePrivacyAvailabilitySchema, checkAvailabilityRules } from "./privacy-availability.js";
+import { handlePrivacyPurge, runPrivacyPurgeMaintenance, ensurePrivacyPurgeSchema } from "./privacy-purge.js";
 import { handleFinalFeatures, runFinalMaintenance, ensureFinalFeaturesSchema } from "./final-features.js";
 import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata, ensurePlatformCompletionSchema, recordSecurityFailure } from "./platform-completion.js";
 const SESSION_COOKIE = "gmach_session";
@@ -146,7 +147,7 @@ export default {
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env),ensureDistributionCompletionSchema(env),ensureNavigationAdminSchema(env),ensurePrivacyAvailabilitySchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env)]); })());
+    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env),ensureDistributionCompletionSchema(env),ensureNavigationAdminSchema(env),ensurePrivacyAvailabilitySchema(env),ensurePrivacyPurgeSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env), runPrivacyPurgeMaintenance(env)]); })());
   }
 };
 
@@ -606,6 +607,8 @@ async function routeApi(request, env, ctx, url) {
   if (navigationAdminResponse) return navigationAdminResponse;
   const privacyAvailabilityResponse = await handlePrivacyAvailability(request, env, ctx, url);
   if (privacyAvailabilityResponse) return privacyAvailabilityResponse;
+  const privacyPurgeResponse = await handlePrivacyPurge(request, env, ctx, url);
+  if (privacyPurgeResponse) return privacyPurgeResponse;
 
   throw new HttpError(404, "הכתובת לא נמצאה");
 }
@@ -903,7 +906,7 @@ async function listSessions(request, env) {
 
 async function listMySecurityEvents(request,env){const user=await requireUser(request,env);const rows=await env.DB.prepare("SELECT id,event_type,severity,details_json,created_at FROM security_events WHERE user_id=? ORDER BY created_at DESC LIMIT 100").bind(user.id).all();return json({events:rows.results.map(x=>({...x,details:safeJsonObject(x.details_json)}))})}
 
-async function requestAccountDeletion(request,env){const user=await requireUser(request,env);const active=await env.DB.prepare("SELECT COUNT(*) AS n FROM loan_requests WHERE (borrower_id=? OR item_id IN (SELECT id FROM items WHERE organization_id IN (SELECT id FROM organizations WHERE owner_id=?))) AND status IN ('pending','approved','collected')").bind(user.id,user.id).first();const now=new Date().toISOString(),scheduled=new Date(Date.now()+7*86400000).toISOString();await env.DB.prepare("UPDATE users SET deletion_requested_at=?,updated_at=? WHERE id=?").bind(now,now,user.id).run();await env.DB.prepare("INSERT INTO security_events(id,user_id,event_type,severity,details_json) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),user.id,"account_deletion_requested","warning",JSON.stringify({scheduledAt:scheduled,activeLoans:Number(active?.n||0)})).run();return json({ok:true,scheduledAt:scheduled,blockedByActiveLoans:Number(active?.n||0)>0,activeLoans:Number(active?.n||0)});}
+async function requestAccountDeletion(request,env){const user=await requireUser(request,env);const [active,owned]=await env.DB.batch([env.DB.prepare("SELECT COUNT(*) AS n FROM loan_requests WHERE (borrower_id=? OR item_id IN (SELECT id FROM items WHERE organization_id IN (SELECT id FROM organizations WHERE owner_id=?))) AND status IN (\'pending\',\'approved\',\'collected\')").bind(user.id,user.id),env.DB.prepare("SELECT COUNT(*) AS n FROM organizations WHERE owner_id=? AND deleted_at IS NULL").bind(user.id)]);const activeLoans=Number(active.results?.[0]?.n||0),ownedOrganizations=Number(owned.results?.[0]?.n||0),now=new Date().toISOString(),scheduled=new Date(Date.now()+7*86400000).toISOString();await env.DB.prepare("UPDATE users SET deletion_requested_at=?,updated_at=? WHERE id=?").bind(now,now,user.id).run();await env.DB.prepare("INSERT INTO security_events(id,user_id,event_type,severity,details_json) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),user.id,"account_deletion_requested","warning",JSON.stringify({scheduledAt:scheduled,activeLoans,ownedOrganizations})).run();return json({ok:true,scheduledAt:scheduled,blockedByActiveLoans:activeLoans>0,activeLoans,blockedByOwnedOrganizations:ownedOrganizations>0,ownedOrganizations});}
 
 async function cancelAccountDeletion(request, env) {
   const user=await requireUser(request,env);
