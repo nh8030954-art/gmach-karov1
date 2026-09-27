@@ -156,6 +156,26 @@ export default {
         if (expansionPreflight) return withSecurityHeaders(expansionPreflight);
         const completionResponse = await handlePlatformCompletionApi(request, env, ctx, url);
         if (completionResponse) return withSecurityHeaders(completionResponse);
+        const publicCacheTtl = request.method === "GET" ? ({
+          "/api/items": 45,
+          "/api/categories": 300,
+          "/api/discovery": 120
+        })[url.pathname] : 0;
+        if (publicCacheTtl && typeof caches !== "undefined") {
+          const cache = caches.default;
+          const cacheKey = new Request(url.toString(), { method:"GET", headers:{ "Accept":"application/json" } });
+          const cached = await cache.match(cacheKey);
+          if (cached) return withSecurityHeaders(cached);
+          const response = await routeApi(request, env, ctx, url);
+          if (response.ok) {
+            const headers = new Headers(response.headers);
+            headers.set("Cache-Control", `public, max-age=${publicCacheTtl}, stale-while-revalidate=${Math.max(300, publicCacheTtl * 10)}`);
+            const cacheable = new Response(response.body, { status:response.status, statusText:response.statusText, headers });
+            try { ctx.waitUntil(cache.put(cacheKey, cacheable.clone())); } catch {}
+            return withSecurityHeaders(cacheable);
+          }
+          return withSecurityHeaders(response);
+        }
         const response = await routeApi(request, env, ctx, url);
         return withSecurityHeaders(response);
       }
