@@ -2742,6 +2742,22 @@ async function deliverNotificationChannels(env){
     }
   }
 }
+async function deliverDailyDigests(env){
+  const clock=israelClock();if(clock<"19:00"||clock>"20:00"||!env.RESEND_API_KEY)return;
+  const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Jerusalem",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+  const users=await env.DB.prepare(`SELECT DISTINCT u.id,u.email,u.preferred_language FROM users u JOIN notification_preferences p ON p.user_id=u.id WHERE p.digest='daily' AND p.email=1 AND u.deleted_at IS NULL`).all().catch(()=>({results:[]}));
+  for(const user of users.results||[]){
+    const done=await env.DB.prepare("SELECT id FROM notification_digests WHERE user_id=? AND digest_date=? AND status='sent'").bind(user.id,today).first();if(done)continue;
+    const items=await env.DB.prepare(`SELECT n.id,n.title,n.body,n.created_at FROM notifications n WHERE n.user_id=? AND n.created_at>=datetime('now','-1 day') AND NOT EXISTS(SELECT 1 FROM notification_delivery_log l WHERE l.notification_id=n.id AND l.channel='email' AND l.status='sent') ORDER BY n.created_at DESC LIMIT 30`).bind(user.id).all();
+    if(!(items.results||[]).length)continue;
+    const en=user.preferred_language==="en",subject=en?"Your daily Gmach Berega summary":"הסיכום היומי שלך מגמ״ח ברגע";
+    const text=(en?"Updates from the last day:":"עדכונים מהיממה האחרונה:")+"\n\n"+items.results.map(x=>"• "+x.title+" — "+x.body).join("\n");
+    const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],subject,text,reply_to:String(env.SUPPORT_EMAIL||DEFAULT_SUPPORT_EMAIL)})});
+    const id=crypto.randomUUID(),now=new Date().toISOString();
+    if(response.ok){await env.DB.batch([env.DB.prepare("INSERT OR REPLACE INTO notification_digests(id,user_id,digest_date,payload_json,status,sent_at) VALUES(?,?,?,?, 'sent',?)").bind(id,user.id,today,JSON.stringify({count:items.results.length}),now),...items.results.map(x=>env.DB.prepare("INSERT OR REPLACE INTO notification_delivery_log(notification_id,channel,status,attempted_at,error) VALUES(?, 'email','sent',?,NULL)").bind(x.id,now))]);}
+    else await env.DB.prepare("INSERT OR REPLACE INTO notification_digests(id,user_id,digest_date,payload_json,status) VALUES(?,?,?,?, 'failed')").bind(id,user.id,today,JSON.stringify({status:response.status})).run();
+  }
+}
 async function runScheduledMaintenance(env) {
   await ensureProductionHardeningSchema(env);
   const now = new Date().toISOString();
@@ -2784,6 +2800,7 @@ async function runScheduledMaintenance(env) {
     env.DB.prepare("INSERT INTO loan_request_events(id,request_id,actor_id,event_type,details_json) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),row.id,null,"pickup_expired",JSON.stringify({expiredAt:now}))
   ]);
   await deliverNotificationChannels(env);
+  await deliverDailyDigests(env);
 
 }
 
