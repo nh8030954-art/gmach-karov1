@@ -166,3 +166,9 @@ for(const token of ["no_show","const expiredHolds=","hold_expired","advanceWaitl
 for(const token of ["data-no-show","אי-הגעה"])assert.ok(appClient.includes(token),token+" missing from no-show UI");
 
 for(const token of ["History-aware deletion","Advanced gmach tools","No-show","Inventory hold expired"])assert.ok(remainingClient.includes(token),token+" missing from English advanced workflow localization");
+
+for(const token of ["data-counter-pickup",`$$("[data-counter-pickup]",d).forEach`])assert.ok(appClient.includes(token),token+" missing from corrected counter proposal binding");
+
+for(const token of ["branchRating:branch","דירוג סניף 1-5"])assert.ok(finalClient.includes(token),token+" missing from branch review editing");
+
+for(const token of ["My reviews","Smart matches","Community request offers"])assert.ok(remainingClient.includes(token),token+" missing from English review/community localization");
