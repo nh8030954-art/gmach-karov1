@@ -44,6 +44,13 @@ jobs:
       - run: npm ci
         if: steps.cf.outputs.enabled == 'true'
 
+      - name: Provision dedicated backup bucket
+        if: steps.cf.outputs.enabled == 'true'
+        run: |
+          if ! npx wrangler r2 bucket list --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s||'[]');process.exit(x.some(v=>v.name==='gmach-karov-backups')?0:1)})"; then
+            npx wrangler r2 bucket create gmach-karov-backups
+          fi
+
       - name: Read live feature state
         if: steps.cf.outputs.enabled == 'true'
         run: |
