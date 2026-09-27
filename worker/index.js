@@ -379,7 +379,7 @@ async function routeApi(request, env, ctx, url) {
     // authenticated admin health endpoint; doing them here can make deploy probes
     // time out while D1 is busy.
     await env.DB.prepare("SELECT 1 AS ok").first();
-    return json({ ok:true, release:"complete-platform-2026-09-27.10", database:"D1", storage:"R2", timestamp:new Date().toISOString() });
+    return json({ ok:true, release:"complete-platform-2026-09-27.10", database:"D1", storage:"R2", email:Boolean(env.RESEND_API_KEY), privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY), timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/translate/user-content") return translateUserContent(request, env, ctx);
