@@ -9,7 +9,7 @@ on:
 
 # Re-run provisioning whenever this workflow changes.
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: provision-external-features
