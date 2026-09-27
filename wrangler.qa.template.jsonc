@@ -24,6 +24,5 @@
     "bucket_name": "__QA_BACKUP_BUCKET__"
   }],
   "ai": {"binding":"AI"},
-  "observability": {"enabled": true},
-  "triggers": {"crons": ["*/5 * * * *"]}
+  "observability": {"enabled": true}
 }
