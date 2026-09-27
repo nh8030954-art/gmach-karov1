@@ -1,7 +1,40 @@
-sha=cea3b0016b97c82590f867a46b4353ddc53b0b7a
-install=cancelled
-syntax=skipped
-tests=skipped
-smoke=skipped
-live=skipped
+sha=1fbeec891975bd07626a48b273faaee6b5c50cda
+install=success
+syntax=success
+tests=failure
+smoke=failure
+live=cancelled
+Release experience static release gate passed.
+Admin control center static release gate passed.
+Privacy purge static release gate passed.
+Community chat retention static release gate passed.
+QR scanning, structured SEO and accessibility shell gate passed.
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: Excel export UI missing
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:369:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
+
+AssertionError [ERR_ASSERTION]: Excel export UI missing
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790505306572:369:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
+
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
