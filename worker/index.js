@@ -128,6 +128,16 @@ async function importItems(request,env){
 }
 
 
+async function invalidatePublicSnapshotRoots(origin) {
+  if (typeof caches === "undefined") return;
+  const cache = caches.default;
+  await Promise.all([
+    "/api/items",
+    "/api/categories",
+    "/api/discovery"
+  ].map(path => cache.delete(new Request(origin + path, { method:"GET", headers:{ "Accept":"application/json" } })).catch(() => false)));
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -155,7 +165,10 @@ export default {
         const expansionPreflight = await requirementsExpansionPreflight(request, env, url);
         if (expansionPreflight) return withSecurityHeaders(expansionPreflight);
         const completionResponse = await handlePlatformCompletionApi(request, env, ctx, url);
-        if (completionResponse) return withSecurityHeaders(completionResponse);
+        if (completionResponse) {
+          if (!["GET","HEAD","OPTIONS"].includes(request.method) && completionResponse.ok) await invalidatePublicSnapshotRoots(url.origin);
+          return withSecurityHeaders(completionResponse);
+        }
         const publicSnapshotPolicy = request.method === "GET" ? ({
           "/api/items": { fresh:30, stale:86400 },
           "/api/categories": { fresh:1800, stale:86400 },
@@ -202,6 +215,7 @@ export default {
           }
         }
         const response = await routeApi(request, env, ctx, url);
+        if (!["GET","HEAD","OPTIONS"].includes(request.method) && response.ok) await invalidatePublicSnapshotRoots(url.origin);
         return withSecurityHeaders(response);
       }
       if (url.pathname === "/sitemap.xml") {
@@ -477,7 +491,7 @@ async function routeApi(request, env, ctx, url) {
     }
     return json({
       ok:true,
-      release:"complete-platform-2026-09-27.13",
+      release:"complete-platform-2026-09-27.14",
       database:"D1",
       storage:"R2",
       email:Boolean(env.RESEND_API_KEY),
