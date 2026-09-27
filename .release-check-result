@@ -1,7 +1,40 @@
-sha=970dcdfb5562a1ed6cf543ac4700893eec7384f2
-install=cancelled
-syntax=skipped
-tests=skipped
-smoke=skipped
-live=skipped
+sha=fc893fff621ec7302cc7577d61a4de33255e3056
+install=success
+syntax=success
+tests=failure
+smoke=failure
+live=success
+QR scanning, structured SEO and accessibility shell gate passed.
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+Full requirements regression extensions passed.
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: stale Web Push endpoint must not remain in client
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:413:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
+
+AssertionError [ERR_ASSERTION]: stale Web Push endpoint must not remain in client
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790508780708:413:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
+{"ok":true,"release":"complete-platform-2026-09-27.10","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":false,"timestamp":"2026-09-27T11:33:06.228Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":true,"turnstileSiteKey":"0x4AAAAAAFFH6u5mz0ZekN2Q","pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
