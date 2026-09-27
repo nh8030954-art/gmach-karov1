@@ -347,3 +347,9 @@ assert.ok(appClient.includes("openCommunityOfferChat"),"community offer chat UI 
 assert.ok(appClient.includes("chat-retention-note"),"loan chat retention notice missing");
 assert.ok(finalClient.includes("קריאה בלבד"),"chat media readonly guard missing");
 console.log("Community chat retention static release gate passed.");
+
+
+for(const token of ["saved_organizations WHERE organization_id","saved_categories WHERE category_id","favorites WHERE item_id","organization_changed","event:\"available\""]) assert.ok(worker.includes(token),token+" missing from saved follower notifications");
+for(const token of ["data-org-category-filter","organization-category-browser","קטגוריות בגמ״ח","data-org-category-summary"]) assert.ok(appClient.includes(token),token+" missing from organization category browser");
+assert.ok(remainingClient.includes("Categories in this gmach"),"organization category browser English translation missing");
+console.log("Saved discovery notification static gate passed.");

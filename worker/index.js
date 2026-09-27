@@ -1488,6 +1488,8 @@ async function updateOrganization(request, env, id) {
       .bind(values.name, category, values.city, values.neighborhood, values.description,values.address,null,values.serviceArea,values.hoursJson,values.pickupOptions,now,["private","family","community","nonprofit","business","authority"].includes(body.organizationType)?body.organizationType:(existing.organization_type||"private"),status, now, id),
     env.DB.prepare("UPDATE organization_contacts SET contact_phone = ? WHERE organization_id = ?").bind(values.phone, id)
   ]);
+  const organizationChanged=values.name!==existing.name||values.city!==existing.city||(values.neighborhood||null)!==(existing.neighborhood||null)||values.description!==existing.description||values.phone!==existing.contact_phone||values.address!==existing.address||(values.serviceArea||null)!==(existing.service_area||null)||values.hoursJson!==(existing.hours_json||"{}")||values.pickupOptions!==(existing.pickup_options||"[]");
+  if(organizationChanged)await notifySavedFollowers(env,{organizationId:id,title:values.name,event:"organization_changed"});
   return json({ organization: { id, ...values, primaryCategory: category, status, hidden: Boolean(existing.is_hidden) } });
 }
 
@@ -2040,11 +2042,11 @@ async function updateAvailability(request, env, id) {
   const body = await readJson(request);
   const availability = cleanText(body.availabilityStatus, 2, 20, "זמינות");
   if (!["available", "unavailable", "reserved"].includes(availability)) throw new HttpError(400, "מצב הזמינות אינו תקין");
-  const item = await env.DB.prepare(`SELECT i.id FROM items i JOIN organizations o ON o.id = i.organization_id
+  const item = await env.DB.prepare(`SELECT i.id,i.title,i.category,i.organization_id,i.availability_status FROM items i JOIN organizations o ON o.id = i.organization_id
     WHERE i.id = ? AND (o.owner_id = ? OR ? = 'admin')`).bind(id, user.id, user.role).first();
   if (!item) throw new HttpError(403, "אין הרשאה לערוך את הפריט");
-  await env.DB.prepare("UPDATE items SET availability_status = ?, updated_at = ? WHERE id = ?")
-    .bind(availability, new Date().toISOString(), id).run();
+  await env.DB.prepare("UPDATE items SET availability_status = ?, updated_at = ? WHERE id = ?").bind(availability, new Date().toISOString(), id).run();
+  if(availability==="available"&&item.availability_status!=="available")await notifySavedFollowers(env,{itemId:id,organizationId:item.organization_id,category:item.category,title:item.title,event:"available"});
   return json({ id, availabilityStatus: availability });
 }
 
@@ -2604,8 +2606,31 @@ async function requireAdmin(request, env) {
   return user;
 }
 
-async function notifySavedFollowers(env,{itemId,organizationId,category,title,event}){try{const rows=await env.DB.prepare(`SELECT DISTINCT user_id FROM saved_entities WHERE notify=1 AND ((entity_type='item' AND entity_id=?) OR (entity_type='organization' AND entity_id=?) OR (entity_type='category' AND entity_id=?))`).bind(itemId||"",organizationId||"",category||"").all();if(!rows.results?.length)return;const messages={created:["נוסף מוצר שעשוי לעניין אותך",`${title} נוסף לתוכן ששמרת.`],changed:["פרטי מוצר שמור השתנו",`עודכנו פרטים עבור ${title}.`],available:["מוצר שמור חזר לזמינות",`${title} זמין שוב להשאלה.`]};const [subject,body]=messages[event]||messages.changed;await env.DB.batch(rows.results.map(r=>notificationStatement(env,r.user_id,"system",subject,body,null)))}catch(error){console.error("saved follower notification failed",{itemId,event,error})}}
-
+async function notifySavedFollowers(env,{itemId,organizationId,category,title,event}){
+  try{
+    const categoryRow=category?await env.DB.prepare("SELECT id FROM categories WHERE id=? OR name_he=? OR name_en=? LIMIT 1").bind(category,category,category).first():null;
+    const categoryId=categoryRow?.id||category||"";
+    const rows=await env.DB.prepare(`SELECT DISTINCT user_id FROM (
+      SELECT user_id FROM saved_entities WHERE notify=1 AND (
+        (entity_type='item' AND entity_id=?) OR
+        (entity_type='organization' AND entity_id=?) OR
+        (entity_type='category' AND entity_id IN (?,?))
+      )
+      UNION SELECT user_id FROM favorites WHERE item_id=?
+      UNION SELECT user_id FROM saved_organizations WHERE organization_id=?
+      UNION SELECT user_id FROM saved_categories WHERE category_id=?
+    )`).bind(itemId||"",organizationId||"",categoryId,category||"",itemId||"",organizationId||"",categoryId).all();
+    if(!rows.results?.length)return;
+    const messages={
+      created:["נוסף מוצר שעשוי לעניין אותך",`${title} נוסף לתוכן ששמרת.`],
+      changed:["פרטי מוצר שמור השתנו",`עודכנו פרטים עבור ${title}.`],
+      available:["מוצר שמור חזר לזמינות",`${title} זמין שוב להשאלה.`],
+      organization_changed:["פרטי גמ״ח שמור השתנו",`עודכנו שעות, כתובת או פרטים עבור ${title}.`]
+    };
+    const pair=messages[event]||messages.changed;
+    await env.DB.batch(rows.results.map(r=>notificationStatement(env,r.user_id,"system",pair[0],pair[1],null)));
+  }catch(error){console.error("saved follower notification failed",{itemId,organizationId,category,event,error})}
+}
 function notificationStatement(env, userId, type, title, body, requestId = null) {
   if (!["request", "status", "message", "system"].includes(type)) type = "status";
   return env.DB.prepare("INSERT INTO notifications (id,user_id,type,title,body,request_id) VALUES (?,?,?,?,?,?)")
