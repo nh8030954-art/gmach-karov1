@@ -240,11 +240,43 @@ const I18N_FINAL_EN={
   "לא נמצאו מכשירים מחוברים.": "No connected devices found.",
   "אין אירועי אבטחה להצגה.": "No security events to show."
 };
-Object.assign(I18N.en,I18N_FINAL_EN);
+Object.assign(I18N.en,I18N_FINAL_EN,{
+  "יצירת קשר":"Contact","אזור אישי, כניסה או הרשמה":"My account, sign in or register",
+  "- גמ״ח ברגע":"- Gmach Berega","איסוף:":"Pickup:","החזרה:":"Return:",
+  "ההשאלה הקרובה ·":"Next loan ·","המוצר הוסתר עד לסיום ההשאלות הפעילות":"The item is hidden until active loans are completed",
+  "ניהול מלאי —":"Inventory management -","יחידות ·":"Units ·","· כמות":"· Quantity",
+  "זמינות, כמות או קטגוריה":"Availability, quantity or category",
+  "שורות ללא title או city. הייבוא לא בוצע.":"rows without title or city. Nothing was imported.",
+  "שורות תקינות. לייבא עכשיו?":"valid rows. Import now?","עם":"with",
+  "לבטל גם בקשות עתידיות שטרם נאספו? לחצו ביטול כדי להשאיר אותן פעילות ורק להודיע לשואלים.":"Cancel future requests that have not been collected? Choose Cancel to keep them active and only notify borrowers.",
+  "הגמ״ח נסגר והבקשות העתידיות בוטלו":"The gmach closed and future requests were cancelled",
+  "הגמ״ח נסגר והמשתמשים קיבלו הודעה":"The gmach closed and users were notified",
+  "#/catalog או https://...":"#/catalog or https://...",
+  "לחסום את המשתמש? אם קיימת השאלה פעילה, החסימה המלאה תיכנס לתוקף לאחר סיומה.":"Block this user? If an active loan exists, the full block will take effect after it ends.",
+  "· דחוף":"· Urgent","השליחה לא הושלמה":"Sending was not completed",
+  "לא הצלחנו לשלוח כרגע. נסו שוב בעוד רגע.":"We could not send this now. Please try again shortly.",
+  "הפעולה דורשת קוד אישור נוסף שיישלח למייל המנהל. להמשיך?":"This action requires an additional code sent to the administrator's email. Continue?",
+  "לא ניתן ליצור קוד אישור":"Could not create a confirmation code",
+  "הזינו את קוד האישור בן 6 הספרות שנשלח למייל:":"Enter the six-digit confirmation code sent by email:",
+  "מה תרצו לקבל בבקשת העיון?":"What would you like to receive in your access request?",
+  "איזה מידע תרצו לתקן?":"What information would you like to correct?",
+  "להתחיל תהליך מחיקת חשבון? ניתן לבטל במשך שבעה ימים.":"Start account deletion? You can cancel within seven days.",
+  "בקשת המחיקה נקלטה. אפשר לבטל אותה דרך לשונית הפרופיל.":"Your deletion request was received. You can cancel it from the Profile tab.",
+  "· רק זמינים":"· Available only",
+  "למזג את הקטגוריה? כל השיוכים יעברו לקטגוריית היעד והקטגוריה הנוכחית תוסתר.":"Merge this category? All assignments will move to the destination category and the current category will be hidden.",
+  "לפרטים ←":"Details ←","פרט":"Item","Google - איסוף":"Google - pickup","Google - החזרה":"Google - return",
+  "Outlook - איסוף":"Outlook - pickup","Outlook - החזרה":"Outlook - return",
+  "אין חסימות מלאי.":"No inventory blocks.","יחידות":"units","מקום":"Position","אין סניפים.":"No branches.",
+  "אימייל משתמש":"User email","בקשת מחיקה מתחילה תקופת המתנה של שבעה ימים. אם יש השאלות פעילות, הטיפול ימתין לסגירתן.":"Requesting deletion starts a seven-day waiting period. If active loans exist, deletion waits until they end.",
+  "6 שעות":"6 hours","12 שעות":"12 hours","24 שעות":"24 hours","48 שעות":"48 hours",
+  "לכל השאלה נוצר אירוע איסוף ואירוע החזרה. אפשר להוריד אותם מכרטיס ההשאלה.":"Each loan has a separate pickup and return event. Download them from the loan card.",
+  "מוצרים, גמ״חים, קטגוריות, בקשות קהילה וחיפושים שמורים במקום אחד.":"Items, gmachs, categories, community requests and saved searches in one place.",
+  "📷 תמונה":"📷 Photo","🎤 קול":"🎤 Voice","📍 מיקום":"📍 Location"
+});
 let lang=localStorage.getItem("gmach-language")||document.documentElement.lang||"he";
-function replaceTranslatedPhrase(text,he,en){let out=text,pos=0;const isHeb=c=>!!c&&/[\u0590-\u05FF]/.test(c),starts=isHeb(he[0]),ends=isHeb(he[he.length-1]);while((pos=out.indexOf(he,pos))!==-1){const before=out[pos-1]||"",after=out[pos+he.length]||"";if((starts&&isHeb(before))||(ends&&isHeb(after))){pos+=he.length;continue}out=out.slice(0,pos)+en+out.slice(pos+he.length);pos+=en.length}return out}function translateText(raw){if(!raw)return raw;if(I18N.en[raw])return I18N.en[raw];let out=raw;for(const [he,en] of Object.entries(I18N.en).sort((a,b)=>b[0].length-a[0].length)){if(he.length>2&&out.includes(he))out=replaceTranslatedPhrase(out,he,en)}return out}window.GmachTranslate=translateText;function translateNode(n){if(lang!=="en")return;const full=n.nodeValue||"",trim=full.trim();if(!trim)return;const translated=translateText(trim);if(translated!==trim)n.nodeValue=full.replace(trim,translated)}
-function translate(root=document.body){if(lang!=="en")return;document.documentElement.lang="en";document.documentElement.dir="ltr";const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;while(n=w.nextNode())translateNode(n);$$("input[placeholder],textarea[placeholder],[title],[aria-label]",root).forEach(el=>{for(const a of ["placeholder","title","aria-label"]){const v=el.getAttribute(a);if(v){const translated=translateText(v);if(translated!==v)el.setAttribute(a,translated)}}})}
-function observeTranslations(){if(lang!=="en")return;const o=new MutationObserver(ms=>{for(const m of ms)for(const n of m.addedNodes){if(n.nodeType===Node.TEXT_NODE)translateNode(n);else if(n.nodeType===Node.ELEMENT_NODE)translate(n)}});o.observe(document.body,{childList:true,subtree:true})}
+function replaceTranslatedPhrase(text,he,en){let out=text,pos=0;const isHeb=c=>!!c&&/[\u0590-\u05FF]/.test(c),starts=isHeb(he[0]),ends=isHeb(he[he.length-1]);while((pos=out.indexOf(he,pos))!==-1){const before=out[pos-1]||"",after=out[pos+he.length]||"";if((starts&&isHeb(before))||(ends&&isHeb(after))){pos+=he.length;continue}out=out.slice(0,pos)+en+out.slice(pos+he.length);pos+=en.length}return out}function translateText(raw){if(!raw)return raw;if(I18N.en[raw])return I18N.en[raw];let out=raw;for(const [he,en] of Object.entries(I18N.en).sort((a,b)=>b[0].length-a[0].length)){if(he.length>2&&out.includes(he))out=replaceTranslatedPhrase(out,he,en)}return out}window.GmachTranslate=value=>lang==="en"?translateText(value):value;function translateNode(n){if(lang!=="en")return;const full=n.nodeValue||"",trim=full.trim();if(!trim)return;const translated=translateText(trim);if(translated!==trim)n.nodeValue=full.replace(trim,translated)}
+function translate(root=document.body){if(lang!=="en")return;document.documentElement.lang="en";document.documentElement.dir="ltr";const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;while(n=w.nextNode())translateNode(n);$$("input[placeholder],textarea[placeholder],[title],[aria-label],input[type=button][value],input[type=submit][value]",root).forEach(el=>{for(const a of ["placeholder","title","aria-label","value"]){if(a==="value"&&!el.matches("input[type=button],input[type=submit]"))continue;const v=el.getAttribute(a);if(v){const translated=translateText(v);if(translated!==v)el.setAttribute(a,translated)}}})}
+function observeTranslations(){if(lang!=="en")return;const o=new MutationObserver(ms=>{for(const m of ms){if(m.type==="characterData"){translateNode(m.target);continue}if(m.type==="attributes"){const el=m.target,a=m.attributeName,v=el.getAttribute(a);if(v&&(!(["value"].includes(a))||el.matches("input[type=button],input[type=submit]"))){const translated=translateText(v);if(translated!==v)el.setAttribute(a,translated)}continue}for(const n of m.addedNodes){if(n.nodeType===Node.TEXT_NODE)translateNode(n);else if(n.nodeType===Node.ELEMENT_NODE)translate(n)}}});o.observe(document.body,{childList:true,characterData:true,attributes:true,attributeFilter:["placeholder","title","aria-label","value"],subtree:true})}
 function installLanguage(){
  if($("#language-switch"))return;const host=$(".site-actions,.header-actions,.top-actions,header nav")||document.body;const b=document.createElement("button");b.id="language-switch";b.type="button";b.className="button button-secondary";b.textContent=lang==="en"?"עברית":"English";b.setAttribute("aria-label","החלף שפה");b.onclick=async()=>{lang=lang==="en"?"he":"en";localStorage.setItem("gmach-language",lang);try{await api("/api/me/profile",{method:"PATCH",body:{preferredLanguage:lang}})}catch{}location.reload()};host.appendChild(b);if(lang==="en"){document.title=translateText(document.title);const meta=document.querySelector('meta[name="description"]');if(meta)meta.content=translateText(meta.content);translate(document.body);observeTranslations()}
 }
