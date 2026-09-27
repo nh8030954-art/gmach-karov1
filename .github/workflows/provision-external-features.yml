@@ -48,8 +48,17 @@ jobs:
       - name: Provision dedicated backup bucket
         if: steps.cf.outputs.enabled == 'true'
         run: |
-          if ! npx wrangler r2 bucket list --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s||'[]');process.exit(x.some(v=>v.name==='gmach-karov-backups')?0:1)})"; then
-            npx wrangler r2 bucket create gmach-karov-backups
+          set +e
+          OUTPUT="$(npx wrangler r2 bucket create gmach-karov-backups 2>&1)"
+          STATUS=$?
+          set -e
+          if [ "$STATUS" -eq 0 ]; then
+            echo "$OUTPUT"
+          elif echo "$OUTPUT" | grep -qi "already exists"; then
+            echo "Backup bucket already exists."
+          else
+            echo "$OUTPUT" >&2
+            exit "$STATUS"
           fi
 
       - name: Read live feature state
@@ -102,8 +111,11 @@ jobs:
               --data '{"domains":["gmach-karov1.nh8030954.workers.dev"],"mode":"managed","name":"gmach-karov1-production"}')"
             printf '%s' "$CREATE" > "$RUNNER_TEMP/turnstile.json"
           else
-            curl -fsS "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/challenges/widgets/$SITEKEY" \
-              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" > "$RUNNER_TEMP/turnstile.json"
+            curl -fsS "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/challenges/widgets/$SITEKEY/rotate_secret" \
+              -X POST \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              --data '{"invalidate_immediately":false}' > "$RUNNER_TEMP/turnstile.json"
           fi
 
           node - <<'NODE'
