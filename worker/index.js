@@ -374,12 +374,27 @@ async function routeApi(request, env, ctx, url) {
   if (method === "OPTIONS") return new Response(null, { status: 204 });
 
   if (method === "GET" && path === "/api/health") {
-    // Keep the liveness endpoint intentionally lightweight. Schema reconciliation and
-    // deep operational checks run in migrations, scheduled maintenance and the
-    // authenticated admin health endpoint; doing them here can make deploy probes
-    // time out while D1 is busy.
+    // Keep the normal production liveness probe lightweight. Deep schema
+    // reconciliation is explicit so deploy probes never pay its D1 cost.
     await env.DB.prepare("SELECT 1 AS ok").first();
-    return json({ ok:true, release:"complete-platform-2026-09-27.10", database:"D1", storage:"R2", email:Boolean(env.RESEND_API_KEY), privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY), timestamp:new Date().toISOString() });
+    if (url.searchParams.get("deep")==="1") {
+      await ensureAdvancedBookingSchema(env);
+      await ensureProductionHardeningSchema(env);
+      await ensureCompletePlatformSchema(env);
+      await Promise.all([
+        ensurePlatformCompletionSchema(env),
+        ensureFinalFeaturesSchema(env),
+        ensureRemainingFeaturesSchema(env),
+        ensureRequirementsExpansionSchema(env),
+        ensureLaunchReadinessSchema(env),
+        ensureDistributionCompletionSchema(env),
+        ensureNavigationAdminSchema(env),
+        ensurePrivacyAvailabilitySchema(env),
+        ensurePrivacyPurgeSchema(env),
+        ensureCommunityChatSchema(env)
+      ]);
+    }
+    return json({ ok:true, release:"complete-platform-2026-09-27.10", database:"D1", storage:"R2", email:Boolean(env.RESEND_API_KEY), privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY), deep:url.searchParams.get("deep")==="1", timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/translate/user-content") return translateUserContent(request, env, ctx);
