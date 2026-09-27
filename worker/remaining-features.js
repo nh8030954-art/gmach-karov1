@@ -160,7 +160,8 @@ async function validateBackup(request,env,id){
  try{
   const manifest=safe(backup.manifest_json,{});
   if(backup.status!=="completed"||!manifest.storageKey||!manifest.checksum)throw new Error("Backup manifest is incomplete");
-  const object=await env.ITEM_IMAGES.get(manifest.storageKey);
+  const backupStorage=env.BACKUP_STORAGE||env.ITEM_IMAGES;
+  const object=await backupStorage.get(manifest.storageKey);
   if(!object)throw new Error("Backup artifact is missing");
   const raw=await object.text(),checksum=await hash(raw);
   if(checksum!==manifest.checksum)throw new Error("Backup checksum mismatch");

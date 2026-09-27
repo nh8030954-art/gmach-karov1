@@ -1,5 +1,6 @@
 import { handleRemainingFeatures, runRemainingMaintenance, ensureRemainingFeaturesSchema } from "./remaining-features.js";
 import { handleRequirementsExpansion, requirementsExpansionPreflight, runRequirementsExpansionMaintenance, ensureRequirementsExpansionSchema } from "./requirements-expansion.js";
+import { handleLaunchReadiness, runLaunchReadinessMaintenance, ensureLaunchReadinessSchema } from "./launch-readiness.js";
 import { handleFinalFeatures, runFinalMaintenance, ensureFinalFeaturesSchema } from "./final-features.js";
 import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata, ensurePlatformCompletionSchema, recordSecurityFailure } from "./platform-completion.js";
 const SESSION_COOKIE = "gmach_session";
@@ -142,7 +143,7 @@ export default {
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env)]); })());
+    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), runLaunchReadinessMaintenance(env)]); })());
   }
 };
 
@@ -264,7 +265,7 @@ async function activePlatformClosure(env,now){
     return item?{message:item.message||"חג שמח — האתר סגור כעת לכבוד החג",endsAt:item.endsAt}:null;
   }catch{return null;}
 }
-function platformClosedPage(closure){const reopens=new Intl.DateTimeFormat("he-IL",{timeZone:"Asia/Jerusalem",dateStyle:"full",timeStyle:"short"}).format(new Date(closure.endsAt));return new Response(`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>גמ״ח ברגע — סגור זמנית</title></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#fff;font-family:Arial,sans-serif;color:#123c46;text-align:center"><main style="max-width:620px;padding:40px 24px"><img src="/gmach-berega-logo.jpg" alt="גמ״ח ברגע" style="max-width:260px"><h1>${escapeHtml(closure.message)}</h1><p>האתר ישוב לפעילות ב־${escapeHtml(reopens)}</p></main></body></html>`,{status:503,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});}
+function platformClosedPage(closure){const reopens=new Intl.DateTimeFormat("he-IL",{timeZone:"Asia/Jerusalem",dateStyle:"full",timeStyle:"short"}).format(new Date(closure.endsAt));return new Response(`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>גמ״ח ברגע - סגור זמנית</title></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#fff;font-family:Arial,sans-serif;color:#123c46;text-align:center"><main style="max-width:680px;padding:40px 24px"><img src="/gmach-berega-logo.jpg" alt="גמ״ח ברגע" style="max-width:260px"><h1>${escapeHtml(closure.message)}</h1><p style="font-size:20px">האתר ישוב לפעילות ב-${escapeHtml(reopens)}</p><p style="line-height:1.7">המידע, הבקשות וההשאלות שכבר נשמרו במערכת נשארים שמורים בזמן התחזוקה.</p><p><a href="mailto:${escapeHtml(DEFAULT_SUPPORT_EMAIL)}" style="color:#123c46;font-weight:700">פנייה לתמיכה</a></p></main></body></html>`,{status:503,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Retry-After":"900"}});}
 
 async function createSupportRequest(request, env, ctx) {
   await ensureProductionHardeningSchema(env);
@@ -594,6 +595,8 @@ async function routeApi(request, env, ctx, url) {
   if (remainingFeaturesResponse) return remainingFeaturesResponse;
   const requirementsExpansionResponse = await handleRequirementsExpansion(request, env, ctx, url);
   if (requirementsExpansionResponse) return requirementsExpansionResponse;
+  const launchReadinessResponse = await handleLaunchReadiness(request, env, ctx, url);
+  if (launchReadinessResponse) return launchReadinessResponse;
 
   throw new HttpError(404, "הכתובת לא נמצאה");
 }
