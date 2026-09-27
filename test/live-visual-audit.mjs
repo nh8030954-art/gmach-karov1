@@ -37,7 +37,7 @@ async function auditPage(browser,{target,base,device,lang,route,label,auth=false
   const url=base+"/"+(route.startsWith("#")?route:"#/"+route);
   let status=null;
   try{
-    const response=await page.goto(url,{waitUntil:"networkidle",timeout:60000});
+    const response=await page.goto(url,{waitUntil:"domcontentloaded",timeout:30000});
     status=response?.status()||null;
     await page.waitForTimeout(1800);
     if(afterLoad) await afterLoad(page);
