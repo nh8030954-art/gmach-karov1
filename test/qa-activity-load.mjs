@@ -109,6 +109,13 @@ const created = await pool(actors, 10, async actor => {
 });
 
 const createdLoans = created.filter(x => x?.requestId);
+console.log(JSON.stringify({
+  stage:"loan-create-diagnostic",
+  created:createdLoans.length,
+  total:created.length,
+  failures:failures.slice(0,25),
+  samples:created.slice(0,8).map(x=>({borrower:x.borrower,itemId:x.itemId,loanOk:x.loanOk,requestId:x.requestId||null}))
+}));
 assert.ok(createdLoans.length >= 114, `Expected at least 95% loan creation success, got ${createdLoans.length}/120`);
 
 const managed = await pool(createdLoans, 10, async entry => {
