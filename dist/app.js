@@ -432,7 +432,7 @@
         let d=$("#nearby-gmachs-dialog");if(!d){d=document.createElement("dialog");d.id="nearby-gmachs-dialog";d.className="modal modal-wide";document.body.append(d)}
         d.innerHTML=`<button class="dialog-close" type="button" aria-label="סגירה">×</button><h2>גמ"חים קרובים</h2><p>המיקום משמש לחיפוש הזה בלבד ואינו נשמר.</p>${distinct.map(row=>`<article class="dashboard-row"><div><strong>${escapeHTML(row.organization_name)}</strong><p>${escapeHTML(row.branch_name||row.branch_city||row.city||"")} · ${Number(row.distanceKm||0).toFixed(1)} ק"מ</p></div><button class="button button-primary button-small" data-nearby-org="${escapeHTML(row.organization_id)}">צפייה בגמ"ח</button></article>`).join("")||"<p>לא נמצאו גמ״חים עם נקודת איסוף פעילה בטווח של 30 ק״מ.</p>"}`;
         $(".dialog-close",d).onclick=()=>closeDialog(d);
-        $("[data-nearby-org]",d).forEach(button=>button.onclick=()=>{closeDialog(d);openOrganization(button.dataset.nearbyOrg)});
+        $$("[data-nearby-org]",d).forEach(button=>button.onclick=()=>{closeDialog(d);openOrganization(button.dataset.nearbyOrg)});
         openDialog(d);
       }catch(error){toast(error.message||"לא הצלחנו למצוא גמ״חים קרובים","error")}
     },()=>{toast("לא ניתנה הרשאת מיקום. אפשר לחפש לפי עיר.","error");showHome();$("#city-filter")?.focus();},{enableHighAccuracy:false,timeout:8000,maximumAge:60000});
