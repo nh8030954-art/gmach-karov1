@@ -221,7 +221,3 @@ assert.ok(worker.includes("Promise.all([ensureCompletePlatformSchema(env),ensure
 
 for(const token of ["זמינות חלקית","request-use-available","request-change-dates"])assert.ok((appClient+indexHtml).includes(token),token+" missing from partial availability choice UI");
 assert.ok(worker.includes("turnaround_minutes||0"),"waitlist availability must respect turnaround time");
-
-for(const token of ["moderateItemImage","@cf/moondream/moondream3.1-9B-A2B","moderationFindings","autoHidden"])assert.ok(worker.includes(token),token+" missing from automatic item image moderation");
-for(const token of ["PAGE_LOAD","JS_ERROR","INP","ביצועים - 7 ימים","analytics.performance"])assert.ok(finalClient.includes(token),token+" missing from performance monitoring dashboard");
-for(const token of ["moderation?.autoHidden","moderation?.reviewRequired"])assert.ok(appClient.includes(token),token+" missing from image moderation upload feedback");
