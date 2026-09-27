@@ -2,6 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "gmach-karov1-qa",
   "main": "worker/index.js",
+  "vars": {"QA_CATALOG_LIMIT": "300"},
   "compatibility_date": "2026-09-20",
   "assets": {
     "directory": "./dist",
