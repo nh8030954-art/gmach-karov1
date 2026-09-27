@@ -280,3 +280,15 @@ for(const token of ["navigation_links","footer_find","footer_share","footer_info
 assert.ok(worker.includes("handleNavigationAdmin"),"navigation admin handler not wired");
 assert.ok(indexHtml.includes("./navigation-admin.js"),"navigation admin client not loaded");
 console.log("Navigation admin static release gate passed.");
+
+
+const privacyAvailabilityWorker=await readFile("worker/privacy-availability.js","utf8");
+const privacyAvailabilityClient=await readFile("dist/privacy-availability.js","utf8");
+const privacyAvailabilityMigration=await readFile("migrations/0023_privacy_availability.sql","utf8");
+for(const token of ["/availability-rules","/api/admin/data-requests","checkAvailabilityRules","weekly_window","advance_limit"]) assert.ok(privacyAvailabilityWorker.includes(token),token+" missing from privacy/availability backend");
+for(const token of ["ניהול זמינות מתקדם","בקשות פרטיות","data-privacy-save","data-rule-toggle"]) assert.ok(privacyAvailabilityClient.includes(token),token+" missing from privacy/availability UI");
+for(const token of ["admin_note","assigned_to","due_at","availability_rules_scope_idx"]) assert.ok(privacyAvailabilityMigration.includes(token),token+" missing from privacy/availability migration");
+assert.ok(worker.includes("handlePrivacyAvailability"),"privacy/availability handler not wired");
+assert.ok(worker.includes("checkAvailabilityRules(env,itemId,from,until"),"availability rules not enforced for loan requests");
+assert.ok(indexHtml.includes("./privacy-availability.js"),"privacy/availability client not loaded");
+console.log("Privacy availability static release gate passed.");
