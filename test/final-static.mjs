@@ -369,3 +369,7 @@ assert.ok((await readFile("worker/launch-readiness.js","utf8")).includes("applic
 assert.ok((await readFile("dist/admin-control-center.js","utf8")).includes("ייצוא Excel"),"Excel export UI missing");
 assert.ok(appClient.includes("unit-qr-image"),"QR image scanner fallback missing");
 console.log("Excel export and QR image scanner gate passed.");
+
+assert.ok(finalClient.includes("MediaRecorder"),"in-browser voice message recording missing");
+assert.ok(finalClient.includes("voice-message.webm"),"voice message upload missing");
+console.log("Voice message recording gate passed.");
