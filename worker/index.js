@@ -477,7 +477,7 @@ async function routeApi(request, env, ctx, url) {
     }
     return json({
       ok:true,
-      release:"complete-platform-2026-09-27.12",
+      release:"complete-platform-2026-09-27.13",
       database:"D1",
       storage:"R2",
       email:Boolean(env.RESEND_API_KEY),
@@ -998,10 +998,11 @@ async function updateProfile(request, env) {
   const fullName=cleanText(body.fullName,2,80,"שם מלא"), phone=validatePhone(body.phone), city=cleanText(body.city,2,80,"עיר או יישוב");
   const language=body.preferredLanguage==="en"?"en":"he", navigation=["google","waze","apple"].includes(body.preferredNavigation)?body.preferredNavigation:(user.preferred_navigation||"google"), operational=body.operationalEmails===false?0:1, community=body.communityEmails===true?1:0;
   const now=new Date().toISOString();
-  await env.DB.batch([
-    env.DB.prepare("UPDATE users SET full_name=?,phone=?,city=?,preferred_language=?,preferred_navigation=?,operational_emails_accepted=?,community_emails_accepted=?,updated_at=? WHERE id=?").bind(fullName,phone,city,language,navigation,operational,community,now,user.id),
-    env.DB.prepare("INSERT INTO navigation_preferences(user_id,preferred_app) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET preferred_app=excluded.preferred_app,updated_at=?").bind(user.id,navigation,now)
-  ]);
+  // preferred_navigation on users is the canonical navigation preference.
+  // Do not depend on the obsolete navigation_preferences table, which was
+  // never part of the migration ledger and made profile updates schema-order dependent.
+  await env.DB.prepare("UPDATE users SET full_name=?,phone=?,city=?,preferred_language=?,preferred_navigation=?,operational_emails_accepted=?,community_emails_accepted=?,updated_at=? WHERE id=?")
+    .bind(fullName,phone,city,language,navigation,operational,community,now,user.id).run();
   return json({ profile:{...publicUser({...user,full_name:fullName}),phone,city,preferredLanguage:language,preferredNavigation:navigation,operationalEmails:Boolean(operational),communityEmails:Boolean(community)} });
 }
 
