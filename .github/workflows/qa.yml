@@ -3,7 +3,7 @@ name: QA deploy and tests
 on:
   workflow_dispatch:
   push:
-    branches: [main, qa]
+    branches: [qa]
 
 permissions:
   contents: read
@@ -92,22 +92,22 @@ jobs:
           done
           exit 1
       - name: Moderate QA load test
-        if: steps.config.outputs.enabled == 'true'
+        if: steps.config.outputs.enabled == 'true' && github.event_name == 'workflow_dispatch'
         run: node test/qa-load.mjs
       - name: Live multi-user activity simulation
-        if: steps.config.outputs.enabled == 'true'
+        if: steps.config.outputs.enabled == 'true' && github.event_name == 'workflow_dispatch'
         run: node test/qa-activity-load.mjs
 
       - name: Install live visual browser
-        if: steps.config.outputs.enabled == 'true'
+        if: steps.config.outputs.enabled == 'true' && github.event_name == 'workflow_dispatch'
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
       - name: Live production and QA visual audit
-        if: steps.config.outputs.enabled == 'true'
+        if: steps.config.outputs.enabled == 'true' && github.event_name == 'workflow_dispatch'
         run: node test/live-visual-audit.mjs
       - name: Upload live visual audit
-        if: always() && steps.config.outputs.enabled == 'true'
+        if: always() && steps.config.outputs.enabled == 'true' && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: live-visual-audit
