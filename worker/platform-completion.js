@@ -15,7 +15,8 @@ export async function ensurePlatformCompletionSchema(env){
     reviews:[["branch_id","TEXT"],["branch_rating","INTEGER"],["edited_until","TEXT"]],
     organization_invitations:[["invited_email","TEXT"]],
     saved_searches:[["last_checked_at","TEXT"],["last_result_signature","TEXT"]],
-    push_subscriptions:[["user_agent","TEXT"]]
+    push_subscriptions:[["user_agent","TEXT"]],
+    analytics_events:[["source","TEXT"],["referrer","TEXT"],["page_path","TEXT"]]
   };
   for(const [table,defs] of Object.entries(alters)){
     const info=await env.DB.prepare(`PRAGMA table_info(${table})`).all().catch(()=>({results:[]}));
