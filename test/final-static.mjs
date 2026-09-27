@@ -393,3 +393,22 @@ await access("test/production-load.mjs");
 await access("migrations/0026_notification_delivery_runtime.sql");
 await access("migrations/0027_notification_templates.sql");
 console.log("Full requirements regression extensions passed.");
+
+
+/* End-to-end wiring invariants: client actions must have matching server routes. */
+for (const token of [
+  '/api/push-subscriptions',
+  '/chat-attachment',
+  '/chat-rich',
+  '/report',
+  '/block'
+]) assert.ok((appClient+finalClient+platformClient).includes(token), token+" missing from client wiring");
+for (const token of [
+  'path==="/api/push-subscriptions"',
+  '/chat-attachment$/',
+  '/chat-rich$/',
+  '/report$/',
+  '/block$/'
+]) assert.ok((worker+platform).includes(token), token+" missing from server wiring");
+assert.ok(!finalClient.includes('/api/me/push-subscriptions'),"stale Web Push endpoint must not remain in client");
+for (const token of ['messageType:"location"','uploadRequestChatAttachment','reportRequestMessage','blockChatUser']) assert.ok(worker.includes(token),token+" missing from request chat backend");
