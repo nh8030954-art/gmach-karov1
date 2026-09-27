@@ -2395,8 +2395,17 @@ async function createOrganizationInvitation(request,env,organizationId,url){
   let emailSent=false;
   if(invitedEmail&&env.RESEND_API_KEY){
     try{
-      const org=await env.DB.prepare("SELECT name FROM organizations WHERE id=?").bind(organizationId).first(),deliver=env.RESEND_SERVICE?.fetch?env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE):fetch;
-      const res=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[invitedEmail],subject:`הזמנה לניהול ${org?.name||"גמ״ח"}`,text:`הוזמנת להצטרף כמנהל/ת. הקישור בתוקף לשבעה ימים: ${inviteUrl}`,html:`<div dir="rtl" style="font-family:Arial,sans-serif"><h2>הזמנה לניהול</h2><p>הוזמנת להצטרף כמנהל/ת של ${String(org?.name||"גמ״ח").replace(/[&<>"]/g,"")}.</p><p><a href="${inviteUrl}">פתיחת ההזמנה</a></p><p>הקישור בתוקף לשבעה ימים.</p></div>`})});emailSent=res.ok;
+      const org=await env.DB.prepare("SELECT name FROM organizations WHERE id=?").bind(organizationId).first();
+      const recipient=await env.DB.prepare("SELECT preferred_language FROM users WHERE email=? COLLATE NOCASE LIMIT 1").bind(invitedEmail).first();
+      const name=String(org?.name||"Gmach"),safeName=escapeHtmlEmail(name),language=recipient?.preferred_language||"both";
+      const englishText=`You were invited to manage ${name}. This invitation expires in seven days: ${inviteUrl}`;
+      const hebrewText=`הוזמנת להצטרף כמנהל/ת של ${name}. הקישור בתוקף לשבעה ימים: ${inviteUrl}`;
+      const subject=language==="he"?`הזמנה לניהול ${name}`:language==="en"?`Invitation to manage ${name}`:`Invitation to manage a gmach | הזמנה לניהול גמ״ח`;
+      const text=language==="he"?hebrewText:language==="en"?englishText:`${englishText}\n\n${hebrewText}`;
+      const englishHtml=`<section dir="ltr" lang="en"><h2>Invitation to manage a gmach</h2><p>You were invited to manage ${safeName}.</p><p><a href="${inviteUrl}">Open invitation</a></p><p>The invitation expires in seven days.</p></section>`;
+      const hebrewHtml=`<section dir="rtl" lang="he"><h2>הזמנה לניהול</h2><p>הוזמנת להצטרף כמנהל/ת של ${safeName}.</p><p><a href="${inviteUrl}">פתיחת ההזמנה</a></p><p>הקישור בתוקף לשבעה ימים.</p></section>`;
+      const deliver=env.RESEND_SERVICE?.fetch?env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE):fetch;
+      const res=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[invitedEmail],subject,text,html:`<div style="font-family:Arial,sans-serif">${language==="he"?hebrewHtml:language==="en"?englishHtml:englishHtml+hebrewHtml}</div>`})});emailSent=res.ok;
     }catch(error){console.error("manager invitation email failed",{organizationId,invitedEmail,error});}
   }
   return json({invitation:{id,role,expiresAt,url:inviteUrl,invitedEmail,emailSent}},201);
