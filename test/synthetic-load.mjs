@@ -85,6 +85,11 @@ try {
     assert.ok(statuses.every(status => status === 200), `${concurrency} clients: ${JSON.stringify(statuses.filter(status => status !== 200))}`);
     console.log(JSON.stringify({ users, organizations, items, concurrency, requests: statuses.length, success: statuses.length, durationMs: Math.round(performance.now() - start) }));
   }
+  // Reproduce a live database whose optional review column has not migrated.
+  // Listing equipment must remain possible even if the richer review query fails.
+  await db.prepare("ALTER TABLE reviews DROP COLUMN item_rating").run();
+  const olderSchemaPage = await get("/api/organizations/synthetic-org-0/public");
+  assert.equal(olderSchemaPage.items.length, 10, "Public gmach must retain its listed items with an older review schema");
 } finally {
   await mf.dispose();
 }

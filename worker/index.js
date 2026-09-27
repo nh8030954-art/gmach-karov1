@@ -1376,8 +1376,31 @@ async function getPublicOrganization(env, id) {
   for (const [section,result] of [["items",itemsResult],["reviews",reviewsResult],["categories",categoriesResult]]) {
     if (result.status === "rejected") console.error("Public organization section unavailable", { organizationId: id, section, error: result.reason });
   }
-  const items = itemsResult.status === "fulfilled" ? itemsResult.value.results.map(mapItem) : [];
-  const reviews = reviewsResult.status === "fulfilled" ? reviewsResult.value.results : [];
+  let items = itemsResult.status === "fulfilled" ? itemsResult.value.results.map(mapItem) : [];
+  if (itemsResult.status === "rejected") {
+    // Public pages must still show listed equipment while optional review and
+    // inventory migrations are being reconciled on an older D1 database.
+    try {
+      const compatibleItems = await env.DB.prepare(`SELECT i.*,o.id AS org_id,o.name AS org_name,i.quantity AS available_count
+        FROM items i JOIN organizations o ON o.id=i.organization_id
+        WHERE i.organization_id=? AND i.status='active' ORDER BY i.updated_at DESC`).bind(id).all();
+      items = compatibleItems.results.map(mapItem);
+    } catch (error) {
+      console.error("Compatible public organization items unavailable", { organizationId: id, error });
+    }
+  }
+  let reviews = reviewsResult.status === "fulfilled" ? reviewsResult.value.results : [];
+  if (reviewsResult.status === "rejected") {
+    try {
+      const compatibleReviews = await env.DB.prepare(`SELECT r.id,r.rating,r.comment,r.created_at,
+        substr(u.full_name,1,instr(u.full_name||' ',' ')-1) AS author_name
+        FROM reviews r JOIN users u ON u.id=r.author_id
+        WHERE r.organization_id=? AND r.status='published' ORDER BY r.created_at DESC LIMIT 30`).bind(id).all();
+      reviews = compatibleReviews.results;
+    } catch (error) {
+      console.error("Compatible public organization reviews unavailable", { organizationId: id, error });
+    }
+  }
   const categories = categoriesResult.status === "fulfilled" ? categoriesResult.value.results : [];
   return json({ organization: { ...organization, verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options), categories }, items, reviews, partial: !schemaReady || [itemsResult,reviewsResult,categoriesResult].some(result => result.status === "rejected") });
 }
@@ -3252,4 +3275,3 @@ function withSecurityHeaders(response) {
   headers.set("Cross-Origin-Resource-Policy", "same-origin");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
-
