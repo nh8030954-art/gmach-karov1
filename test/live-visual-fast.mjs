@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 import { mkdir, writeFile } from "node:fs/promises";
-const OUT="visual-fast", BASE="https://gmach-karov1.nh8030954.workers.dev";
+const OUT="visual-fast", BASE=process.env.TARGET_URL||"https://gmach-karov1.nh8030954.workers.dev";
 await mkdir(OUT,{recursive:true});
 const shots=[], browser=await chromium.launch({headless:true});
 async function shot({name,lang="he",viewport={width:1440,height:1000},route="#/",fullPage=false,action}){
