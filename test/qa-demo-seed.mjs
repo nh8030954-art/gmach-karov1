@@ -5,11 +5,11 @@ const destination = process.argv[2];
 if (!destination) throw new Error("Pass the output SQL filename");
 const cities = ["ירושלים", "תל אביב-יפו", "בני ברק", "חיפה", "פתח תקווה", "בית שמש", "אשדוד", "נתניה", "באר שבע", "מודיעין עילית"];
 const groups = [
-  ["ציוד לאירועים", ["שולחן מתקפל", "כיסאות מתקפלים", "מיחם לשבת", "רמקול נייד", "מקרן ומסך", "סט כלים לאירוע"]],
-  ["תינוקות וילדים", ["עגלת תינוק", "לול מתקפל", "כיסא בטיחות", "משאבת חלב", "טרמפולינה לתינוק", "מיטת מעבר"]],
-  ["רפואה ושיקום", ["כיסא גלגלים", "הליכון מתקפל", "קביים", "מכשיר אינהלציה", "מיטה סיעודית", "מד לחץ דם"]],
+  ["אירועים", ["שולחן מתקפל", "כיסאות מתקפלים", "מיחם לשבת", "רמקול נייד", "מקרן ומסך", "סט כלים לאירוע"]],
+  ["תינוקות", ["עגלת תינוק", "לול מתקפל", "כיסא בטיחות", "משאבת חלב", "טרמפולינה לתינוק", "מיטת מעבר"]],
+  ["רפואה", ["כיסא גלגלים", "הליכון מתקפל", "קביים", "מכשיר אינהלציה", "מיטה סיעודית", "מד לחץ דם"]],
   ["כלי עבודה", ["מקדחה נטענת", "סולם מתקפל", "ארגז כלי עבודה", "מכונת שטיפה", "מברגה חשמלית", "מסור ידני"]],
-  ["נסיעות וטיולים", ["מזוודה גדולה", "תיק גב לטיול", "צידנית חשמלית", "אוהל משפחתי", "מנשא תינוק", "גגון לרכב"]],
+  ["טיולים", ["מזוודה גדולה", "תיק גב לטיול", "צידנית חשמלית", "אוהל משפחתי", "מנשא תינוק", "גגון לרכב"]],
   ["ספרים ולימוד", ["ספרי לימוד", "ערכת יצירה", "מחשבון מדעי", "סט ספרי ילדים", "לוח מחיק", "עמדת קריאה"]]
 ];
 const quote = value => `'${String(value).replaceAll("'", "''")}'`;
@@ -26,11 +26,13 @@ for (let org = 0; org < 36; org++) {
   const ownerId = `qa-demo-user-${String(org + 1).padStart(3, "0")}`;
   sql.push(`INSERT OR IGNORE INTO organizations (id, owner_id, name, primary_category, city, description, status) VALUES (${quote(organizationId)}, ${quote(ownerId)}, ${quote(name)}, ${quote(category)}, ${quote(city)}, ${quote("נתוני הדגמה בלבד בסביבת הבדיקות. אין לפנות לגמ״ח זה לצורך השאלה אמיתית.")}, 'approved');`);
   sql.push(`UPDATE organizations SET owner_id=${quote(ownerId)} WHERE id=${quote(organizationId)} AND owner_id IS NULL;`);
+  sql.push(`UPDATE organizations SET primary_category=${quote(category)} WHERE id=${quote(organizationId)};`);
   for (let index = 0; index < 6; index++) {
     const product = products[(index + Math.floor(org / groups.length)) % products.length];
     const itemId = `qa-demo-item-${String(org + 1).padStart(2, "0")}-${index + 1}`;
     const availability = index === 5 ? "unavailable" : "available";
     sql.push(`INSERT OR IGNORE INTO items (id, organization_id, title, category, description, condition, quantity, city, status, availability_status, icon) VALUES (${quote(itemId)}, ${quote(organizationId)}, ${quote(product)}, ${quote(category)}, ${quote("פריט הדגמה בלבד. מופיע כדי להמחיש חיפוש, סינון ועמוד גמ״ח בסביבת הבדיקות.")}, 'טוב', ${1 + (index % 4)}, ${quote(city)}, 'active', ${quote(availability)}, 'box');`);
+    sql.push(`UPDATE items SET category=${quote(category)} WHERE id=${quote(itemId)};`);
   }
 }
 await writeFile(destination, sql.join("\n") + "\n");
