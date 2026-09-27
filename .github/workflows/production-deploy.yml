@@ -59,6 +59,7 @@ jobs:
           npm test 2>&1 | tee production-test-output.log
       - name: Persist production test failure
         if: steps.tests.outcome != 'success'
+        continue-on-error: true
         run: |
           {
             echo "deploy_sha=${GITHUB_SHA}"
@@ -69,8 +70,10 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .deploy-test-failure
           git commit -m "Record production test failure" || true
-          git push
+          git pull --rebase origin main || true
+          git push || echo "::warning::Could not persist production test failure because main advanced."
       - name: Enforce production tests
+        if: always()
         run: test "${{ steps.tests.outcome }}" = "success"
       - name: Ensure dedicated backup R2 bucket
         run: |
