@@ -190,7 +190,7 @@ async function adminSupportDetail(request,env,ticketId){
 async function adminSupportReply(request,env,ticketId){
   const admin=await requireAdmin(request,env),b=await body(request),ticket=await env.DB.prepare("SELECT * FROM support_tickets WHERE id=?").bind(ticketId).first();if(!ticket)throw new LaunchError(404,"הפנייה לא נמצאה");
   const message=text(b.message,1500);if(!message)throw new LaunchError(400,"יש לכתוב הודעה"),now=new Date().toISOString(),id=crypto.randomUUID(),status=b.close===true?"closed":"waiting";
-  const statements=[env.DB.prepare("INSERT INTO support_ticket_messages(id,ticket_id,sender_id,body) VALUES(?,?,?,?)").bind(id,ticketId,admin.id,message),env.DB.prepare("UPDATE support_tickets SET status=?,updated_at=? WHERE id=?").bind(status,now,ticketId),audit(env,admin.id,"support.admin_reply","support_ticket",ticketId,{status:ticket.status},{status},{},{messageId:id})];
+  const statements=[env.DB.prepare("INSERT INTO support_ticket_messages(id,ticket_id,sender_id,body) VALUES(?,?,?,?)").bind(id,ticketId,admin.id,message),env.DB.prepare("UPDATE support_tickets SET status=?,updated_at=? WHERE id=?").bind(status,now,ticketId),audit(env,admin.id,"support.admin_reply","support_ticket",ticketId,{status:ticket.status},{status},null,{messageId:id})];
   if(ticket.user_id)statements.push(env.DB.prepare("INSERT INTO notifications(id,user_id,type,title,body) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),ticket.user_id,"support","עדכון בפניית התמיכה #"+ticket.ticket_number,message.slice(0,300)));
   await env.DB.batch(statements);return json({message:{id,createdAt:now},status},201);
 }
