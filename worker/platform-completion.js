@@ -485,7 +485,27 @@ async function navigationPreferences(request,env){const u=await requireUser(requ
 async function saveNavigationPreferences(request,env){const u=await requireUser(request,env),b=await readJson(request),app=["google","waze","apple"].includes(b.preferredApp)?b.preferredApp:"google";await env.DB.batch([env.DB.prepare("INSERT INTO navigation_preferences(user_id,preferred_app) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET preferred_app=excluded.preferred_app,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')").bind(u.id,app),env.DB.prepare("UPDATE users SET preferred_navigation=?,updated_at=? WHERE id=?").bind(app,new Date().toISOString(),u.id)]);return json({ok:true,preferredApp:app})}
 async function calendarPreferences(request,env){const u=await requireUser(request,env),x=await qfirst(env,"SELECT * FROM calendar_preferences WHERE user_id=?",[u.id]);return json({preferences:x||{preferred_app:"ics",reminder_minutes:1440}});}
 async function saveCalendarPreferences(request,env){const u=await requireUser(request,env),b=await readJson(request),app=["ics","google","apple","outlook"].includes(b.preferredApp)?b.preferredApp:"ics",mins=Math.max(0,Math.min(10080,Number(b.reminderMinutes)||1440));await qrun(env,"INSERT INTO calendar_preferences(user_id,preferred_app,reminder_minutes) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET preferred_app=excluded.preferred_app,reminder_minutes=excluded.reminder_minutes,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')",[u.id,app,mins]);return json({ok:true});}
-async function exportMyData(request,env){const u=await requireUser(request,env);const [profile,orgs,items,loans,reviews,messages]=await Promise.all([qfirst(env,"SELECT id,email,full_name,role,phone,city,preferred_language,created_at,last_login_at FROM users WHERE id=?",[u.id]),qall(env,"SELECT * FROM organizations WHERE owner_id=?",[u.id]),qall(env,"SELECT i.* FROM items i JOIN organizations o ON o.id=i.organization_id WHERE o.owner_id=?",[u.id]),qall(env,"SELECT * FROM loan_requests WHERE borrower_id=?",[u.id]),qall(env,"SELECT * FROM reviews WHERE author_id=?",[u.id]),qall(env,"SELECT m.* FROM request_messages m JOIN loan_requests l ON l.id=m.request_id WHERE m.sender_id=? OR l.borrower_id=?",[u.id,u.id])]);return json({exportedAt:new Date().toISOString(),profile,organizations:orgs,items,loans,reviews,messages});}
+async function exportMyData(request,env){
+  const u=await requireUser(request,env);
+  const [profile,orgs,items,loans,reviews,messages,addresses,savedSearches,savedEntities,notificationPreferences,supportTickets,securityEvents,legalConsents,recentOrganizations,dataRequests]=await Promise.all([
+    qfirst(env,"SELECT id,email,full_name,role,phone,city,preferred_language,preferred_navigation,terms_accepted_at,privacy_accepted_at,created_at,last_login_at FROM users WHERE id=?",[u.id]),
+    qall(env,"SELECT * FROM organizations WHERE owner_id=?",[u.id]),
+    qall(env,"SELECT i.* FROM items i JOIN organizations o ON o.id=i.organization_id WHERE o.owner_id=?",[u.id]),
+    qall(env,"SELECT * FROM loan_requests WHERE borrower_id=?",[u.id]),
+    qall(env,"SELECT * FROM reviews WHERE author_id=?",[u.id]),
+    qall(env,"SELECT m.* FROM request_messages m JOIN loan_requests l ON l.id=m.request_id WHERE m.sender_id=? OR l.borrower_id=?",[u.id,u.id]),
+    qall(env,"SELECT id,label,city,latitude,longitude,is_default,created_at,updated_at FROM user_addresses WHERE user_id=?",[u.id]),
+    qall(env,"SELECT * FROM saved_searches WHERE user_id=?",[u.id]),
+    qall(env,"SELECT * FROM saved_entities WHERE user_id=?",[u.id]),
+    qall(env,"SELECT * FROM notification_preferences WHERE user_id=?",[u.id]),
+    qall(env,"SELECT * FROM support_tickets WHERE user_id=?",[u.id]),
+    qall(env,"SELECT id,event_type,severity,device_label,details_json,created_at FROM security_events WHERE user_id=? ORDER BY created_at DESC LIMIT 1000",[u.id]),
+    qall(env,"SELECT document_type,version,accepted_at,source FROM legal_consents WHERE user_id=? ORDER BY accepted_at DESC",[u.id]),
+    qall(env,"SELECT r.organization_id,r.viewed_at,o.name,o.city FROM recently_viewed_organizations r JOIN organizations o ON o.id=r.organization_id WHERE r.user_id=? ORDER BY r.viewed_at DESC",[u.id]),
+    qall(env,"SELECT id,request_type,details,status,created_at,completed_at FROM user_data_requests WHERE user_id=? ORDER BY created_at DESC",[u.id])
+  ]);
+  return json({exportedAt:new Date().toISOString(),profile,addresses,organizations:orgs,items,loans,reviews,messages,savedSearches,savedEntities,notificationPreferences,supportTickets,securityEvents,legalConsents,recentOrganizations,dataRequests});
+}
 async function dataRequest(request,env){const u=await requireUser(request,env),b=await readJson(request),type=["export","access","correction"].includes(b.type)?b.type:"access",id=crypto.randomUUID();await qrun(env,"INSERT INTO user_data_requests(id,user_id,request_type,details) VALUES(?,?,?,?)",[id,u.id,type,optional(b.details,2000)]);return json({request:{id,type,status:"open"}},201);}
 
 /* ---------- admin / backup ---------- */
