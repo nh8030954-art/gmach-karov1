@@ -57,6 +57,16 @@ Object.assign(I18N.en,{
 "ביקורות ותגובות":"Reviews & responses","ביקורות ותגובות הגמ״ח":"Gmach reviews & responses","תגובה לביקורת":"Respond to review","תגובת הגמ״ח לביקורת:":"Gmach response to the review:","תגובת הגמ״ח נשמרה":"Gmach response saved","אין עדיין ביקורות לגמ״ח.":"This gmach has no reviews yet.","הביקורות שלי":"My reviews","עדיין לא כתבת ביקורות.":"You have not written any reviews yet.","עריכה":"Edit","דירוג חדש 1-5:":"New rating 1-5:","עדכון הביקורת:":"Update review:","הביקורת עודכנה":"Review updated","תגובת הגמ״ח:":"Gmach response:","ללא טקסט":"No text","תיאום איסוף חדש":"Reschedule pickup","ביטול לאחר אי הגעה":"Cancel after missed pickup","נשלחה בקשה לתיאום חלון איסוף חדש":"A request to reschedule pickup was sent","הבקשה בוטלה והמלאי שוחרר":"The request was cancelled and inventory was released","שמירת המלאי פגה":"Inventory hold expired","חלון האיסוף הסתיים":"Pickup window ended","אי הגעה לאיסוף":"Missed pickup","הצעת המוצר":"Offer item","מוצרים מתאימים לבקשה":"Matching items for the request","לא נמצאו כרגע מוצרים מתאימים.":"No matching items were found right now.","ההצעה נשלחה":"Offer sent","כלים מתקדמים לגמ״ח":"Advanced gmach tools","העברת בעלות":"Transfer ownership","אימייל הבעלים החדש":"New owner's email","שליחת הזמנה":"Send invitation","סגירה ומחיקה":"Closure & deletion","פתיחה מחדש":"Reopen","סגירה זמנית":"Temporarily close","בקשת מחיקה בעוד 7 ימים":"Request deletion in 7 days","ביטול בקשת מחיקה":"Cancel deletion request","העברת מלאי בין סניפים":"Transfer inventory between branches","מזהה יחידה":"Unit ID","מסניף":"From branch","לסניף":"To branch","ללא סניף":"No branch","התחלת העברה":"Start transfer","אישור קבלה":"Confirm receipt","אין העברות פעילות.":"No active transfers.","פעולות מלאי קבוצתיות":"Bulk inventory actions","פעולה":"Action","הפעלה":"Activate","השבתה":"Deactivate","שינוי זמינות":"Change availability","שינוי כמות":"Change quantity","שינוי קטגוריה":"Change category","ערך":"Value","ביצוע על המוצרים שנבחרו":"Apply to selected items","ייבוא מוצרים":"Import items","בדיקה וייבוא":"Validate and import","אין מוצרים זמינים.":"No items available.","מחיקה לפי היסטוריה":"History-aware deletion","מוצרים מתאימים":"Matching items"
 });
 const I18N_FINAL_EN={
+  "גמ\"חים קרובים": "Nearby gmachs",
+  "המיקום משמש לחיפוש הזה בלבד ואינו נשמר.": "Your location is used only for this search and is not stored.",
+  "מבקשים את המיקום רק כדי למצוא גמ״חים קרובים": "Location is requested only to find nearby gmachs",
+  "לא ניתנה הרשאת מיקום. אפשר לחפש לפי עיר.": "Location permission was not granted. You can search by city.",
+  "המכשיר אינו מאפשר קבלת מיקום. אפשר לחפש לפי עיר.": "This device does not provide location access. You can search by city.",
+  "לא נמצאו גמ״חים עם נקודת איסוף פעילה בטווח של 30 ק״מ.": "No gmachs with an active pickup point were found within 30 km.",
+  "מקורות הגעה": "Acquisition sources",
+  "אתרים מפנים": "Referring sites",
+  "ייצוא נתוני שימוש CSV": "Export usage data CSV",
+
   "גמ\"חים שנצפו לאחרונה": "Recently viewed gmachs",
   "מתחילים מכאן": "Start here",
   "חיפוש ציוד": "Find equipment",
