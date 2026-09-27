@@ -269,3 +269,14 @@ console.log("Distribution completion static release gate passed.");
 for(const token of ["/api/admin/entities","patchAdminEntity","branchManagement"])assert.ok(launchWorker.includes(token),token+" missing from admin entity controls and branch editing");
 for(const token of ["מרכז ישויות","openAdminEntities","openBranchEdit","dataset.branchEdit"])assert.ok(launchClient.includes(token),token+" missing from admin entity controls and branch editing UI");
 for(const token of ["entities|support-tickets|server-errors"])assert.ok(platform.includes(token),token+" missing from sensitive admin step-up coverage");
+
+
+const navigationWorker=await readFile("worker/navigation-admin.js","utf8");
+const navigationClient=await readFile("dist/navigation-admin.js","utf8");
+const navigationMigration=await readFile("migrations/0022_navigation_admin.sql","utf8");
+for(const token of ["/api/navigation-links","/api/admin/navigation-links","navigation.create","navigation.update","navigation.delete"]) assert.ok(navigationWorker.includes(token),token+" missing from navigation admin backend");
+for(const token of ["ניהול קישורים ותפריטים","applyPublicLinks","data-navigation-admin","#action:support"]) assert.ok(navigationClient.includes(token),token+" missing from navigation admin UI");
+for(const token of ["navigation_links","footer_find","footer_share","footer_info"]) assert.ok(navigationMigration.includes(token),token+" missing from navigation migration");
+assert.ok(worker.includes("handleNavigationAdmin"),"navigation admin handler not wired");
+assert.ok(indexHtml.includes("./navigation-admin.js"),"navigation admin client not loaded");
+console.log("Navigation admin static release gate passed.");
