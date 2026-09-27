@@ -292,3 +292,7 @@ assert.ok(worker.includes("handlePrivacyAvailability"),"privacy/availability han
 assert.ok(worker.includes("checkAvailabilityRules(env,itemId,from,until"),"availability rules not enforced for loan requests");
 assert.ok(indexHtml.includes("./privacy-availability.js"),"privacy/availability client not loaded");
 console.log("Privacy availability static release gate passed.");
+
+
+for(const token of ["communityUnsubscribeUrl","/api/unsubscribe/community","List-Unsubscribe","List-Unsubscribe-Post","community_emails_accepted=0","notification_type='community'"]) assert.ok(platform.includes(token),token+" missing from community unsubscribe flow");
+console.log("Community unsubscribe static release gate passed.");
