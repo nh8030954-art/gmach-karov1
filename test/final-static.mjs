@@ -221,3 +221,16 @@ assert.ok(worker.includes("Promise.all([ensureCompletePlatformSchema(env),ensure
 
 for(const token of ["זמינות חלקית","request-use-available","request-change-dates"])assert.ok((appClient+indexHtml).includes(token),token+" missing from partial availability choice UI");
 assert.ok(worker.includes("turnaround_minutes||0"),"waitlist availability must respect turnaround time");
+
+
+const expansionWorker=await readFile("worker/requirements-expansion.js","utf8");
+const expansionClient=await readFile("dist/requirements-expansion.js","utf8");
+const expansionMigration=await readFile("migrations/0019_requirements_expansion.sql","utf8");
+for(const token of ["/multi-range-check","/multi-range-request","/api/me/reports","/full","/control","/api/admin/audit/export.csv","branches-public"]) assert.ok(expansionWorker.includes(token),token+" missing from requirements expansion backend");
+for(const token of ["כמה טווחים","הדיווחים שלי","ניהול משתמשים מתקדם","כל הסניפים ונקודות האיסוף","data-loan-hold","data-user-schedule"]) assert.ok(expansionClient.includes(token),token+" missing from requirements expansion UI");
+for(const token of ["admin_user_controls","admin_loan_holds","multi_range_batch_id"]) assert.ok(expansionMigration.includes(token),token+" missing from requirements expansion migration");
+assert.ok(worker.includes("handleRequirementsExpansion"),"requirements expansion handler not wired");
+assert.ok(worker.includes("requirementsExpansionPreflight"),"requirements expansion preflight not wired");
+assert.ok(worker.includes("runRequirementsExpansionMaintenance"),"requirements expansion maintenance not wired");
+assert.ok(indexHtml.includes("./requirements-expansion.js"),"requirements expansion client not loaded");
+console.log("Requirements expansion static release gate passed.");
