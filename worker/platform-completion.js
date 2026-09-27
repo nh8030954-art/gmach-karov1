@@ -593,7 +593,31 @@ async function markNotificationFailure(env,n,now,e){
   await qrun(env,"INSERT INTO system_alerts(id,alert_type,severity,details_json) VALUES(?,?,?,?)",[crypto.randomUUID(),"notification_failure","warning",JSON.stringify({queueId:n.id,error:String(e).slice(0,300)})]);
 }
 async function maybeBackup(env,now){const last=await qfirst(env,"SELECT created_at FROM backup_runs WHERE status='completed' ORDER BY created_at DESC LIMIT 1",[]);if(last&&Date.now()-Date.parse(last.created_at)<20*3600000)return;const id=crypto.randomUUID();await qrun(env,"INSERT INTO backup_runs(id,status) VALUES(?,'started')",[id]);await createBackup(env,id,null);}
-async function createBackup(env,id,actorId){try{const tables=["users","organizations","items","loan_requests","item_units","organization_branches","reviews","help_requests","support_tickets","categories","managed_content","site_settings"];const data={version:1,createdAt:new Date().toISOString(),tables:{}};let count=0;for(const t of tables){const rows=await qall(env,`SELECT * FROM ${t} LIMIT 50000`,[]);data.tables[t]=rows;count+=rows.length;}const bytes=new TextEncoder().encode(JSON.stringify(data)),key=`backups/${new Date().toISOString().slice(0,10)}/${id}.json`;await env.ITEM_IMAGES.put(key,bytes,{httpMetadata:{contentType:"application/json"}});await qrun(env,"UPDATE backup_runs SET backup_key=?,status='completed',row_count=?,size_bytes=?,completed_at=? WHERE id=?",[key,count,bytes.byteLength,new Date().toISOString(),id]);if(actorId)await audit(env,actorId,"backup.run",id,{key,count});}catch(e){await qrun(env,"UPDATE backup_runs SET status='failed',error=?,completed_at=? WHERE id=?",[String(e).slice(0,500),new Date().toISOString(),id]);}}
+async function createBackup(env,id,actorId){
+  try{
+    const tables=["users","organizations","items","loan_requests","item_units","organization_branches","reviews","help_requests","support_tickets","categories","managed_content","site_settings"],data={version:2,createdAt:new Date().toISOString(),tables:{}};
+    let count=0;for(const t of tables){const rows=await qall(env,`SELECT * FROM ${t} LIMIT 50000`,[]);data.tables[t]=rows;count+=rows.length;}
+    const bytes=new TextEncoder().encode(JSON.stringify(data)),day=new Date().toISOString().slice(0,10),key=`d1/${day}/${id}.json`,storage=env.BACKUP_STORAGE||env.ITEM_IMAGES;
+    if(!storage)throw new Error("Backup storage binding missing");
+    await storage.put(key,bytes,{httpMetadata:{contentType:"application/json"}});
+    let copied=0,cursor=undefined;
+    if(env.BACKUP_STORAGE&&env.ITEM_IMAGES&&env.BACKUP_STORAGE!==env.ITEM_IMAGES){
+      do{
+        const page=await env.ITEM_IMAGES.list({cursor,limit:500});
+        for(const obj of page.objects||[]){
+          if(String(obj.key).startsWith("backups/")||String(obj.key).startsWith("d1/")||String(obj.key).startsWith("r2/"))continue;
+          const source=await env.ITEM_IMAGES.get(obj.key);if(!source)continue;
+          const target=`r2/${day}/${obj.key}`;await env.BACKUP_STORAGE.put(target,source.body,{httpMetadata:source.httpMetadata,customMetadata:{sourceKey:obj.key,backupRunId:id}});
+          copied++;try{await qrun(env,"INSERT OR REPLACE INTO backup_objects(backup_run_id,storage_key,object_type,size_bytes,checksum) VALUES(?,?,?,?,NULL)",[id,target,"r2",Number(obj.size||0)])}catch{}
+        }
+        cursor=page.truncated?page.cursor:undefined;
+      }while(cursor);
+    }
+    try{await qrun(env,"INSERT OR REPLACE INTO backup_objects(backup_run_id,storage_key,object_type,size_bytes,checksum) VALUES(?,?,?,?,NULL)",[id,key,"d1",bytes.byteLength])}catch{}
+    await qrun(env,"UPDATE backup_runs SET backup_key=?,status='completed',row_count=?,size_bytes=?,completed_at=?,manifest_json=? WHERE id=?",[key,count,bytes.byteLength,new Date().toISOString(),JSON.stringify({storageKey:key,r2Objects:copied,separateStorage:Boolean(env.BACKUP_STORAGE)}),id]);
+    if(actorId)await audit(env,actorId,"backup.run",id,{key,count,r2Objects:copied,separateStorage:Boolean(env.BACKUP_STORAGE)});
+  }catch(e){await qrun(env,"UPDATE backup_runs SET status='failed',error=?,completed_at=? WHERE id=?",[String(e).slice(0,500),new Date().toISOString(),id]);throw e}
+}
 
 /* ---------- helpers ---------- */
 async function requireUser(request,env){const token=cookieValue(request,SESSION_COOKIE);if(!token)throw new HttpError(401,"יש להתחבר");const hash=await sha256(token),u=await qfirst(env,"SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>? AND u.account_status='active'",[hash,new Date().toISOString()]);if(!u)throw new HttpError(401,"החיבור פג");return u;}
