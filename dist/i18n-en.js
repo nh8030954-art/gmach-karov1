@@ -458,3 +458,19 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
   "מקסימום ימי השאלה":"Maximum loan days","רדיוס שירות בקילומטרים":"Service radius in kilometers",
   "תמונות הפריט":"Item photos","(אפשר עד 12 תמונות, כל תמונה עד 5MB)":"(Up to 12 photos, 5 MB each)","דירוג הסניף":"Branch rating","מתי צריך?":"When do you need it?","עד מתי?":"Until when?","טווח חיפוש בק\"מ":"Search radius in km","למשל 20":"For example, 20"
 });
+
+window.GmachEnglish = Object.freeze({...window.GmachEnglish,
+  "סיור קצר":"Quick tour",
+  "סיור קצר באזור האישי":"Quick account tour",
+  "שלושה צעדים כדי להתחיל להשתמש בגמ\"ח ברגע.":"Three steps to get started with Gmach Berega.",
+  "1. מחפשים":"1. Search",
+  "מחפשים מוצר, גמ\"ח או קטגוריה ובודקים זמינות.":"Search for an item, gmach or category and check availability.",
+  "2. מבקשים ומשאילים":"2. Request and borrow",
+  "בוחרים מועדים, שולחים בקשה ומתאמים איסוף והחזרה.":"Choose dates, send a request, and coordinate pickup and return.",
+  "3. לא מצאתם?":"3. Did not find it?",
+  "מפרסמים בקשת קהילה או פותחים גמ\"ח ומוסיפים ציוד להשאלה.":"Post a community request or create a gmach and add equipment to lend.",
+  "לחיפוש ציוד":"Search equipment",
+  "בקשת קהילה":"Community request",
+  "דלג ואל תציג שוב":"Skip and do not show again",
+  "הסיור לא יוצג שוב במכשיר הזה":"The tour will not be shown again on this device"
+});
