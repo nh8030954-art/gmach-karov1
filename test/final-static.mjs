@@ -14,7 +14,7 @@ for(const file of ["dist/sw.js","dist/platform-completion.js","migrations/0013_p
 
 assert.match(worker,/handleFinalFeatures/);
 assert.match(worker,/runFinalMaintenance/);
-assert.match(worker,/complete-platform-2026-09-25\.9/);
+assert.match(worker,/complete-platform-2026-09-27\.10/);
 assert.match(worker,/finalFeaturesSchema/);
 assert.match(worker,/\/sitemap\.xml/);
 assert.match(worker,/\/robots\.txt/);
@@ -199,3 +199,10 @@ for(const token of ["ops-filters","מגמת בקשות","לוח פעולות ק�
 for(const token of ["orgQuery","orgCity","orgCategory","minRating","orgAvailable","available_items"])assert.ok(worker.includes(token),token+" missing from advanced gmach discovery backend");
 for(const token of ["advanced-gmach-search","openAdvancedGmachSearch","data-advanced-org","רק גמ״חים עם פריט זמין"])assert.ok(appClient.includes(token),token+" missing from advanced gmach search UI");
 for(const token of ["openSupportForError","data-support-organization","dashboard-support-error"])assert.ok(appClient.includes(token),token+" missing from support-ready error handling");
+
+
+for(const token of ["login_failed","recordSecurityFailure"])assert.ok(worker.includes(token),token+" missing from adaptive login security");
+assert.ok(platform.includes("turnstileRequired:true"),"repeated suspicious login attempts should require Turnstile");
+assert.ok(platformClient.includes("requireLogin"),"the UI should render a login Turnstile only when required");
+assert.ok(appClient.includes('location.hash === "#/community"'),"community board should have a direct route");
+for(const token of ["events-stages","medical-ramps","community-projectors"])assert.ok(platform.includes(token),token+" missing from expanded category catalog");

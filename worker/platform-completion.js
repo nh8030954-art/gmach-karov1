@@ -79,6 +79,74 @@ export async function ensurePlatformCompletionSchema(env){
     ["waitlist","operational_emails_accepted","immediate"]
   ];
   for(const [type,emailExpr,digest] of defaults) await env.DB.prepare(`INSERT OR IGNORE INTO notification_preferences(user_id,notification_type,in_app,email,push,digest) SELECT id,?,1,${emailExpr},0,? FROM users WHERE account_status='active'`).bind(type,digest).run();
+
+  const expandedCategories=[
+    ["events-stages","events","במות ופודיומים","Stages & podiums","sparkles",["במה","פודיום","סטנד"],16],
+    ["events-generators","events","גנרטורים וחשמל לאירועים","Event generators & power","light",["גנרטור","חשמל","כבל מאריך"],17],
+    ["events-heating","events","חימום וקירור לאירועים","Event heating & cooling","appliance",["פטריית חימום","מאוורר","מצנן"],18],
+    ["events-centerpieces","events","מרכזי שולחן ואביזרי עיצוב","Centerpieces & decor","sparkles",["מרכז שולחן","אגרטל","נרות"],19],
+    ["events-signage","events","שילוט ומעמדים","Signs & stands","box",["שלט","מעמד","כן ציור"],20],
+    ["events-catering","events","ציוד קייטרינג וחימום מזון","Catering equipment","dish",["מיחם","פלטה","שפשף","חימום אוכל"],21],
+    ["events-coolers","events","צידניות וקירור לאירועים","Event coolers","cooler",["צידנית","קרח","קירור"],22],
+    ["events-partitions","events","מחיצות ופרגודים","Partitions & screens","box",["מחיצה","פרגוד"],23],
+    ["tools-saws","tools","מסורים","Saws","tools",["מסור","ג'יגסו","מסור עגול"],26],
+    ["tools-sanders","tools","מלטשות ומשייפות","Sanders","tools",["מלטשת","משייפת"],27],
+    ["tools-grinders","tools","משחזות","Grinders","tools",["משחזת","דיסק"],28],
+    ["tools-paint","tools","צביעה ושיפוץ","Painting tools","tools",["רולר","אקדח צבע","צבע"],29],
+    ["tools-plumbing","tools","כלי אינסטלציה","Plumbing tools","tools",["אינסטלציה","מפתח צינורות","פותח סתימות"],30],
+    ["tools-electrical","tools","כלי חשמל ואלקטרוניקה","Electrical tools","tools",["מודד מתח","מלחם","חשמל"],31],
+    ["tools-measuring","tools","מדידה וסימון","Measuring tools","tools",["פלס","לייזר","מטר","מדידה"],32],
+    ["tools-pressure","tools","גרניקים ושטיפה בלחץ","Pressure washers","clean",["גרניק","שטיפה בלחץ"],33],
+    ["tools-tile","tools","חיתוך קרמיקה וריצוף","Tile tools","tools",["קרמיקה","חותך אריחים","ריצוף"],34],
+    ["tools-moving","tools","עגלות וכלי שינוע","Moving tools","box",["עגלת משא","סבל","שינוע"],35],
+    ["babies-highchairs","babies","כיסאות אוכל","High chairs","chair",["כיסא אוכל","כסא אוכל"],37],
+    ["babies-pumps","babies","משאבות הנקה","Breast pumps","bottle",["משאבה","הנקה"],38],
+    ["babies-travelcribs","babies","מיטות נסיעה","Travel cribs","crib",["מיטת נסיעה","לול קמפינג"],39],
+    ["babies-monitors","babies","מוניטורים לתינוק","Baby monitors","baby",["מוניטור","מצלמת תינוק"],40],
+    ["babies-bouncers","babies","טרמפולינות ונדנדות","Bouncers & swings","baby",["טרמפולינה","נדנדה"],41],
+    ["babies-gates","babies","שערי בטיחות","Safety gates","seat",["שער בטיחות","מחסום"],42],
+    ["babies-changing","babies","שידות ומשטחי החתלה","Changing stations","baby",["החתלה","משטח החתלה"],43],
+    ["babies-sterilizers","babies","סטריליזציה וחימום בקבוקים","Sterilizers & bottle warmers","bottle",["סטריליזטור","מחמם בקבוקים"],44],
+    ["medical-shower","medical","כיסאות רחצה","Shower chairs","medical",["כיסא רחצה","כסא רחצה"],46],
+    ["medical-commodes","medical","כיסאות שירותים","Commodes","medical",["כיסא שירותים","קומוד"],47],
+    ["medical-transfer","medical","לוחות ואביזרי העברה","Transfer aids","accessibility",["לוח העברה","העברה"],48],
+    ["medical-ramps","medical","רמפות נגישות","Accessibility ramps","accessibility",["רמפה","נגישות"],49],
+    ["medical-canes","medical","מקלות הליכה","Walking canes","crutch",["מקל הליכה","מקל"],50],
+    ["medical-cushions","medical","כריות תמיכה וישיבה","Support cushions","recovery",["כרית ישיבה","כרית תמיכה"],51],
+    ["medical-recliners","medical","כורסאות ומושבי החלמה","Recovery seating","recovery",["כורסה","מושב החלמה"],52],
+    ["medical-braces","medical","תומכים ואביזרים אורתופדיים","Orthopedic supports","orthopedic",["סד","תומך","אורתופדי"],53],
+    ["travel-sleepingbags","travel","שקי שינה","Sleeping bags","bed",["שק שינה"],56],
+    ["travel-mattresses","travel","מזרני שטח","Camping mattresses","bed",["מזרן שטח","מזרן מתנפח"],57],
+    ["travel-stoves","travel","גזיות וציוד בישול","Camping stoves","kitchen",["גזיה","בישול שטח"],58],
+    ["travel-lanterns","travel","פנסים ותאורת שטח","Camping lights","light",["פנס","תאורת שטח"],59],
+    ["travel-chairs","travel","כיסאות ושולחנות קמפינג","Camping furniture","chair",["כיסא קמפינג","שולחן קמפינג"],60],
+    ["travel-carriers","travel","מנשאי טיולים ותרמילי נשיאה","Hiking carriers","backpack",["מנשא טיולים","תרמיל נשיאה"],61],
+    ["travel-poles","travel","מקלות הליכה וטרקים","Trekking poles","backpack",["מקלות הליכה","טרקים"],62],
+    ["travel-picnic","travel","ערכות פיקניק","Picnic sets","dish",["פיקניק","כלי אוכל"],63],
+    ["travel-sunshade","travel","צליות ושמשיות","Sunshades & umbrellas","tent",["צליה","שמשיה"],64],
+    ["home-vacuums","home","שואבי אבק","Vacuum cleaners","appliance",["שואב אבק"],66],
+    ["home-carpet","home","מכונות ניקוי שטיחים וריפוד","Carpet cleaners","clean",["ניקוי שטיחים","ניקוי ריפוד"],67],
+    ["home-fans","home","מאווררים ומצננים","Fans & coolers","appliance",["מאוורר","מצנן"],68],
+    ["home-heaters","home","תנורי חימום","Heaters","appliance",["תנור חימום","רדיאטור"],69],
+    ["home-dehumidifiers","home","מייבשי לחות","Dehumidifiers","appliance",["מייבש לחות","לחות"],70],
+    ["home-sewing","home","מכונות תפירה","Sewing machines","appliance",["מכונת תפירה","תפירה"],71],
+    ["home-foldingbeds","home","מיטות מתקפלות","Folding beds","bed",["מיטה מתקפלת"],72],
+    ["home-mattresses","home","מזרנים לאירוח","Guest mattresses","bed",["מזרן","מזרן אורחים"],73],
+    ["home-trolleys","home","עגלות משא לבית ומעבר","Household trolleys","box",["עגלת משא","מעבר דירה"],74],
+    ["home-extension","home","כבלים ומפצלי חשמל","Extension cords & power strips","appliance",["כבל מאריך","מפצל"],75],
+    ["community-projectors","community","מקרנים","Projectors","book",["מקרן","פרזנטציה"],76],
+    ["community-screens","community","מסכי הקרנה","Projection screens","book",["מסך הקרנה"],77],
+    ["community-audio","community","הגברה ומיקרופונים","PA & microphones","sport",["הגברה","מיקרופון","רמקול"],78],
+    ["community-whiteboards","community","לוחות כתיבה","Whiteboards","book",["לוח מחיק","לוח כתיבה"],79],
+    ["community-partitions","community","מחיצות ופרגודים","Community partitions","box",["מחיצה","פרגוד"],80],
+    ["community-prayer","community","ציוד תפילה ובית כנסת","Synagogue equipment","book",["סטנדר","סידור","בית כנסת"],81],
+    ["community-study","community","סטנדרים וציוד לימוד","Study stands & equipment","book",["סטנדר","לימוד"],82],
+    ["community-games","community","משחקי חברה","Group games","sport",["משחקי חברה","משחק"],83],
+    ["community-eventkits","community","ערכות פעילות קהילתית","Community activity kits","heart",["פעילות","קהילה"],84],
+    ["community-office","community","ציוד משרדי זמני","Temporary office equipment","box",["משרד","מגרסה","למינציה"],85]
+  ];
+  const seedStmt=env.DB.prepare("INSERT OR IGNORE INTO categories(id,parent_id,name_he,name_en,icon,synonyms_json,status,sort_order) VALUES(?,?,?,?,?,?,'active',?)");
+  for(const row of expandedCategories) await seedStmt.bind(row[0],row[1],row[2],row[3],row[4],JSON.stringify(row[5]),row[6]).run();
 }
 
 export async function platformPreflight(request,env,url){
@@ -87,12 +155,19 @@ export async function platformPreflight(request,env,url){
   if(block) return json({error:"הגישה הוגבלה זמנית בעקבות פעילות חריגה",blockedUntil:block.blocked_until},429);
   if(!["POST","PUT","PATCH","DELETE"].includes(request.method.toUpperCase())) return null;
   await requireAdminActionChallenge(request,env,url);
-  if(!env.TURNSTILE_SECRET_KEY||!["/api/auth/register","/api/support"].includes(url.pathname)) return null;
-  let body={}; try{body=await request.clone().json();}catch{return null;}
+  if(!env.TURNSTILE_SECRET_KEY) return null;
+  let needsTurnstile=["/api/auth/register","/api/support"].includes(url.pathname),body={};
+  if(url.pathname==="/api/auth/login"){
+    const ipHash=await sha256(request.headers.get("CF-Connecting-IP")||"unknown");
+    const failures=await qfirst(env,"SELECT COUNT(*) AS n FROM security_events WHERE ip_hash=? AND event_type IN ('login_failed','turnstile_failed') AND created_at>datetime('now','-1 hour')",[ipHash]);
+    needsTurnstile=Number(failures?.n||0)>=2;
+  }
+  if(!needsTurnstile)return null;
+  try{body=await request.clone().json();}catch{return null;}
   const token=String(body.turnstileToken||"").trim();
-  if(!token) return json({error:"נדרש אימות אנושי"},400);
+  if(!token) return json({error:url.pathname==="/api/auth/login"?"נדרש אימות אנושי לפני ניסיון כניסה נוסף":"נדרש אימות אנושי",turnstileRequired:true},428);
   const ok=await verifyTurnstile(env,token,request.headers.get("CF-Connecting-IP"));
-  if(!ok){await recordSecurityFailure(request,env,"turnstile_failed");return json({error:"האימות האנושי נכשל. נסו שוב"},400);}
+  if(!ok){await recordSecurityFailure(request,env,"turnstile_failed");return json({error:"האימות האנושי נכשל. נסו שוב",turnstileRequired:true},400);}
   return null;
 }
 
@@ -113,7 +188,7 @@ export async function sessionMetadata(request,env,userId){
 export async function handlePlatformCompletionApi(request,env,ctx,url){
   const method=request.method.toUpperCase(),path=url.pathname;
   if(method==="GET"&&path==="/api/platform/features") return json({
-    release:"complete-platform-2026-09-25.9",
+    release:"complete-platform-2026-09-27.10",
     turnstileEnabled:Boolean(env.TURNSTILE_SECRET_KEY&&env.TURNSTILE_SITE_KEY),
     turnstileSiteKey:env.TURNSTILE_SITE_KEY||null,
     pushConfigured:Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY),
@@ -496,7 +571,7 @@ function csvCell(v){const s=String(v??"");return /[",\n]/.test(s)?'"'+s.replaceA
 function eventIcs(uid,summary,start,end,location){const dt=x=>new Date(x).toISOString().replace(/[-:]/g,"").replace(/\.\d{3}/,"");return["BEGIN:VEVENT",`UID:${uid}@gmach-berega`,`DTSTART:${dt(start)}`,`DTEND:${dt(end)}`,`SUMMARY:${summary.replace(/[;,]/g," ")}`,`LOCATION:${String(location||"").replace(/[;,]/g," ")}`,"END:VEVENT"].join("\r\n");}
 async function verifyTurnstile(env,token,ip){const form=new FormData();form.set("secret",env.TURNSTILE_SECRET_KEY);form.set("response",token);if(ip)form.set("remoteip",ip);const r=await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify",{method:"POST",body:form});if(!r.ok)return false;return Boolean((await r.json()).success);}
 async function currentSecurityBlock(request,env){const id=await sha256(request.headers.get("CF-Connecting-IP")||"unknown");return qfirst(env,"SELECT * FROM security_blocks WHERE identity_hash=? AND blocked_until>?",[id,new Date().toISOString()]);}
-async function recordSecurityFailure(request,env,type){const id=await sha256(request.headers.get("CF-Connecting-IP")||"unknown"),now=new Date().toISOString();await qrun(env,"INSERT INTO security_events(id,event_type,severity,ip_hash,details_json) VALUES(?,?,?,?,?)",[crypto.randomUUID(),type,"warning",id,"{}"]);const recent=await qfirst(env,"SELECT COUNT(*) n FROM security_events WHERE ip_hash=? AND created_at>datetime('now','-1 hour')",[id]);if(Number(recent?.n||0)>=5)await qrun(env,"INSERT INTO security_blocks(identity_hash,reason,level,blocked_until) VALUES(?,?,?,datetime('now','+1 hour')) ON CONFLICT(identity_hash) DO UPDATE SET reason=excluded.reason,level=MIN(10,security_blocks.level+1),blocked_until=datetime('now','+'||(MIN(24,security_blocks.level+1))||' hours'),updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')",[id,type,1]);}
+export async function recordSecurityFailure(request,env,type){const id=await sha256(request.headers.get("CF-Connecting-IP")||"unknown"),now=new Date().toISOString();await qrun(env,"INSERT INTO security_events(id,event_type,severity,ip_hash,details_json) VALUES(?,?,?,?,?)",[crypto.randomUUID(),type,"warning",id,"{}"]);const recent=await qfirst(env,"SELECT COUNT(*) n FROM security_events WHERE ip_hash=? AND created_at>datetime('now','-1 hour')",[id]);if(Number(recent?.n||0)>=5)await qrun(env,"INSERT INTO security_blocks(identity_hash,reason,level,blocked_until) VALUES(?,?,?,datetime('now','+1 hour')) ON CONFLICT(identity_hash) DO UPDATE SET reason=excluded.reason,level=MIN(10,security_blocks.level+1),blocked_until=datetime('now','+'||(MIN(24,security_blocks.level+1))||' hours'),updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')",[id,type,1]);}
 async function sendSecurityEmail(env,userId,subject,body){const u=await qfirst(env,"SELECT email,full_name,preferred_language FROM users WHERE id=?",[userId]);if(u)try{await sendEmail(env,u.email,subject,body,u.full_name,u.preferred_language)}catch{}}
 
 function operationalEnglish(value){let text=String(value||"");const phrases={"הסיכום היומי שלך מגמ״ח ברגע":"Your daily Gmach Berega summary","כניסה ממכשיר חדש":"New device sign-in","זוהתה כניסה חדשה ממכשיר:":"A new sign-in was detected from device:","אם זו לא הייתה כניסה שלך, החלף סיסמה ונתק מכשירים אחרים.":"If this was not you, change your password and sign out other devices.","שמירת המלאי פגה":"Inventory hold expired","שמירת מלאי פגה":"Inventory hold expired","חלון שמירת המלאי עבור":"The inventory hold for","הסתיים. אפשר ליצור בקשה חדשה אם המוצר עדיין זמין.":"has ended. You can create a new request if the item is still available.","בקשה ממתינה עבור":"A pending request for","שוחררה לאחר שחלון ה-Hold הסתיים.":"was released after the hold window ended.","זמן האיסוף פג":"Pickup window expired","חלון האיסוף של":"The pickup window for","הסתיים. בחרו באזור האישי אם להמתין לתיאום חדש או לבטל.":"has ended. In your account, choose whether to wait for rescheduling or cancel.","הסתיים ללא סימון איסוף.":"ended without pickup confirmation.","ההשאלה באיחור":"Loan overdue","פריט באיחור":"Item overdue","מועד ההחזרה של":"The return time for","עבר. אפשר לבקש הארכה.":"has passed. You can request an extension.","טרם הוחזר במועד.":"has not been returned on time.","הבקשה בוטלה עקב סגירה זמנית":"Request cancelled due to temporary closure","בוטל עקב סגירה זמנית של הגמ״ח.":"was cancelled because the gmach temporarily closed.","פתיחה צפויה:":"Expected reopening:","הגמ״ח נסגר זמנית":"Gmach temporarily closed","בקשות שכבר נאספו נשארות פעילות עד להחזרה.":"Requests already collected remain active until they are returned.","העברת בעלות ממתינה":"Ownership transfer pending","הוזמנת לקבל בעלות על גמ״ח.":"You were invited to take ownership of a gmach.","העברת הבעלות הושלמה":"Ownership transfer completed","הבעלות על הגמ״ח הועברה.":"Ownership of the gmach was transferred.","בקשת שינוי להשאלה":"Loan change request","השואל ביקש לשנות מועד או כמות.":"The borrower requested a change to the time or quantity.","השינוי אושר":"Change approved","השינוי שביקשת אושר.":"Your requested change was approved.","השינוי לא אושר":"Change declined","בקשת השינוי לא אושרה.":"Your requested change was declined.","הארכה אושרה":"Extension approved","בקשת ההארכה אושרה ומועד ההחזרה והתזכורות עודכנו.":"Your extension was approved. The return time and reminders were updated.","הארכה לא אושרה":"Extension declined","בקשת ההארכה לא אושרה.":"Your extension request was declined.","בקשת ההארכה אושרה":"Extension request approved","בקשת ההארכה נדחתה":"Extension request declined","מועד ההחזרה החדש אושר.":"The new return time was approved.","מועד ההחזרה המקורי נשאר בתוקף.":"The original return time remains in effect.","הודעה חדשה":"New message","הודעה חדשה על":"New message about","נשלחה אליך הודעת מדיה.":"You received a media message.","קוד אישור לפעולת מנהל":"Administrator action confirmation code","קוד האישור לפעולה":"The confirmation code for action","הוא":"is","הקוד תקף ל-10 דקות.":"The code is valid for 10 minutes.","בוצעה פעולת מנהל רגישה":"Sensitive administrator action completed","בוצעה הפעולה":"The action","אם לא ביצעת אותה, יש להחליף סיסמה ולבדוק את מכשירי החשבון.":"If you did not perform it, change your password and review your account devices.","התפנה פריט":"An item is available","התפנה מלאי עבורך. אשרו לפני שתוקף ההצעה יסתיים.":"Inventory is available for you. Accept before the offer expires.","מחיקת החשבון מתקרבת":"Account deletion is approaching","בקשת המחיקה תושלם בתום שבעה ימים אם אין השאלה פעילה.":"Your deletion request will be completed after seven days if there is no active loan.","בקשת השאלה חדשה":"New loan request","פרטי המוצר השתנו":"Item details changed","מוצר שמור חזר לזמינות":"Saved item is available again","נוסף מוצר שעשוי לעניין אותך":"A new item may interest you","פרטי מוצר שמור השתנו":"Saved item details changed","נמצאו תוצאות חדשות":"New results found","נוספו תוצאות חדשות לחיפוש השמור שלך.":"New results were added to your saved search."};for(const [from,to] of Object.entries(phrases).sort((a,b)=>b[0].length-a[0].length))text=text.replaceAll(from,to);return text}
