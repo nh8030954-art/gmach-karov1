@@ -118,8 +118,11 @@ jobs:
       - name: Verify live health
         run: |
           for i in {1..6}; do
-            if curl --fail --silent --show-error --max-time 10 'https://gmach-karov1.nh8030954.workers.dev/api/health?deep=1' | grep -q '"ok":true' &&
-               curl --fail --silent --show-error --max-time 10 'https://gmach-karov1.nh8030954.workers.dev/api/items?limit=1' | grep -q '"items":\['; then
+            body="$(curl --fail --silent --show-error --max-time 10 'https://gmach-karov1.nh8030954.workers.dev/api/health?deep=1' || true)"
+            echo "$body"
+            if echo "$body" | grep -q '"ok":true' &&
+               echo "$body" | grep -q '"catalog":true' &&
+               echo "$body" | grep -q '"categories":true'; then
               exit 0
             fi
             sleep 5
