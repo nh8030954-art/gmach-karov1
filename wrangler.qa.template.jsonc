@@ -19,6 +19,7 @@
     "binding": "ITEM_IMAGES",
     "bucket_name": "__QA_R2_BUCKET__"
   }],
+  "ai": {"binding":"AI"},
   "observability": {"enabled": true},
   "triggers": {"crons": ["23 3 * * *"]}
 }
