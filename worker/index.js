@@ -636,7 +636,7 @@ async function routeApi(request, env, ctx, url) {
   const adminReport = path.match(/^\/api\/admin\/reports\/([^/]+)$/);
   if (method === "PATCH" && adminReport) return moderateReport(request, env, decodeURIComponent(adminReport[1]));
 
-  const bulkRoute=path.match(/^\\/api\\/organizations\\/([^/]+)\\/inventory\\/bulk$/);
+  const bulkRoute=path.match(/^\/api\/organizations\/([^/]+)\/inventory\/bulk$/);
   if(method==="POST"&&bulkRoute)return bulkInventoryAction(request,env,decodeURIComponent(bulkRoute[1]));
   if(method==="POST"&&path==="/api/items/import")return importItems(request,env);
 
