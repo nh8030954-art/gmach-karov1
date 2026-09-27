@@ -119,7 +119,7 @@ function renderExports(root){
   ["loans",t("השאלות","Loans"),t("בקשות, תאריכים וסטטוס תהליך","Requests, dates and workflow status")],
   ["support",t("תמיכה","Support"),t("פניות, עדיפות והקצאה","Tickets, priority and assignment")]
  ];
- root.innerHTML='<div class="dashboard-section"><h3>'+t("ייצוא נתוני מערכת","System data exports")+'</h3><p>'+t("הורדת CSV או גיליון Excel. CSV נשמר ב-UTF-8.","Download UTF-8 CSV or Excel spreadsheet files.")+'</p><div style="display:grid;gap:8px">'+rows.map(r=>'<article class="dashboard-row"><div><strong>'+esc(r[1])+'</strong><p>'+esc(r[2])+'</p></div><a class="button button-secondary button-small" href="/api/admin/export.csv?type='+encodeURIComponent(r[0])+'" download>'+t("ייצוא CSV","Export CSV")+'</a></article>').join("")+'</div></div>';
+ root.innerHTML='<div class="dashboard-section"><h3>'+t("ייצוא נתוני מערכת","System data exports")+'</h3><p>'+t("הורדת CSV או גיליון Excel. CSV נשמר ב-UTF-8.","Download UTF-8 CSV or Excel spreadsheet files.")+'</p><div style="display:grid;gap:8px">'+rows.map(r=>'<article class="dashboard-row"><div><strong>'+esc(r[1])+'</strong><p>'+esc(r[2])+'</p></div><div class="dashboard-row-actions"><a class="button button-secondary button-small" href="/api/admin/export.csv?type='+encodeURIComponent(r[0])+'" download>'+t("ייצוא CSV","Export CSV")+'</a><a class="button button-secondary button-small" href="/api/admin/export.xls?type='+encodeURIComponent(r[0])+'" download>'+t("ייצוא Excel","Export Excel")+'</a></div></article>').join("")+'</div></div>';
 }
 function install(){
  const tab=$("#admin-tab"),actions=$("#dashboard-view .dashboard-actions");
