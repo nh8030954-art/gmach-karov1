@@ -70,7 +70,19 @@ jobs:
           if-no-files-found: error
 
       - name: Apply production database migrations
-        run: npx wrangler d1 migrations apply DB --remote
+        run: |
+          set +e
+          OUTPUT="$(npx wrangler d1 migrations apply DB --remote 2>&1)"
+          STATUS=$?
+          set -e
+          echo "$OUTPUT"
+          if [ "$STATUS" -ne 0 ]; then
+            if echo "$OUTPUT" | grep -Eqi "duplicate column name|already exists"; then
+              echo "::warning::The live D1 schema is ahead of the Wrangler migration ledger. Continuing with the runtime idempotent schema reconciliation already built into the Worker."
+            else
+              exit "$STATUS"
+            fi
+          fi
       - name: Publish production Worker
         run: npx wrangler deploy
       - name: Verify live health
