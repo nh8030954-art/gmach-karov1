@@ -1248,30 +1248,65 @@ async function getItem(env, id) {
   return json({ item: mapItem(row) });
 }
 
+function israelClockParts(date=new Date()){
+  const parts=new Intl.DateTimeFormat("he-IL",{timeZone:"Asia/Jerusalem",weekday:"long",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(date);
+  const map=Object.fromEntries(parts.filter(p=>p.type!=="literal").map(p=>[p.type,p.value]));
+  return {weekday:String(map.weekday||"").replace(/^יום\s+/,"").trim(),minutes:Number(map.hour||0)*60+Number(map.minute||0)};
+}
+function parseHourMinutes(value){const m=String(value||"").trim().match(/^(\d{1,2}):(\d{2})$/);if(!m)return null;const h=Number(m[1]),min=Number(m[2]);return h>=0&&h<24&&min>=0&&min<60?h*60+min:null}
+function branchOpenNow(hoursJson,date=new Date()){
+  let hours={};try{hours=typeof hoursJson==="string"?JSON.parse(hoursJson||"{}"):(hoursJson||{})}catch{return null}
+  const {weekday,minutes}=israelClockParts(date),aliases={א:"ראשון",ב:"שני",ג:"שלישי",ד:"רביעי",ה:"חמישי",ו:"שישי",שבת:"שבת"};
+  const names=[weekday,aliases[weekday]||weekday,weekday==="ראשון"?"א":weekday==="שני"?"ב":weekday==="שלישי"?"ג":weekday==="רביעי"?"ד":weekday==="חמישי"?"ה":weekday==="שישי"?"ו":weekday];
+  let value=names.map(k=>hours[k]).find(v=>typeof v==="string"&&v.trim());
+  if(!value&&["ראשון","שני","שלישי","רביעי","חמישי"].includes(weekday))value=hours["ראשון-חמישי"]||hours["א-ה"]||hours["א׳-ה׳"];
+  if(!value)return null;
+  if(/סגור|closed/i.test(value))return false;
+  const ranges=String(value).split(/[;,]/).map(x=>x.trim()).filter(Boolean);
+  for(const range of ranges){const m=range.match(/(\d{1,2}:\d{2})\s*[-–]\s*(\d{1,2}:\d{2})/);if(!m)continue;const a=parseHourMinutes(m[1]),b=parseHourMinutes(m[2]);if(a===null||b===null)continue;if(b>=a&&minutes>=a&&minutes<=b)return true;if(b<a&&(minutes>=a||minutes<=b))return true}
+  return false;
+}
 async function discovery(env, url) {
   const query = cleanOptional(url.searchParams.get("q"), 80);
   const like = `%${String(query || "").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
   const orgCity=cleanOptional(url.searchParams.get("orgCity"),80),orgCategory=cleanOptional(url.searchParams.get("orgCategory"),80),orgQuery=cleanOptional(url.searchParams.get("orgQuery"),100);
-  const minRating=Math.max(0,Math.min(5,Number(url.searchParams.get("minRating"))||0)),availableOnly=url.searchParams.get("orgAvailable")==="1";
+  const branchQuery=cleanOptional(url.searchParams.get("branchQuery"),100),minRating=Math.max(0,Math.min(5,Number(url.searchParams.get("minRating"))||0)),availableOnly=url.searchParams.get("orgAvailable")==="1",openNow=url.searchParams.get("openNow")==="1";
+  const lat=Number(url.searchParams.get("lat")),lon=Number(url.searchParams.get("lon")),hasLocation=Number.isFinite(lat)&&Number.isFinite(lon),radius=Math.max(1,Math.min(200,Number(url.searchParams.get("radius"))||30));
   const orgWhere=["o.status='approved'","o.is_hidden=0","o.deleted_at IS NULL"],orgBind=[];
   if(orgCity){orgWhere.push("o.city=?");orgBind.push(orgCity)}
   if(orgCategory){orgWhere.push("EXISTS (SELECT 1 FROM items ci WHERE ci.organization_id=o.id AND ci.status='active' AND ci.deleted_at IS NULL AND ci.category=?)");orgBind.push(orgCategory)}
   if(orgQuery){const oq=`%${orgQuery.replaceAll("%","\\%").replaceAll("_","\\_")}%`;orgWhere.push("(o.name LIKE ? ESCAPE '\\' OR o.description LIKE ? ESCAPE '\\' OR o.city LIKE ? ESCAPE '\\')");orgBind.push(oq,oq,oq)}
   if(availableOnly)orgWhere.push("EXISTS (SELECT 1 FROM items ai WHERE ai.organization_id=o.id AND ai.status='active' AND ai.deleted_at IS NULL AND ai.availability_status='available')");
   if(minRating>0){orgWhere.push("COALESCE((SELECT AVG(rr.rating) FROM reviews rr WHERE rr.organization_id=o.id AND rr.status='published'),0)>=?");orgBind.push(minRating)}
-  const [categories, cities, suggestions, organizations] = await env.DB.batch([
-    env.DB.prepare(`SELECT category,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY category ORDER BY count DESC`),
-    env.DB.prepare(`SELECT city,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY city ORDER BY count DESC LIMIT 80`),
-    env.DB.prepare(`SELECT DISTINCT title FROM items WHERE status='active' AND (?='' OR title LIKE ?) ORDER BY updated_at DESC LIMIT 8`).bind(query || "", like),
+  const branchWhere=["b.status='active'","o.status='approved'","o.is_hidden=0","o.deleted_at IS NULL"],branchBind=[];
+  if(orgCity){branchWhere.push("b.city=?");branchBind.push(orgCity)}
+  if(orgCategory){branchWhere.push("EXISTS (SELECT 1 FROM items ci WHERE ci.organization_id=o.id AND ci.status='active' AND ci.deleted_at IS NULL AND ci.category=?)");branchBind.push(orgCategory)}
+  if(orgQuery){const oq=`%${orgQuery.replaceAll("%","\\%").replaceAll("_","\\_")}%`;branchWhere.push("(o.name LIKE ? ESCAPE '\\' OR o.description LIKE ? ESCAPE '\\' OR b.city LIKE ? ESCAPE '\\')");branchBind.push(oq,oq,oq)}
+  if(branchQuery){const bq=`%${branchQuery.replaceAll("%","\\%").replaceAll("_","\\_")}%`;branchWhere.push("(b.name LIKE ? ESCAPE '\\' OR b.address LIKE ? ESCAPE '\\' OR b.city LIKE ? ESCAPE '\\')");branchBind.push(bq,bq,bq)}
+  if(availableOnly)branchWhere.push("EXISTS (SELECT 1 FROM items ai WHERE ai.organization_id=o.id AND ai.status='active' AND ai.deleted_at IS NULL AND ai.availability_status='available')");
+  if(minRating>0){branchWhere.push("COALESCE((SELECT AVG(rr.rating) FROM reviews rr WHERE rr.organization_id=o.id AND rr.status='published'),0)>=?");branchBind.push(minRating)}
+  const [categories, cities, suggestions, organizations, branchRows] = await Promise.all([
+    env.DB.prepare(`SELECT category,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY category ORDER BY count DESC`).all(),
+    env.DB.prepare(`SELECT city,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY city ORDER BY count DESC LIMIT 80`).all(),
+    env.DB.prepare(`SELECT DISTINCT title FROM items WHERE status='active' AND (?='' OR title LIKE ?) ORDER BY updated_at DESC LIMIT 8`).bind(query || "", like).all(),
     env.DB.prepare(`SELECT o.id,o.name,o.city,o.description,o.last_active_at,
       COUNT(DISTINCT i.id) AS item_count,
       ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count,
       SUM(CASE WHEN i.availability_status='available' THEN 1 ELSE 0 END) AS available_items
       FROM organizations o LEFT JOIN items i ON i.organization_id=o.id AND i.status='active' AND i.deleted_at IS NULL
       LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
-      WHERE ${orgWhere.join(" AND ")} GROUP BY o.id ORDER BY rating DESC,available_items DESC,item_count DESC LIMIT 100`).bind(...orgBind)
+      WHERE ${orgWhere.join(" AND ")} GROUP BY o.id ORDER BY rating DESC,available_items DESC,item_count DESC LIMIT 100`).bind(...orgBind).all(),
+    env.DB.prepare(`SELECT b.id,b.organization_id,b.name,b.address,b.city,b.latitude,b.longitude,b.hours_json,b.inventory_mode,o.name organization_name,o.description organization_description,
+      (SELECT ROUND(AVG(rr.rating),1) FROM reviews rr WHERE rr.organization_id=o.id AND rr.status='published') organization_rating,
+      (SELECT ROUND(AVG(rr.branch_rating),1) FROM reviews rr WHERE rr.branch_id=b.id AND rr.status='published' AND rr.branch_rating IS NOT NULL) branch_rating,
+      (SELECT COUNT(*) FROM items ii WHERE ii.organization_id=o.id AND ii.status='active' AND ii.deleted_at IS NULL) item_count,
+      (SELECT COUNT(*) FROM items ii WHERE ii.organization_id=o.id AND ii.status='active' AND ii.deleted_at IS NULL AND ii.availability_status='available') available_items
+      FROM organization_branches b JOIN organizations o ON o.id=b.organization_id WHERE ${branchWhere.join(" AND ")} ORDER BY organization_rating DESC,b.name LIMIT 500`).bind(...branchBind).all()
   ]);
-  return json({ categories: categories.results, cities: cities.results, suggestions: suggestions.results.map(row => row.title), organizations: organizations.results,organizationFilters:{city:orgCity||"",category:orgCategory||"",query:orgQuery||"",minRating,availableOnly} });
+  let branches=(branchRows.results||[]).map(row=>{const distanceKm=hasLocation&&row.latitude!=null&&row.longitude!=null?haversineKm(lat,lon,Number(row.latitude),Number(row.longitude)):null;return {...row,distanceKm,isOpenNow:branchOpenNow(row.hours_json)}})
+    .filter(row=>(!hasLocation||row.distanceKm!==null&&row.distanceKm<=radius)&&(!openNow||row.isOpenNow===true))
+    .sort((a,b)=>hasLocation?(Number(a.distanceKm)-Number(b.distanceKm)):(Number(b.branch_rating||b.organization_rating||0)-Number(a.branch_rating||a.organization_rating||0))).slice(0,100);
+  return json({ categories: categories.results, cities: cities.results, suggestions: suggestions.results.map(row => row.title), organizations: organizations.results,branches,organizationFilters:{city:orgCity||"",category:orgCategory||"",query:orgQuery||"",branchQuery:branchQuery||"",minRating,availableOnly,openNow,hasLocation,radius} });
 }
 
 async function getPublicOrganization(env, id) {
@@ -2407,9 +2442,12 @@ async function updateBranch(request,env,id){
   const phone=body.phone===undefined?branch.phone:validatePhone(body.phone);
   const mode=body.inventoryMode===undefined?branch.inventory_mode:(["separate","shared","hybrid"].includes(body.inventoryMode)?body.inventoryMode:null);
   if(!mode) throw new HttpError(400,"מודל המלאי אינו תקין");
+  const latitude=body.latitude===undefined?branch.latitude:(Number.isFinite(Number(body.latitude))?Number(body.latitude):null);
+  const longitude=body.longitude===undefined?branch.longitude:(Number.isFinite(Number(body.longitude))?Number(body.longitude):null);
+  const hoursJson=body.hours===undefined?branch.hours_json:sanitizeHours(body.hours);
   const now=new Date().toISOString();
   await env.DB.batch([
-    env.DB.prepare("UPDATE organization_branches SET name=?,address=?,city=?,phone=?,inventory_mode=?,status=?,reopens_at=?,updated_at=? WHERE id=?").bind(name,address,city,phone,mode,status,reopensAt,now,id),
+    env.DB.prepare("UPDATE organization_branches SET name=?,address=?,city=?,phone=?,latitude=?,longitude=?,hours_json=?,inventory_mode=?,status=?,reopens_at=?,updated_at=? WHERE id=?").bind(name,address,city,phone,latitude,longitude,hoursJson,mode,status,reopensAt,now,id),
     auditStatement(env,user.id,"branch.update","organization_branch",id,{before:{status:branch.status,reopensAt:branch.reopens_at},after:{status,reopensAt}})
   ]);
   if(status==="temporarily_closed"&&branch.status!=="temporarily_closed"){
