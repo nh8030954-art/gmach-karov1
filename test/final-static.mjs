@@ -358,3 +358,8 @@ assert.ok(indexHtml.includes("./release-shell.js"),"release shell is not loaded"
 assert.equal(JSON.parse(manifestText).display,"standalone");
 assert.ok((await readFile("worker/launch-readiness.js","utf8")).includes("/api/admin/export.csv"),"admin CSV export route missing");
 assert.ok((await readFile("dist/admin-control-center.js","utf8")).includes("ייצוא נתונים"),"admin export UI missing");
+
+for(const token of ["scan-unit-qr","BarcodeDetector","getUserMedia","unit-qr-manual"])assert.ok(appClient.includes(token),token+" missing from camera QR scanner");
+for(const token of ['application/ld+json','SearchAction','og:site_name','twitter:card'])assert.ok(indexHtml.includes(token),token+" missing from structured SEO metadata");
+assert.ok(indexHtml.includes('class="skip-link"'),"global skip link missing");
+console.log("QR scanning, structured SEO and accessibility shell gate passed.");
