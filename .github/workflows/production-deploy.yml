@@ -11,9 +11,6 @@ on:
       - "package*.json"
       - "test/**"
       - ".github/workflows/production-deploy.yml"
-      - ".github/workflows/verify.yml"
-      - ".github/workflows/release-checks.yml"
-      - ".github/workflows/provision-external-features.yml"
   workflow_dispatch:
 
 permissions:
