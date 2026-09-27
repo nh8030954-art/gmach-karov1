@@ -1,19 +1,6 @@
-sha=8d8f2fc5b99daad149238e6e5e61c6519a2827da
+sha=fbae03c02244860ff63ec6d184e35b4927ba7544
 install=success
-syntax=success
-smoke=success
-live=failure
-Privacy availability static release gate passed.
-Release hardening static gate passed.
-Release experience static release gate passed.
-Admin control center static release gate passed.
-Privacy purge static release gate passed.
-Community chat retention static release gate passed.
-remaining-features Error: Backup checksum mismatch
-    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
-    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:314:91)
-    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:599:37)
-    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:126:26)
-Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
-{"ok":true,"release":"complete-platform-2026-09-27.10","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-27T10:06:36.504Z"}
+syntax=failure
+smoke=skipped
+live=skipped
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":false,"vapidPublicKey":null,"geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
