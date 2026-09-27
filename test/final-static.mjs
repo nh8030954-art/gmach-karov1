@@ -15,7 +15,7 @@ for(const file of ["dist/sw.js","dist/platform-completion.js","migrations/0013_p
 assert.match(worker,/handleFinalFeatures/);
 assert.match(worker,/runFinalMaintenance/);
 assert.match(worker,/complete-platform-2026-09-27\.10/);
-assert.match(worker,/finalFeaturesSchema/);
+assert.match(worker,/ensureFinalFeaturesSchema/);
 assert.match(worker,/\/sitemap\.xml/);
 assert.match(worker,/\/robots\.txt/);
 assert.ok(worker.includes("updateAdminCategory"));
