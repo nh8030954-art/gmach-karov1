@@ -1,6 +1,6 @@
 import { handleRemainingFeatures, runRemainingMaintenance, ensureRemainingFeaturesSchema } from "./remaining-features.js";
 import { handleFinalFeatures, runFinalMaintenance, ensureFinalFeaturesSchema } from "./final-features.js";
-import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata, ensurePlatformCompletionSchema } from "./platform-completion.js";
+import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata, ensurePlatformCompletionSchema, recordSecurityFailure } from "./platform-completion.js";
 const SESSION_COOKIE = "gmach_session";
 const SESSION_SECONDS = 60 * 60 * 24 * 30;
 // Keep PBKDF2 within the Cloudflare Workers CPU budget. Existing production
@@ -388,7 +388,7 @@ async function routeApi(request, env, ctx, url) {
     const completionTables=await Promise.all(["inventory_holds","branch_transfers","notification_queue","backup_runs","geo_cache"].map(name=>env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").bind(name).first()));
     const completionReady=completionTables.every(Boolean);
     const finalFeaturesReady=await ensureFinalFeaturesSchema(env).then(()=>true).catch(()=>false);
-    return json({ ok:true,release:"complete-platform-2026-09-25.9",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady&&completionReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at"),completionReady},finalFeaturesSchema:{ready:finalFeaturesReady},timestamp:new Date().toISOString() });
+    return json({ ok:true,release:"complete-platform-2026-09-27.10",database:"D1",storage:"R2",email:Boolean(env.RESEND_API_KEY),privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),authSchema:{users:Boolean(usersTable),challenges:Boolean(challengesTable),memberRole:userSql.includes("'member'"),borrowerRole:userSql.includes("'borrower'"),emailVerified:userSql.includes("email_verified"),adminCredentialRotated},bookingSchema:{ready:bookingReady,items:Boolean(itemsTable),waitlist:Boolean(waitlistTable),inventoryBlocks:Boolean(blocksTable)},completePlatformSchema:{ready:completeReady&&categoriesReady&&completionReady,categories:categoriesReady,securityEvents:Boolean(securityTable),sessionDevices:String(sessionsTable?.sql||"").includes("device_label"),registrationConsents:userSql.includes("terms_accepted_at"),completionReady},finalFeaturesSchema:{ready:finalFeaturesReady},timestamp:new Date().toISOString() });
   }
 
   if (method === "POST" && path === "/api/translate/user-content") return translateUserContent(request, env, ctx);
@@ -744,10 +744,10 @@ async function login(request, env, ctx, url) {
   const password = validatePassword(body.password);
   await enforceAuthRateLimit(env, email, "login", ctx);
   const user = await env.DB.prepare("SELECT * FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
-  if (!user) throw new HttpError(401, "האימייל או הסיסמה אינם נכונים");
+  if (!user) { await recordSecurityFailure(request,env,"login_failed"); throw new HttpError(401, "האימייל או הסיסמה אינם נכונים"); }
   if (user.account_status === "suspended") throw new HttpError(403, "החשבון הושעה. יש לפנות למנהל האתר");
   const candidate = await derivePassword(password, user.password_salt, user.password_iterations);
-  if (!constantTimeEqual(candidate, user.password_hash)) throw new HttpError(401, "האימייל או הסיסמה אינם נכונים");
+  if (!constantTimeEqual(candidate, user.password_hash)) { await recordSecurityFailure(request,env,"login_failed"); throw new HttpError(401, "האימייל או הסיסמה אינם נכונים"); }
   if (Number(user.email_verified || 0) !== 1) return json({ error: "יש לאמת את כתובת האימייל לפני הכניסה", verificationRequired: true, email: user.email }, 403);
 
   if (Number(user.totp_enabled || 0) === 1) {
