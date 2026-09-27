@@ -109,7 +109,7 @@ jobs:
       - name: Verify live health
         run: |
           for i in {1..12}; do
-            if curl --fail --silent --show-error https://gmach-karov1.nh8030954.workers.dev/api/health | grep -q '"ok":true'; then
+            if curl --fail --silent --show-error --max-time 30 https://gmach-karov1.nh8030954.workers.dev/api/health | grep -q '"ok":true'; then
               exit 0
             fi
             sleep 10
