@@ -139,7 +139,7 @@ jobs:
           echo "$FEATURES" | tee "$RUNNER_TEMP/features-after.json"
           printf '%s' "$FEATURES" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s);if(!x.turnstileEnabled||!x.turnstileSiteKey)throw new Error('Turnstile provisioning did not become active');if(!x.pushConfigured||!x.vapidPublicKey)throw new Error('VAPID provisioning did not become active')})"
       - name: Persist feature verification state
-        if: always() && steps.cf.outputs.enabled == 'true' && steps.verify_features.outcome != 'success'
+        if: steps.cf.outputs.enabled == 'true' && steps.verify_features.outcome != 'success'
         run: |
           {
             echo "provision_sha=${GITHUB_SHA}"
@@ -152,5 +152,5 @@ jobs:
           git commit -m "Record external feature provisioning failure" || true
           git push
       - name: Enforce feature verification
-        if: always() && steps.cf.outputs.enabled == 'true'
+        if: steps.cf.outputs.enabled == 'true'
         run: test "${{ steps.verify_features.outcome }}" = "success"
