@@ -40,6 +40,18 @@ try{
   await shot({name:"desktop-en-auth",lang:"en",action:async p=>{const b=p.locator("#dashboard-button");if(await b.isVisible())await b.click();}});
   await shot({name:"mobile-he-menu",viewport:{width:390,height:844},action:async p=>{const b=p.locator("#mobile-menu-button");if(await b.isVisible())await b.click();}});
   await shot({name:"mobile-en-menu",lang:"en",viewport:{width:390,height:844},action:async p=>{const b=p.locator("#mobile-menu-button");if(await b.isVisible())await b.click();}});
+  await shot({name:"mobile-en-community",lang:"en",viewport:{width:390,height:844},route:"#/community",action:async p=>{
+    const menu=p.locator("#mobile-menu-button"); if(await menu.count()&&await menu.isVisible())await menu.click();
+    const b=p.locator("#mobile-community-board"); if(await b.count()&&await b.isVisible())await b.click();
+    const overlap=await p.evaluate(()=>{
+      const d=document.querySelector("#community-board-dialog"),x=d?.querySelector(".dialog-close"),h=d?.querySelector(".dialog-heading h2");
+      if(!d?.open||!x||!h)return {open:false};
+      const a=x.getBoundingClientRect(),q=h.getBoundingClientRect();
+      return {open:true,intersects:!(a.right<=q.left||a.left>=q.right||a.bottom<=q.top||a.top>=q.bottom)};
+    });
+    console.log("COMMUNITY_OVERLAP",JSON.stringify(overlap));
+    if(!overlap.open||overlap.intersects)throw new Error("Community dialog close button overlaps title: "+JSON.stringify(overlap));
+  }});
   await shot({name:"desktop-he-accessibility",action:async p=>{const b=p.locator("#accessibility-button");if(await b.isVisible())await b.click();}});
   await shot({name:"desktop-en-accessibility",lang:"en",action:async p=>{const b=p.locator("#accessibility-button");if(await b.isVisible())await b.click();}});
 } finally { await browser.close(); }
