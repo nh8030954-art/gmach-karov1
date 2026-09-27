@@ -44,6 +44,24 @@ async function installTour(){
     };render();
   }catch{}
 }
+async function openOrganizationOnboardingPreview(orgId){
+  const [pub,status]=await Promise.all([api("/api/organizations/"+encodeURIComponent(orgId)+"/public"),api("/api/organizations/"+encodeURIComponent(orgId)+"/onboarding").catch(()=>({readiness:{}}))]);
+  await api("/api/organizations/"+encodeURIComponent(orgId)+"/onboarding",{method:"PATCH",body:{previewSeen:true}}).catch(()=>{});
+  const org=pub.organization||{},items=pub.items||[],readiness=status.readiness||{};
+  let d=$("#organization-onboarding-preview");if(!d){d=document.createElement("dialog");d.id="organization-onboarding-preview";d.className="platform-dialog";document.body.append(d)}
+  d.innerHTML=`<div class="platform-dialog-inner" dir="${document.documentElement.lang==="en"?"ltr":"rtl"}"><div class="platform-dialog-head"><h2>${esc(org.name||"תצוגה מקדימה")}</h2><button type="button" class="platform-dialog-close" aria-label="סגירה">×</button></div><div class="platform-form"><p>${esc(org.description||"")}</p><p>📍 ${esc([org.city,org.neighborhood].filter(Boolean).join(", "))}</p><div class="platform-note">${readiness.publiclyVisible?"העמוד מוכן ומוצג לציבור.":"העמוד עדיין אינו מוצג בחיפוש. יש להשלים את הפריטים החסרים."}</div><div class="platform-list">${items.map(item=>`<div class="platform-row"><strong>${esc(item.title)}</strong><span>${esc(item.availability_status||"")}</span></div>`).join("")||"<p>עדיין אין מוצרים בעמוד.</p>"}</div></div></div>`;
+  $(".platform-dialog-close",d).onclick=()=>d.close();d.showModal();
+}
+async function showOrganizationOnboarding(org){
+  const orgId=org?.id;if(!orgId)return;
+  const data=await api("/api/organizations/"+encodeURIComponent(orgId)+"/onboarding").catch(()=>({onboarding:{},readiness:{}})),state=data.onboarding||{},readiness=data.readiness||{};
+  const missing=(readiness.missing||[]),labels={name:"שם",description:"תיאור",city:"עיר",address:"כתובת",phone:"טלפון",category:"קטגוריה",first_active_item:"מוצר פעיל ראשון"};
+  const d=modal("הגמ״ח נוצר - משלימים את ההקמה",`<div class="platform-list"><div class="platform-note"><strong>${esc(org.name||"הגמ״ח")}</strong><p>${readiness.publiclyVisible?"העמוד כבר מוכן לפרסום.":"העמוד נשמר. הוא יוצג בחיפוש אחרי השלמת כל דרישות הפרסום."}</p>${missing.length?`<p>נשאר להשלים: ${missing.map(x=>esc(labels[x]||x)).join(", ")}</p>`:""}</div><div class="platform-row-actions"><button class="platform-action" id="onboarding-first-item">הוספת המוצר הראשון</button><button class="platform-action secondary" id="onboarding-preview">תצוגה מקדימה</button><button class="platform-action secondary" id="onboarding-manage">מעבר לניהול הגמ"ח</button></div><section id="onboarding-tips" ${state.tips_dismissed?"hidden":""}><h3>שלושה דברים שכדאי לעשות עכשיו</h3><ol><li>להוסיף לפחות מוצר פעיל אחד כדי להופיע בחיפוש.</li><li>לבדוק שעות פעילות, כתובת ודרך האיסוף.</li><li>להוסיף קטגוריות וסניפים לפי הצורך.</li></ol><button class="platform-action secondary" id="onboarding-dismiss-tips">הבנתי, לא להציג שוב</button></section></div>`);
+  $("#onboarding-first-item",d).onclick=async()=>{d.close();location.hash="#/dashboard";setTimeout(()=>$("#add-item-button")?.click(),80)};
+  $("#onboarding-preview",d).onclick=()=>openOrganizationOnboardingPreview(orgId).catch(e=>notice(e.message,true));
+  $("#onboarding-manage",d).onclick=async()=>{await api("/api/organizations/"+encodeURIComponent(orgId)+"/onboarding",{method:"PATCH",body:{managementTourDone:true}}).catch(()=>{});d.close();location.hash="#/dashboard";setTimeout(()=>document.querySelector('[data-dashboard-tab="gmachim"]')?.click(),80)};
+  $("#onboarding-dismiss-tips",d)?.addEventListener("click",async()=>{await api("/api/organizations/"+encodeURIComponent(orgId)+"/onboarding",{method:"PATCH",body:{tipsDismissed:true}}).catch(()=>{});$("#onboarding-tips",d).hidden=true});
+}
 async function openWizard(){
   let drafts=(await api("/api/me/organization-drafts")).drafts||[],draft=drafts[0]||null,step=draft?.step||1,payload=draft?.payload||{};
   const fields=[
@@ -63,7 +81,7 @@ async function openWizard(){
       const created=await api("/api/organizations",{method:"POST",body:{name:payload.name,organizationType:payload.organizationType,city:payload.city,address:payload.address,phone:payload.phone,description:payload.description,serviceArea:payload.serviceArea||payload.city,primaryCategory:payload.primaryCategory,hours:{text:payload.hours||""},pickupOptions:["pickup"]}});
       if(payload.categories?.length){try{const cats=await api("/api/categories");const ids=(cats.categories||[]).filter(c=>payload.categories.some(x=>x===c.name_he||x===c.name_en)).map(c=>c.id);if(ids.length)await api("/api/organizations/"+created.organization.id+"/categories",{method:"PUT",body:{categoryIds:ids}})}catch{}}
       if(draft)await api("/api/me/organization-drafts/"+draft.id,{method:"DELETE"});
-      d.close();notice("הגמ״ח נוצר. השלב הבא: הוספת מוצר ראשון כדי לפרסם אותו בחיפוש.");location.hash="#/dashboard";
+      d.close();notice("הגמ״ח נוצר. השלב הבא: הוספת מוצר ראשון כדי לפרסם אותו בחיפוש.");location.hash="#/dashboard";setTimeout(()=>showOrganizationOnboarding(created.organization).catch(e=>notice(e.message,true)),120);
     };
   };show();
 }
