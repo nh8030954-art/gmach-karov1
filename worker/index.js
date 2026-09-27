@@ -1253,7 +1253,7 @@ async function discovery(env, url) {
   const like = `%${String(query || "").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
   const orgCity=cleanOptional(url.searchParams.get("orgCity"),80),orgCategory=cleanOptional(url.searchParams.get("orgCategory"),80),orgQuery=cleanOptional(url.searchParams.get("orgQuery"),100);
   const minRating=Math.max(0,Math.min(5,Number(url.searchParams.get("minRating"))||0)),availableOnly=url.searchParams.get("orgAvailable")==="1";
-  const orgWhere=["o.status='approved'","o.is_hidden=0","o.deleted_at IS NULL"],orgBind=[];
+  const orgWhere=["o.status='approved'","o.is_hidden=0","o.deleted_at IS NULL","EXISTS (SELECT 1 FROM items vi WHERE vi.organization_id=o.id AND vi.status='active' AND vi.deleted_at IS NULL)"],orgBind=[];
   if(orgCity){orgWhere.push("o.city=?");orgBind.push(orgCity)}
   if(orgCategory){orgWhere.push("EXISTS (SELECT 1 FROM items ci WHERE ci.organization_id=o.id AND ci.status='active' AND ci.deleted_at IS NULL AND ci.category=?)");orgBind.push(orgCategory)}
   if(orgQuery){const oq=`%${orgQuery.replaceAll("%","\\%").replaceAll("_","\\_")}%`;orgWhere.push("(o.name LIKE ? ESCAPE '\\' OR o.description LIKE ? ESCAPE '\\' OR o.city LIKE ? ESCAPE '\\')");orgBind.push(oq,oq,oq)}
