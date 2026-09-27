@@ -485,7 +485,38 @@ async function navigationPreferences(request,env){const u=await requireUser(requ
 async function saveNavigationPreferences(request,env){const u=await requireUser(request,env),b=await readJson(request),app=["google","waze","apple"].includes(b.preferredApp)?b.preferredApp:"google";await env.DB.batch([env.DB.prepare("INSERT INTO navigation_preferences(user_id,preferred_app) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET preferred_app=excluded.preferred_app,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')").bind(u.id,app),env.DB.prepare("UPDATE users SET preferred_navigation=?,updated_at=? WHERE id=?").bind(app,new Date().toISOString(),u.id)]);return json({ok:true,preferredApp:app})}
 async function calendarPreferences(request,env){const u=await requireUser(request,env),x=await qfirst(env,"SELECT * FROM calendar_preferences WHERE user_id=?",[u.id]);return json({preferences:x||{preferred_app:"ics",reminder_minutes:1440}});}
 async function saveCalendarPreferences(request,env){const u=await requireUser(request,env),b=await readJson(request),app=["ics","google","apple","outlook"].includes(b.preferredApp)?b.preferredApp:"ics",mins=Math.max(0,Math.min(10080,Number(b.reminderMinutes)||1440));await qrun(env,"INSERT INTO calendar_preferences(user_id,preferred_app,reminder_minutes) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET preferred_app=excluded.preferred_app,reminder_minutes=excluded.reminder_minutes,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')",[u.id,app,mins]);return json({ok:true});}
-async function exportMyData(request,env){const u=await requireUser(request,env);const [profile,orgs,items,loans,reviews,messages]=await Promise.all([qfirst(env,"SELECT id,email,full_name,role,phone,city,preferred_language,created_at,last_login_at FROM users WHERE id=?",[u.id]),qall(env,"SELECT * FROM organizations WHERE owner_id=?",[u.id]),qall(env,"SELECT i.* FROM items i JOIN organizations o ON o.id=i.organization_id WHERE o.owner_id=?",[u.id]),qall(env,"SELECT * FROM loan_requests WHERE borrower_id=?",[u.id]),qall(env,"SELECT * FROM reviews WHERE author_id=?",[u.id]),qall(env,"SELECT m.* FROM request_messages m JOIN loan_requests l ON l.id=m.request_id WHERE m.sender_id=? OR l.borrower_id=?",[u.id,u.id])]);return json({exportedAt:new Date().toISOString(),profile,organizations:orgs,items,loans,reviews,messages});}
+async function decryptPrivateExportValue(value,env){
+  if(!value)return null;const parts=String(value).split(".");if(parts.length!==3||parts[0]!=="v1")return null;
+  const secret=String(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY||"");if(secret.length<24)return null;
+  try{const keyBytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(secret)),key=await crypto.subtle.importKey("raw",keyBytes,{name:"AES-GCM"},false,["decrypt"]),plain=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64uBytes(parts[1])},key,b64uBytes(parts[2]));return new TextDecoder().decode(plain)}catch{return null}
+}
+async function exportMyData(request,env){
+  const u=await requireUser(request,env);
+  const [profile,orgs,items,loans,reviews,messages,consents,addressRows,sessions,navigation,calendar,notificationPreferences,savedSearches,favorites,savedOrganizations,supportTickets,dataRequests,securityEvents]=await Promise.all([
+    qfirst(env,"SELECT id,email,full_name,role,phone,city,preferred_language,preferred_navigation,consent_version,operational_emails_accepted,community_emails_accepted,address_cipher,created_at,last_login_at,deletion_requested_at FROM users WHERE id=?",[u.id]),
+    qall(env,"SELECT * FROM organizations WHERE owner_id=?",[u.id]),
+    qall(env,"SELECT i.* FROM items i JOIN organizations o ON o.id=i.organization_id WHERE o.owner_id=?",[u.id]),
+    qall(env,"SELECT * FROM loan_requests WHERE borrower_id=? OR item_id IN (SELECT i.id FROM items i JOIN organizations o ON o.id=i.organization_id WHERE o.owner_id=?)",[u.id,u.id]),
+    qall(env,"SELECT * FROM reviews WHERE author_id=?",[u.id]),
+    qall(env,"SELECT m.* FROM request_messages m JOIN loan_requests l ON l.id=m.request_id WHERE m.sender_id=? OR l.borrower_id=?",[u.id,u.id]),
+    qall(env,"SELECT document_type,version,accepted_at,source FROM legal_consents WHERE user_id=? ORDER BY accepted_at",[u.id]).catch(()=>[]),
+    qall(env,"SELECT id,label,address_cipher,city,latitude,longitude,is_default,created_at,updated_at FROM user_addresses WHERE user_id=? ORDER BY is_default DESC,updated_at DESC",[u.id]).catch(()=>[]),
+    qall(env,"SELECT device_label,last_seen_at,created_at,expires_at,trusted FROM sessions WHERE user_id=? ORDER BY COALESCE(last_seen_at,created_at) DESC",[u.id]).catch(()=>[]),
+    qfirst(env,"SELECT preferred_app,updated_at FROM navigation_preferences WHERE user_id=?",[u.id]).catch(()=>null),
+    qfirst(env,"SELECT preferred_app,reminder_minutes,updated_at FROM calendar_preferences WHERE user_id=?",[u.id]).catch(()=>null),
+    qall(env,"SELECT notification_type,in_app,email,push,digest,quiet_start,quiet_end FROM notification_preferences WHERE user_id=? ORDER BY notification_type",[u.id]).catch(()=>[]),
+    qall(env,"SELECT id,name,query_text,city,category,notify_enabled,created_at,updated_at FROM saved_searches WHERE user_id=? ORDER BY created_at DESC",[u.id]).catch(()=>[]),
+    qall(env,"SELECT item_id,created_at FROM favorites WHERE user_id=? ORDER BY created_at DESC",[u.id]).catch(()=>[]),
+    qall(env,"SELECT organization_id,created_at FROM saved_organizations WHERE user_id=? ORDER BY created_at DESC",[u.id]).catch(()=>[]),
+    qall(env,"SELECT id,ticket_number,subject,status,created_at,updated_at FROM support_tickets WHERE user_id=? OR email=? COLLATE NOCASE ORDER BY created_at DESC",[u.id,u.email]).catch(()=>[]),
+    qall(env,"SELECT id,request_type,details,status,created_at,completed_at FROM user_data_requests WHERE user_id=? ORDER BY created_at DESC",[u.id]).catch(()=>[]),
+    qall(env,"SELECT event_type,severity,details_json,created_at FROM security_events WHERE user_id=? ORDER BY created_at DESC LIMIT 500",[u.id]).catch(()=>[])
+  ]);
+  const registrationAddress=await decryptPrivateExportValue(profile?.address_cipher,env);
+  if(profile)delete profile.address_cipher;
+  const addresses=[];for(const row of addressRows){const address=await decryptPrivateExportValue(row.address_cipher,env);const clean={...row,address,isDefault:Boolean(row.is_default)};delete clean.address_cipher;delete clean.is_default;addresses.push(clean)}
+  return json({exportedAt:new Date().toISOString(),profile:{...profile,registrationAddress},legalConsents:consents,addresses,devices:sessions,navigationPreferences:navigation,calendarPreferences:calendar,notificationPreferences,savedSearches,favorites,savedOrganizations,organizations:orgs,items,loans,reviews,messages,supportTickets,dataRequests,securityEvents});
+}
 async function dataRequest(request,env){const u=await requireUser(request,env),b=await readJson(request),type=["export","access","correction"].includes(b.type)?b.type:"access",id=crypto.randomUUID();await qrun(env,"INSERT INTO user_data_requests(id,user_id,request_type,details) VALUES(?,?,?,?)",[id,u.id,type,optional(b.details,2000)]);return json({request:{id,type,status:"open"}},201);}
 
 /* ---------- admin / backup ---------- */
