@@ -1868,14 +1868,14 @@ async function updateRequestStatus(request, env, id) {
   const body = await readJson(request);
   const target = cleanText(body.status, 2, 20, "סטטוס");
   const row = await env.DB.prepare(`SELECT lr.status,lr.borrower_id,lr.item_id,lr.requested_from,lr.requested_until,lr.manager_note,lr.quantity AS requested_quantity,
-    i.title AS item_title,i.quantity,i.turnaround_minutes,o.owner_id FROM loan_requests lr
+    i.title AS item_title,i.quantity,i.turnaround_minutes,i.category,o.id AS organization_id,o.owner_id FROM loan_requests lr
     JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id WHERE lr.id = ?`).bind(id).first();
   if (!row) throw new HttpError(404, "הבקשה לא נמצאה");
   let allowed = false;
   if (row.borrower_id === user.id && ["pending","approved"].includes(row.status) && target === "cancelled") allowed = true;
   if (row.owner_id === user.id || user.role === "admin") {
     allowed = allowed || (row.status === "pending" && ["approved", "declined", "cancelled"].includes(target));
-    allowed = allowed || (row.status === "approved" && ["collected","cancelled"].includes(target));
+    allowed = allowed || (row.status === "approved" && ["collected","cancelled","no_show"].includes(target));
     allowed = allowed || (row.status === "collected" && target === "returned");
   }
   if (!allowed) throw new HttpError(403, "מעבר הסטטוס הזה אינו מורשה");
@@ -1902,13 +1902,13 @@ async function updateRequestStatus(request, env, id) {
     if (!result.meta.changes) throw new HttpError(409, "כל היחידות תפוסות בתאריכים האלה. אפשר לדחות את הבקשה או לתאם תאריכים אחרים בצ׳אט");
   } else {
     const undoUntil=target==="cancelled"?new Date(Date.now()+15*1000).toISOString():null;
-    const workflow={cancelled:"cancelled",declined:"declined",collected:"awaiting_return",returned:"completed"}[target]||target;
+    const workflow={cancelled:"cancelled",declined:"declined",collected:"awaiting_return",returned:"completed",no_show:"no_show"}[target]||target;
     result = await env.DB.prepare("UPDATE loan_requests SET status = ?, manager_note = ?, collected_at = CASE WHEN ?='collected' THEN ? ELSE collected_at END, returned_at = CASE WHEN ?='returned' THEN ? ELSE returned_at END, cancelled_at = CASE WHEN ?='cancelled' THEN ? ELSE cancelled_at END, cancellation_undo_until=CASE WHEN ?='cancelled' THEN ? ELSE cancellation_undo_until END, workflow_status=?, updated_at = ? WHERE id = ? AND status = ?")
       .bind(target, managerNote, target, now, target, now, target, now, target, undoUntil, workflow, now, id, row.status).run();
     if (!result.meta.changes) throw new HttpError(409, "הבקשה כבר עודכנה. רעננו את האזור האישי");
   }
 
-  const statusText = { approved: "אושרה", declined: "נדחתה", cancelled: "בוטלה", collected: "סומנה כנאספה", returned: "סומנה כהוחזרה" }[target] || "עודכנה";
+  const statusText = { approved: "אושרה", declined: "נדחתה", cancelled: "בוטלה", collected: "סומנה כנאספה", returned: "סומנה כהוחזרה", no_show:"סומנה כאי-הגעה" }[target] || "עודכנה";
   const recipientId = row.borrower_id === user.id ? row.owner_id : row.borrower_id;
   const statusStatements=[
     notificationStatement(env, recipientId, "status", `הבקשה ${statusText}`, `הבקשה עבור ${row.item_title} ${statusText}.`, id),
@@ -1916,13 +1916,13 @@ async function updateRequestStatus(request, env, id) {
       .bind(crypto.randomUUID(),id,user.id,target,JSON.stringify({managerNote:managerNote||null}))
   ];
   if(target==="approved") statusStatements.push(env.DB.prepare("UPDATE inventory_holds SET status='converted' WHERE request_id=? AND status='active'").bind(id));
-  if(["declined","cancelled","returned"].includes(target)) statusStatements.push(env.DB.prepare("UPDATE inventory_holds SET status='released' WHERE request_id=? AND status IN ('active','converted')").bind(id));
+  if(["declined","cancelled","returned","no_show"].includes(target)) statusStatements.push(env.DB.prepare("UPDATE inventory_holds SET status='released' WHERE request_id=? AND status IN ('active','converted')").bind(id));
   if(target==="returned"){
     statusStatements.push(env.DB.prepare("UPDATE loan_unit_assignments SET returned_at=? WHERE request_id=? AND returned_at IS NULL").bind(now,id));
     statusStatements.push(env.DB.prepare("UPDATE item_units SET status='available',updated_at=? WHERE id IN (SELECT unit_id FROM loan_unit_assignments WHERE request_id=?)").bind(now,id));
   }
   await env.DB.batch(statusStatements);
-  if(["declined","returned"].includes(target)) await advanceWaitlist(env,row.item_id);
+  if(["declined","returned","no_show"].includes(target)) await advanceWaitlist(env,row.item_id);
   if(target==="returned") await notifySavedFollowers(env,{itemId:row.item_id,organizationId:row.organization_id,category:row.category,title:row.item_title,event:"available"});
   return json({ id, status: target, managerNote });
 }
