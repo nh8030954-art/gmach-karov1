@@ -249,10 +249,10 @@
     const register = state.authMode === "register"; $("#auth-name-field").hidden = !register; $$(".auth-register-field").forEach(field=>field.hidden=!register); $("#auth-name").required = register; ["#auth-phone","#auth-city","#auth-address","#auth-operational-consent"].forEach(selector=>$(selector).required=register); $("#auth-consent-row").hidden = !register; $("#auth-consent").required = register; $("#forgot-password-button").hidden = register; $("#auth-password").autocomplete = register ? "new-password" : "current-password"; $("#auth-title").textContent = register ? "מצטרפים לגמ״ח ברגע" : "כניסה לגמ״ח ברגע"; $("#auth-description").textContent = register ? "יוצרים חשבון בחינם ומתחילים להשאיל ולעזור." : "נכנסים עם אימייל וסיסמה כדי לבקש, לשמור ולנהל פריטים."; $("#auth-submit").textContent = register ? "יצירת חשבון" : "כניסה";
   }
   async function finishAuthentication(user, form = null) {
-    state.user = user; state.pendingVerificationEmail = ""; updateAuthUI(); await refreshAccountSnapshot(); await refreshNotifications(true); form?.reset(); closeDialog($("#auth-dialog")); const action = state.pendingAction; state.pendingAction = null; action?.();
+    state.user = user; state.pendingVerificationEmail = ""; if(user?.preferredLanguage && !localStorage.getItem("gmach-language")) localStorage.setItem("gmach-language", user.preferredLanguage); updateAuthUI(); await refreshAccountSnapshot(); await refreshNotifications(true); form?.reset(); closeDialog($("#auth-dialog")); const action = state.pendingAction; state.pendingAction = null; action?.();
   }
   async function refreshUser() {
-    try { const data = await api("/api/auth/me"); state.user = data.user; updateAuthUI(); if (state.user) { await refreshAccountSnapshot(); await refreshNotifications(true); } }
+    try { const data = await api("/api/auth/me"); state.user = data.user; if(state.user?.preferredLanguage && !localStorage.getItem("gmach-language")) localStorage.setItem("gmach-language",state.user.preferredLanguage); updateAuthUI(); if (state.user) { await refreshAccountSnapshot(); await refreshNotifications(true); } }
     catch { state.user = null; updateAuthUI(); }
   }
   async function refreshAccountSnapshot() {
