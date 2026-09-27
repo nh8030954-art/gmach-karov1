@@ -22,16 +22,21 @@ jobs:
       QA_URL: https://gmach-karov1-qa.nh8030954.workers.dev
       QA_R2_BUCKET: gmach-karov-images-qa
       QA_BACKUP_BUCKET: gmach-karov-backups-qa
+      QA_RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      QA_DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY }}
     steps:
       - name: Check QA configuration
         id: config
         run: |
-          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "QA deployment blocked: Cloudflare account credentials are not configured." >&2
             exit 1
           fi
+          if [ -z "$QA_RESEND_API_KEY" ] || [ -z "$QA_DATA_ENCRYPTION_KEY" ]; then
+            echo "QA deployment blocked: RESEND_API_KEY and DATA_ENCRYPTION_KEY repository secrets are required for end-to-end account testing." >&2
+            exit 1
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v5
         if: steps.config.outputs.enabled == 'true'
       - uses: actions/setup-node@v5
@@ -81,13 +86,24 @@ jobs:
       - name: Deploy QA Worker
         if: steps.config.outputs.enabled == 'true'
         run: npx wrangler deploy --config wrangler.qa.jsonc
+      - name: Configure QA email and private-data encryption
+        if: steps.config.outputs.enabled == 'true'
+        run: |
+          printf '%s' "$QA_RESEND_API_KEY" | npx wrangler secret put RESEND_API_KEY --config wrangler.qa.jsonc
+          printf '%s' "$QA_DATA_ENCRYPTION_KEY" | npx wrangler secret put DATA_ENCRYPTION_KEY --config wrangler.qa.jsonc
       - name: Smoke QA
         if: steps.config.outputs.enabled == 'true'
         run: |
           for i in {1..18}; do
-            body="$(curl -fsS ${QA_URL}/api/health || true)"
+            body="$(curl -fsS "${QA_URL}/api/health?deep=1" || true)"
             echo "$body"
-            if echo "$body" | grep -q '"ok":true'; then exit 0; fi
+            if echo "$body" | grep -q '"ok":true' &&
+               echo "$body" | grep -q '"catalog":true' &&
+               echo "$body" | grep -q '"categories":true' &&
+               echo "$body" | grep -q '"email":true' &&
+               echo "$body" | grep -q '"privateDataEncryption":true'; then
+              exit 0
+            fi
             sleep 10
           done
           exit 1
