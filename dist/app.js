@@ -353,7 +353,7 @@
   function requestActions(row) {
     let actions = `<button class="button button-secondary button-small" data-open-chat="${escapeHTML(row.id)}">שיחה</button><button class="button button-secondary button-small" data-calendar-request="${escapeHTML(row.id)}">הוספה ליומן</button>`;
     if (row.direction === "incoming" && row.status === "pending") actions += `<button class="button button-primary button-small" data-request-decision="approved" data-request-id="${escapeHTML(row.id)}">אישור</button><button class="button button-secondary button-small" data-request-decision="declined" data-request-id="${escapeHTML(row.id)}">דחייה</button>`;
-    if (row.direction === "incoming" && row.status === "approved") actions += `<button class="button button-primary button-small" data-pickup-request="${escapeHTML(row.id)}">מסך איסוף</button>`;
+    if (row.direction === "incoming" && row.status === "approved") actions += `<button class="button button-primary button-small" data-pickup-request="${escapeHTML(row.id)}">מסך איסוף</button><button class="button button-secondary button-small" data-no-show="${escapeHTML(row.id)}">אי-הגעה</button>`;
     if (row.direction === "incoming" && row.status === "approved") actions += `<button class="button button-secondary button-small" data-manager-cancel="${escapeHTML(row.id)}">ביטול מצד הגמ״ח</button>`;
     if (row.direction === "incoming" && row.status === "collected") actions += `<button class="button button-primary button-small" data-return-request="${escapeHTML(row.id)}">מסך החזרה</button>`;
     if (["pending","approved"].includes(row.status)) actions += `<button class="button button-secondary button-small" data-loan-flow="${escapeHTML(row.id)}" data-direction="${escapeHTML(row.direction)}">תיאום וציר זמן</button>`;
