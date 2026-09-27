@@ -6,6 +6,9 @@ on:
     paths:
       - ".github/workflows/visual-fast.yml"
       - "test/live-visual-fast.mjs"
+      - "dist/styles.css"
+      - "dist/app.js"
+      - "worker/**"
 permissions:
   contents: read
 concurrency:
@@ -14,11 +17,30 @@ concurrency:
 jobs:
   visual:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      TARGET_URL: https://gmach-karov1-qa.nh8030954.workers.dev
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
-        with: { node-version: 24 }
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - name: Build existing QA config without querying D1
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const raw=fs.readFileSync('wrangler.qa.template.jsonc','utf8')
+            .replaceAll('__QA_D1_DATABASE_ID__','03c97ef5-631b-42e6-870f-37c4d23bda8e')
+            .replaceAll('__QA_R2_BUCKET__','gmach-karov-images-qa')
+            .replaceAll('__QA_BACKUP_BUCKET__','gmach-karov-backups-qa');
+          fs.writeFileSync('wrangler.qa.jsonc',raw);
+          NODE
+      - name: Deploy QA hotfix only
+        run: npx wrangler deploy --config wrangler.qa.jsonc
       - run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
