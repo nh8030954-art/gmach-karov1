@@ -21,5 +21,8 @@
   },
   "dependencies": {
     "qrcode-generator": "^1.4.4"
+  },
+  "overrides": {
+    "undici": "7.29.0"
   }
 }
