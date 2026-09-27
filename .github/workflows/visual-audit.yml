@@ -1,0 +1,42 @@
+name: Live visual audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [qa]
+    paths:
+      - ".github/workflows/visual-audit.yml"
+      - "test/live-visual-audit.mjs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-visual-audit
+  cancel-in-progress: true
+
+jobs:
+  visual:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      QA_URL: https://gmach-karov1-qa.nh8030954.workers.dev
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Capture and inspect live site
+        run: node test/live-visual-audit.mjs
+      - name: Upload screenshots and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-visual-audit
+          path: visual-audit/
+          retention-days: 7
+          if-no-files-found: error
