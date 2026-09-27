@@ -161,7 +161,7 @@ for(const token of ["data-org-reviews","openOrganizationReviews","data-respond-r
 
 for(const token of ["data-edit-my-review","הביקורות שלי"])assert.ok(finalClient.includes(token),token+" missing from review editing UI");
 
-for(const token of ["no_show","const expiredHolds=","hold_expired","advanceWaitlist(env,h.item_id)"])assert.ok(worker.includes(token),token+" missing from hold/no-show lifecycle");
+for(const token of ["no_show","const expiredHolds=","hold_expired","advanceWaitlist(env,row.item_id)"])assert.ok(worker.includes(token),token+" missing from hold/no-show lifecycle");
 
 for(const token of ["data-no-show","אי-הגעה"])assert.ok(appClient.includes(token),token+" missing from no-show UI");
 
