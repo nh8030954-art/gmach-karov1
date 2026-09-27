@@ -165,6 +165,101 @@ async function auditCsv(request,env,url){
   return new Response(csv,{headers:{"Content-Type":"text/csv; charset=utf-8","Content-Disposition":'attachment; filename="gmach-audit.csv"',"Cache-Control":"no-store"}});
 }
 
+
+async function safeCount(env,sql,args=[]){try{const row=await env.DB.prepare(sql).bind(...args).first();return Number(row?.count||0)}catch{return 0}}
+async function safeFirst(env,sql,args=[]){try{return await env.DB.prepare(sql).bind(...args).first()}catch{return null}}
+async function safeAll(env,sql,args=[]){try{return (await env.DB.prepare(sql).bind(...args).all()).results||[]}catch{return []}}
+
+async function adminLaunchReadiness(request,env){
+  await requireAdmin(request,env);
+  const now=Date.now(),latestBackup=await safeFirst(env,"SELECT id,status,backup_type,COALESCE(finished_at,completed_at,started_at,created_at) AS finished_at,error FROM backup_runs ORDER BY COALESCE(finished_at,completed_at,started_at,created_at) DESC LIMIT 1");
+  const backupAgeHours=latestBackup?.finished_at?Math.round((now-Date.parse(latestBackup.finished_at))/360000)/10:null;
+  const [failedNotifications,stuckNotifications,pendingModeration,pendingReports,criticalAlerts,openSupport,oldSupport]=await Promise.all([
+    safeCount(env,"SELECT COUNT(*) AS count FROM notification_queue WHERE failed_at>=datetime('now','-24 hours')"),
+    safeCount(env,"SELECT COUNT(*) AS count FROM notification_queue WHERE sent_at IS NULL AND failed_at IS NULL AND scheduled_at<datetime('now','-30 minutes')"),
+    safeCount(env,"SELECT COUNT(*) AS count FROM moderation_jobs WHERE status='pending'"),
+    safeCount(env,"SELECT (SELECT COUNT(*) FROM reports WHERE status='pending')+(SELECT COUNT(*) FROM review_reports WHERE status='pending')+(SELECT COUNT(*) FROM message_reports WHERE status='pending')+(SELECT COUNT(*) FROM content_reports WHERE status='pending') AS count"),
+    safeCount(env,"SELECT COUNT(*) AS count FROM system_alerts WHERE resolved_at IS NULL AND severity='critical'"),
+    safeCount(env,"SELECT COUNT(*) AS count FROM support_tickets WHERE status IN ('open','reopened','waiting')"),
+    safeCount(env,"SELECT COUNT(*) AS count FROM support_tickets WHERE status IN ('open','reopened','waiting') AND updated_at<datetime('now','-48 hours')")
+  ]);
+  const config={
+    email:Boolean(env.RESEND_API_KEY),
+    privateDataEncryption:Boolean(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY),
+    turnstile:Boolean(env.TURNSTILE_SECRET_KEY&&env.TURNSTILE_SITE_KEY),
+    push:Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY),
+    separateBackupStorage:Boolean(env.BACKUP_STORAGE),
+    aiModeration:Boolean(env.AI)
+  };
+  let r2Healthy=false;try{if(env.ITEM_IMAGES?.list){await env.ITEM_IMAGES.list({limit:1});r2Healthy=true}}catch{}
+  let dbHealthy=false;try{const x=await env.DB.prepare("SELECT 1 AS ok").first();dbHealthy=Number(x?.ok)===1}catch{}
+  const checks=[
+    {key:"database",label:"D1 database",status:dbHealthy?"pass":"fail",detail:dbHealthy?"Database responds":"Database health check failed"},
+    {key:"storage",label:"R2 storage",status:r2Healthy?"pass":"fail",detail:r2Healthy?"Storage responds":"Storage health check failed"},
+    {key:"backup",label:"Recent backup",status:latestBackup?.status==="completed"&&backupAgeHours!==null&&backupAgeHours<=30?"pass":"fail",detail:latestBackup?.finished_at?("Last backup "+backupAgeHours+"h ago"):"No completed backup found"},
+    {key:"backup-isolation",label:"Separate backup storage",status:config.separateBackupStorage?"pass":"warn",detail:config.separateBackupStorage?"Dedicated backup storage configured":"Backups currently rely on the primary storage fallback"},
+    {key:"email",label:"Operational email",status:config.email?"pass":"fail",detail:config.email?"Email delivery configured":"RESEND_API_KEY is missing"},
+    {key:"turnstile",label:"Anti-abuse Turnstile",status:config.turnstile?"pass":"warn",detail:config.turnstile?"Turnstile configured":"Turnstile keys are not fully configured"},
+    {key:"push",label:"Browser push",status:config.push?"pass":"warn",detail:config.push?"VAPID configured":"VAPID keys are not fully configured"},
+    {key:"notifications",label:"Notification delivery",status:failedNotifications===0&&stuckNotifications===0?"pass":failedNotifications>5||stuckNotifications>20?"fail":"warn",detail:failedNotifications+" failed in 24h, "+stuckNotifications+" delayed"},
+    {key:"critical-alerts",label:"Critical operational alerts",status:criticalAlerts===0?"pass":"fail",detail:criticalAlerts+" unresolved critical alerts"},
+    {key:"moderation",label:"Moderation queue",status:pendingModeration+pendingReports<50?"pass":"warn",detail:(pendingModeration+pendingReports)+" pending reports/jobs"},
+    {key:"support",label:"Support queue",status:oldSupport===0?"pass":"warn",detail:openSupport+" open, "+oldSupport+" waiting over 48h"}
+  ];
+  const overall=checks.some(x=>x.status==="fail")?"blocked":checks.some(x=>x.status==="warn")?"attention":"ready";
+  return json({overall,checks,config,metrics:{failedNotifications,stuckNotifications,pendingModeration,pendingReports,criticalAlerts,openSupport,oldSupport,backupAgeHours},latestBackup});
+}
+
+async function adminOperationalAlerts(request,env){
+  const admin=await requireAdmin(request,env);
+  if(request.method==="GET"){
+    const system=await safeAll(env,"SELECT id,alert_type,severity,details_json,resolved_at,created_at FROM system_alerts ORDER BY (resolved_at IS NULL) DESC,created_at DESC LIMIT 300");
+    const operational=await safeAll(env,"SELECT id,alert_type,severity,details_json,resolved_at,created_at FROM operational_alerts ORDER BY (resolved_at IS NULL) DESC,created_at DESC LIMIT 300");
+    return json({alerts:[...system.map(x=>({...x,source:"system"})),...operational.map(x=>({...x,source:"operational"}))].sort((a,b)=>String(b.created_at).localeCompare(String(a.created_at))).slice(0,400)});
+  }
+  const b=await readJson(request),id=String(b.id||""),source=b.source==="operational"?"operational":"system",action=String(b.action||"resolve");
+  if(!id)throw new ExpansionError(400,"נדרש מזהה התראה");
+  if(action==="resolve"){
+    const table=source==="operational"?"operational_alerts":"system_alerts";
+    await env.DB.prepare("UPDATE "+table+" SET resolved_at=COALESCE(resolved_at,?) WHERE id=?").bind(new Date().toISOString(),id).run();
+    await audit(env,admin.id,"alert.resolve","operational_alert",id,{source});
+    return json({ok:true});
+  }
+  if(action==="reopen"){
+    const table=source==="operational"?"operational_alerts":"system_alerts";
+    await env.DB.prepare("UPDATE "+table+" SET resolved_at=NULL WHERE id=?").bind(id).run();
+    await audit(env,admin.id,"alert.reopen","operational_alert",id,{source});
+    return json({ok:true});
+  }
+  throw new ExpansionError(400,"פעולת התראה אינה תקינה");
+}
+
+async function createOperationalAlert(env,type,severity,details){
+  const recent=await safeCount(env,"SELECT COUNT(*) AS count FROM system_alerts WHERE alert_type=? AND resolved_at IS NULL AND created_at>=datetime('now','-6 hours')",[type]);
+  if(recent)return false;
+  const id=crypto.randomUUID();
+  await env.DB.prepare("INSERT INTO system_alerts(id,alert_type,severity,details_json) VALUES(?,?,?,?)").bind(id,type,severity,JSON.stringify(details||{})).run();
+  if(severity==="critical"&&env.RESEND_API_KEY){
+    const admins=await safeAll(env,"SELECT email,full_name FROM users WHERE role='admin' AND account_status='active' LIMIT 10");
+    for(const admin of admins){
+      try{await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Authorization":"Bearer "+env.RESEND_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({from:String(env.FROM_EMAIL||"Gmach Berega <onboarding@resend.dev>"),to:[admin.email],subject:"Gmach Berega - critical operational alert",text:"Alert: "+type+"\n\n"+JSON.stringify(details||{},null,2)})})}catch{}
+    }
+  }
+  return true;
+}
+
+async function runLaunchHealthChecks(env){
+  const latest=await safeFirst(env,"SELECT status,COALESCE(finished_at,completed_at,started_at,created_at) AS finished_at FROM backup_runs ORDER BY COALESCE(finished_at,completed_at,started_at,created_at) DESC LIMIT 1");
+  const age=latest?.finished_at?(Date.now()-Date.parse(latest.finished_at))/3600000:9999;
+  if(!latest||latest.status!=="completed"||age>30)await createOperationalAlert(env,"backup_stale","critical",{latestBackup:latest||null,ageHours:Math.round(age*10)/10});
+  const failed=await safeCount(env,"SELECT COUNT(*) AS count FROM notification_queue WHERE failed_at>=datetime('now','-1 hour')");
+  if(failed>=5)await createOperationalAlert(env,"notification_failures","warning",{failedLastHour:failed});
+  const stuck=await safeCount(env,"SELECT COUNT(*) AS count FROM notification_queue WHERE sent_at IS NULL AND failed_at IS NULL AND scheduled_at<datetime('now','-60 minutes')");
+  if(stuck>=20)await createOperationalAlert(env,"notification_queue_stuck","critical",{stuck});
+  const oldSupport=await safeCount(env,"SELECT COUNT(*) AS count FROM support_tickets WHERE status IN ('open','reopened','waiting') AND updated_at<datetime('now','-72 hours')");
+  if(oldSupport>=10)await createOperationalAlert(env,"support_backlog","warning",{olderThan72Hours:oldSupport});
+}
+
 export async function requirementsExpansionPreflight(request,env,url){
   if(!url.pathname.startsWith("/api/loan-requests/")||["GET","HEAD"].includes(request.method.toUpperCase()))return null;
   if(url.pathname.includes("/admin-control"))return null;
@@ -187,6 +282,7 @@ export async function runRequirementsExpansionMaintenance(env){
   for(const row of restore.results||[])await env.DB.batch([env.DB.prepare("UPDATE users SET account_status='active',updated_at=? WHERE id=?").bind(now,row.user_id),env.DB.prepare("UPDATE admin_user_controls SET restored_at=? WHERE id=?").bind(now,row.id)]).catch(()=>{});
   const expired=await env.DB.prepare("SELECT request_id FROM admin_loan_holds WHERE hold_until IS NOT NULL AND hold_until<=? LIMIT 100").bind(now).all();
   for(const row of expired.results||[])await releaseExpiredLoanHold(env,row.request_id);
+  await runLaunchHealthChecks(env);
 }
 
 export async function handleRequirementsExpansion(request,env,ctx,url){
@@ -202,6 +298,8 @@ export async function handleRequirementsExpansion(request,env,ctx,url){
     if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/users\/([^/]+)\/control$/)))return adminUserControl(request,env,decodeURIComponent(m[1]));
     if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/loan-requests\/([^/]+)\/control$/)))return adminLoanControl(request,env,decodeURIComponent(m[1]));
     if(method==="GET"&&path==="/api/admin/audit/export.csv")return auditCsv(request,env,url);
+    if(method==="GET"&&path==="/api/admin/launch-readiness")return adminLaunchReadiness(request,env);
+    if(path==="/api/admin/operational-alerts"&&(method==="GET"||method==="PATCH"))return adminOperationalAlerts(request,env);
     return null;
   }catch(error){
     if(error instanceof ExpansionError)return json({error:error.message},error.status);
