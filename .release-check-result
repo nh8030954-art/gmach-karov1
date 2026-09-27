@@ -1,4 +1,4 @@
-sha=11575cfed210d8fbfb4eb4b0a1e1b78096e93e4a
+sha=2bb997083fe239c85b7bdf93f4a36c8b7d947338
 install=success
 syntax=success
 tests=failure
@@ -9,32 +9,32 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: {"error":"אירעה תקלה זמנית בשרת","requestId":"5b34e793-3ac0-4ebc-bf36-e77e4e2ee4c2"}
+AssertionError [ERR_ASSERTION]: {"error":"אירעה תקלה זמנית בשרת","requestId":"c3b73b61-4302-400c-a655-d1e5ac7cbc5b"}
 
-500 !== 200
+500 !== 201
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:264:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:266:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: 500,
-  expected: 200,
+  expected: 201,
   operator: 'strictEqual',
   diff: 'simple'
 }
 
 Node.js v24.21.0
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790505868618:264:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790505986146:266:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: 500,
-  expected: 200,
+  expected: 201,
   operator: 'strictEqual',
   diff: 'simple'
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.10","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"timestamp":"2026-09-27T10:44:34.747Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.10","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"timestamp":"2026-09-27T10:46:29.516Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
