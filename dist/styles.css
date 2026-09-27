@@ -795,3 +795,7 @@ html.a11y-high-contrast :focus-visible { outline-color: #ffdf00 !important; }
 .community-board-filters{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:18px 0}.community-board-filters label{display:grid;gap:5px;flex:1 1 170px;font-weight:600}.community-board-filters input,.community-board-filters select,.community-offer-form textarea{width:100%;padding:10px;border:1px solid #cbd7df;border-radius:10px;background:#fff;color:#183b4e}.community-board-results{display:grid;gap:12px;max-height:52vh;overflow:auto}.community-board-card{border:1px solid #dce5eb;border-radius:16px;padding:16px;background:#fff}.community-board-card h3{margin:0 0 8px}.community-board-card p{margin:8px 0;white-space:pre-wrap}.community-board-card small{color:#576c78}.community-board-actions,.community-board-pages{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}.community-offer-form{display:grid;gap:8px;margin-top:12px}.community-offer-form[hidden]{display:none}.community-board-pages{justify-content:center}
 .site-language-pending body{visibility:hidden}
 [lang="en"] .audience-paths button{text-align:left}
+#translate-user-content { font-size: .8rem; white-space: normal; max-width: 190px; line-height: 1.2; }
+@media (max-width: 700px) {
+  .header-actions #translate-user-content { display: inline-flex; position: fixed; right: 16px; bottom: 82px; z-index: 1090; max-width: 155px; padding: 9px 11px; background: #fff; box-shadow: 0 5px 18px rgba(18,42,76,.17); }
+}
