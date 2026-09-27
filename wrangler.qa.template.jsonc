@@ -18,6 +18,9 @@
   "r2_buckets": [{
     "binding": "ITEM_IMAGES",
     "bucket_name": "__QA_R2_BUCKET__"
+  },{
+    "binding": "BACKUP_STORAGE",
+    "bucket_name": "__QA_BACKUP_BUCKET__"
   }],
   "ai": {"binding":"AI"},
   "observability": {"enabled": true},
