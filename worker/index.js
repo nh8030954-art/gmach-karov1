@@ -1712,9 +1712,9 @@ async function joinWaitlist(request,env,itemId){
   const from=validateLoanDateTime(body.requestedFrom,"מועד האיסוף"),until=validateLoanDateTime(body.requestedUntil,"מועד ההחזרה");
   assertAllowedPickupReturnTime(from,"האיסוף"); assertAllowedPickupReturnTime(until,"ההחזרה");
   if(Date.parse(until)<=Date.parse(from)) throw new HttpError(400,"מועד ההחזרה חייב להיות אחרי מועד האיסוף");
-  const item=await env.DB.prepare("SELECT quantity FROM items WHERE id=? AND status='active'").bind(itemId).first(); if(!item) throw new HttpError(404,"הפריט לא נמצא");
+  const item=await env.DB.prepare("SELECT quantity,turnaround_minutes FROM items WHERE id=? AND status='active'").bind(itemId).first(); if(!item) throw new HttpError(404,"הפריט לא נמצא");
   const quantity=positiveInt(body.quantity,1,1,Number(item.quantity),"כמות");
-  const available=await availableQuantityForRange(env,itemId,from,until,0,null);
+  const available=await availableQuantityForRange(env,itemId,from,until,Number(item.turnaround_minutes||0),null);
   if(available>=quantity) throw new HttpError(409,"הפריט זמין כרגע; אפשר לבצע הזמנה במקום להצטרף לרשימת המתנה");
   const existing=await env.DB.prepare("SELECT id FROM waitlist_entries WHERE item_id=? AND user_id=? AND requested_from=? AND requested_until=? AND status='waiting'").bind(itemId,user.id,from,until).first();
   if(existing) return json({entry:{id:existing.id,status:"waiting"}});

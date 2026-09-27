@@ -447,6 +447,15 @@
       <div class="two-columns"><label><span>מתאריך ושעה</span><input id="request-start" type="datetime-local" required></label><label><span>עד תאריך ושעה</span><input id="request-end" type="datetime-local" required></label></div>
       <label><span>כמות</span><input id="request-quantity" type="number" min="1" max="999" value="1" required></label>
       <p id="request-availability" role="status" aria-live="polite">בחרו תאריך ושעה כדי לבדוק זמינות.</p>
+      <div id="request-partial-options" class="dashboard-empty" hidden>
+        <strong>זמינות חלקית</strong>
+        <p id="request-partial-message"></p>
+        <div class="dashboard-row-actions">
+          <button class="button button-primary button-small" id="request-use-available" type="button">לקבל את הכמות הזמינה</button>
+          <button class="button button-secondary button-small" id="request-partial-waitlist" type="button">רשימת המתנה לכמות המלאה</button>
+          <button class="button button-secondary button-small" id="request-change-dates" type="button">לבחור מועד אחר</button>
+        </div>
+      </div>
       <button class="button button-secondary" id="request-waitlist" type="button" hidden>הצטרפות לרשימת המתנה לטווח הזה</button>
       <div id="request-deposit-box" hidden><p><strong>פיקדון:</strong> <span id="request-deposit-amount"></span> ₪. הפיקדון נועד להבטיח את החזרת המוצר כפי שנלקח ואינו תשלום עבור ההשאלה.</p><label class="consent-row"><input id="request-deposit-consent" type="checkbox"><span>קראתי ואני מאשר/ת את תנאי הפיקדון.</span></label></div>
       <label><span>טלפון לתיאום</span><input id="request-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="05X-XXXXXXX" dir="ltr" required></label>

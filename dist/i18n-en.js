@@ -474,3 +474,14 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
   "דלג ואל תציג שוב":"Skip and do not show again",
   "הסיור לא יוצג שוב במכשיר הזה":"The tour will not be shown again on this device"
 });
+
+window.GmachEnglish = Object.freeze({...window.GmachEnglish,
+  "זמינות חלקית":"Partial availability",
+  "לקבל את הכמות הזמינה":"Use available quantity",
+  "רשימת המתנה לכמות המלאה":"Waitlist for full quantity",
+  "לבחור מועד אחר":"Choose another time",
+  "אפשר לקבל עכשיו את הכמות הזמינה, להמתין לכמות המלאה או לבחור מועד אחר.":"You can use the available quantity now, wait for the full quantity, or choose another time.",
+  "אין כרגע כמות זמינה. אפשר להצטרף לרשימת ההמתנה או לבחור מועד אחר.":"No quantity is currently available. You can join the waitlist or choose another time.",
+  "בחרו אם לקבל את הכמות הזמינה, להמתין לכמות המלאה או לשנות מועד.":"Choose whether to use the available quantity, wait for the full quantity, or change the time.",
+  "נוספתם לרשימת ההמתנה. נעדכן אתכם כשהכמות שביקשתם תתפנה.":"You joined the waitlist. We will notify you when the quantity you requested becomes available."
+});
