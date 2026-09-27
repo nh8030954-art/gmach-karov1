@@ -23,6 +23,9 @@ jobs:
         run: npm ci
       - id: syntax
         run: npm run check
+      - id: tests
+        continue-on-error: true
+        run: npm test > test.log 2>&1
       - id: smoke
         continue-on-error: true
         run: node test/release-smoke.mjs > smoke.log 2>&1
@@ -45,7 +48,8 @@ jobs:
         if: always()
         continue-on-error: true
         run: |
-          printf 'sha=%s\ninstall=%s\nsyntax=%s\nsmoke=%s\nlive=%s\n' "$GITHUB_SHA" "${{ steps.install.outcome }}" "${{ steps.syntax.outcome }}" "${{ steps.smoke.outcome }}" "${{ steps.live.outcome }}" > .release-check-result
+          printf 'sha=%s\ninstall=%s\nsyntax=%s\ntests=%s\nsmoke=%s\nlive=%s\n' "$GITHUB_SHA" "${{ steps.install.outcome }}" "${{ steps.syntax.outcome }}" "${{ steps.tests.outcome }}" "${{ steps.smoke.outcome }}" "${{ steps.live.outcome }}" > .release-check-result
+          if [ -f test.log ]; then tail -n 20 test.log >> .release-check-result; fi
           if [ -f smoke.log ]; then tail -n 12 smoke.log >> .release-check-result; fi
           if [ -f live.log ]; then tail -n 3 live.log >> .release-check-result; fi
           if [ -f platform-features.log ]; then echo "platform_features=$(cat platform-features.log)" >> .release-check-result; fi
@@ -56,4 +60,4 @@ jobs:
           git push
       - name: Enforce smoke success
         if: always()
-        run: test "${{ steps.smoke.outcome }}" = "success" && test "${{ steps.live.outcome }}" = "success"
+        run: test "${{ steps.tests.outcome }}" = "success" && test "${{ steps.smoke.outcome }}" = "success" && test "${{ steps.live.outcome }}" = "success"
