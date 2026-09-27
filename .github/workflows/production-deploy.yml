@@ -112,6 +112,11 @@ jobs:
             sleep 5
           done
           exit 1
+      - name: Read-only production load gate
+        env:
+          PRODUCTION_URL: https://gmach-karov1.nh8030954.workers.dev
+        run: node test/production-load.mjs
+
       - name: Verify external security and notification configuration
         id: capabilities
         continue-on-error: true
