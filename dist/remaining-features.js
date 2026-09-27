@@ -351,14 +351,41 @@ async function enhanceOrganizationDialog(){
    const box=document.createElement("section");box.style.cssText="margin-top:16px;border-top:1px solid #e5e7eb;padding-top:16px";box.innerHTML='<h3>'+(lang==="en"?"Operations snapshot":"דוח תפעולי")+'</h3><button type="button" class="button button-secondary" data-ops>פתיחת דוח</button>';box.querySelector("[data-ops]").onclick=()=>showOps(id);host.append(box);
  }catch{}
 }
-async function showOps(id){const d=dialog("ops-dialog",lang==="en"?"Operations dashboard":"דוח תפעולי"),b=$(".remaining-body",d);b.innerHTML="<p>טוענים…</p>";d.showModal();try{const x=await api("/api/organizations/"+encodeURIComponent(id)+"/operations-dashboard");b.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">${[["בקשות חדשות",x.newRequests],["איסופים היום",x.pickupsToday],["החזרות היום",x.returnsToday],["באיחור",x.late],["הודעות לא נקראו",x.unreadMessages],["דירוגים 30 יום",x.reviews30d]].map(([k,v])=>`<article style="padding:14px;border:1px solid #e5e7eb;border-radius:12px;text-align:center"><strong style="font-size:1.4rem">${v}</strong><div>${k}</div></article>`).join("")}</div><h3>מלאי</h3><p>סה״כ ${x.inventory.total} · זמין ${x.inventory.available} · מושאל ${x.inventory.loaned} · תיקון ${x.inventory.repair}</p><h3>המוצרים המבוקשים</h3><ol>${x.topItems.map(i=>`<li>${esc(i.title)} — ${i.loans}</li>`).join("")}</ol><button type="button" class="button button-secondary" id="ops-export-csv">ייצוא מלאי ל־CSV</button>`;
-  $("#ops-export-csv",d).onclick=async()=>{try{
-   const response=await fetch("/api/organizations/"+encodeURIComponent(id)+"/inventory-export.csv",{credentials:"same-origin"});
-   if(!response.ok){const error=await response.json();throw new Error(error.error||"הייצוא נכשל")}
-   const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement("a");
-   link.href=url;link.download="gmach-inventory.csv";link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
-  }catch(error){toast(error.message,true)}}
- }catch(e){b.innerHTML='<p>'+esc(e.message)+'</p>'}}
+async function showOps(id){
+ const d=dialog("ops-dialog",lang==="en"?"Operations dashboard":"דוח תפעולי"),b=$(".remaining-body",d);d.showModal();
+ const load=async(params=new URLSearchParams())=>{
+  b.innerHTML="<p>"+(lang==="en"?"Loading…":"טוענים…")+"</p>";
+  try{
+   const suffix=params.toString()?"?"+params.toString():"",x=await api("/api/organizations/"+encodeURIComponent(id)+"/operations-dashboard"+suffix);
+   const from=params.get("from")||String(x.range?.from||"").slice(0,10),to=params.get("to")||String(x.range?.to||"").slice(0,10),branch=params.get("branch")||"",category=params.get("category")||"";
+   const maxDaily=Math.max(1,...(x.daily||[]).map(row=>Number(row.total||0)));
+   const pct=x.range?.total?Math.round(Number(x.range.successful||0)*100/Number(x.range.total)):0;
+   const exportParams=new URLSearchParams();if(from)exportParams.set("from",from);if(to)exportParams.set("to",to);if(branch)exportParams.set("branch",branch);if(category)exportParams.set("category",category);
+   b.innerHTML=`<form id="ops-filters" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:14px">
+    <label>${lang==="en"?"From":"מתאריך"}<input name="from" type="date" value="${esc(from)}"></label>
+    <label>${lang==="en"?"To":"עד תאריך"}<input name="to" type="date" value="${esc(to)}"></label>
+    <label>${lang==="en"?"Branch":"סניף"}<select name="branch"><option value="">${lang==="en"?"All branches":"כל הסניפים"}</option>${(x.filters?.branches||[]).map(row=>`<option value="${esc(row.id)}" ${String(row.id)===branch?"selected":""}>${esc(row.name)} · ${esc(row.city||"")}</option>`).join("")}</select></label>
+    <label>${lang==="en"?"Category":"קטגוריה"}<select name="category"><option value="">${lang==="en"?"All categories":"כל הקטגוריות"}</option>${(x.filters?.categories||[]).map(value=>`<option value="${esc(value)}" ${value===category?"selected":""}>${esc(value)}</option>`).join("")}</select></label>
+    <button class="button button-primary" type="submit">${lang==="en"?"Apply filters":"החלת סינון"}</button>
+   </form>
+   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">
+    ${[["בקשות חדשות",x.newRequests],["איסופים היום",x.pickupsToday],["החזרות היום",x.returnsToday],["באיחור",x.late],["הודעות לא נקראו",x.unreadMessages],["דירוגים 30 יום",x.reviews30d],["בקשות בטווח",x.range?.total||0],["הצלחה בטווח",pct+"%"]].map(([k,v])=>`<article style="padding:14px;border:1px solid #e5e7eb;border-radius:12px;text-align:center"><strong style="font-size:1.4rem">${v}</strong><div>${lang==="en"?(window.GmachTranslate?.(k)||k):k}</div></article>`).join("")}
+   </div>
+   <h3>${lang==="en"?"Inventory":"מלאי"}</h3><p>${lang==="en"?"Total":"סה״כ"} ${x.inventory.total} · ${lang==="en"?"Available":"זמין"} ${x.inventory.available} · ${lang==="en"?"On loan":"מושאל"} ${x.inventory.loaned} · ${lang==="en"?"Repair":"תיקון"} ${x.inventory.repair}</p>
+   <h3>${lang==="en"?"Requests trend":"מגמת בקשות"}</h3><div style="display:grid;gap:6px">${(x.daily||[]).map(row=>`<div style="display:grid;grid-template-columns:88px 1fr 36px;gap:8px;align-items:center"><small>${esc(row.day)}</small><div style="height:10px;background:#eef2f5;border-radius:999px;overflow:hidden"><span style="display:block;height:100%;width:${Math.max(3,Math.round(Number(row.total||0)*100/maxDaily))}%;background:currentColor;opacity:.55"></span></div><strong>${Number(row.total||0)}</strong></div>`).join("")||`<p>${lang==="en"?"No requests in this range.":"אין בקשות בטווח הזה."}</p>`}</div>
+   <h3>${lang==="en"?"Upcoming operations":"לוח פעולות קרובות"}</h3><div style="display:grid;gap:8px">${(x.upcoming||[]).slice(0,30).map(row=>`<article style="border:1px solid #e5e7eb;border-radius:12px;padding:10px"><strong>${esc(row.title)}</strong><p>${esc(row.borrower_name||"")} · ${esc(row.branch_name||"")} · ${esc(row.status)}</p><small>${esc(row.requested_from)} - ${esc(row.requested_until)}</small></article>`).join("")||`<p>${lang==="en"?"No upcoming operations.":"אין פעולות קרובות."}</p>`}</div>
+   <h3>${lang==="en"?"Most requested items":"המוצרים המבוקשים"}</h3><ol>${(x.topItems||[]).map(i=>`<li>${esc(i.title)} - ${Number(i.loans||0)}</li>`).join("")}</ol>
+   <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="button button-secondary" href="/api/organizations/${encodeURIComponent(id)}/operations-export.csv?${esc(exportParams.toString())}" download>${lang==="en"?"Export filtered operations CSV":"ייצוא פעולות מסוננות ל-CSV"}</a><button type="button" class="button button-secondary" id="ops-export-csv">${lang==="en"?"Export inventory CSV":"ייצוא מלאי ל-CSV"}</button></div>`;
+   $("#ops-filters",d).onsubmit=e=>{e.preventDefault();const fd=new FormData(e.currentTarget),next=new URLSearchParams();for(const key of ["from","to","branch","category"]){const value=String(fd.get(key)||"").trim();if(value)next.set(key,value)}load(next)};
+   $("#ops-export-csv",d).onclick=async()=>{try{
+    const response=await fetch("/api/organizations/"+encodeURIComponent(id)+"/inventory-export.csv",{credentials:"same-origin"});
+    if(!response.ok){const error=await response.json();throw new Error(error.error||"הייצוא נכשל")}
+    const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement("a");link.href=url;link.download="gmach-inventory.csv";link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
+   }catch(error){toast(error.message,true)}};
+  }catch(e){b.innerHTML='<p role="alert">'+esc(e.message)+'</p>'}
+ };
+ await load();
+}
 function installAdminRemaining(){
  const observer=new MutationObserver(async()=>{const tools=$("#platform-tools-dialog .pt-body");if(!tools||!profileIsAdmin())return;if($("#remaining-admin-card",tools))return;const card=document.createElement("section");card.id="remaining-admin-card";card.className="pt-card";card.innerHTML='<h3>CMS, גיבויים ושירותים</h3><div class="pt-row"><button class="pt-btn" data-cms>CMS ותוכן</button><button class="pt-btn" data-moderation>דיווחים ואכיפה</button><button class="pt-btn" data-backups>גיבויים</button><button class="pt-btn" data-services>סטטוס שירותים</button></div>';tools.prepend(card);card.querySelector("[data-cms]").onclick=openCms;card.querySelector("[data-moderation]").onclick=openUnifiedModeration;card.querySelector("[data-backups]").onclick=openBackups;card.querySelector("[data-services]").onclick=openServices});observer.observe(document.body,{subtree:true,childList:true})
 }
