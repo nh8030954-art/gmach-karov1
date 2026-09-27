@@ -234,3 +234,15 @@ assert.ok(worker.includes("requirementsExpansionPreflight"),"requirements expans
 assert.ok(worker.includes("runRequirementsExpansionMaintenance"),"requirements expansion maintenance not wired");
 assert.ok(indexHtml.includes("./requirements-expansion.js"),"requirements expansion client not loaded");
 console.log("Requirements expansion static release gate passed.");
+
+
+const launchWorker=await readFile("worker/launch-readiness.js","utf8");
+const launchClient=await readFile("dist/launch-readiness.js","utf8");
+const launchMigration=await readFile("migrations/0020_launch_readiness.sql","utf8");
+for(const token of ["/api/admin/loan-requests","/timeline","/override","inventory-workspace","/api/admin/operations/health","runLaunchReadinessMaintenance"]) assert.ok(launchWorker.includes(token),token+" missing from launch readiness backend");
+for(const token of ["מרכז ניהול השאלות","מדיניות מלאי לסניף","בריאות מערכת והפצה","data-loan-override","data-resolve-alert"]) assert.ok(launchClient.includes(token),token+" missing from launch readiness UI");
+for(const token of ["operational_health_snapshots","system_alerts_type_open_idx"]) assert.ok(launchMigration.includes(token),token+" missing from launch readiness migration");
+assert.ok(worker.includes("handleLaunchReadiness"),"launch readiness handler not wired");
+assert.ok(worker.includes("runLaunchReadinessMaintenance"),"launch readiness maintenance not wired");
+assert.ok(indexHtml.includes("./launch-readiness.js"),"launch readiness client not loaded");
+console.log("Launch readiness static release gate passed.");
