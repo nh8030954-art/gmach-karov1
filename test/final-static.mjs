@@ -214,3 +214,5 @@ for(const token of ["legalConsents","recentOrganizations","securityEvents","noti
 
 for(const token of ["accountTourKey","openAccountTour","maybeShowAccountTour","account-start-tour","דלג ואל תציג שוב"])assert.ok(appClient.includes(token),token+" missing from new-user account tour");
 for(const token of ["Alternative pickup branch","Quick account tour","Skip and do not show again"])assert.ok(remainingClient.includes(token),token+" missing from English account/branch completion");
+
+for(const token of ["gmach-account-tour-dismissed","gmach-account-tour-shown"])assert.ok(appClient.includes(token),token+" missing from account tour dismissal persistence");
