@@ -27,6 +27,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           DEPLOY_CONCLUSION="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${FAILED_SHA}&event=push&per_page=100" --jq '[.workflow_runs[] | select(.name=="Deploy production")][0].conclusion // ""')"
+          FAILED_FILES="$(git diff-tree --no-commit-id --name-only -r "$FAILED_SHA" || true)"
+          if ! echo "$FAILED_FILES" | grep -Eq '^(dist/|worker/|migrations/|wrangler\.jsonc$|package(-lock)?\.json$)'; then
+            echo "Failed release check belongs only to tests/workflows/diagnostics, not a production runtime change. Skipping rollback."
+            exit 0
+          fi
           if [ "$DEPLOY_CONCLUSION" != "success" ]; then
             echo "Production was not successfully deployed for $FAILED_SHA (Deploy production: ${DEPLOY_CONCLUSION:-not found}). Skipping rollback because live verification cannot validate an undeployed commit."
             exit 0
