@@ -1,40 +1,40 @@
-sha=2cc85e31ff6c824a5a1a51d28438fa78dcfbba45
+sha=cb0904d57f98215ee09dcb15c791b2359a55e346
 install=success
 syntax=success
-tests=failure
-smoke=failure
+tests=success
+smoke=success
 live=success
-
-> gmach-karov@1.0.0 test
-> node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs
-
-Final completion static release gate passed.
-node:internal/modules/run_main:107
-    triggerUncaughtException(
-    ^
-
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:139:83 {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
-
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790514152275:139:83 {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.10","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":false,"timestamp":"2026-09-27T13:02:32.590Z"}
+Distribution completion static release gate passed.
+Navigation admin static release gate passed.
+Privacy availability static release gate passed.
+Release hardening static gate passed.
+Release experience static release gate passed.
+Admin control center static release gate passed.
+Privacy purge static release gate passed.
+Community chat retention static release gate passed.
+QR scanning, structured SEO and accessibility shell gate passed.
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+Full requirements regression extensions passed.
+Static English interface coverage 100.0% (411/411)
+remaining-features Error: Backup checksum mismatch
+    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
+    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:314:91)
+    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:645:37)
+    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:159:26)
+Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
+Community chat retention static release gate passed.
+QR scanning, structured SEO and accessibility shell gate passed.
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+Full requirements regression extensions passed.
+remaining-features Error: Backup checksum mismatch
+    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
+    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:314:91)
+    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:645:37)
+    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:159:26)
+Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
+{"ok":true,"release":"complete-platform-2026-09-27.10","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":false,"timestamp":"2026-09-27T13:10:44.706Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":true,"turnstileSiteKey":"0x4AAAAAAFFH6u5mz0ZekN2Q","pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
