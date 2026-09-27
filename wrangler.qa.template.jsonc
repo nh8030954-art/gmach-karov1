@@ -24,5 +24,5 @@
   }],
   "ai": {"binding":"AI"},
   "observability": {"enabled": true},
-  "triggers": {"crons": ["23 3 * * *"]}
+  "triggers": {"crons": ["*/5 * * * *"]}
 }
