@@ -867,8 +867,11 @@ async function updateProfile(request, env) {
   const user = await requireUser(request, env), body = await readJson(request);
   const fullName=cleanText(body.fullName,2,80,"שם מלא"), phone=validatePhone(body.phone), city=cleanText(body.city,2,80,"עיר או יישוב");
   const language=body.preferredLanguage==="en"?"en":"he", navigation=["google","waze","apple"].includes(body.preferredNavigation)?body.preferredNavigation:(user.preferred_navigation||"google"), operational=body.operationalEmails===false?0:1, community=body.communityEmails===true?1:0;
-  await env.DB.prepare("UPDATE users SET full_name=?,phone=?,city=?,preferred_language=?,preferred_navigation=?,operational_emails_accepted=?,community_emails_accepted=?,updated_at=? WHERE id=?")
-    .bind(fullName,phone,city,language,navigation,operational,community,new Date().toISOString(),user.id).run();
+  const now=new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE users SET full_name=?,phone=?,city=?,preferred_language=?,preferred_navigation=?,operational_emails_accepted=?,community_emails_accepted=?,updated_at=? WHERE id=?").bind(fullName,phone,city,language,navigation,operational,community,now,user.id),
+    env.DB.prepare("INSERT INTO navigation_preferences(user_id,preferred_app) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET preferred_app=excluded.preferred_app,updated_at=?").bind(user.id,navigation,now)
+  ]);
   return json({ profile:{...publicUser({...user,full_name:fullName}),phone,city,preferredLanguage:language,preferredNavigation:navigation,operationalEmails:Boolean(operational),communityEmails:Boolean(community)} });
 }
 
