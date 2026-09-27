@@ -432,3 +432,8 @@ for (const token of [
 const catalogWorker = await readFile(new URL("../worker/index.js", import.meta.url), "utf8");
 assert.ok(catalogWorker.includes("lq.requested_from <= strftime('%Y-%m-%dT%H:%M','now')"),"catalog minimum quantity must use overlapping loans");
 assert.ok(catalogWorker.includes("ib.starts_at <= strftime('%Y-%m-%dT%H:%M','now')"),"catalog availability must subtract overlapping inventory blocks");
+
+// Regression: bulk inventory/import UI routes must have backend handlers.
+assert.ok(worker.includes("bulkInventoryAction"),"bulk inventory backend missing");
+assert.ok(worker.includes('path==="/api/items/import"'),"item import backend missing");
+assert.ok(worker.includes("bulk_inventory_jobs"),"bulk inventory audit/job record missing");
