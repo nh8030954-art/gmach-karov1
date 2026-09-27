@@ -81,7 +81,9 @@
     if (options.body && !(options.body instanceof FormData) && typeof options.body !== "string") { init.headers.set("Content-Type", "application/json"); init.body = JSON.stringify(options.body); }
     try {
       const response = await fetch(path, init); const type = response.headers.get("content-type") || ""; const data = type.includes("application/json") ? await response.json() : null;
-      if (!response.ok) { const error = new Error(data?.error || "הפעולה לא הושלמה"); if (data && typeof data === "object") Object.assign(error, data); throw error; } return data;
+      if (!response.ok) { const error = new Error(data?.error || "הפעולה לא הושלמה"); if (data && typeof data === "object") Object.assign(error, data); throw error; }
+      if (data && typeof data === "object" && response.headers.get("X-Data-Stale") === "1") data._stale = true;
+      return data;
     } catch (error) {
       if (error?.name === "AbortError") throw new Error("השרת מתעכב. אפשר להמשיך לעיין ולנסות שוב בעוד רגע.");
       throw error;
@@ -171,10 +173,55 @@
     state.pendingAction = action || null; setAuthMode("login"); openDialog($("#auth-dialog")); return false;
   }
   function renderSkeletons() { $("#items-grid").innerHTML = Array.from({ length: 8 }, () => '<div class="skeleton-card" aria-hidden="true"></div>').join(""); }
+  const CATALOG_CACHE_KEY = "gmach-catalog-cache-v1";
+  function saveCatalogCache(items) {
+    try { localStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), items })); } catch {}
+  }
+  function readCatalogCache() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(CATALOG_CACHE_KEY) || "null");
+      if (!cached || !Array.isArray(cached.items) || !cached.items.length) return null;
+      if (Date.now() - Number(cached.savedAt || 0) > 86400000) return null;
+      return cached.items;
+    } catch { return null; }
+  }
   async function loadItems() {
     renderSkeletons();
-    try { const params = new URLSearchParams(); if ($("#date-filter").value) params.set("date", $("#date-filter").value); const data = await api(`/api/items${params.size ? `?${params}` : ""}`); state.items = data.items || []; for (const id of state.compareIds) if (!state.items.some(item => String(item.id) === id)) state.compareIds.delete(id); applyFilters(); renderCompareTray(); state.serverAvailable = true; $("#connection-banner").hidden = true; }
-    catch (error) { console.error("Unable to load items", error); $("#items-grid").innerHTML = ""; $("#empty-state").hidden = false; $("#empty-state h3").textContent = "לא הצלחנו לטעון את הפריטים"; $("#empty-state p").textContent = "כדאי לרענן את הדף בעוד רגע."; $("#results-summary").textContent = "שגיאה בטעינת הקטלוג"; }
+    try {
+      const params = new URLSearchParams();
+      if ($("#date-filter").value) params.set("date", $("#date-filter").value);
+      const data = await api(`/api/items${params.size ? `?${params}` : ""}`);
+      state.items = data.items || [];
+      saveCatalogCache(state.items);
+      for (const id of state.compareIds) if (!state.items.some(item => String(item.id) === id)) state.compareIds.delete(id);
+      applyFilters();
+      renderCompareTray();
+      state.serverAvailable = !data._stale;
+      const banner = $("#connection-banner");
+      banner.hidden = !data._stale;
+      if (data._stale) banner.querySelector("span").textContent = "השירות החי אינו זמין כרגע. מוצג snapshot אחרון של הקטלוג; זמינות הפריטים עשויה להשתנות.";
+    } catch (error) {
+      console.error("Unable to load items", error);
+      const cachedItems = readCatalogCache();
+      if (cachedItems) {
+        state.items = cachedItems;
+        state.serverAvailable = false;
+        applyFilters();
+        renderCompareTray();
+        const banner = $("#connection-banner");
+        banner.hidden = false;
+        banner.querySelector("span").textContent = "החיבור לשירות אינו זמין כרגע. מוצג הקטלוג האחרון שנשמר במכשיר; זמינות הפריטים עשויה להשתנות.";
+        $("#results-summary").textContent = `מוצג עותק שמור של ${state.filteredItems.length} פריטים`;
+        return;
+      }
+      state.serverAvailable = false;
+      $("#items-grid").innerHTML = "";
+      $("#empty-state").hidden = false;
+      $("#empty-state h3").textContent = "הקטלוג אינו זמין כרגע";
+      $("#empty-state p").textContent = "השירות עמוס זמנית. אפשר להמשיך לעיין בשאר האתר ולנסות שוב בעוד רגע.";
+      $("#results-summary").textContent = "הקטלוג אינו זמין כרגע";
+      $("#connection-banner").hidden = false;
+    }
   }
   function editDistance(a,b){a=normalize(a);b=normalize(b);if(a===b)return 0;if(!a)return b.length;if(!b)return a.length;const prev=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){let left=i,diag=i-1;prev[0]=i;for(let j=1;j<=b.length;j++){const up=prev[j],cost=a[i-1]===b[j-1]?0:1,next=Math.min(up+1,left+1,diag+cost);diag=up;prev[j]=next;left=next}}return prev[b.length]}
   function fuzzyQueryMatch(item,query){const q=normalize(query);if(!q)return true;const words=normalize([item.title,item.description,item.category,item.subcategory,...(item.tags||[]),item.city,item.neighborhood,item.organizations?.name].join(" ")).split(/\s+/).filter(Boolean);return q.split(/\s+/).every(term=>words.some(word=>word.includes(term)||term.includes(word)||editDistance(term,word)<=Math.max(1,Math.floor(Math.min(term.length,word.length)/4))))}
