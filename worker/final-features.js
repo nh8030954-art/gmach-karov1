@@ -293,7 +293,7 @@ async function communityMatches(request,env,id){
     FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.status='active' AND i.deleted_at IS NULL AND o.deleted_at IS NULL AND o.is_hidden=0 LIMIT 500`).all();
   const q=(hr.title+" "+hr.description+" "+(hr.category||"")).toLowerCase();
   const out=rows.results.map(x=>{let score=0;if(hr.category&&x.category===hr.category)score+=50;if(hr.city&&x.city===hr.city)score+=25;for(const w of q.split(/\s+/).filter(x=>x.length>2))if((x.title+" "+x.category).toLowerCase().includes(w))score+=4;if(x.availability_status==="available")score+=20;return{...x,score}}).filter(x=>x.score>10).sort((a,b)=>b.score-a.score).slice(0,50);
-  return json({matches:out});
+  return json({request:hr,matches:out});
 }
 async function reviewAction(request,env,id,action){
   const u=await requireUser(request,env),r=await env.DB.prepare("SELECT * FROM reviews WHERE id=?").bind(id).first();if(!r)throw new FinalError(404,"הביקורת לא נמצאה");
