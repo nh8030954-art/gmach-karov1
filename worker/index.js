@@ -3,6 +3,7 @@ import { handleRequirementsExpansion, requirementsExpansionPreflight, runRequire
 import { handleLaunchReadiness, runLaunchReadinessMaintenance, ensureLaunchReadinessSchema } from "./launch-readiness.js";
 import { handleDistributionCompletion, runDistributionCompletionMaintenance, ensureDistributionCompletionSchema, recordDistributionError } from "./distribution-completion.js";
 import { handleNavigationAdmin, ensureNavigationAdminSchema } from "./navigation-admin.js";
+import { handlePrivacyAvailability, ensurePrivacyAvailabilitySchema, checkAvailabilityRules } from "./privacy-availability.js";
 import { handleFinalFeatures, runFinalMaintenance, ensureFinalFeaturesSchema } from "./final-features.js";
 import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata, ensurePlatformCompletionSchema, recordSecurityFailure } from "./platform-completion.js";
 const SESSION_COOKIE = "gmach_session";
@@ -145,7 +146,7 @@ export default {
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env),ensureDistributionCompletionSchema(env),ensureNavigationAdminSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env)]); })());
+    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env),ensureDistributionCompletionSchema(env),ensureNavigationAdminSchema(env),ensurePrivacyAvailabilitySchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env)]); })());
   }
 };
 
@@ -603,6 +604,8 @@ async function routeApi(request, env, ctx, url) {
   if (distributionCompletionResponse) return distributionCompletionResponse;
   const navigationAdminResponse = await handleNavigationAdmin(request, env, ctx, url);
   if (navigationAdminResponse) return navigationAdminResponse;
+  const privacyAvailabilityResponse = await handlePrivacyAvailability(request, env, ctx, url);
+  if (privacyAvailabilityResponse) return privacyAvailabilityResponse;
 
   throw new HttpError(404, "הכתובת לא נמצאה");
 }
@@ -1831,6 +1834,8 @@ async function createLoanRequest(request, env) {
 
   const from = validateLoanDateTime(body.requestedFrom, "מועד האיסוף");
   const until = validateLoanDateTime(body.requestedUntil, "מועד ההחזרה");
+  const availabilityRuleCheck = await checkAvailabilityRules(env,itemId,from,until,cleanOptional(body.branchId,100));
+  if (!availabilityRuleCheck.allowed) throw new HttpError(409, availabilityRuleCheck.reason || "המועד אינו זמין לפי כללי הגמ״ח");
   assertAllowedPickupReturnTime(from, "האיסוף");
   assertAllowedPickupReturnTime(until, "ההחזרה");
   const duration = loanMinutes(from, until);
