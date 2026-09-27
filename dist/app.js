@@ -129,23 +129,35 @@
     d.innerHTML=`<button class="dialog-close" type="button" aria-label="סגירה">×</button><h2>חיפוש גמ״חים מתקדם</h2>
       <form id="advanced-gmach-form" class="form-grid">
         <label class="wide">שם, תיאור או עיר<input name="query" type="search" maxlength="100" autocomplete="off"></label>
+        <label>שם סניף או כתובת<input name="branchQuery" type="search" maxlength="100" autocomplete="off"></label>
         <label>עיר<select name="city"><option value="">כל הארץ</option>${cities.map(value=>`<option value="${escapeHTML(value)}">${escapeHTML(value)}</option>`).join("")}</select></label>
         <label>קטגוריה<select name="category"><option value="">כל הקטגוריות</option>${categories.map(value=>`<option value="${escapeHTML(value)}">${escapeHTML(value)}</option>`).join("")}</select></label>
         <label>דירוג מינימלי<select name="rating"><option value="0">ללא סינון</option><option value="3">3+</option><option value="4">4+</option><option value="4.5">4.5+</option></select></label>
+        <label>מרחק מרבי<select name="radius"><option value="30">30 ק״מ</option><option value="5">5 ק״מ</option><option value="10">10 ק״מ</option><option value="20">20 ק״מ</option><option value="50">50 ק״מ</option><option value="100">100 ק״מ</option><option value="200">200 ק״מ</option></select></label>
+        <label class="check"><input name="nearby" type="checkbox">חיפוש לפי המיקום הנוכחי</label>
+        <label class="check"><input name="openNow" type="checkbox">רק סניפים שפתוחים עכשיו</label>
         <label class="check"><input name="available" type="checkbox">רק גמ״חים עם פריט זמין</label>
         <button class="button button-primary" type="submit">חיפוש</button>
       </form>
+      <p class="dashboard-note">המיקום נשלח רק לבקשת החיפוש הנוכחית ואינו נשמר בחשבון.</p>
       <div id="advanced-gmach-results" class="organizations-grid" aria-live="polite"></div>`;
     $(".dialog-close",d).onclick=()=>closeDialog(d);
     const form=$("#advanced-gmach-form",d),results=$("#advanced-gmach-results",d);
+    const currentPosition=()=>new Promise((resolve,reject)=>{
+      if(!navigator.geolocation)return reject(new Error("המכשיר אינו מאפשר קבלת מיקום"));
+      navigator.geolocation.getCurrentPosition(p=>resolve({lat:p.coords.latitude,lon:p.coords.longitude}),()=>reject(new Error("לא ניתנה הרשאת מיקום")),{enableHighAccuracy:false,timeout:8000,maximumAge:60000});
+    });
     form.onsubmit=async e=>{
-      e.preventDefault();results.innerHTML='<div class="dashboard-empty">מחפשים גמ״חים…</div>';
+      e.preventDefault();results.innerHTML='<div class="dashboard-empty">מחפשים גמ״חים וסניפים…</div>';
       const fd=new FormData(form),params=new URLSearchParams();
-      const query=String(fd.get("query")||"").trim(),city=String(fd.get("city")||""),category=String(fd.get("category")||""),rating=String(fd.get("rating")||"0");
-      if(query)params.set("orgQuery",query);if(city)params.set("orgCity",city);if(category)params.set("orgCategory",category);if(Number(rating)>0)params.set("minRating",rating);if(fd.has("available"))params.set("orgAvailable","1");
+      const query=String(fd.get("query")||"").trim(),branchQuery=String(fd.get("branchQuery")||"").trim(),city=String(fd.get("city")||""),category=String(fd.get("category")||""),rating=String(fd.get("rating")||"0"),radius=String(fd.get("radius")||"30");
+      if(query)params.set("orgQuery",query);if(branchQuery)params.set("branchQuery",branchQuery);if(city)params.set("orgCity",city);if(category)params.set("orgCategory",category);if(Number(rating)>0)params.set("minRating",rating);if(fd.has("available"))params.set("orgAvailable","1");if(fd.has("openNow"))params.set("openNow","1");
       try{
-        const data=await api("/api/discovery?"+params.toString()),rows=data.organizations||[];
-        results.innerHTML=rows.map(org=>`<article class="organization-card"><div><span class="verification-chip">${org.rating?`⭐ ${escapeHTML(org.rating)}`:"חדש"}</span><h3>${escapeHTML(org.name)}</h3><p>${escapeHTML(org.description||"")}</p></div><ul><li>📍 ${escapeHTML(org.city||"")}</li><li>📦 ${Number(org.item_count||0)} פריטים</li><li>✅ ${Number(org.available_items||0)} זמינים</li></ul><button class="button button-primary button-small" type="button" data-advanced-org="${escapeHTML(org.id)}">צפייה בגמ״ח</button></article>`).join("")||'<div class="dashboard-empty"><strong>לא נמצאו גמ״חים מתאימים</strong><p>נסו להסיר מסנן או להרחיב את החיפוש.</p></div>';
+        if(fd.has("nearby")){const pos=await currentPosition();params.set("lat",String(pos.lat));params.set("lon",String(pos.lon));params.set("radius",radius)}
+        const data=await api("/api/discovery?"+params.toString()),branches=data.branches||[],branchOrgIds=new Set(branches.map(row=>String(row.organization_id))),orgs=(data.organizations||[]).filter(org=>!branchOrgIds.has(String(org.id)));
+        const branchCards=branches.map(row=>`<article class="organization-card"><div><span class="verification-chip">${row.branch_rating?`⭐ סניף ${escapeHTML(row.branch_rating)}`:row.organization_rating?`⭐ ${escapeHTML(row.organization_rating)}`:"חדש"}</span><h3>${escapeHTML(row.organization_name)} · ${escapeHTML(row.name)}</h3><p>${escapeHTML(row.organization_description||"")}</p></div><ul><li>📍 ${escapeHTML(row.city||"")} · ${escapeHTML(row.address||"")}</li>${row.distanceKm!=null?`<li>🧭 ${Number(row.distanceKm).toFixed(1)} ק״מ</li>`:""}<li>${row.isOpenNow===true?"🟢 פתוח עכשיו":row.isOpenNow===false?"⚪ סגור כעת":"🕒 שעות לפי תיאום"}</li><li>📦 ${Number(row.item_count||0)} פריטים · ✅ ${Number(row.available_items||0)} זמינים</li></ul><div class="dashboard-row-actions"><button class="button button-primary button-small" type="button" data-advanced-org="${escapeHTML(row.organization_id)}">צפייה בגמ״ח</button>${row.latitude!=null&&row.longitude!=null?`<a class="button button-secondary button-small" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.latitude+","+row.longitude)}">ניווט לסניף</a>`:""}</div></article>`).join("");
+        const orgCards=orgs.map(org=>`<article class="organization-card"><div><span class="verification-chip">${org.rating?`⭐ ${escapeHTML(org.rating)}`:"חדש"}</span><h3>${escapeHTML(org.name)}</h3><p>${escapeHTML(org.description||"")}</p></div><ul><li>📍 ${escapeHTML(org.city||"")}</li><li>📦 ${Number(org.item_count||0)} פריטים</li><li>✅ ${Number(org.available_items||0)} זמינים</li></ul><button class="button button-primary button-small" type="button" data-advanced-org="${escapeHTML(org.id)}">צפייה בגמ״ח</button></article>`).join("");
+        results.innerHTML=branchCards+orgCards||'<div class="dashboard-empty"><strong>לא נמצאו גמ״חים מתאימים</strong><p>נסו להסיר מסנן או להרחיב את החיפוש.</p></div>';
         $$("[data-advanced-org]",results).forEach(button=>button.onclick=()=>{closeDialog(d);openOrganization(button.dataset.advancedOrg)});
       }catch(error){results.innerHTML=`<p role="alert">${escapeHTML(error.message||"לא הצלחנו להשלים את החיפוש")}</p>`}
     };
