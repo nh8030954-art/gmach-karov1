@@ -100,7 +100,7 @@ async function installPush(){
     const me=await api("/api/auth/me");if(!me.user)return;
     let sub=await reg.pushManager.getSubscription();
     if(!sub && Notification.permission==="granted")sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(cfg.pushPublicKey)});
-    if(sub){const j=sub.toJSON();await api("/api/me/push-subscriptions",{method:"POST",body:{endpoint:j.endpoint,keys:j.keys}})}
+    if(sub){const j=sub.toJSON();await api("/api/push-subscriptions",{method:"POST",body:{endpoint:j.endpoint,keys:j.keys}})}
     const addButton=()=>{const host=$("#platform-panel");if(!host||$("#enable-push"))return;const b=document.createElement("button");b.id="enable-push";b.className="platform-action secondary";b.textContent="הפעלת התראות Push";b.onclick=async()=>{const perm=await Notification.requestPermission();if(perm!=="granted")return notice("לא ניתנה הרשאת התראות",true);const s=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(cfg.pushPublicKey)});const j=s.toJSON();await api("/api/push-subscriptions",{method:"POST",body:{endpoint:j.endpoint,keys:j.keys}});notice("התראות Push הופעלו")};host.prepend(b)};
     new MutationObserver(addButton).observe(document.body,{childList:true,subtree:true});addButton();
   }catch(e){console.warn("push unavailable",e)}
