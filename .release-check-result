@@ -1,15 +1,16 @@
-sha=d16c437250bd1b427c24e8a8efe3f3c2d5650b30
+sha=f68385d5511044a975da8fa2a47b4621c8d71266
 install=success
 syntax=success
 smoke=success
 live=failure
 Final completion static release gate passed.
 Requirements expansion static release gate passed.
+Launch readiness static release gate passed.
 remaining-features Error: Backup checksum mismatch
-    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:166:41)
-    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:313:91)
-    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:593:37)
-    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:120:26)
+    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
+    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:314:91)
+    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:594:37)
+    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:121:26)
 Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
-{"ok":true,"release":"complete-platform-2026-09-27.10","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-27T07:27:08.632Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.10","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"authSchema":{"users":true,"challenges":true,"memberRole":true,"borrowerRole":false,"emailVerified":true,"adminCredentialRotated":true},"bookingSchema":{"ready":true,"items":true,"waitlist":true,"inventoryBlocks":true},"completePlatformSchema":{"ready":true,"categories":true,"securityEvents":true,"sessionDevices":true,"registrationConsents":true,"completionReady":true},"finalFeaturesSchema":{"ready":true},"timestamp":"2026-09-27T08:06:23.114Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":false,"vapidPublicKey":null,"geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
