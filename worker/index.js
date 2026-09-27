@@ -1078,8 +1078,8 @@ async function adminSecurityEvents(request,env){
 
 async function listCategories(env,url) {
   const locale=url.searchParams.get("locale")==="en"?"en":"he";
-  const rows=await env.DB.prepare("SELECT id,parent_id,name_he,name_en,icon,image_url FROM categories WHERE status='active' ORDER BY sort_order,name_he").all();
-  return json({categories:rows.results.map(row=>({...row,name:locale==="en"&&row.name_en?row.name_en:row.name_he}))});
+  const rows=await env.DB.prepare("SELECT id,parent_id,name_he,name_en,icon,image_url,synonyms_json FROM categories WHERE status='active' ORDER BY sort_order,name_he").all();
+  return json({categories:rows.results.map(row=>{let synonyms=[];try{const parsed=JSON.parse(row.synonyms_json||"[]");if(Array.isArray(parsed))synonyms=parsed.filter(x=>typeof x==="string").slice(0,80)}catch{}return {...row,synonyms,name:locale==="en"&&row.name_en?row.name_en:row.name_he}})});
 }
 
 async function getNotificationPreferences(request,env) {
@@ -1326,8 +1326,10 @@ async function recordOrganizationView(request,env,organizationId){
 async function listHelpRequests(env, url) {
   const city = cleanOptional(url.searchParams.get("city"), 80);
   const category = cleanOptional(url.searchParams.get("category"), 40);
+  const requestId = cleanOptional(url.searchParams.get("id"), 100);
   const page = Math.max(1,Math.min(1000,Number.parseInt(url.searchParams.get("page")||"1",10)||1)),limit=12;
   const where = ["h.status='open'"]; const params = [];
+  if (requestId) { where.push("h.id=?"); params.push(requestId); }
   if (city) { where.push("h.city=?"); params.push(city); }
   if (category) { where.push("h.category=?"); params.push(category); }
   const [count,result]=await env.DB.batch([
