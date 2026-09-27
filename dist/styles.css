@@ -822,3 +822,6 @@ html[dir="ltr"] .header-actions .button { padding-inline: 14px; }
   .dialog-heading { padding-inline: 46px; }
   .dialog-heading h2 { overflow-wrap: anywhere; }
 }
+
+/* Mobile subpixel overflow guard for translated LTR content. */
+html, body { max-width: 100%; overflow-x: clip; }
