@@ -1,6 +1,7 @@
 import { handleRemainingFeatures, runRemainingMaintenance, ensureRemainingFeaturesSchema } from "./remaining-features.js";
 import { handleRequirementsExpansion, requirementsExpansionPreflight, runRequirementsExpansionMaintenance, ensureRequirementsExpansionSchema } from "./requirements-expansion.js";
 import { handleLaunchReadiness, runLaunchReadinessMaintenance, ensureLaunchReadinessSchema } from "./launch-readiness.js";
+import { handleDistributionCompletion, runDistributionCompletionMaintenance, ensureDistributionCompletionSchema, recordDistributionError } from "./distribution-completion.js";
 import { handleFinalFeatures, runFinalMaintenance, ensureFinalFeaturesSchema } from "./final-features.js";
 import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata, ensurePlatformCompletionSchema, recordSecurityFailure } from "./platform-completion.js";
 const SESSION_COOKIE = "gmach_session";
@@ -138,12 +139,12 @@ export default {
     } catch (error) {
       const status = error instanceof HttpError ? error.status : 500;
       const requestId = crypto.randomUUID();
-      if (status >= 500) console.error("Request failed", { requestId, path: url.pathname, error });
+      if (status >= 500) { console.error("Request failed", { requestId, path: url.pathname, error }); try { ctx.waitUntil(recordDistributionError(env,request,error,requestId)); } catch {} }
       return withSecurityHeaders(json({ error: error instanceof HttpError ? error.message : "אירעה תקלה זמנית בשרת", requestId }, status, { "X-Request-Id": requestId }));
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), runLaunchReadinessMaintenance(env)]); })());
+    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env),ensureDistributionCompletionSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env)]); })());
   }
 };
 
@@ -251,8 +252,8 @@ function israelHolidayState(now){
 }
 function shabbatClosedPage(state){
   const reopens=new Intl.DateTimeFormat("he-IL",{timeZone:"Asia/Jerusalem",dateStyle:"full",timeStyle:"short"}).format(new Date(state.reopensAt));
-  const html=`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>גמ״ח ברגע — שבת שלום</title></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#fff;font-family:Arial,sans-serif;color:#123c46;text-align:center"><main style="max-width:620px;padding:40px 24px"><img src="/gmach-berega-logo.jpg" alt="גמ״ח ברגע" style="max-width:260px;width:70%;height:auto"><h1 style="font-size:42px;margin:20px 0">שבת שלום</h1><p style="font-size:22px;line-height:1.7">גמ״ח ברגע סגור כעת לכבוד השבת.</p><p style="font-size:18px;line-height:1.7">האתר ישוב לפעילות בעזרת ה׳ בצאת השבת, ב־${escapeHtml(reopens)}.</p></main></body></html>`;
-  return new Response(html,{status:503,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
+  const html=`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>גמ״ח ברגע - שבת שלום</title></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#fff;font-family:Arial,sans-serif;color:#123c46;text-align:center"><main style="max-width:680px;padding:40px 24px"><img src="/gmach-berega-logo.jpg" alt="גמ״ח ברגע" style="max-width:260px;width:70%;height:auto"><h1 style="font-size:42px;margin:20px 0">שבת שלום</h1><p style="font-size:22px;line-height:1.7">גמ״ח ברגע סגור כעת לכבוד השבת.</p><p style="font-size:18px;line-height:1.7">האתר ישוב לפעילות בעזרת ה׳ בצאת השבת, ב-${escapeHtml(reopens)}.</p><p style="line-height:1.7">כל המידע, הבקשות וההשאלות שכבר נשמרו נשארים שמורים בזמן הסגירה.</p><p><a href="mailto:${escapeHtml(DEFAULT_SUPPORT_EMAIL)}" style="color:#123c46;font-weight:700">פנייה לתמיכה</a></p></main></body></html>`;
+  return new Response(html,{status:503,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Retry-After":"900"}});
 }
 
 async function activePlatformClosure(env,now){
@@ -597,6 +598,8 @@ async function routeApi(request, env, ctx, url) {
   if (requirementsExpansionResponse) return requirementsExpansionResponse;
   const launchReadinessResponse = await handleLaunchReadiness(request, env, ctx, url);
   if (launchReadinessResponse) return launchReadinessResponse;
+  const distributionCompletionResponse = await handleDistributionCompletion(request, env, ctx, url);
+  if (distributionCompletionResponse) return distributionCompletionResponse;
 
   throw new HttpError(404, "הכתובת לא נמצאה");
 }
