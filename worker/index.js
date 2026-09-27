@@ -1213,7 +1213,7 @@ async function listItems(env, url) {
   if (condition) { where.push("i.condition = ?"); params.push(condition); }
   if (subcategory) { where.push("i.subcategory = ?"); params.push(subcategory); }
   if (minimumRating > 0) { where.push("COALESCE((SELECT AVG(r.rating) FROM reviews r WHERE r.organization_id=o.id AND r.status='published'),0) >= ?"); params.push(Math.min(5,minimumRating)); }
-  if (minimumQuantity > 0) { where.push("MAX(0,i.quantity-(SELECT COALESCE(SUM(lq.quantity),0) FROM loan_requests lq WHERE lq.item_id=i.id AND lq.status IN ('pending','approved','collected'))) >= ?"); params.push(Math.min(999,minimumQuantity)); }
+  if (minimumQuantity > 0) { where.push("MAX(0,i.quantity-(SELECT COALESCE(SUM(lq.quantity),0) FROM loan_requests lq WHERE lq.item_id=i.id AND lq.status IN ('pending','approved','collected') AND lq.requested_from <= strftime('%Y-%m-%dT%H:%M','now') AND lq.requested_until > strftime('%Y-%m-%dT%H:%M','now'))-(SELECT COALESCE(SUM(ib.quantity),0) FROM inventory_blocks ib WHERE ib.item_id=i.id AND ib.starts_at <= strftime('%Y-%m-%dT%H:%M','now') AND ib.ends_at > strftime('%Y-%m-%dT%H:%M','now'))) >= ?"); params.push(Math.min(999,minimumQuantity)); }
   if (availableOnly) where.push("i.availability_status = 'available'");
   if (requestedDate) {
     const date = validateDate(requestedDate, "תאריך החיפוש");
@@ -1231,8 +1231,9 @@ async function listItems(env, url) {
         (SELECT COUNT(*) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_review_count,
         (SELECT ROUND(AVG(r.item_rating),1) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_rating,
         (SELECT COUNT(*) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_review_count,
-        CASE WHEN i.quantity - (SELECT COALESCE(SUM(lr.quantity),0) FROM loan_requests lr WHERE lr.item_id=i.id AND lr.status IN ('pending','approved','collected')) > 0
-          THEN i.quantity - (SELECT COALESCE(SUM(lr.quantity),0) FROM loan_requests lr WHERE lr.item_id=i.id AND lr.status IN ('pending','approved','collected')) ELSE 0 END AS available_count
+        MAX(0, i.quantity
+          - (SELECT COALESCE(SUM(lr.quantity),0) FROM loan_requests lr WHERE lr.item_id=i.id AND lr.status IN ('pending','approved','collected') AND lr.requested_from <= strftime('%Y-%m-%dT%H:%M','now') AND lr.requested_until > strftime('%Y-%m-%dT%H:%M','now'))
+          - (SELECT COALESCE(SUM(ib.quantity),0) FROM inventory_blocks ib WHERE ib.item_id=i.id AND ib.starts_at <= strftime('%Y-%m-%dT%H:%M','now') AND ib.ends_at > strftime('%Y-%m-%dT%H:%M','now'))) AS available_count
       FROM items i JOIN organizations o ON o.id = i.organization_id
       WHERE ${where.join(" AND ")}
       ORDER BY CASE i.availability_status WHEN 'available' THEN 0 ELSE 1 END, i.created_at DESC
