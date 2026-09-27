@@ -363,3 +363,9 @@ for(const token of ["scan-unit-qr","BarcodeDetector","getUserMedia","unit-qr-man
 for(const token of ['application/ld+json','SearchAction','og:site_name','twitter:card'])assert.ok(indexHtml.includes(token),token+" missing from structured SEO metadata");
 assert.ok(indexHtml.includes('class="skip-link"'),"global skip link missing");
 console.log("QR scanning, structured SEO and accessibility shell gate passed.");
+
+assert.ok((await readFile("worker/launch-readiness.js","utf8")).includes("/api/admin/export.xls"),"Excel-compatible admin export route missing");
+assert.ok((await readFile("worker/launch-readiness.js","utf8")).includes("application/vnd.ms-excel"),"Excel export content type missing");
+assert.ok((await readFile("dist/admin-control-center.js","utf8")).includes("ייצוא Excel"),"Excel export UI missing");
+assert.ok(appClient.includes("unit-qr-image"),"QR image scanner fallback missing");
+console.log("Excel export and QR image scanner gate passed.");
