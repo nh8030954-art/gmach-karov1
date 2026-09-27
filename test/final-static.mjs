@@ -160,3 +160,9 @@ for(const token of ["data-pickup-expiry","pickup-expired"])assert.ok(appClient.i
 for(const token of ["data-org-reviews","openOrganizationReviews","data-respond-review"])assert.ok(appClient.includes(token),token+" missing from organization review response UI");
 
 for(const token of ["data-edit-my-review","הביקורות שלי"])assert.ok(finalClient.includes(token),token+" missing from review editing UI");
+
+for(const token of ["no_show","const expiredHolds=","hold_expired","advanceWaitlist(env,h.item_id)"])assert.ok(worker.includes(token),token+" missing from hold/no-show lifecycle");
+
+for(const token of ["data-no-show","אי-הגעה"])assert.ok(appClient.includes(token),token+" missing from no-show UI");
+
+for(const token of ["History-aware deletion","Advanced gmach tools","No-show","Inventory hold expired"])assert.ok(remainingClient.includes(token),token+" missing from English advanced workflow localization");
