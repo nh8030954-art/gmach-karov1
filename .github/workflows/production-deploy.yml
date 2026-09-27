@@ -41,6 +41,12 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+      - name: Ensure dedicated backup R2 bucket
+        run: |
+          if ! npx wrangler r2 bucket list --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s||'[]');process.exit(x.some(v=>v.name==='gmach-karov-backups')?0:1)})"; then
+            npx wrangler r2 bucket create gmach-karov-backups
+          fi
+
       - name: Create pre-migration D1 snapshot
         run: |
           mkdir -p .deploy-backups
