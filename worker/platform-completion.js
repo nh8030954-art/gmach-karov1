@@ -597,7 +597,7 @@ async function createBackup(env,id,actorId){
   try{
     const tables=["users","organizations","items","loan_requests","item_units","organization_branches","reviews","help_requests","support_tickets","categories","managed_content","site_settings"],data={version:2,createdAt:new Date().toISOString(),tables:{}};
     let count=0;for(const t of tables){const rows=await qall(env,`SELECT * FROM ${t} LIMIT 50000`,[]);data.tables[t]=rows;count+=rows.length;}
-    const bytes=new TextEncoder().encode(JSON.stringify(data)),day=new Date().toISOString().slice(0,10),key=`d1/${day}/${id}.json`,storage=env.BACKUP_STORAGE||env.ITEM_IMAGES;
+    const bytes=new TextEncoder().encode(JSON.stringify(data)),checksum=await sha256(new TextDecoder().decode(bytes)),day=new Date().toISOString().slice(0,10),key=`d1/${day}/${id}.json`,storage=env.BACKUP_STORAGE||env.ITEM_IMAGES;
     if(!storage)throw new Error("Backup storage binding missing");
     await storage.put(key,bytes,{httpMetadata:{contentType:"application/json"}});
     let copied=0,cursor=undefined;
@@ -614,7 +614,7 @@ async function createBackup(env,id,actorId){
       }while(cursor);
     }
     try{await qrun(env,"INSERT OR REPLACE INTO backup_objects(backup_run_id,storage_key,object_type,size_bytes,checksum) VALUES(?,?,?,?,NULL)",[id,key,"d1",bytes.byteLength])}catch{}
-    await qrun(env,"UPDATE backup_runs SET backup_key=?,status='completed',row_count=?,size_bytes=?,completed_at=?,manifest_json=? WHERE id=?",[key,count,bytes.byteLength,new Date().toISOString(),JSON.stringify({storageKey:key,r2Objects:copied,separateStorage:Boolean(env.BACKUP_STORAGE)}),id]);
+    await qrun(env,"UPDATE backup_runs SET backup_key=?,status='completed',row_count=?,size_bytes=?,completed_at=?,manifest_json=? WHERE id=?",[key,count,bytes.byteLength,new Date().toISOString(),JSON.stringify({storageKey:key,checksum,r2Objects:copied,separateStorage:Boolean(env.BACKUP_STORAGE)}),id]);
     if(actorId)await audit(env,actorId,"backup.run",id,{key,count,r2Objects:copied,separateStorage:Boolean(env.BACKUP_STORAGE)});
   }catch(e){await qrun(env,"UPDATE backup_runs SET status='failed',error=?,completed_at=? WHERE id=?",[String(e).slice(0,500),new Date().toISOString(),id]);throw e}
 }
