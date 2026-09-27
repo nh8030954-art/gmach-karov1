@@ -6,6 +6,7 @@ const { FormData: WorkerFormData, Miniflare } = miniflare;
 
 const base = "http://local.test";
 const sentEmails = [];
+let adminSessionCookie = null;
 const mf = new Miniflare({
   modules: true,
   modulesRules: [{ type: "ESModule", include: ["**/*.js"], fallthrough: true }],
@@ -25,6 +26,14 @@ async function request(path, { method = "GET", body, cookie, form, origin = base
     headers.set("Sec-Fetch-Site", origin === base ? "same-origin" : "cross-site");
   }
   if (cookie) headers.set("Cookie", cookie);
+  if (cookie && cookie === adminSessionCookie && !["GET", "HEAD"].includes(method) && /^\/api\/admin\/(users|organizations|items|reports|backups|moderation)(\/|$)/.test(path)) {
+    const db = await mf.getD1Database("DB"), code = "123456", challengeId = crypto.randomUUID();
+    const admin = await db.prepare("SELECT id FROM users WHERE email=?").bind("admin@example.org").first();
+    await db.prepare("INSERT INTO admin_action_challenges(id,user_id,action,token_hash,expires_at) VALUES(?,?,?,?,?)")
+      .bind(challengeId, admin.id, `${method} ${path}`, createHash("sha256").update(code).digest("base64url"), new Date(Date.now() + 600000).toISOString()).run();
+    headers.set("X-Admin-Challenge-Id", challengeId);
+    headers.set("X-Admin-Challenge-Code", code);
+  }
   let payload;
   if (form) payload = form;
   else if (body !== undefined) {
@@ -104,6 +113,50 @@ try {
   result = await request("/api/auth/register", { method: "POST", body: { fullName: "מנהל בדיקה", phone: "052-1234567", city: "ירושלים", address: "רחוב הבדיקה 1, ירושלים", email: "admin@example.org", password: "UniqueAdminPass!456", termsAccepted: true, operationalEmailsAccepted: true } });
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
   const adminCookie = await verifyLatestEmail("admin@example.org");
+  adminSessionCookie = adminCookie;
+  result = await request("/api/auth/register", { method: "POST", body: { fullName: "English Member", phone: "052-1234578", city: "Jerusalem", address: "10 Example Street, Jerusalem", email: "english@example.org", password: "EnglishUserPass!456", preferredLanguage: "en", termsAccepted: true, operationalEmailsAccepted: true } });
+  assert.equal(result.response.status, 201, JSON.stringify(result.data));
+  const englishVerification = sentEmails.at(-1);
+  assert.equal(englishVerification.subject, "Your Gmach Berega verification code");
+  assert.match(englishVerification.html, /dir="ltr"/);
+  const englishCookie = await verifyLatestEmail("english@example.org");
+  result = await request("/api/me/profile", { cookie: englishCookie });
+  assert.equal(result.data.profile.preferredLanguage, "en");
+  result = await request("/api/auth/forgot-password", { method: "POST", body: { email: "english@example.org" } });
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  assert.equal(sentEmails.at(-1).subject, "Reset your Gmach Berega password");
+
+  result = await request("/api/me/favorites-overview");
+  assert.equal(result.response.status, 401, "Favorites require authentication");
+  result = await request("/api/me/saved-categories/tools", { method: "PUT", cookie: firstCookie });
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  result = await request("/api/me/saved-searches", { method: "POST", cookie: firstCookie, body: { name: "כלים קרובים", filters: { q: "מקדחה", city: "ירושלים", condition: "טוב", availableOnly: true }, notify: true } });
+  assert.equal(result.response.status, 201, JSON.stringify(result.data));
+  const overviewSavedSearchId = result.data.search.id;
+  result = await request("/api/me/favorites-overview", { cookie: firstCookie });
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  assert.ok(result.data.saved.some(entry => entry.type === "category" && entry.id === "tools"));
+  assert.ok(result.data.saved.some(entry => entry.type === "search" && entry.id === overviewSavedSearchId));
+  result = await request("/api/me/favorites-overview", { cookie: adminCookie });
+  assert.equal(result.data.saved.length, 0, "Favorites must be isolated per user");
+  result = await request("/api/me/favorites-overview/category/tools", { method: "DELETE", cookie: firstCookie });
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  result = await request("/api/me/saved-categories", { cookie: firstCookie });
+  assert.ok(!result.data.categories.some(entry => entry.id === "tools"));
+  result = await request("/api/help-requests", { method: "POST", cookie: firstCookie, body: { title: "מקדחה להשאלה", description: "צריכים מקדחה לעבודות בית קטנות", category: "כלי עבודה", city: "ירושלים" } });
+  assert.equal(result.response.status, 201, JSON.stringify(result.data));
+  const boardRequestId=result.data.request.id;
+  result = await request("/api/help-requests?city="+encodeURIComponent("ירושלים")+"&page=1");
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  assert.equal(result.data.page, 1);
+  assert.ok(result.data.total >= 1);
+  assert.ok(result.data.requests.some(entry=>entry.id===boardRequestId));
+  result = await request("/api/help-requests?city="+encodeURIComponent("תל אביב")+"&page=1");
+  assert.ok(!result.data.requests.some(entry=>entry.id===boardRequestId));
+  result = await request("/api/me/saved-entities", { method: "POST", cookie: adminCookie, body: { type: "help_request", id: boardRequestId } });
+  assert.equal(result.response.status, 201, JSON.stringify(result.data));
+  result = await request("/api/me/favorites-overview", { cookie: adminCookie });
+  assert.ok(result.data.saved.some(entry=>entry.type==="help_request"&&entry.id===boardRequestId&&entry.label==="מקדחה להשאלה"));
 
   result = await request("/api/support", { method: "POST", cookie: firstCookie, body: { name: "משתמש ראשון", email: "first@example.org", subject: "בדיקת שיחת תמיכה", message: "הודעת פתיחה לפנייה של המשתמש הראשון." } });
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
@@ -317,7 +370,7 @@ try {
   assert.ok(result.data.requestId);
   result = await request("/api/help-requests", { method: "POST", cookie: borrowerCookie, body: { title: "צריך שולחן מתקפל", description: "דרוש שולחן מתקפל לאירוע משפחתי קרוב", category: "אירועים", city: "ירושלים", urgency: "urgent" } });
   assert.equal(result.response.status, 201);
-  result = await request("/api/help-requests?city=ירושלים");
+  result = await request("/api/help-requests?city=ירושלים&category=אירועים");
   assert.equal(result.data.requests.length, 1);
   const helpRequestId=result.data.requests[0].id;
   result = await request(`/api/help-requests/${helpRequestId}/offers`, { method:"POST",cookie:adminCookie,body:{itemId,message:"הפריט שלנו מתאים לבקשה"} });
