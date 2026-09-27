@@ -10,7 +10,6 @@ on:
       - "wrangler.jsonc"
       - "package*.json"
       - "test/**"
-      - ".github/workflows/production-deploy.yml"
   workflow_dispatch:
 
 permissions:
