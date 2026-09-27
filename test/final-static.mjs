@@ -313,3 +313,17 @@ assert.ok(indexHtml.includes("./release-experience.js"),"release experience clie
 assert.ok(expansionClient.includes("שעות פעילות"),"branch hours missing from public branch UI");
 assert.ok(expansionClient.includes("data-copy-branch"),"branch copy-address action missing");
 console.log("Release experience static release gate passed.");
+
+
+const privacyPurgeWorker=await readFile("worker/privacy-purge.js","utf8");
+const privacyPurgeClient=await readFile("dist/privacy-purge.js","utf8");
+const privacyPurgeMigration=await readFile("migrations/0024_privacy_purge.sql","utf8");
+for(const token of ["privacy_purge_runs","privacy_retention_policies","purgeDeletedUser","applyRetention","/api/admin/privacy-retention","media_url=NULL"]) assert.ok(privacyPurgeWorker.includes(token),token+" missing from privacy purge backend");
+for(const token of ["מחיקה, פרטיות ושמירת נתונים","Retention days","data-privacy-retention","Run purge and retention now"]) assert.ok(privacyPurgeClient.includes(token),token+" missing from privacy purge UI");
+for(const token of ["privacy_purge_runs","privacy_retention_policies","security_events","analytics_events"]) assert.ok(privacyPurgeMigration.includes(token),token+" missing from privacy purge migration");
+assert.ok(worker.includes("handlePrivacyPurge"),"privacy purge handler not wired");
+assert.ok(worker.includes("runPrivacyPurgeMaintenance"),"privacy purge maintenance not wired");
+assert.ok(worker.includes("blockedByOwnedOrganizations"),"account deletion ownership guard missing");
+assert.ok(platform.includes("privacy-retention"),"privacy retention admin operations are not step-up protected");
+assert.ok(indexHtml.includes("./privacy-purge.js"),"privacy purge client not loaded");
+console.log("Privacy purge static release gate passed.");
