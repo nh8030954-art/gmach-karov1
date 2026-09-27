@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#243f75">
   <meta name="description" content="גמ״ח ברגע — מוצאים ומשאילים ציוד בחינם, קרוב לבית.">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com https://www.openstreetmap.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';">
+  <script src="./i18n-boot.js"></script>
   <title>גמ״ח ברגע — גדולה גמילות חסדים יותר מן הצדקה</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -45,6 +46,7 @@
         <a href="#/catalog">חיפוש</a>
         <a href="#how-it-works">איך זה עובד</a>
         <a href="#gmachim">גמ״חים</a>
+        <button class="nav-button" id="nav-community-board" type="button">לוח בקשות</button>
         <button class="nav-button" id="nav-help-request" type="button">בקשת עזרה</button>
       </nav>
 
@@ -64,6 +66,7 @@
       <a href="#/catalog">חיפוש</a>
       <a href="#how-it-works">איך זה עובד</a>
       <a href="#gmachim">גמ״חים</a>
+      <button type="button" id="mobile-community-board">לוח בקשות</button>
       <button type="button" id="mobile-help-request">בקשת עזרה</button>
       <button type="button" data-requires-auth>האזור שלי</button>
     </nav>
@@ -534,6 +537,14 @@
     </form>
   </dialog>
 
+  <dialog class="modal modal-wide" id="community-board-dialog" aria-labelledby="community-board-title">
+    <button class="dialog-close" type="button" data-close-dialog aria-label="סגירה">×</button>
+    <div class="dialog-heading align-start"><span class="section-kicker">עזרה הדדית</span><h2 id="community-board-title">לוח בקשות הקהילה</h2><p>בקשות פתוחות שאפשר לעזור בהן.</p></div>
+    <form id="community-board-filter" class="community-board-filters"><label>עיר<input name="city" list="israel-cities" placeholder="כל הארץ"></label><label>קטגוריה<select name="category"><option value="">כל הקטגוריות</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option></select></label><button class="button button-secondary" type="submit">סינון</button></form>
+    <div id="community-board-results" class="community-board-results" aria-live="polite"></div>
+    <div id="community-board-pages" class="community-board-pages"></div>
+  </dialog>
+
   <dialog class="modal modal-medium" id="help-request-dialog" aria-labelledby="help-request-title">
     <button class="dialog-close" type="button" data-close-dialog aria-label="סגירה">×</button>
     <div class="dialog-heading align-start"><span class="section-kicker">לא מצאתם?</span><h2 id="help-request-title">שליחת בקשת עזרה</h2><p>הבקשה תוצג ללא טלפון או אימייל לגמ״חים שעשויים לעזור.</p></div>
@@ -559,6 +570,7 @@
   <script src="./vendor/qrcode.js" defer></script>
   <script src="./app.js" defer></script>\n  <script src="./platform-completion.js" defer></script>
   <script src="./final-features.js" defer></script>
+  <script src="./i18n-en.js" defer></script>
   <script src="./remaining-features.js" defer></script>
   <script src="./motion.js" defer></script>
 
