@@ -33,9 +33,9 @@ jobs:
         continue-on-error: true
         run: |
           for i in {1..6}; do
-            body="$(curl -fsS --max-time 10 https://gmach-karov1.nh8030954.workers.dev/api/health || true)"
+            body="$(curl -fsS --max-time 10 'https://gmach-karov1.nh8030954.workers.dev/api/health?deep=1' || true)"
             echo "$body" > live.log
-            if echo "$body" | grep -q '"ok":true'; then exit 0; fi
+            if echo "$body" | grep -q '"ok":true' && curl -fsS --max-time 10 'https://gmach-karov1.nh8030954.workers.dev/api/items?limit=1' | grep -q '"items":\['; then exit 0; fi
             sleep 5
           done
           exit 1
