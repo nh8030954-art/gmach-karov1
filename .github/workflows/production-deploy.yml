@@ -38,6 +38,15 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: Detect migration changes
+        id: migration_changes
+        run: |
+          if git show --pretty='' --name-only "$GITHUB_SHA" | grep -q '^migrations/'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No database migration changed in this deployment; D1 snapshot/migration steps will be skipped."
+          fi
       - run: npm ci
       - run: npm run check
       - name: Run production test suite
@@ -75,11 +84,13 @@ jobs:
           fi
 
       - name: Create pre-migration D1 snapshot
+        if: steps.migration_changes.outputs.changed == 'true'
         run: |
           mkdir -p .deploy-backups
           npx wrangler d1 export DB --remote --output ".deploy-backups/d1-before-${GITHUB_SHA}.sql"
 
       - name: Upload pre-migration snapshot
+        if: steps.migration_changes.outputs.changed == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: d1-before-${{ github.sha }}
@@ -88,6 +99,7 @@ jobs:
           if-no-files-found: error
 
       - name: Apply production database migrations
+        if: steps.migration_changes.outputs.changed == 'true'
         run: |
           set +e
           OUTPUT="$(npx wrangler d1 migrations apply DB --remote 2>&1)"
