@@ -63,6 +63,25 @@ function installAdminButton(){
  const b=document.createElement("button");b.type="button";b.className="button button-secondary";b.dataset.adminUsersFull="1";b.textContent=tr("ניהול משתמשים מתקדם","Advanced users");b.onclick=openAdminUsers;actions.prepend(b);
 }
 
-function init(){const obs=new MutationObserver(()=>{installItemMultiRange();installBranchDirectory();installReportsButton();installAdminButton()});obs.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:["hidden","lang","dir"]});installReportsButton();installAdminButton();installItemMultiRange();installBranchDirectory()}
+
+async function openLaunchReadiness(){
+ const d=dialog("launch-readiness-dialog",tr("מוכנות להשקה","Launch readiness")),body=$(".requirements-expansion-body",d);d.showModal();
+ const render=async()=>{body.innerHTML="<p>"+tr("בודק את סביבת הייצור...","Checking production readiness...")+"</p>";try{
+  const [x,a]=await Promise.all([api("/api/admin/launch-readiness"),api("/api/admin/operational-alerts")]);
+  const overall={ready:tr("מוכן ברמת המערכת","System ready"),attention:tr("דורש תשומת לב","Needs attention"),blocked:tr("חסום להפצה","Blocked for launch")}[x.overall]||x.overall;
+  body.innerHTML='<div class="dashboard-row"><div><strong>'+esc(overall)+'</strong><p>'+tr("הבדיקה מתייחסת למסד, אחסון, גיבויים, אימייל, אבטחה, Push, תורים ותמיכה.","Checks database, storage, backups, email, security, push, queues and support.")+'</p></div><button class="button button-secondary" type="button" data-readiness-refresh>'+tr("בדיקה מחדש","Recheck")+'</button></div>'+
+  '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:14px 0">'+x.checks.map(ch=>'<article style="border:1px solid #e5e7eb;border-radius:12px;padding:12px"><strong>'+esc(ch.label)+'</strong><p>'+esc(ch.detail)+'</p><span class="status-chip '+(ch.status==="pass"?"active":"")+'">'+esc(ch.status.toUpperCase())+'</span></article>').join("")+'</div>'+
+  '<h3>'+tr("התראות תפעוליות","Operational alerts")+'</h3><div style="display:grid;gap:8px">'+(a.alerts||[]).filter(v=>!v.resolved_at).slice(0,100).map(v=>'<article class="dashboard-row"><div><strong>'+esc(v.alert_type)+' · '+esc(v.severity)+'</strong><p>'+esc(v.created_at)+'</p><small>'+esc(v.details_json||"")+'</small></div><button class="button button-secondary button-small" data-resolve-alert="'+esc(v.id)+'" data-alert-source="'+esc(v.source)+'">'+tr("סימון כטופל","Resolve")+'</button></article>').join("")+'</div>';
+  $("[data-readiness-refresh]",d).onclick=render;
+  $("[data-resolve-alert]",d).forEach(b=>b.onclick=async()=>{try{await api("/api/admin/operational-alerts",{method:"PATCH",body:{id:b.dataset.resolveAlert,source:b.dataset.alertSource,action:"resolve"}});toast(tr("ההתראה סומנה כטופלה","Alert resolved"));await render()}catch(e){toast(e.message,true)}});
+ }catch(e){body.innerHTML='<p role="alert">'+esc(e.message)+'</p>'}};
+ await render();
+}
+function installLaunchReadiness(){
+ const tab=$("#admin-tab");if(!tab||tab.hidden)return;const actions=$("#dashboard-view .dashboard-actions");if(!actions||actions.querySelector("[data-launch-readiness]"))return;
+ const b=document.createElement("button");b.type="button";b.className="button button-primary";b.dataset.launchReadiness="1";b.textContent=tr("בדיקת מוכנות להשקה","Launch readiness");b.onclick=openLaunchReadiness;actions.prepend(b);
+}
+
+function init(){const obs=new MutationObserver(()=>{installItemMultiRange();installBranchDirectory();installReportsButton();installAdminButton();installLaunchReadiness()});obs.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:["hidden","lang","dir"]});installReportsButton();installAdminButton();installLaunchReadiness();installItemMultiRange();installBranchDirectory()}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
 })();
