@@ -1,0 +1,32 @@
+name: Live visual fast
+on:
+  workflow_dispatch:
+  push:
+    branches: [qa]
+    paths:
+      - ".github/workflows/visual-fast.yml"
+      - "test/live-visual-fast.mjs"
+permissions:
+  contents: read
+concurrency:
+  group: live-visual-fast
+  cancel-in-progress: true
+jobs:
+  visual:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 24 }
+      - run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - run: node test/live-visual-fast.mjs
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-visual-fast
+          path: visual-fast/
+          retention-days: 7
+          if-no-files-found: error
