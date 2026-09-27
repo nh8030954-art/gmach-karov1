@@ -485,3 +485,17 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
   "בחרו אם לקבל את הכמות הזמינה, להמתין לכמות המלאה או לשנות מועד.":"Choose whether to use the available quantity, wait for the full quantity, or change the time.",
   "נוספתם לרשימת ההמתנה. נעדכן אתכם כשהכמות שביקשתם תתפנה.":"You joined the waitlist. We will notify you when the quantity you requested becomes available."
 });
+
+window.GmachEnglish = Object.freeze({...window.GmachEnglish,
+  "ביצועים - 7 ימים":"Performance - 7 days",
+  "טעינת עמוד":"Page load",
+  "שגיאות JavaScript":"JavaScript errors",
+  "ממוצע":"Average",
+  "מקסימום":"Maximum",
+  "דגימות":"samples",
+  "אין עדיין נתוני ביצועים.":"No performance data yet.",
+  "אחת התמונות סומנה אוטומטית לבדיקה והפריט הוסתר זמנית עד לבדיקת מנהל.":"One image was automatically flagged and the item was temporarily hidden pending administrator review.",
+  "אחת התמונות נשלחה לבדיקת תוכן נוספת.":"One image was sent for additional content review.",
+  "התמונה נחסמה משום שסומנה כתוכן שאינו מתאים לפלטפורמה.":"The image was blocked because it was flagged as unsuitable for the platform.",
+  "התמונה נשלחה לבדיקת תוכן נוספת לפני טיפול מנהל.":"The image was sent for additional content review."
+});
