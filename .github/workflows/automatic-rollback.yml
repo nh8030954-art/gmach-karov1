@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   rollback:
@@ -23,7 +24,14 @@ jobs:
       - name: Revert failed production commit when still current
         env:
           FAILED_SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          DEPLOY_CONCLUSION="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${FAILED_SHA}&event=push&per_page=100" --jq '[.workflow_runs[] | select(.name=="Deploy production")][0].conclusion // ""')"
+          if [ "$DEPLOY_CONCLUSION" != "success" ]; then
+            echo "Production was not successfully deployed for $FAILED_SHA (Deploy production: ${DEPLOY_CONCLUSION:-not found}). Skipping rollback because live verification cannot validate an undeployed commit."
+            exit 0
+          fi
+
           set -euo pipefail
           git fetch origin main
           git checkout main
