@@ -209,3 +209,5 @@ for(const token of ["events-stages","medical-ramps","community-projectors"])asse
 
 for(const token of ["overlapping_requests","dateCompatible","requestedFrom:hr.requested_from","distanceKm:hr.distance_km"])assert.ok(finalWorker.includes(token),token+" missing from date-aware community matching");
 assert.ok(platform.includes("2026-09-24"),"legal consent default version is not aligned");
+
+for(const token of ["legalConsents","recentOrganizations","securityEvents","notificationPreferences","savedEntities","dataRequests"])assert.ok(platform.includes(token),token+" missing from comprehensive personal data export");
