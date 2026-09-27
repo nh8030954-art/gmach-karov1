@@ -32,11 +32,11 @@ jobs:
       - id: live
         continue-on-error: true
         run: |
-          for i in {1..12}; do
-            body="$(curl -fsS https://gmach-karov1.nh8030954.workers.dev/api/health || true)"
+          for i in {1..6}; do
+            body="$(curl -fsS --max-time 10 https://gmach-karov1.nh8030954.workers.dev/api/health || true)"
             echo "$body" > live.log
             if echo "$body" | grep -q '"ok":true' && echo "$body" | grep -q '"completePlatformSchema":{"ready":true' && echo "$body" | grep -q '"adminCredentialRotated":true'; then exit 0; fi
-            sleep 10
+            sleep 5
           done
           exit 1
       - name: Inspect live platform configuration
