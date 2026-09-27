@@ -120,6 +120,80 @@ async function branchInventoryWorkspace(request,env,branchId){
   return json({ok:true,policies:updated.results||[]});
 }
 
+
+async function branchManagement(request,env,branchId){
+  const branch=await env.DB.prepare("SELECT * FROM organization_branches WHERE id=?").bind(branchId).first();
+  if(!branch)throw new LaunchError(404,"הסניף לא נמצא");
+  await orgAccess(request,env,branch.organization_id,["owner"]);
+  return json({branch:{...branch,hours:safe(branch.hours_json,{})}});
+}
+
+async function adminEntities(request,env,url){
+  await requireAdmin(request,env);
+  const type=String(url.searchParams.get("type")||"users"),q=text(url.searchParams.get("q"),120),status=text(url.searchParams.get("status"),40),like=q?"%"+q+"%":null;
+  let sql,args=[];
+  if(type==="users"){
+    sql="SELECT id,email,full_name,role,account_status,email_verified,created_at,last_login_at FROM users WHERE deleted_at IS NULL";
+    if(q){sql+=" AND (email LIKE ? OR full_name LIKE ?)";args.push(like,like)}if(status){sql+=" AND account_status=?";args.push(status)}
+    sql+=" ORDER BY COALESCE(last_login_at,created_at) DESC LIMIT 300";
+  }else if(type==="organizations"){
+    sql="SELECT o.id,o.name,o.city,o.status,o.is_hidden,o.temporarily_closed,o.reopens_at,o.owner_id,o.created_at,o.updated_at,u.full_name owner_name,u.email owner_email FROM organizations o LEFT JOIN users u ON u.id=o.owner_id WHERE o.deleted_at IS NULL";
+    if(q){sql+=" AND (o.name LIKE ? OR o.city LIKE ? OR u.email LIKE ?)";args.push(like,like,like)}if(status){sql+=" AND o.status=?";args.push(status)}
+    sql+=" ORDER BY o.updated_at DESC LIMIT 300";
+  }else if(type==="items"){
+    sql="SELECT i.id,i.title,i.status,i.availability_status,i.quantity,i.city,i.organization_id,i.updated_at,o.name organization_name FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.deleted_at IS NULL";
+    if(q){sql+=" AND (i.title LIKE ? OR i.city LIKE ? OR o.name LIKE ?)";args.push(like,like,like)}if(status){sql+=" AND i.status=?";args.push(status)}
+    sql+=" ORDER BY i.updated_at DESC LIMIT 300";
+  }else if(type==="support"){
+    sql="SELECT id,ticket_number,user_id,name,email,subject,status,created_at,updated_at FROM support_tickets WHERE 1=1";
+    if(q){sql+=" AND (subject LIKE ? OR email LIKE ? OR name LIKE ? OR CAST(ticket_number AS TEXT) LIKE ?)";args.push(like,like,like,like)}if(status){sql+=" AND status=?";args.push(status)}
+    sql+=" ORDER BY updated_at DESC LIMIT 300";
+  }else throw new LaunchError(400,"סוג ישות אינו נתמך");
+  const rows=await env.DB.prepare(sql).bind(...args).all();
+  return json({type,entities:rows.results||[]});
+}
+
+async function patchAdminEntity(request,env,type,id){
+  const admin=await requireAdmin(request,env),b=await body(request),now=new Date().toISOString();
+  if(type==="users"){
+    const old=await env.DB.prepare("SELECT id,account_status FROM users WHERE id=? AND deleted_at IS NULL").bind(id).first();if(!old)throw new LaunchError(404,"המשתמש לא נמצא");if(id===admin.id&&b.accountStatus==="suspended")throw new LaunchError(400,"אי אפשר להשעות את חשבון המנהל הנוכחי");
+    const next=["active","suspended"].includes(b.accountStatus)?b.accountStatus:old.account_status;
+    const statements=[env.DB.prepare("UPDATE users SET account_status=?,updated_at=? WHERE id=?").bind(next,now,id),audit(env,admin.id,"admin.entity.user","user",id,old,{account_status:next})];
+    if(b.revokeSessions===true)statements.push(env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(id));
+    await env.DB.batch(statements);return json({ok:true,accountStatus:next});
+  }
+  if(type==="organizations"){
+    const old=await env.DB.prepare("SELECT id,status,is_hidden,temporarily_closed,reopens_at FROM organizations WHERE id=? AND deleted_at IS NULL").bind(id).first();if(!old)throw new LaunchError(404,"הגמ״ח לא נמצא");
+    const status=["pending","approved","rejected"].includes(b.status)?b.status:old.status,isHidden=b.isHidden===undefined?old.is_hidden:(b.isHidden?1:0),closed=b.temporarilyClosed===undefined?old.temporarily_closed:(b.temporarilyClosed?1:0),reopens=b.reopensAt===undefined?old.reopens_at:(b.reopensAt?new Date(b.reopensAt).toISOString():null);
+    await env.DB.batch([env.DB.prepare("UPDATE organizations SET status=?,is_hidden=?,temporarily_closed=?,reopens_at=?,updated_at=? WHERE id=?").bind(status,isHidden,closed,reopens,now,id),audit(env,admin.id,"admin.entity.organization","organization",id,old,{status,is_hidden:isHidden,temporarily_closed:closed,reopens_at:reopens})]);
+    return json({ok:true,status,isHidden:Boolean(isHidden),temporarilyClosed:Boolean(closed)});
+  }
+  if(type==="items"){
+    const old=await env.DB.prepare("SELECT id,status,availability_status FROM items WHERE id=? AND deleted_at IS NULL").bind(id).first();if(!old)throw new LaunchError(404,"המוצר לא נמצא");
+    const status=["pending","active","rejected","archived"].includes(b.status)?b.status:old.status,availability=["available","unavailable","reserved"].includes(b.availabilityStatus)?b.availabilityStatus:old.availability_status;
+    await env.DB.batch([env.DB.prepare("UPDATE items SET status=?,availability_status=?,updated_at=? WHERE id=?").bind(status,availability,now,id),audit(env,admin.id,"admin.entity.item","item",id,old,{status,availability_status:availability})]);
+    return json({ok:true,status,availabilityStatus:availability});
+  }
+  if(type==="support"){
+    const old=await env.DB.prepare("SELECT id,status FROM support_tickets WHERE id=?").bind(id).first();if(!old)throw new LaunchError(404,"הפנייה לא נמצאה");
+    const status=["open","waiting","closed","reopened"].includes(b.status)?b.status:old.status;
+    await env.DB.batch([env.DB.prepare("UPDATE support_tickets SET status=?,updated_at=? WHERE id=?").bind(status,now,id),audit(env,admin.id,"admin.entity.support","support_ticket",id,old,{status})]);return json({ok:true,status});
+  }
+  throw new LaunchError(400,"סוג ישות אינו נתמך");
+}
+
+async function adminSupportDetail(request,env,ticketId){
+  await requireAdmin(request,env);const ticket=await env.DB.prepare("SELECT * FROM support_tickets WHERE id=?").bind(ticketId).first();if(!ticket)throw new LaunchError(404,"הפנייה לא נמצאה");
+  const messages=await env.DB.prepare("SELECT m.id,m.sender_id,m.body,m.created_at,u.full_name sender_name,u.role sender_role FROM support_ticket_messages m LEFT JOIN users u ON u.id=m.sender_id WHERE m.ticket_id=? ORDER BY m.created_at").bind(ticketId).all();
+  return json({ticket,messages:messages.results||[]});
+}
+async function adminSupportReply(request,env,ticketId){
+  const admin=await requireAdmin(request,env),b=await body(request),ticket=await env.DB.prepare("SELECT * FROM support_tickets WHERE id=?").bind(ticketId).first();if(!ticket)throw new LaunchError(404,"הפנייה לא נמצאה");
+  const message=text(b.message,1500);if(!message)throw new LaunchError(400,"יש לכתוב הודעה"),now=new Date().toISOString(),id=crypto.randomUUID(),status=b.close===true?"closed":"waiting";
+  const statements=[env.DB.prepare("INSERT INTO support_ticket_messages(id,ticket_id,sender_id,body) VALUES(?,?,?,?)").bind(id,ticketId,admin.id,message),env.DB.prepare("UPDATE support_tickets SET status=?,updated_at=? WHERE id=?").bind(status,now,ticketId),audit(env,admin.id,"support.admin_reply","support_ticket",ticketId,{status:ticket.status},{status},{},{messageId:id})];
+  if(ticket.user_id)statements.push(env.DB.prepare("INSERT INTO notifications(id,user_id,type,title,body) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),ticket.user_id,"support","עדכון בפניית התמיכה #"+ticket.ticket_number,message.slice(0,300)));
+  await env.DB.batch(statements);return json({message:{id,createdAt:now},status},201);
+}
 async function operationalHealth(request,env){
   await requireAdmin(request,env);const now=Date.now();
   const [backup,drill,failedQueue,failedOutbox,critical,totals]=await env.DB.batch([
@@ -200,6 +274,11 @@ export async function handleLaunchReadiness(request,env,ctx,url){
     if(method==="GET"&&(m=path.match(/^\/api\/admin\/loan-requests\/([^/]+)\/timeline$/)))return adminLoanTimeline(request,env,decodeURIComponent(m[1]));
     if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/loan-requests\/([^/]+)\/override$/)))return adminLoanOverride(request,env,decodeURIComponent(m[1]));
     if((method==="GET"||method==="PUT")&&(m=path.match(/^\/api\/branches\/([^/]+)\/inventory-workspace$/)))return branchInventoryWorkspace(request,env,decodeURIComponent(m[1]));
+    if(method==="GET"&&(m=path.match(/^\/api\/branches\/([^/]+)\/management$/)))return branchManagement(request,env,decodeURIComponent(m[1]));
+    if(method==="GET"&&path==="/api/admin/entities")return adminEntities(request,env,url);
+    if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/entities\/(users|organizations|items|support)\/([^/]+)$/)))return patchAdminEntity(request,env,m[1],decodeURIComponent(m[2]));
+    if(method==="GET"&&(m=path.match(/^\/api\/admin\/support-tickets\/([^/]+)$/)))return adminSupportDetail(request,env,decodeURIComponent(m[1]));
+    if(method==="POST"&&(m=path.match(/^\/api\/admin\/support-tickets\/([^/]+)\/messages$/)))return adminSupportReply(request,env,decodeURIComponent(m[1]));
     if(method==="GET"&&path==="/api/admin/operations/health")return operationalHealth(request,env);
     if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/operations\/alerts\/([^/]+)\/resolve$/)))return resolveAlert(request,env,decodeURIComponent(m[1]));
     return null;
