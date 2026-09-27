@@ -477,7 +477,7 @@ async function routeApi(request, env, ctx, url) {
     }
     return json({
       ok:true,
-      release:"complete-platform-2026-09-27.11",
+      release:"complete-platform-2026-09-27.12",
       database:"D1",
       storage:"R2",
       email:Boolean(env.RESEND_API_KEY),
