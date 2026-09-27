@@ -81,7 +81,9 @@
     if (options.body && !(options.body instanceof FormData) && typeof options.body !== "string") { init.headers.set("Content-Type", "application/json"); init.body = JSON.stringify(options.body); }
     try {
       const response = await fetch(path, init); const type = response.headers.get("content-type") || ""; const data = type.includes("application/json") ? await response.json() : null;
-      if (!response.ok) { const error = new Error(data?.error || "הפעולה לא הושלמה"); if (data && typeof data === "object") Object.assign(error, data); throw error; } return data;
+      if (!response.ok) { const error = new Error(data?.error || "הפעולה לא הושלמה"); if (data && typeof data === "object") Object.assign(error, data); throw error; }
+      if (data && typeof data === "object" && response.headers.get("X-Data-Stale") === "1") data._stale = true;
+      return data;
     } catch (error) {
       if (error?.name === "AbortError") throw new Error("השרת מתעכב. אפשר להמשיך לעיין ולנסות שוב בעוד רגע.");
       throw error;
@@ -194,8 +196,10 @@
       for (const id of state.compareIds) if (!state.items.some(item => String(item.id) === id)) state.compareIds.delete(id);
       applyFilters();
       renderCompareTray();
-      state.serverAvailable = true;
-      $("#connection-banner").hidden = true;
+      state.serverAvailable = !data._stale;
+      const banner = $("#connection-banner");
+      banner.hidden = !data._stale;
+      if (data._stale) banner.querySelector("span").textContent = "השירות החי אינו זמין כרגע. מוצג snapshot אחרון של הקטלוג; זמינות הפריטים עשויה להשתנות.";
     } catch (error) {
       console.error("Unable to load items", error);
       const cachedItems = readCatalogCache();
