@@ -152,3 +152,11 @@ for(const token of ["image/svg+xml","X-Gmach-QR-Payload","<metadata>"])assert.ok
 for(const token of ["lr.workflow_status","lr.extension_status","lr.change_pending_json","lr.cancellation_undo_until"])assert.ok(worker.includes(token),token+" missing from dashboard workflow state");
 
 for(const token of ["data-manager-cancel","ביטול מצד הגמ״ח","managerCancel"])assert.ok(appClient.includes(token),token+" missing from approved-loan manager cancellation UI");
+
+for(const token of ["expiredHolds","missedPickups","hold_expired","pickup_expired"])assert.ok(worker.includes(token),token+" missing from hold/no-show maintenance");
+
+for(const token of ["data-pickup-expiry","pickup-expired"])assert.ok(appClient.includes(token),token+" missing from missed pickup recovery UI");
+
+for(const token of ["data-org-reviews","openOrganizationReviews","data-respond-review"])assert.ok(appClient.includes(token),token+" missing from organization review response UI");
+
+for(const token of ["data-edit-my-review","הביקורות שלי"])assert.ok(finalClient.includes(token),token+" missing from review editing UI");
