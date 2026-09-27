@@ -540,9 +540,18 @@ async function routeApi(request, env, ctx, url) {
   const requestMessages = path.match(/^\/api\/loan-requests\/([^/]+)\/messages$/);
   if (method === "GET" && requestMessages) return listRequestMessages(request, env, decodeURIComponent(requestMessages[1]));
   if (method === "POST" && requestMessages) return createRequestMessage(request, env, decodeURIComponent(requestMessages[1]));
+  const requestAttachment=path.match(/^\/api\/loan-requests\/([^/]+)\/chat-attachment$/);
+  if(method==="POST"&&requestAttachment)return uploadRequestChatAttachment(request,env,decodeURIComponent(requestAttachment[1]));
+  const requestRich=path.match(/^\/api\/loan-requests\/([^/]+)\/chat-rich$/);
+  if(method==="POST"&&requestRich){const b=await readJson(request);return createRequestMessage(new Request(request.url,{method:"POST",headers:request.headers,body:JSON.stringify(b.type==="location"?{messageType:"location",latitude:b.metadata?.lat,longitude:b.metadata?.lon,label:b.metadata?.label}:{messageType:"item_card",itemId:b.metadata?.itemId})}),env,decodeURIComponent(requestRich[1]));}
+
   const requestMessage = path.match(/^\/api\/messages\/([^/]+)$/);
   if (method === "PATCH" && requestMessage) return editRequestMessage(request, env, decodeURIComponent(requestMessage[1]));
   if (method === "DELETE" && requestMessage) return deleteRequestMessage(request, env, decodeURIComponent(requestMessage[1]));
+  const reportMessage=path.match(/^\/api\/messages\/([^/]+)\/report$/);
+  if(method==="POST"&&reportMessage)return reportRequestMessage(request,env,decodeURIComponent(reportMessage[1]));
+  const blockUser=path.match(/^\/api\/users\/([^/]+)\/block$/);
+  if(method==="POST"&&blockUser)return blockChatUser(request,env,decodeURIComponent(blockUser[1]));
   const helpOffers = path.match(/^\/api\/help-requests\/([^/]+)\/offers$/);
   if (method === "GET" && helpOffers) return listHelpOffers(request, env, decodeURIComponent(helpOffers[1]));
   if (method === "POST" && helpOffers) return createHelpOffer(request, env, decodeURIComponent(helpOffers[1]));
@@ -2104,6 +2113,44 @@ async function createRequestMessage(request, env, requestId) {
     notificationStatement(env, recipientId, "message", `הודעה חדשה על ${row.item_title}`, `${user.full_name}: ${message.slice(0, 120)}`, requestId)
   ]);
   return json({ message: { id, request_id: requestId, sender_id: user.id, sender_name: user.full_name, body: message,message_type:messageType,metadata,isMine: true, created_at: createdAt } }, 201);
+}
+
+async function uploadRequestChatAttachment(request,env,requestId){
+  const {user,row,participant}=await getRequestParticipant(request,env,requestId,{allowAdmin:false});
+  if(!participant)throw new HttpError(403,"רק הצדדים להשאלה יכולים לצרף קובץ");
+  if(row.returned_at&&Date.now()-Date.parse(row.returned_at)>14*86400000)throw new HttpError(409,"השיחה נסגרה 14 ימים לאחר החזרת הפריט");
+  const form=await request.formData(),file=form.get("file"),kind=String(form.get("type")||"image");
+  if(!(file instanceof File)||!file.size)throw new HttpError(400,"לא נבחר קובץ");
+  const imageTypes=new Map([["image/jpeg","jpg"],["image/png","png"],["image/webp","webp"]]);
+  const audioTypes=new Map([["audio/webm","webm"],["audio/ogg","ogg"],["audio/mp4","m4a"],["audio/mpeg","mp3"]]);
+  const types=kind==="audio"?audioTypes:imageTypes,ext=types.get(file.type);
+  if(!ext)throw new HttpError(400,kind==="audio"?"סוג קובץ הקול אינו נתמך":"סוג התמונה אינו נתמך");
+  const max=kind==="audio"?10*1024*1024:5*1024*1024;if(file.size>max)throw new HttpError(400,"הקובץ גדול מדי");
+  const key=`chat/${user.id}/${requestId}/${crypto.randomUUID()}.${ext}`;
+  await env.ITEM_IMAGES.put(key,file.stream(),{httpMetadata:{contentType:file.type,cacheControl:"private, max-age=86400"}});
+  const id=crypto.randomUUID(),recipientId=row.borrower_id===user.id?row.owner_id:row.borrower_id,now=new Date().toISOString();
+  try{
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO request_messages(id,request_id,sender_id,body,message_type,media_url,metadata_json) VALUES(?,?,?,?,?,?,?)").bind(id,requestId,user.id,kind==="audio"?"הודעה קולית":"תמונה",kind,"/media/"+key,JSON.stringify({contentType:file.type,size:file.size})),
+      notificationStatement(env,recipientId,"message",`הודעה חדשה על ${row.item_title}`,kind==="audio"?"נשלחה הודעה קולית":"נשלחה תמונה",requestId)
+    ]);
+  }catch(e){await env.ITEM_IMAGES.delete(key);throw e}
+  return json({ok:true,message:{id,request_id:requestId,sender_id:user.id,message_type:kind,media_url:"/media/"+key,created_at:now}},201);
+}
+async function reportRequestMessage(request,env,messageId){
+  const user=await requireUser(request,env),b=await readJson(request),reason=cleanText(b.reason,2,500,"סיבת הדיווח");
+  const m=await env.DB.prepare("SELECT request_id,sender_id FROM request_messages WHERE id=?").bind(messageId).first();if(!m)throw new HttpError(404,"ההודעה לא נמצאה");
+  await getRequestParticipant(request,env,m.request_id);if(m.sender_id===user.id)throw new HttpError(400,"לא ניתן לדווח על הודעה ששלחתם");
+  await env.DB.prepare("INSERT OR IGNORE INTO message_reports(id,message_id,reporter_id,reason) VALUES(?,?,?,?)").bind(crypto.randomUUID(),messageId,user.id,reason).run();
+  return json({ok:true});
+}
+async function blockChatUser(request,env,blockedId){
+  const user=await requireUser(request,env);if(user.id===blockedId)throw new HttpError(400,"לא ניתן לחסום את עצמכם");
+  const exists=await env.DB.prepare("SELECT id FROM users WHERE id=? AND deleted_at IS NULL").bind(blockedId).first();if(!exists)throw new HttpError(404,"המשתמש לא נמצא");
+  const b=await readJson(request),after=b.effectiveAfterRequestId?cleanText(b.effectiveAfterRequestId,1,100,"השאלה"):null;
+  if(after)await getRequestParticipant(request,env,after);
+  await env.DB.prepare("INSERT INTO user_blocks(blocker_id,blocked_id,effective_after_request_id) VALUES(?,?,?) ON CONFLICT(blocker_id,blocked_id) DO UPDATE SET effective_after_request_id=excluded.effective_after_request_id").bind(user.id,blockedId,after).run();
+  return json({ok:true,effectiveAfterRequestId:after});
 }
 
 async function decideLoanExtension(request,env,requestId){const {user,loan}=await loanAccess(request,env,requestId);if(user.id===loan.borrower_id&&user.role!=="admin")throw new HttpError(403,"רק מנהל הגמ״ח יכול להחליט על הארכה");if(loan.extension_status!=="pending"||!loan.extension_until)throw new HttpError(409,"אין בקשת הארכה ממתינה");const body=await readJson(request),decision=String(body.decision||"");if(!["approved","declined"].includes(decision))throw new HttpError(400,"יש לבחור אישור או דחייה");const now=new Date().toISOString();if(decision==="approved"){const available=await availableQuantityForRange(env,loan.item_id,loan.requested_until,loan.extension_until,0,requestId);if(available<Number(loan.quantity||1))throw new HttpError(409,"לא ניתן לאשר את ההארכה כי קיימת התנגשות מלאי");await env.DB.batch([env.DB.prepare("UPDATE loan_requests SET requested_until=extension_until,extension_status='approved',workflow_status=CASE WHEN status='collected' THEN 'awaiting_return' ELSE workflow_status END,updated_at=? WHERE id=?").bind(now,requestId),env.DB.prepare("INSERT INTO loan_status_events(id,request_id,status,actor_id,note) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),requestId,"extension_approved",user.id,cleanOptional(body.note,500)),notificationStatement(env,loan.borrower_id,"status","בקשת ההארכה אושרה","מועד ההחזרה החדש אושר.",requestId)]);return json({ok:true,status:"approved"});}await env.DB.batch([env.DB.prepare("UPDATE loan_requests SET extension_status='declined',updated_at=? WHERE id=?").bind(now,requestId),env.DB.prepare("INSERT INTO loan_status_events(id,request_id,status,actor_id,note) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),requestId,"extension_declined",user.id,cleanOptional(body.note,500)),notificationStatement(env,loan.borrower_id,"status","בקשת ההארכה נדחתה","מועד ההחזרה המקורי נשאר בתוקף.",requestId)]);return json({ok:true,status:"declined"});}
