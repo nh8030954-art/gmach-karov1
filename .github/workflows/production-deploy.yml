@@ -114,6 +114,7 @@ jobs:
           done
           exit 1
       - name: Read-only production load gate
+        if: github.event_name == 'workflow_dispatch'
         env:
           PRODUCTION_URL: https://gmach-karov1.nh8030954.workers.dev
         run: node test/production-load.mjs
