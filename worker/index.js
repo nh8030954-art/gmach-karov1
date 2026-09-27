@@ -417,6 +417,7 @@ async function routeApi(request, env, ctx, url) {
     return json({ user: user ? publicUser(user) : null });
   }
   if (method === "GET" && path === "/api/public-config") return json({ supportEmail: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL), pushPublicKey: String(env.VAPID_PUBLIC_KEY || "") });
+  if (method === "GET" && path === "/api/unsubscribe/community") return unsubscribeCommunity(env,url.searchParams.get("token"));
   if (method === "GET" && path === "/api/categories") return listCategories(env, url);
   if (method === "POST" && path === "/api/support") return createSupportRequest(request, env, ctx);
   if (method === "GET" && path === "/api/me/profile") return getProfile(request, env);
@@ -2695,6 +2696,18 @@ async function enforcePublicRateLimit(env, identityValue, action, ctx, limit = 1
   ctx?.waitUntil(env.DB.prepare("DELETE FROM abuse_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')").run());
 }
 
+async function communityUnsubscribeToken(env,userId){
+  const secret=String(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY||"");if(!secret)return null;
+  const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
+  const sig=new Uint8Array(await crypto.subtle.sign("HMAC",key,new TextEncoder().encode("community-unsubscribe:"+userId)));
+  return userId+"."+toBase64Url(sig);
+}
+async function unsubscribeCommunity(env,token){
+  const [userId,sig]=String(token||"").split(".");if(!userId||!sig)throw new HttpError(400,"קישור ההסרה אינו תקין");
+  const expected=await communityUnsubscribeToken(env,userId);if(!expected||expected!==token)throw new HttpError(403,"קישור ההסרה אינו תקף");
+  await env.DB.prepare("UPDATE users SET community_emails_accepted=0,updated_at=? WHERE id=?").bind(new Date().toISOString(),userId).run();
+  return new Response("<!doctype html><meta charset=utf-8><title>גמ״ח ברגע</title><main dir=rtl style='font-family:Arial;max-width:600px;margin:60px auto'><h1>העדכונים הופסקו</h1><p>הוסרת בהצלחה עדכוני קהילה באימייל. הודעות תפעוליות חיוניות לחשבון אינן מושפעות.</p></main>",{headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store"}});
+}
 async function vapidJwt(env,endpoint){
   const pub=fromBase64Url(env.VAPID_PUBLIC_KEY||""),priv=fromBase64Url(env.VAPID_PRIVATE_KEY||"");
   if(pub.length!==65||pub[0]!==4||priv.length!==32)throw new Error("Invalid VAPID key material");
@@ -2721,12 +2734,13 @@ async function sendOperationalNotificationEmail(env,user,notification){
   if(template&&Number(template.enabled)===0)return false;
   const render=s=>String(s||"").replaceAll("{{title}}",notification.title||"").replaceAll("{{body}}",notification.body||"").replaceAll("{{account_url}}",accountUrl);
   const subject=template?.subject?render(template.subject):(en?"Gmach Berega update":notification.title),plain=template?.body_text?render(template.body_text):(en?`You have a new update in Gmach Berega. Open your account for details.\n\n${notification.title}\n${notification.body}`:`${notification.title}\n\n${notification.body}`);
-  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],subject,text:plain,html:`<div dir="${en?"ltr":"rtl"}" style="font-family:Arial,sans-serif;max-width:560px;margin:auto"><h2>${escapeHtmlEmail(subject)}</h2><p style="white-space:pre-line">${escapeHtmlEmail(plain)}</p><p><a href="${accountUrl}">${en?"Open account":"פתיחת האזור האישי"}</a></p></div>`,reply_to:String(env.SUPPORT_EMAIL||DEFAULT_SUPPORT_EMAIL)})});
+  const unsubToken=Number(user.community_emails_accepted)?await communityUnsubscribeToken(env,user.id):null,unsubUrl=unsubToken?"https://gmach-karov1.nh8030954.workers.dev/api/unsubscribe/community?token="+encodeURIComponent(unsubToken):null,finalPlain=plain+(unsubUrl?(en?"\n\nUnsubscribe from community updates: ":"\n\nהסרה מעדכוני קהילה: ")+unsubUrl:"");
+  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],subject,text:finalPlain,html:`<div dir="${en?"ltr":"rtl"}" style="font-family:Arial,sans-serif;max-width:560px;margin:auto"><h2>${escapeHtmlEmail(subject)}</h2><p style="white-space:pre-line">${escapeHtmlEmail(plain)}</p><p><a href="${accountUrl}">${en?"Open account":"פתיחת האזור האישי"}</a></p></div>`,reply_to:String(env.SUPPORT_EMAIL||DEFAULT_SUPPORT_EMAIL)})});
   if(!response.ok)throw new Error("Email provider returned "+response.status);return true;
 }
 async function deliverNotificationChannels(env){
   const nowIso=new Date().toISOString(),clock=israelClock();
-  const rows=await env.DB.prepare(`SELECT n.id,n.user_id,n.type,n.title,n.body,n.request_id,n.created_at,u.email,u.preferred_language,
+  const rows=await env.DB.prepare(`SELECT n.id,n.user_id,n.type,n.title,n.body,n.request_id,n.created_at,u.email,u.preferred_language,u.community_emails_accepted,
     COALESCE(p.email,CASE WHEN n.type IN ('request','status') THEN 1 ELSE 0 END) pref_email,
     COALESCE(p.push,0) pref_push,COALESCE(p.digest,'immediate') digest,p.quiet_start,p.quiet_end
     FROM notifications n JOIN users u ON u.id=n.user_id
