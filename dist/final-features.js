@@ -12,11 +12,11 @@ async function api(path,options={}){
 }
 function notice(message,error=false){
   let n=$("#final-feature-notice");if(!n){n=document.createElement("div");n.id="final-feature-notice";n.setAttribute("role","status");n.style.cssText="position:fixed;z-index:100000;left:16px;right:16px;bottom:16px;max-width:620px;margin:auto;padding:12px 16px;border-radius:12px;color:#fff;box-shadow:0 10px 40px #0003";document.body.append(n)}
-  n.style.background=error?"#8b1e2d":"#17365d";n.textContent=message;n.hidden=false;clearTimeout(n._t);n._t=setTimeout(()=>n.hidden=true,4200);
+  n.style.background=error?"#8b1e2d":"#17365d";n.textContent=window.GmachTranslate?.(message)||message;n.hidden=false;clearTimeout(n._t);n._t=setTimeout(()=>n.hidden=true,4200);
 }
 function modal(title,html){
   let d=$("#final-feature-dialog");if(!d){d=document.createElement("dialog");d.id="final-feature-dialog";d.className="platform-dialog";document.body.append(d)}
-  d.innerHTML=`<div class="platform-dialog-inner" dir="rtl"><div class="platform-dialog-head"><h2>${esc(title)}</h2><button type="button" class="platform-dialog-close" aria-label="סגירה">×</button></div><div id="final-feature-body">${html}</div></div>`;
+  d.innerHTML=`<div class="platform-dialog-inner" dir="${document.documentElement.lang==="en"?"ltr":"rtl"}"><div class="platform-dialog-head"><h2>${esc(title)}</h2><button type="button" class="platform-dialog-close" aria-label="סגירה">×</button></div><div id="final-feature-body">${html}</div></div>`;
   $(".platform-dialog-close",d).onclick=()=>d.close();d.showModal();return d;
 }
 async function installTour(){
