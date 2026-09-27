@@ -247,6 +247,7 @@ export default {
         await ensureAdvancedBookingSchema(env);
         await ensureProductionHardeningSchema(env);
         await ensureCompletePlatformSchema(env);
+        await ensureReviewBranchRatingSchema(env);
         await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env),ensureDistributionCompletionSchema(env),ensureNavigationAdminSchema(env),ensurePrivacyAvailabilitySchema(env),ensurePrivacyPurgeSchema(env),ensureCommunityChatSchema(env)]);
       }
       await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env), runPrivacyPurgeMaintenance(env), runCommunityChatMaintenance(env)]);
@@ -491,7 +492,7 @@ async function routeApi(request, env, ctx, url) {
     }
     return json({
       ok:true,
-      release:"complete-platform-2026-09-27.14",
+      release:"complete-platform-2026-09-27.15",
       database:"D1",
       storage:"R2",
       email:Boolean(env.RESEND_API_KEY),
@@ -1539,8 +1540,28 @@ async function createHelpRequest(request, env) {
   return json({ request: { id, status: "open",requestedFrom,requestedUntil,distanceKm } }, 201);
 }
 
+let reviewBranchRatingSchemaPromise = null;
+async function ensureReviewBranchRatingSchema(env) {
+  if (reviewBranchRatingSchemaPromise) return reviewBranchRatingSchemaPromise;
+  reviewBranchRatingSchemaPromise = (async () => {
+    const columns = await env.DB.prepare("PRAGMA table_info(reviews)").all();
+    if ((columns.results || []).some(column => column.name === "branch_rating")) return true;
+    try {
+      await env.DB.prepare("ALTER TABLE reviews ADD COLUMN branch_rating INTEGER CHECK (branch_rating BETWEEN 1 AND 5)").run();
+    } catch (error) {
+      if (!/duplicate column name/i.test(String(error))) throw error;
+    }
+    return true;
+  })().catch(error => {
+    reviewBranchRatingSchemaPromise = null;
+    throw error;
+  });
+  return reviewBranchRatingSchemaPromise;
+}
+
 async function createReview(request, env) {
   const user = await requireUser(request, env); const body = await readJson(request);
+  await ensureReviewBranchRatingSchema(env);
   const requestId = cleanText(body.requestId,1,100,"בקשה");
   const rating = Number(body.organizationRating); const itemRating = Number(body.itemRating); const serviceRating = Number(body.serviceRating); const branchRating = body.branchRating==null?null:Number(body.branchRating);
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) throw new HttpError(400, "דירוג הגמ״ח חייב להיות בין 1 ל־5");
