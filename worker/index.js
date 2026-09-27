@@ -2510,6 +2510,8 @@ async function runScheduledMaintenance(env) {
   const scheduledItems=await env.DB.prepare(`SELECT i.id,i.title,i.description,i.city,i.category,i.condition,o.name organization_name FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.status='pending' AND i.publish_at IS NOT NULL AND i.publish_at<=?`).bind(now).all();
   for(const item of scheduledItems.results||[]){await env.DB.prepare("UPDATE items SET status='active',updated_at=? WHERE id=? AND status='pending'").bind(now,item.id).run();await notifyMatchingSavedSearches(env,{id:item.id,title:item.title,description:item.description,organizationName:item.organization_name,city:item.city,category:item.category,condition:item.condition})}
   const newlyOverdue=await env.DB.prepare(`SELECT lr.id,lr.borrower_id,i.title,o.owner_id FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.status='collected' AND lr.requested_until<? AND lr.workflow_status!='overdue'`).bind(now).all();
+  const expiredHolds=await env.DB.prepare(`SELECT h.id,h.request_id,h.item_id,lr.borrower_id,i.title,o.owner_id FROM inventory_holds h JOIN loan_requests lr ON lr.id=h.request_id JOIN items i ON i.id=h.item_id JOIN organizations o ON o.id=i.organization_id WHERE h.status='active' AND h.expires_at<=? AND lr.status='pending'`).bind(now).all();
+  const missedPickups=await env.DB.prepare(`SELECT lr.id,lr.item_id,lr.borrower_id,i.title,o.owner_id FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.status='approved' AND lr.pickup_expires_at IS NOT NULL AND lr.pickup_expires_at<=? AND lr.workflow_status='approved_ready_for_pickup'`).bind(now).all();
   await env.DB.batch([
     env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now),
     env.DB.prepare("DELETE FROM auth_challenges WHERE expires_at <= ?").bind(now),
@@ -2527,6 +2529,19 @@ async function runScheduledMaintenance(env) {
     notificationStatement(env,row.borrower_id,"status","ההשאלה באיחור",`מועד ההחזרה של ${row.title} עבר. החזירו את הפריט בהקדם או בקשו הארכה מהאזור האישי.`,row.id),
     notificationStatement(env,row.owner_id,"status","השאלה באיחור",`${row.title} עדיין לא סומן כהוחזר. ניתן ליצור קשר עם השואל דרך הבקשה.`,row.id),
     env.DB.prepare("INSERT INTO loan_request_events(id,request_id,actor_id,event_type,details_json) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),row.id,null,"overdue",JSON.stringify({detectedAt:now}))
+  ]);
+  for(const row of expiredHolds.results||[]){await env.DB.batch([
+    env.DB.prepare("UPDATE inventory_holds SET status='released' WHERE id=? AND status='active'").bind(row.id),
+    env.DB.prepare("UPDATE loan_requests SET status='cancelled',workflow_status='hold_expired',cancelled_at=?,updated_at=? WHERE id=? AND status='pending'").bind(now,now,row.request_id),
+    notificationStatement(env,row.borrower_id,"status","שמירת המלאי פגה",`שמירת המלאי עבור ${row.title} פגה משום שהבקשה לא אושרה בזמן.`,row.request_id),
+    notificationStatement(env,row.owner_id,"status","שמירת מלאי פגה",`בקשת ההשאלה עבור ${row.title} שוחררה והמלאי זמין שוב.`,row.request_id),
+    env.DB.prepare("INSERT INTO loan_request_events(id,request_id,actor_id,event_type,details_json) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),row.request_id,null,"hold_expired",JSON.stringify({expiredAt:now}))
+  ]);await advanceWaitlist(env,row.item_id)}
+  for(const row of missedPickups.results||[]) await env.DB.batch([
+    env.DB.prepare("UPDATE loan_requests SET workflow_status='pickup_expired',updated_at=? WHERE id=? AND workflow_status='approved_ready_for_pickup'").bind(now,row.id),
+    notificationStatement(env,row.borrower_id,"status","חלון האיסוף הסתיים",`חלון האיסוף של ${row.title} הסתיים. אפשר לבקש תיאום חדש או לבטל את הבקשה.`,row.id),
+    notificationStatement(env,row.owner_id,"status","אי הגעה לאיסוף",`חלון האיסוף של ${row.title} הסתיים ללא סימון איסוף.`,row.id),
+    env.DB.prepare("INSERT INTO loan_request_events(id,request_id,actor_id,event_type,details_json) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),row.id,null,"pickup_expired",JSON.stringify({expiredAt:now}))
   ]);
 
 }
