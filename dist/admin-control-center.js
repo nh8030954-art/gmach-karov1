@@ -29,7 +29,8 @@ const sections=[
  ["holidays",t("חגים","Holidays")],
  ["emails",t("תבניות מייל","Email templates")],
  ["moderation",t("מודרציה","Moderation")],
- ["security",t("אבטחה","Security")]
+ ["security",t("אבטחה","Security")],
+ ["exports",t("ייצוא נתונים","Data exports")]
 ];
 async function openCenter(){
  const d=dialog(),tabs=$("[data-control-tabs]",d),body=$("[data-control-body]",d);
@@ -45,6 +46,7 @@ async function openCenter(){
      if(id==="emails")await renderEmails(body);
      if(id==="moderation")await renderModeration(body);
      if(id==="security")await renderSecurity(body);
+     if(id==="exports")await renderExports(body);
    }catch(e){body.innerHTML='<div class="dashboard-empty"><strong>'+t("לא הצלחנו לטעון את המסך","Could not load this screen")+'</strong><p>'+esc(e.message)+'</p></div>'}
  }
  $$("[data-control-tab]",d).forEach(b=>b.onclick=()=>show(b.dataset.controlTab));
@@ -108,6 +110,16 @@ async function renderModeration(root){
 async function renderSecurity(root){
  const x=await api("/api/admin/security-events"),rows=x.events||[];
  root.innerHTML='<div class="dashboard-section"><h3>'+t("אירועי אבטחה","Security events")+'</h3><div style="display:grid;gap:8px">'+rows.map(r=>'<article class="dashboard-row"><div><strong>'+esc(r.event_type)+' · '+esc(r.severity)+'</strong><p>'+esc(r.device_label||"")+'</p><small>'+esc(fmt(r.created_at))+' · '+esc(r.user_id||"")+'</small></div></article>').join("")||"<p>"+t("אין אירועי אבטחה.","No security events.")+"</p>"+'</div></div>';
+}
+function renderExports(root){
+ const rows=[
+  ["users",t("משתמשים","Users"),t("חשבונות, תפקידים וסטטוס","Accounts, roles and status")],
+  ["organizations",t("גמ״חים","Organizations"),t("פרטי גמ״חים וסטטוס","Organization details and status")],
+  ["items",t("פריטים","Items"),t("קטלוג, מלאי וסטטוס","Catalog, inventory and status")],
+  ["loans",t("השאלות","Loans"),t("בקשות, תאריכים וסטטוס תהליך","Requests, dates and workflow status")],
+  ["support",t("תמיכה","Support"),t("פניות, עדיפות והקצאה","Tickets, priority and assignment")]
+ ];
+ root.innerHTML='<div class="dashboard-section"><h3>'+t("ייצוא נתוני מערכת","System data exports")+'</h3><p>'+t("הורדת CSV עם קידוד UTF-8 לפתיחה ישירה ב-Excel.","Download UTF-8 CSV files ready for Excel.")+'</p><div style="display:grid;gap:8px">'+rows.map(r=>'<article class="dashboard-row"><div><strong>'+esc(r[1])+'</strong><p>'+esc(r[2])+'</p></div><a class="button button-secondary button-small" href="/api/admin/export.csv?type='+encodeURIComponent(r[0])+'" download>'+t("ייצוא CSV","Export CSV")+'</a></article>').join("")+'</div></div>';
 }
 function install(){
  const tab=$("#admin-tab"),actions=$("#dashboard-view .dashboard-actions");

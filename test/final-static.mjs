@@ -347,3 +347,14 @@ assert.ok(appClient.includes("openCommunityOfferChat"),"community offer chat UI 
 assert.ok(appClient.includes("chat-retention-note"),"loan chat retention notice missing");
 assert.ok(finalClient.includes("קריאה בלבד"),"chat media readonly guard missing");
 console.log("Community chat retention static release gate passed.");
+
+const releaseShell=await readFile("dist/release-shell.js","utf8");
+const swClient=await readFile("dist/sw.js","utf8");
+const manifestText=await readFile("dist/manifest.webmanifest","utf8");
+for(const token of ["beforeinstallprompt","serviceWorker.register","connection-status-banner","appinstalled"])assert.ok(releaseShell.includes(token),token+" missing from release shell");
+for(const token of ["CACHE_NAME","caches.open","req.mode===\"navigate\"","notificationclick"])assert.ok(swClient.includes(token),token+" missing from service worker");
+assert.ok(indexHtml.includes('rel="manifest"'),"web app manifest is not linked");
+assert.ok(indexHtml.includes("./release-shell.js"),"release shell is not loaded");
+assert.equal(JSON.parse(manifestText).display,"standalone");
+assert.ok((await readFile("worker/launch-readiness.js","utf8")).includes("/api/admin/export.csv"),"admin CSV export route missing");
+assert.ok((await readFile("dist/admin-control-center.js","utf8")).includes("ייצוא נתונים"),"admin export UI missing");
