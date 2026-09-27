@@ -1,4 +1,5 @@
 import { handleRemainingFeatures, runRemainingMaintenance, ensureRemainingFeaturesSchema } from "./remaining-features.js";
+import { handleRequirementsExpansion, requirementsExpansionPreflight, runRequirementsExpansionMaintenance, ensureRequirementsExpansionSchema } from "./requirements-expansion.js";
 import { handleFinalFeatures, runFinalMaintenance, ensureFinalFeaturesSchema } from "./final-features.js";
 import { platformPreflight, handlePlatformCompletionApi, runPlatformCompletionMaintenance, sessionMetadata, ensurePlatformCompletionSchema, recordSecurityFailure } from "./platform-completion.js";
 const SESSION_COOKIE = "gmach_session";
@@ -112,6 +113,8 @@ export default {
       if (url.pathname.startsWith("/api/")) {
         const preflight = await platformPreflight(request, env, url);
         if (preflight) return withSecurityHeaders(preflight);
+        const expansionPreflight = await requirementsExpansionPreflight(request, env, url);
+        if (expansionPreflight) return withSecurityHeaders(expansionPreflight);
         const completionResponse = await handlePlatformCompletionApi(request, env, ctx, url);
         if (completionResponse) return withSecurityHeaders(completionResponse);
         const response = await routeApi(request, env, ctx, url);
@@ -139,7 +142,7 @@ export default {
     }
   },
   async scheduled(_event, env, ctx) {
-    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env)]); })());
+    ctx.waitUntil((async()=>{ await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env)]); await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env)]); })());
   }
 };
 
@@ -589,6 +592,8 @@ async function routeApi(request, env, ctx, url) {
   if (finalFeaturesResponse) return finalFeaturesResponse;
   const remainingFeaturesResponse = await handleRemainingFeatures(request, env, ctx, url);
   if (remainingFeaturesResponse) return remainingFeaturesResponse;
+  const requirementsExpansionResponse = await handleRequirementsExpansion(request, env, ctx, url);
+  if (requirementsExpansionResponse) return requirementsExpansionResponse;
 
   throw new HttpError(404, "הכתובת לא נמצאה");
 }
