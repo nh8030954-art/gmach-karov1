@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: provision-external-features
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   provision:
@@ -92,7 +92,6 @@ jobs:
 
       - name: Provision Turnstile when missing and permitted
         if: steps.cf.outputs.enabled == 'true'
-        continue-on-error: true
         run: |
           TURNSTILE="$(node -e "const x=require(process.env.RUNNER_TEMP+'/features.json');process.stdout.write(String(Boolean(x.turnstileEnabled)))")"
           if [ "$TURNSTILE" = "true" ]; then
