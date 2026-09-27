@@ -192,3 +192,10 @@ for(const token of ["categoryAliases","loadCategoryAliases","dynamicAliases","sy
 for(const token of ["pendingCommunityItem","data-create-help-item","קושר אוטומטית לבקשת הקהילה"])assert.ok((appClient+remainingClient).includes(token),token+" missing from create-and-link community item flow");
 for(const token of ["data-board-share","?help=","sharedHelp"])assert.ok(appClient.includes(token),token+" missing from shareable community request flow");
 assert.ok(finalWorker.includes("request:hr"),"community smart matches must return request context");
+
+
+for(const token of ["operations-export.csv","range:{from:rangeFrom","daily:daily.results","upcoming:upcoming.results","filters:{branches"])assert.ok(remainingWorker.includes(token),token+" missing from expanded manager reporting backend");
+for(const token of ["ops-filters","מגמת בקשות","לוח פעולות קרובות","ייצוא פעולות מסוננות ל-CSV"])assert.ok(remainingClient.includes(token),token+" missing from expanded manager reporting UI");
+for(const token of ["orgQuery","orgCity","orgCategory","minRating","orgAvailable","available_items"])assert.ok(worker.includes(token),token+" missing from advanced gmach discovery backend");
+for(const token of ["advanced-gmach-search","openAdvancedGmachSearch","data-advanced-org","רק גמ״חים עם פריט זמין"])assert.ok(appClient.includes(token),token+" missing from advanced gmach search UI");
+for(const token of ["openSupportForError","data-support-organization","dashboard-support-error"])assert.ok(appClient.includes(token),token+" missing from support-ready error handling");
