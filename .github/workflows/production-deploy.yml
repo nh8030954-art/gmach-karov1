@@ -94,3 +94,8 @@ jobs:
             sleep 10
           done
           exit 1
+      - name: Verify external security and notification configuration
+        run: |
+          FEATURES="$(curl --fail --silent --show-error https://gmach-karov1.nh8030954.workers.dev/api/platform/features)"
+          echo "$FEATURES"
+          printf '%s' "$FEATURES" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s);if(!x.turnstileEnabled||!x.turnstileSiteKey)throw new Error('Turnstile is not active in production');if(!x.pushConfigured||!x.vapidPublicKey)throw new Error('Web Push VAPID is not active in production');if(!x.backups||!x.calendar||!x.chatMedia||!x.geocoding)throw new Error('One or more required platform capabilities are inactive')})"
