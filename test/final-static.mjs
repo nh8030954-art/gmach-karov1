@@ -253,3 +253,15 @@ for(const token of ["moderation?.autoHidden","moderation?.reviewRequired"])asser
 for(const token of ["moderateChatImage","validJpeg","validPng","validWebp","chat_image","reviewRequired"])assert.ok(platform.includes(token),token+" missing from chat image validation/moderation");
 assert.ok(finalClient.includes("התמונה נשלחה לבדיקת תוכן נוספת לפני טיפול מנהל."),"chat moderation feedback missing");
 assert.ok(finalWorker.includes('new Set(["LCP","CLS","INP","PAGE_LOAD","JS_ERROR"])'),"performance telemetry allowlist missing");
+
+
+const distributionWorker=await readFile("worker/distribution-completion.js","utf8");
+const distributionClient=await readFile("dist/distribution-completion.js","utf8");
+const distributionMigration=await readFile("migrations/0021_distribution_completion.sql","utf8");
+for(const token of ["/api/search/branches","/api/admin/support-tickets","/messages","/api/admin/server-errors","recordDistributionError","runDistributionCompletionMaintenance"]) assert.ok(distributionWorker.includes(token),token+" missing from distribution completion backend");
+for(const token of ["חיפוש סניפים ונקודות איסוף","מרכז תמיכה","תקלות שרת","data-use-location","data-admin-ticket"]) assert.ok(distributionClient.includes(token),token+" missing from distribution completion UI");
+for(const token of ["server_errors","priority","assigned_to","last_staff_reply_at"]) assert.ok(distributionMigration.includes(token),token+" missing from distribution completion migration");
+assert.ok(worker.includes("handleDistributionCompletion"),"distribution completion handler not wired");
+assert.ok(worker.includes("recordDistributionError"),"server error recording not wired");
+assert.ok(indexHtml.includes("./distribution-completion.js"),"distribution completion client not loaded");
+console.log("Distribution completion static release gate passed.");
