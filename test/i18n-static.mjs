@@ -30,7 +30,7 @@ assert.deepEqual(errors,[],'Every literal server error shown to English users re
 assert.ok(html.indexOf('i18n-errors.js')<html.indexOf('remaining-features.js'),'Load server error translations before runtime');
 const missing=hebrew.filter(s=>!keys.has(s));
 const coverage=1-missing.length/hebrew.length;
-assert.ok(coverage>=0.97,`English coverage for static UI is ${(coverage*100).toFixed(1)}%; missing: ${missing.join(' | ')}`);
+assert.equal(missing.length,0,`English static UI is missing translations: ${missing.join(' | ')}`);
 assert.ok(html.indexOf('i18n-en.js')<html.indexOf('remaining-features.js'),'Load English translations before language runtime');
 assert.ok(html.indexOf('i18n-boot.js')<html.indexOf('styles.css'),'Select the stored language before first paint');
 const runtimeLogic=runtime.slice(runtime.indexOf('function replaceTranslatedPhrase'),runtime.indexOf('function translateNode'));
