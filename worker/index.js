@@ -2716,8 +2716,12 @@ function israelClock(){
 function inQuietHours(now,start,end){if(!start||!end||start===end)return false;return start<end?now>=start&&now<end:now>=start||now<end}
 async function sendOperationalNotificationEmail(env,user,notification){
   if(!env.RESEND_API_KEY||!user.email)return false;
-  const en=user.preferred_language==="en",subject=en?"Gmach Berega update":notification.title,plain=en?`You have a new update in Gmach Berega. Open your account for details.\n\n${notification.title}\n${notification.body}`:`${notification.title}\n\n${notification.body}`;
-  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],subject,text:plain,html:`<div dir="${en?"ltr":"rtl"}" style="font-family:Arial,sans-serif;max-width:560px;margin:auto"><h2>${escapeHtmlEmail(subject)}</h2><p>${escapeHtmlEmail(en?"You have a new update in your account.":notification.body)}</p><p><a href="https://gmach-karov1.nh8030954.workers.dev/#/account">${en?"Open account":"פתיחת האזור האישי"}</a></p></div>`,reply_to:String(env.SUPPORT_EMAIL||DEFAULT_SUPPORT_EMAIL)})});
+  const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-karov1.nh8030954.workers.dev/#/account";
+  const template=await env.DB.prepare("SELECT subject,body_text,enabled FROM email_templates WHERE template_key='notification' AND language=?").bind(lang).first().catch(()=>null);
+  if(template&&Number(template.enabled)===0)return false;
+  const render=s=>String(s||"").replaceAll("{{title}}",notification.title||"").replaceAll("{{body}}",notification.body||"").replaceAll("{{account_url}}",accountUrl);
+  const subject=template?.subject?render(template.subject):(en?"Gmach Berega update":notification.title),plain=template?.body_text?render(template.body_text):(en?`You have a new update in Gmach Berega. Open your account for details.\n\n${notification.title}\n${notification.body}`:`${notification.title}\n\n${notification.body}`);
+  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],subject,text:plain,html:`<div dir="${en?"ltr":"rtl"}" style="font-family:Arial,sans-serif;max-width:560px;margin:auto"><h2>${escapeHtmlEmail(subject)}</h2><p style="white-space:pre-line">${escapeHtmlEmail(plain)}</p><p><a href="${accountUrl}">${en?"Open account":"פתיחת האזור האישי"}</a></p></div>`,reply_to:String(env.SUPPORT_EMAIL||DEFAULT_SUPPORT_EMAIL)})});
   if(!response.ok)throw new Error("Email provider returned "+response.status);return true;
 }
 async function deliverNotificationChannels(env){
