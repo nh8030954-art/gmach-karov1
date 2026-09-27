@@ -19,17 +19,17 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      QA_D1_DATABASE_ID: ${{ secrets.QA_D1_DATABASE_ID }}
-      QA_R2_BUCKET: ${{ secrets.QA_R2_BUCKET }}
-      QA_URL: ${{ secrets.QA_URL }}
+      QA_URL: https://gmach-karov1-qa.nh8030954.workers.dev
+      QA_R2_BUCKET: gmach-karov-images-qa
+      QA_BACKUP_BUCKET: gmach-karov-backups-qa
     steps:
       - name: Check QA configuration
         id: config
         run: |
-          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ] && [ -n "$QA_D1_DATABASE_ID" ] && [ -n "$QA_URL" ]; then
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
-            echo "QA deployment blocked: Cloudflare QA secrets/resources are not configured." >&2
+            echo "QA deployment blocked: Cloudflare account credentials are not configured." >&2
             exit 1
           fi
       - uses: actions/checkout@v5
@@ -45,6 +45,20 @@ jobs:
         if: steps.config.outputs.enabled == 'true'
       - run: npm test
         if: steps.config.outputs.enabled == 'true'
+      - name: Provision isolated QA resources
+        if: steps.config.outputs.enabled == 'true'
+        run: |
+          set -euo pipefail
+          DB_JSON="$(npx wrangler d1 list --json)"
+          QA_D1_DATABASE_ID="$(node -e 'const a=JSON.parse(process.argv[1]); const d=a.find(x=>x.name==="gmach-karov-db-qa"); if(d) process.stdout.write(d.uuid||d.id||"")' "$DB_JSON")"
+          if [ -z "$QA_D1_DATABASE_ID" ]; then
+            npx wrangler d1 create gmach-karov-db-qa >/tmp/qa-d1-create.txt
+            DB_JSON="$(npx wrangler d1 list --json)"
+            QA_D1_DATABASE_ID="$(node -e 'const a=JSON.parse(process.argv[1]); const d=a.find(x=>x.name==="gmach-karov-db-qa"); if(!d) process.exit(2); process.stdout.write(d.uuid||d.id)' "$DB_JSON")"
+          fi
+          npx wrangler r2 bucket create "$QA_R2_BUCKET" >/dev/null 2>&1 || true
+          npx wrangler r2 bucket create "$QA_BACKUP_BUCKET" >/dev/null 2>&1 || true
+          echo "QA_D1_DATABASE_ID=$QA_D1_DATABASE_ID" >> "$GITHUB_ENV"
       - name: Build QA Wrangler config
         if: steps.config.outputs.enabled == 'true'
         run: |
@@ -52,7 +66,8 @@ jobs:
           const fs=require('fs');
           const raw=fs.readFileSync('wrangler.qa.template.jsonc','utf8')
             .replaceAll('__QA_D1_DATABASE_ID__',process.env.QA_D1_DATABASE_ID)
-            .replaceAll('__QA_R2_BUCKET__',process.env.QA_R2_BUCKET||'gmach-karov-images-qa');
+            .replaceAll('__QA_R2_BUCKET__',process.env.QA_R2_BUCKET)
+            .replaceAll('__QA_BACKUP_BUCKET__',process.env.QA_BACKUP_BUCKET);
           fs.writeFileSync('wrangler.qa.jsonc',raw);
           NODE
       - name: Apply QA migrations
