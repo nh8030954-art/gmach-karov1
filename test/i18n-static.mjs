@@ -28,4 +28,12 @@ const coverage=1-missing.length/hebrew.length;
 assert.ok(coverage>=0.97,`English coverage for static UI is ${(coverage*100).toFixed(1)}%; missing: ${missing.join(' | ')}`);
 assert.ok(html.indexOf('i18n-en.js')<html.indexOf('remaining-features.js'),'Load English translations before language runtime');
 assert.ok(html.indexOf('i18n-boot.js')<html.indexOf('styles.css'),'Select the stored language before first paint');
+const runtimeLogic=runtime.slice(runtime.indexOf('function replaceTranslatedPhrase'),runtime.indexOf('function translateNode'));
+for(const language of ['he','en']){
+  const sandbox={window:{}};
+  vm.runInNewContext(`let lang=${JSON.stringify(language)}; const I18N={en:{"השליחה לא הושלמה":"Sending was not completed"}};${runtimeLogic}`,sandbox);
+  assert.equal(sandbox.window.GmachTranslate('השליחה לא הושלמה'),language==='en'?'Sending was not completed':'השליחה לא הושלמה');
+}
+assert.match(runtime,/characterData:true/,'Translate updated text nodes');
+assert.match(runtime,/attributeFilter:\["placeholder","title","aria-label","value"\]/,'Translate dynamically changed controls');
 console.log(`Static English interface coverage ${(coverage*100).toFixed(1)}% (${hebrew.length-missing.length}/${hebrew.length})`);
