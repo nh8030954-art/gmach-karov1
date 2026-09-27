@@ -36,7 +36,7 @@ async function adminLoans(request,env,url){
   if(workflow){where.push("lr.workflow_status=?");args.push(workflow)}
   if(q){where.push("(lr.id LIKE ? OR i.title LIKE ? OR o.name LIKE ? OR u.full_name LIKE ? OR u.email LIKE ?)");for(let i=0;i<5;i++)args.push("%"+q+"%")}
   if(overdue){where.push("lr.status='collected' AND lr.requested_until<?");args.push(new Date().toISOString())}
-  const rows=await env.DB.prepare(\`
+  const rows=await env.DB.prepare(`
     SELECT lr.id,lr.item_id,lr.borrower_id,lr.status,lr.workflow_status,lr.quantity,lr.requested_from,lr.requested_until,
       lr.extension_status,lr.extension_until,lr.branch_id,lr.admin_hold_reason,lr.admin_hold_until,lr.created_at,lr.updated_at,
       i.title,o.id AS organization_id,o.name AS organization_name,u.full_name AS borrower_name,u.email AS borrower_email,
@@ -48,19 +48,19 @@ async function adminLoans(request,env,url){
     JOIN organizations o ON o.id=i.organization_id
     JOIN users u ON u.id=lr.borrower_id
     LEFT JOIN organization_branches b ON b.id=lr.branch_id
-    WHERE \${where.join(" AND ")}
+    WHERE ${where.join(" AND ")}
     ORDER BY CASE WHEN lr.status='collected' AND lr.requested_until<? THEN 0 WHEN lr.status IN ('pending','approved') THEN 1 ELSE 2 END,lr.updated_at DESC
     LIMIT 500
-  \`).bind(...args,new Date().toISOString()).all();
+  `).bind(...args,new Date().toISOString()).all();
   return json({loans:rows.results||[]});
 }
 
 async function adminLoanTimeline(request,env,id){
   await requireAdmin(request,env);
-  const loan=await env.DB.prepare(\`
+  const loan=await env.DB.prepare(`
     SELECT lr.*,i.title,o.name AS organization_name,u.full_name AS borrower_name,u.email AS borrower_email,b.name AS branch_name
     FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id JOIN users u ON u.id=lr.borrower_id
-    LEFT JOIN organization_branches b ON b.id=lr.branch_id WHERE lr.id=?\`).bind(id).first();
+    LEFT JOIN organization_branches b ON b.id=lr.branch_id WHERE lr.id=?`).bind(id).first();
   if(!loan)throw new LaunchError(404,"ההשאלה לא נמצאה");
   const [events,units,waitlist]=await env.DB.batch([
     env.DB.prepare("SELECT e.*,u.full_name AS actor_name FROM loan_status_events e LEFT JOIN users u ON u.id=e.actor_id WHERE e.request_id=? ORDER BY e.created_at").bind(id),
@@ -111,8 +111,8 @@ async function branchInventoryWorkspace(request,env,branchId){
     const itemId=text(p.itemId,100),mode=["inherit","separate","shared"].includes(p.mode)?p.mode:"inherit",quantityOverride=p.quantityOverride===null||p.quantityOverride===""||p.quantityOverride===undefined?null:Math.max(0,Math.min(999,Number(p.quantityOverride)||0));
     const item=await env.DB.prepare("SELECT id FROM items WHERE id=? AND organization_id=? AND deleted_at IS NULL").bind(itemId,branch.organization_id).first();
     if(!item)throw new LaunchError(400,"נמצא מוצר שאינו שייך לגמ״ח של הסניף");
-    await env.DB.prepare(\`INSERT INTO branch_inventory_policies(branch_id,item_id,mode,quantity_override,updated_at) VALUES(?,?,?,?,?)
-      ON CONFLICT(branch_id,item_id) DO UPDATE SET mode=excluded.mode,quantity_override=excluded.quantity_override,updated_at=excluded.updated_at\`)
+    await env.DB.prepare(`INSERT INTO branch_inventory_policies(branch_id,item_id,mode,quantity_override,updated_at) VALUES(?,?,?,?,?)
+      ON CONFLICT(branch_id,item_id) DO UPDATE SET mode=excluded.mode,quantity_override=excluded.quantity_override,updated_at=excluded.updated_at`)
       .bind(branchId,itemId,mode,quantityOverride,new Date().toISOString()).run();
   }
   const updated=await env.DB.prepare("SELECT * FROM branch_inventory_policies WHERE branch_id=?").bind(branchId).all();
