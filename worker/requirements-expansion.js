@@ -1,3 +1,4 @@
+import { checkAvailabilityRules } from "./privacy-availability.js";
 
 const SESSION_COOKIE="gmach_session";
 class ExpansionError extends Error{constructor(status,message){super(message);this.status=status}}
@@ -56,6 +57,7 @@ async function publicBranches(env,orgId){
 function safeJson(value,fallback){try{return JSON.parse(value||"")}catch{return fallback}}
 async function availabilityForRange(env,itemId,from,until){
   const item=await env.DB.prepare("SELECT i.id,i.quantity,i.turnaround_minutes,i.availability_status,i.status,o.status AS org_status,o.is_hidden FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.id=?").bind(itemId).first();
+  const ruleCheck=await checkAvailabilityRules(env,itemId,from,until,null);if(!ruleCheck.allowed)return {item,available:0,ruleBlocked:true,reason:ruleCheck.reason};
   if(!item||item.status!=="active"||item.org_status!=="approved"||Number(item.is_hidden))throw new ExpansionError(404,"הפריט לא נמצא");
   const pad=Math.max(0,Number(item.turnaround_minutes||0))*60000;
   const paddedFrom=new Date(Date.parse(from)-pad).toISOString();
