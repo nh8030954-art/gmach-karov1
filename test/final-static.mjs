@@ -186,3 +186,9 @@ for(const token of ["editDistance","fuzzyQueryMatch"])assert.ok(appClient.includ
 for(const token of ["analyticsAcquisition","searchScore","openNearbyGmachs","account-start-nearby","/api/admin/analytics/export.csv"])assert.ok((appClient+worker).includes(token),token+" missing from discovery/analytics completion");
 for(const token of ["source","referrer","page_path","adminAnalyticsCsv"])assert.ok(worker.includes(token),token+" missing from acquisition analytics backend");
 for(const token of ["מקורות הגעה","אתרים מפנים","ייצוא נתוני שימוש CSV"])assert.ok((appClient+remainingClient).includes(token),token+" missing from analytics UI/localization");
+
+
+for(const token of ["categoryAliases","loadCategoryAliases","dynamicAliases","synonyms_json"])assert.ok((appClient+worker).includes(token),token+" missing from synonym-powered search");
+for(const token of ["pendingCommunityItem","data-create-help-item","קושר אוטומטית לבקשת הקהילה"])assert.ok((appClient+remainingClient).includes(token),token+" missing from create-and-link community item flow");
+for(const token of ["data-board-share","?help=","sharedHelp"])assert.ok(appClient.includes(token),token+" missing from shareable community request flow");
+assert.ok(finalWorker.includes("request:hr"),"community smart matches must return request context");
