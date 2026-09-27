@@ -211,3 +211,6 @@ for(const token of ["overlapping_requests","dateCompatible","requestedFrom:hr.re
 assert.ok(platform.includes("2026-09-24"),"legal consent default version is not aligned");
 
 for(const token of ["legalConsents","recentOrganizations","securityEvents","notificationPreferences","savedEntities","dataRequests"])assert.ok(platform.includes(token),token+" missing from comprehensive personal data export");
+
+for(const token of ["accountTourKey","openAccountTour","maybeShowAccountTour","account-start-tour","דלג ואל תציג שוב"])assert.ok(appClient.includes(token),token+" missing from new-user account tour");
+for(const token of ["Alternative pickup branch","Quick account tour","Skip and do not show again"])assert.ok(remainingClient.includes(token),token+" missing from English account/branch completion");
