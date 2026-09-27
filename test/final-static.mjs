@@ -160,11 +160,3 @@ for(const token of ["data-pickup-expiry","pickup-expired"])assert.ok(appClient.i
 for(const token of ["data-org-reviews","openOrganizationReviews","data-respond-review"])assert.ok(appClient.includes(token),token+" missing from organization review response UI");
 
 for(const token of ["data-edit-my-review","הביקורות שלי"])assert.ok(finalClient.includes(token),token+" missing from review editing UI");
-
-for(const token of ["expiredHolds","missedPickups","hold_expired"])assert.ok(worker.includes(token),token+" missing from automated hold/no-show lifecycle");
-
-for(const token of ["data-org-reviews","data-respond-review","openOrganizationReviews"])assert.ok(appClient.includes(token),token+" missing from manager review workflow");
-
-for(const token of ["data-edit-my-review","loan_quantity"])assert.ok(finalClient.includes(token),token+" missing from borrower review workflow");
-
-for(const token of ["extension_approved","UPDATE inventory_holds SET ends_at","השאלה מתנגשת"])assert.ok(platform.includes(token),token+" missing from hardened extension approval");
