@@ -1,36 +1,36 @@
-sha=1d4f6a1e1692f1941f75e6eb34c23ec1286ea807
+sha=da8f8bba3dce30036c4315af0b335c551f2faeb3
 install=success
 syntax=success
 tests=failure
 smoke=failure
 live=failure
-    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:204:26)
+}
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
 AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
 
-0 !== 1
+500 !== 201
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:368:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:400:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: true,
   code: 'ERR_ASSERTION',
-  actual: 0,
-  expected: 1,
+  actual: 500,
+  expected: 201,
   operator: 'strictEqual',
   diff: 'simple'
 }
 
 Node.js v24.21.0
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790531575987:368:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790531673930:400:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: true,
   code: 'ERR_ASSERTION',
-  actual: 0,
-  expected: 1,
+  actual: 500,
+  expected: 201,
   operator: 'strictEqual',
   diff: 'simple'
 }
