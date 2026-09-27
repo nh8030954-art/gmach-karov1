@@ -375,7 +375,7 @@ assert.ok(finalClient.includes("voice-message.webm"),"voice message upload missi
 console.log("Voice message recording gate passed.");
 
 const adminControlCenterLatest=await readFile("dist/admin-control-center.js","utf8");
-for(const token of ["/api/admin/export.xls?type=","ייצוא Excel",'aria-live","polite'])assert.ok(adminControlCenterLatest.includes(token),token+" missing from Excel/accessibility admin completion");
-for(const token of ["unit-qr-image","createImageBitmap(file)","capture=\\\"environment\\\""])assert.ok(appClient.includes(token),token+" missing from QR image scanning");
+for(const token of ["/api/admin/export.xls?type=","ייצוא Excel","aria-live","polite"])assert.ok(adminControlCenterLatest.includes(token),token+" missing from Excel/accessibility admin completion");
+for(const token of ["unit-qr-image","createImageBitmap(file)",'capture="environment"'])assert.ok(appClient.includes(token),token+" missing from QR image scanning");
 assert.ok((await readFile("worker/launch-readiness.js","utf8")).includes("/api/admin/export.xls"),"Excel-compatible export backend missing");
 console.log("Excel export, accessible admin status and QR image scanning gate passed.");
