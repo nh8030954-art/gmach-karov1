@@ -41,6 +41,19 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+      - name: Create pre-migration D1 snapshot
+        run: |
+          mkdir -p .deploy-backups
+          npx wrangler d1 export DB --remote --output ".deploy-backups/d1-before-${GITHUB_SHA}.sql"
+
+      - name: Upload pre-migration snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-before-${{ github.sha }}
+          path: .deploy-backups/d1-before-${{ github.sha }}.sql
+          retention-days: 30
+          if-no-files-found: error
+
       - name: Apply production database migrations
         run: npx wrangler d1 migrations apply DB --remote
       - name: Publish production Worker
