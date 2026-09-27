@@ -1,0 +1,101 @@
+name: QA visual hotfix check
+
+on:
+  push:
+    branches: [qa]
+    paths:
+      - ".github/workflows/qa-visual-hotfix.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      QA_URL: https://gmach-karov1-qa.nh8030954.workers.dev
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - name: Build QA config without D1 inspection
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const raw=fs.readFileSync('wrangler.qa.template.jsonc','utf8')
+            .replaceAll('__QA_D1_DATABASE_ID__','03c97ef5-631b-42e6-870f-37c4d23bda8e')
+            .replaceAll('__QA_R2_BUCKET__','gmach-karov-images-qa')
+            .replaceAll('__QA_BACKUP_BUCKET__','gmach-karov-backups-qa');
+          fs.writeFileSync('wrangler.qa.jsonc',raw);
+          NODE
+      - name: Deploy QA hotfix without migrations
+        run: npx wrangler deploy --config wrangler.qa.jsonc
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Verify visual regressions
+        run: |
+          node - <<'NODE'
+          const { chromium }=require('playwright');
+          (async()=>{
+            const browser=await chromium.launch({headless:true});
+            try{
+              const ctx=await browser.newContext({viewport:{width:1440,height:1000},locale:'en-US'});
+              await ctx.addInitScript(()=>localStorage.setItem('gmach-language','en'));
+              const page=await ctx.newPage();
+              await page.goto(process.env.QA_URL+'/#/',{waitUntil:'domcontentloaded',timeout:30000});
+              await page.waitForTimeout(1500);
+              const home=await page.evaluate(()=>({w:innerWidth,sw:document.documentElement.scrollWidth,dir:document.documentElement.dir,lang:document.documentElement.lang}));
+              console.log('HOME',home);
+              if(home.sw>home.w+2)throw new Error('English desktop horizontal overflow remains: '+JSON.stringify(home));
+              if(home.dir!=='ltr'||home.lang!=='en')throw new Error('English LTR state failed');
+              await page.goto(process.env.QA_URL+'/#/community',{waitUntil:'domcontentloaded',timeout:30000});
+              await page.waitForTimeout(1200);
+              const btn=page.locator('#nav-community-board');
+              if(await btn.count()&&await btn.isVisible())await btn.click();
+              await page.waitForTimeout(300);
+              const overlap=await page.evaluate(()=>{
+                const d=document.querySelector('#community-board-dialog');
+                if(!d?.open)return {open:false};
+                const x=d.querySelector('.dialog-close'),h=d.querySelector('.dialog-heading h2');
+                if(!x||!h)return {open:true,missing:true};
+                const a=x.getBoundingClientRect(),b=h.getBoundingClientRect();
+                return {open:true,intersects:!(a.right<=b.left||a.left>=b.right||a.bottom<=b.top||a.top>=b.bottom),x:{left:a.left,right:a.right,top:a.top,bottom:a.bottom},h:{left:b.left,right:b.right,top:b.top,bottom:b.bottom}};
+              });
+              console.log('COMMUNITY',overlap);
+              if(!overlap.open)throw new Error('Community dialog did not open');
+              if(overlap.intersects)throw new Error('Community title still overlaps close button');
+              await ctx.close();
+
+              const mobile=await browser.newContext({viewport:{width:390,height:844},locale:'en-US',isMobile:true,hasTouch:true});
+              await mobile.addInitScript(()=>localStorage.setItem('gmach-language','en'));
+              const mp=await mobile.newPage();
+              await mp.goto(process.env.QA_URL+'/#/community',{waitUntil:'domcontentloaded',timeout:30000});
+              await mp.waitForTimeout(1200);
+              const mb=mp.locator('#mobile-community-board');
+              const menu=mp.locator('#mobile-menu-button');
+              if(await menu.count()&&await menu.isVisible())await menu.click();
+              if(await mb.count()&&await mb.isVisible())await mb.click();
+              await mp.waitForTimeout(300);
+              const mob=await mp.evaluate(()=>{
+                const d=document.querySelector('#community-board-dialog'),x=d?.querySelector('.dialog-close'),h=d?.querySelector('.dialog-heading h2');
+                if(!d?.open||!x||!h)return {open:false};
+                const a=x.getBoundingClientRect(),b=h.getBoundingClientRect();
+                return {open:true,sw:document.documentElement.scrollWidth,w:innerWidth,intersects:!(a.right<=b.left||a.left>=b.right||a.bottom<=b.top||a.top>=b.bottom)};
+              });
+              console.log('MOBILE',mob);
+              if(!mob.open||mob.intersects||mob.sw>mob.w+2)throw new Error('Mobile English community visual regression: '+JSON.stringify(mob));
+              await mobile.close();
+            } finally {await browser.close();}
+          })().catch(e=>{console.error(e);process.exit(1)});
+          NODE
