@@ -265,3 +265,7 @@ assert.ok(worker.includes("handleDistributionCompletion"),"distribution completi
 assert.ok(worker.includes("recordDistributionError"),"server error recording not wired");
 assert.ok(indexHtml.includes("./distribution-completion.js"),"distribution completion client not loaded");
 console.log("Distribution completion static release gate passed.");
+
+for(const token of ["/api/admin/entities","patchAdminEntity","branchManagement"])assert.ok(launchWorker.includes(token),token+" missing from admin entity controls and branch editing");
+for(const token of ["מרכז ישויות","openAdminEntities","openBranchEdit","dataset.branchEdit"])assert.ok(launchClient.includes(token),token+" missing from admin entity controls and branch editing UI");
+for(const token of ["entities|support-tickets|server-errors"])assert.ok(platform.includes(token),token+" missing from sensitive admin step-up coverage");
