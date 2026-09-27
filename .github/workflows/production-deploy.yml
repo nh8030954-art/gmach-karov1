@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: production-deploy
@@ -43,7 +43,25 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npm test
+      - name: Run production test suite
+        id: tests
+        continue-on-error: true
+        run: npm test 2>&1 | tee production-test-output.log
+      - name: Persist production test failure
+        if: steps.tests.outcome != 'success'
+        run: |
+          {
+            echo "deploy_sha=${GITHUB_SHA}"
+            echo "deploy_tests=${{ steps.tests.outcome }}"
+            tail -n 100 production-test-output.log
+          } > .deploy-test-failure
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .deploy-test-failure
+          git commit -m "Record production test failure" || true
+          git push
+      - name: Enforce production tests
+        run: test "${{ steps.tests.outcome }}" = "success"
       - name: Ensure dedicated backup R2 bucket
         run: |
           set +e
