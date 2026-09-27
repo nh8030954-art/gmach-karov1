@@ -1,4 +1,4 @@
-sha=fc893fff621ec7302cc7577d61a4de33255e3056
+sha=b95f85b18675069eafb17948d2427d9c10c0b281
 install=success
 syntax=success
 tests=failure
@@ -26,7 +26,7 @@ AssertionError [ERR_ASSERTION]: stale Web Push endpoint must not remain in clien
 Node.js v24.21.0
 
 AssertionError [ERR_ASSERTION]: stale Web Push endpoint must not remain in client
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790508780708:413:8 {
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790508803496:413:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
@@ -36,5 +36,5 @@ AssertionError [ERR_ASSERTION]: stale Web Push endpoint must not remain in clien
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.10","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":false,"timestamp":"2026-09-27T11:33:06.228Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.10","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":false,"timestamp":"2026-09-27T11:33:23.784Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":true,"turnstileSiteKey":"0x4AAAAAAFFH6u5mz0ZekN2Q","pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
