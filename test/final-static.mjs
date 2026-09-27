@@ -253,3 +253,7 @@ for(const token of ["moderation?.autoHidden","moderation?.reviewRequired"])asser
 for(const token of ["moderateChatImage","validJpeg","validPng","validWebp","chat_image","reviewRequired"])assert.ok(platform.includes(token),token+" missing from chat image validation/moderation");
 assert.ok(finalClient.includes("התמונה נשלחה לבדיקת תוכן נוספת לפני טיפול מנהל."),"chat moderation feedback missing");
 assert.ok(finalWorker.includes('new Set(["LCP","CLS","INP","PAGE_LOAD","JS_ERROR"])'),"performance telemetry allowlist missing");
+
+for(const token of ["/api/admin/entities","patchAdminEntity","adminSupportDetail","adminSupportReply","branchManagement"])assert.ok(launchWorker.includes(token),token+" missing from admin entity/support operations");
+for(const token of ["מרכז ישויות","openAdminEntities","openAdminSupport","openBranchEdit","data-branch-edit"])assert.ok(launchClient.includes(token),token+" missing from branch/admin support UI");
+assert.ok(platform.includes("entities|support-tickets"),"admin entity/support step-up authentication missing");
