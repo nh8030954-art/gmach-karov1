@@ -10,7 +10,7 @@ const remainingWorker=await readFile("worker/remaining-features.js","utf8");
 const remainingClient=await readFile("dist/remaining-features.js","utf8");
 const migration=await readFile("migrations/0014_final_features.sql","utf8");
 
-for(const file of ["dist/sw.js","dist/platform-completion.js","migrations/0013_platform_completion.sql","migrations/0015_notification_delivery.sql"]) await access(file);
+for(const file of ["dist/sw.js","dist/platform-completion.js","migrations/0013_platform_completion.sql","migrations/0015_notification_delivery.sql","migrations/0016_requirements_completion.sql"]) await access(file);
 
 assert.match(worker,/handleFinalFeatures/);
 assert.match(worker,/runFinalMaintenance/);
@@ -181,3 +181,7 @@ for(const token of ["TERMS_VERSION","PRIVACY_VERSION","legal_consents"])assert.o
 for(const token of ["organizationOnboarding","previewSeen","tipsDismissed","showOrganizationOnboarding","openOrganizationOnboardingPreview"])assert.ok((finalWorker+finalClient).includes(token),token+" missing from post-creation gmach onboarding");
 for(const token of ["branch-proposal","data-branch-proposal","data-branch-response","toBranchName"])assert.ok((finalWorker+appClient).includes(token),token+" missing from alternate pickup branch workflow");
 for(const token of ["editDistance","fuzzyQueryMatch"])assert.ok(appClient.includes(token),token+" missing from typo-tolerant search fallback");
+
+for(const token of ["overlapping_requests","dateCompatible","requestedFrom:hr.requested_from","distanceKm:hr.distance_km"])assert.ok(finalWorker.includes(token),token+" missing from date-aware community matching");
+for(const token of ["Alternative pickup branch","Recently viewed gmachs","Start here"])assert.ok(remainingClient.includes(token),token+" missing from English localization for new workflows");
+assert.ok(platform.includes("2026-09-24"),"legal consent default version is not aligned");
