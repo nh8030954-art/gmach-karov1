@@ -1911,7 +1911,7 @@ async function updateRequestStatus(request, env, id) {
   const statusText = { approved: "אושרה", declined: "נדחתה", cancelled: "בוטלה", collected: "סומנה כנאספה", returned: "סומנה כהוחזרה", no_show:"סומנה כאי-הגעה" }[target] || "עודכנה";
   const recipientId = row.borrower_id === user.id ? row.owner_id : row.borrower_id;
   const statusStatements=[
-    notificationStatement(env, recipientId, "status", `הבקשה ${statusText}`, `הבקשה עבור ${row.item_title} ${statusText}.`, id),
+    notificationStatement(env, recipientId, "status", `הבקשה ${statusText}`, target==="no_show"?`בקשת ההשאלה עבור ${row.item_title} סומנה כאי-הגעה. המלאי שוחרר ורשימת ההמתנה קודמה.`:`הבקשה עבור ${row.item_title} ${statusText}.`, id),
     env.DB.prepare("INSERT INTO loan_request_events(id,request_id,actor_id,event_type,details_json) VALUES (?,?,?,?,?)")
       .bind(crypto.randomUUID(),id,user.id,target,JSON.stringify({managerNote:managerNote||null}))
   ];
