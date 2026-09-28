@@ -545,5 +545,6 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
   "מזוודה גדולה":"Large suitcase","תיק גב לטיול":"Hiking backpack","צידנית חשמלית":"Electric cooler",
   "אוהל משפחתי":"Family tent","מנשא תינוק":"Baby carrier","גגון לרכב":"Roof rack",
   "ספרי לימוד":"Textbooks","ערכת יצירה":"Craft kit","מחשבון מדעי":"Scientific calculator",
-  "סט ספרי ילדים":"Children's book set","לוח מחיק":"Whiteboard","עמדת קריאה":"Reading stand"
+  "סט ספרי ילדים":"Children's book set","לוח מחיק":"Whiteboard","עמדת קריאה":"Reading stand",
+  "מיקום כללי":"General location"
 });
