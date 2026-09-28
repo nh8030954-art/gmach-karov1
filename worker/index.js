@@ -1481,7 +1481,8 @@ async function getPublicOrganization(env, id) {
     }
   }
   const categories = categoriesResult.status === "fulfilled" ? categoriesResult.value.results : [];
-  return json({ organization: { ...organization, verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options), categories }, items, reviews, partial: [itemsResult,reviewsResult,categoriesResult].some(result => result.status === "rejected") });
+  const partialSections = [["items", itemsResult], ["reviews", reviewsResult], ["categories", categoriesResult]].filter(([,result]) => result.status === "rejected").map(([section]) => section);
+  return json({ organization: { ...organization, verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options), categories }, items, reviews, partial: partialSections.length > 0, partialSections });
 }
 
 async function toggleSavedOrganization(request, env, organizationId, save) {
