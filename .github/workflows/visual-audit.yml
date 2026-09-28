@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      QA_URL: https://gmach-karov1-qa.nh8030954.workers.dev
+      QA_URL: https://gmach-karov1.nh8030954.workers.dev
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
