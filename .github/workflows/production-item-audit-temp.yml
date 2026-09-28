@@ -1,0 +1,79 @@
+name: Temporary production mobile item audit
+
+on:
+  push:
+    branches: [qa]
+    paths:
+      - ".github/workflows/production-item-audit-temp.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-item-audit-temp
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Verify mobile item dialog on production
+        run: |
+          mkdir -p production-item-audit
+          node --input-type=module <<'NODE'
+          import { chromium } from "playwright";
+          const PROD="https://gmach-karov1.nh8030954.workers.dev";
+          const browser=await chromium.launch({headless:true});
+          const results=[];
+          try {
+            for (const lang of ["he","en"]) {
+              const ctx=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,locale:lang==="en"?"en-US":"he-IL"});
+              await ctx.addInitScript(({lang})=>{localStorage.setItem("gmach-language",lang)},{lang});
+              const page=await ctx.newPage();
+              await page.goto(PROD+"/#/catalog",{waitUntil:"domcontentloaded",timeout:30000});
+              await page.waitForTimeout(1800);
+              const button=page.locator("[data-open-item]").first();
+              const count=await button.count();
+              const visible=count>0 && await button.isVisible();
+              if(!visible) throw new Error(lang+": mobile item details button is not visible");
+              await button.click();
+              await page.waitForTimeout(500);
+              const diag=await page.evaluate(()=>{
+                const d=document.querySelector("#item-dialog");
+                const r=d?.getBoundingClientRect();
+                return {
+                  open:Boolean(d?.open),
+                  lang:document.documentElement.lang,
+                  dir:document.documentElement.dir,
+                  text:(d?.innerText||"").trim().slice(0,1200),
+                  rect:r?{left:r.left,top:r.top,right:r.right,bottom:r.bottom,width:r.width,height:r.height}:null,
+                  viewport:{width:innerWidth,height:innerHeight},
+                  overflow:Math.max(0,document.documentElement.scrollWidth-innerWidth)
+                };
+              });
+              if(!diag.open) throw new Error(lang+": item dialog did not open");
+              if(diag.rect && (diag.rect.left < -2 || diag.rect.right > diag.viewport.width+2)) throw new Error(lang+": item dialog is horizontally offscreen");
+              await page.screenshot({path:"production-item-audit/mobile-item-"+lang+".png",fullPage:false});
+              results.push({lang,visible,diag});
+              await ctx.close();
+            }
+          } finally { await browser.close(); }
+          console.log(JSON.stringify(results,null,2));
+          NODE
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-mobile-item-audit
+          path: production-item-audit/
+          retention-days: 3
+          if-no-files-found: error
