@@ -373,8 +373,8 @@ try {
   result = await request(`/api/organizations/${organizationId}/public`);
   assert.equal(result.response.status, 200);
   assert.equal(result.data.items.length, 1);
-  assert.equal(result.data.organization.address, "רחוב הבדיקה 1, ירושלים");
-  assert.equal(result.data.organization.contact_phone, "050-1234567");
+  assert.equal(Object.hasOwn(result.data.organization, "address"), false);
+  assert.equal(Object.hasOwn(result.data.organization, "contact_phone"), false);
   result = await request("/api/organizations/nonexistent/public");
   assert.equal(result.response.status, 404);
   assert.ok(result.data.requestId);
