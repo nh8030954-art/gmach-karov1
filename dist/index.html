@@ -62,11 +62,11 @@
       </nav>
 
       <div class="header-actions">
+        <button class="text-button" id="dashboard-button" type="button" data-requires-auth>האזור שלי</button>
         <button class="icon-button notification-button" id="notifications-button" type="button" aria-label="התראות" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
           <span class="notification-badge" id="notification-badge" hidden>0</span>
         </button>
-        <button class="text-button" id="dashboard-button" type="button" data-requires-auth>האזור שלי</button>
         <button class="button button-primary button-small" id="add-gmach-button" type="button">הצטרפו כגמ״ח</button>
         <button class="icon-button mobile-menu-button" id="mobile-menu-button" type="button" aria-label="פתיחת תפריט" aria-expanded="false" aria-controls="mobile-menu">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
@@ -116,6 +116,7 @@
               <datalist id="search-suggestions"></datalist>
             </span>
           </label>
+          <label class="search-field search-field-category"><span class="field-label">קטגוריה</span><select id="hero-category-filter" aria-label="קטגוריה לחיפוש"><option value="">כל הקטגוריות</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option></select></label>
           <label class="search-field">
             <span class="field-label">איפה?</span>
             <span class="field-control">
@@ -179,8 +180,8 @@
         <div class="filter-panel" id="filter-panel" hidden>
           <label><span>קטגוריה</span><select id="category-filter"><option value="">כל הקטגוריות</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option></select></label>
           <label><span>מצב הפריט</span><select id="condition-filter"><option value="">כל המצבים</option><option value="חדש">חדש</option><option value="כמו חדש">כמו חדש</option><option value="מצב טוב">מצב טוב</option><option value="מצב סביר">מצב סביר</option><option value="בלאי נראה לעין">בלאי נראה לעין</option></select></label>
-          <label><span>סוג</span><select id="type-filter"><option value="">הכול</option><option value="loan">השאלה</option><option value="donation">מסירה</option><option value="service">שירות</option></select></label>
-          <label><span>איסוף</span><select id="pickup-filter"><option value="">כל האפשרויות</option><option value="pickup">איסוף עצמי</option><option value="delivery">משלוח</option><option value="coordination">בתיאום</option></select></label>
+          <label><span>סוג</span><select id="type-filter"><option value="">הכול</option><option value="loan">השאלה</option><option value="donation">מסירה</option></select></label>
+          
           <label class="checkbox-filter"><input id="available-only" type="checkbox"><span>רק פריטים זמינים</span></label>
           <button class="link-button" id="clear-filters" type="button">ניקוי סינון</button>
         </div>
@@ -203,7 +204,7 @@
 
       <section class="steps-section" id="how-it-works" aria-labelledby="steps-title">
         <div class="section-shell">
-          <div class="section-heading centered-heading"><div><span class="section-kicker">פשוט ונעים</span><h2 id="steps-title">כך משאילים בגמ״ח ברגע</h2></div></div>
+          <div class="section-heading centered-heading"><div><span class="section-kicker">פשוט ונעים</span><h2 id="steps-title">כך שואלים בגמ״ח ברגע</h2></div></div>
           <ol class="steps-grid">
             <li><span class="step-number">1</span><span class="step-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span><h3>מוצאים</h3><p>מחפשים לפי פריט ועיר ובוחרים את מה שמתאים.</p></li>
             <li><span class="step-number">2</span><span class="step-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M8 11h8M8 15h5"/></svg></span><h3>מבקשים</h3><p>שולחים בקשת השאלה קצרה. מנהל הגמ״ח מאשר ומתאם.</p></li>
@@ -296,10 +297,11 @@
 
       <section class="faq-section section-shell" id="faq" aria-labelledby="faq-title">
         <div class="section-heading centered-heading"><div><span class="section-kicker">חשוב לדעת</span><h2 id="faq-title">שאלות נפוצות</h2></div></div>
-        <div class="faq-list"><details><summary>האם השירות עולה כסף?</summary><p>לא. החיפוש, הפרסום וההשאלה דרך האתר חינמיים.</p></details><details><summary>איך יודעים שהגמ״ח אמין?</summary><p>חפשו את סימון האימות, זמן הפעילות האחרון, עדכון המלאי והביקורות.</p></details><details><summary>איך מקבלים ציוד?</summary><p>שולחים בקשה עם תאריכים, מקבלים אישור ומתאמים בצ׳אט הפרטי.</p></details><details><summary>לא מצאתי את מה שחיפשתי—מה עושים?</summary><p>שולחים בקשת עזרה והיא מופיעה לגמ״חים הרלוונטיים.</p></details></div>
+        <div class="faq-list"><details><summary>האם השירות עולה כסף?</summary><p>לא. החיפוש, הפרסום וההשאלה דרך האתר חינמיים.</p></details><details><summary>איך יודעים שהגמ״ח אמין?</summary><p>חפשו דירוגים, זמן פעילות אחרון ועדכון מלאי.</p></details><details><summary>איך מקבלים ציוד?</summary><p>שולחים בקשה עם תאריכים, מקבלים אישור ומתאמים בצ׳אט הפרטי.</p></details><details><summary>לא מצאתי את מה שחיפשתי—מה עושים?</summary><p>שולחים בקשת עזרה והיא מופיעה לגמ״חים הרלוונטיים.</p></details></div>
       </section>
     </section>
 
+    <section class="organization-page section-shell" id="organization-page-view" hidden aria-label="עמוד גמ״ח"><button class="back-link" type="button" data-go-home>→ חזרה לקטלוג</button><div id="organization-page-content"></div></section>
     <section class="dashboard-view section-shell" id="dashboard-view" hidden aria-labelledby="dashboard-title">
       <div class="dashboard-header">
         <div><button class="back-link" type="button" data-go-home>→ חזרה לקטלוג</button><span class="section-kicker">האזור שלי</span><h1 id="dashboard-title">שלום, <span id="dashboard-name">חבר/ה</span></h1><p>כל ההשאלות והפריטים שלך במקום אחד.</p></div>
@@ -331,7 +333,7 @@
   <footer class="site-footer">
     <div class="footer-inner">
       <div class="footer-brand"><a class="brand brand-footer" href="#/"><span class="brand-mark brand-logo-crop footer-logo full-brand-logo" aria-hidden="true"><img src="./gmach-berega-full.jpg" alt=""></span><span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span></a><p>מחברים בין מי שיש לו לבין מי שצריך — בחינם, בפשטות ובאחריות.</p></div>
-      <div class="footer-links"><div><strong>למצוא</strong><a href="#/catalog">כל הפריטים</a><a href="#how-it-works">איך זה עובד</a></div><div><strong>לשתף</strong><button type="button" data-footer-add-gmach>פרסום גמ״ח</button><button type="button" data-footer-add-item>הוספת פריט</button></div><div><strong>חשוב לדעת</strong><button type="button" data-open-info="safety">כללי השאלה בטוחה</button><button type="button" data-open-info="terms">תנאי שימוש</button><button type="button" data-open-info="privacy">פרטיות</button><button type="button" data-open-accessibility-statement>הצהרת נגישות</button><button type="button" id="support-form-button">יצירת קשר ותמיכה</button></div></div>
+      <div class="footer-links"><div><strong>למצוא</strong><a href="#/catalog">כל הפריטים</a><a href="#how-it-works">איך זה עובד</a></div><div><strong>לשתף</strong><button type="button" data-footer-add-gmach>פרסום גמ״ח</button><button type="button" data-footer-add-item>הוספת פריט</button></div><div><strong>חשוב לדעת</strong><button type="button" data-open-info="safety">כללי השאלה בטוחה</button><button type="button" data-open-info="terms">תנאי שימוש</button><button type="button" data-open-info="privacy">מדיניות פרטיות</button><button type="button" data-open-accessibility-statement>הצהרת נגישות</button><button type="button" id="support-form-button">יצירת קשר ותמיכה</button></div></div>
     </div>
     <div class="footer-bottom"><span>© <span id="current-year"></span> גמ״ח ברגע</span><span>קהילה שמשאילה, קהילה שצומחת</span></div>
   </footer>
@@ -472,7 +474,7 @@
       <div id="request-deposit-box" hidden><p><strong>פיקדון:</strong> <span id="request-deposit-amount"></span> ₪. הפיקדון נועד להבטיח את החזרת המוצר כפי שנלקח ואינו תשלום עבור ההשאלה.</p><label class="consent-row"><input id="request-deposit-consent" type="checkbox"><span>קראתי ואני מאשר/ת את תנאי הפיקדון.</span></label></div>
       <label><span>טלפון לתיאום</span><input id="request-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="05X-XXXXXXX" dir="ltr" required></label>
       <label><span>כמה מילים למנהל הגמ״ח <small>(רשות)</small></span><textarea id="request-note" rows="3" maxlength="500" placeholder="למה אתם צריכים את הפריט ומתי נוח לאסוף"></textarea></label>
-      <label class="consent-row"><input id="request-consent" type="checkbox" required><span>אני מתחייב/ת לשמור על הפריט ולהחזיר אותו בזמן ובמצב שבו התקבל.</span></label>
+      
       <button class="button button-primary button-full" type="submit">שליחת הבקשה</button>
       <p class="free-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg> הבקשה וההשאלה ללא תשלום</p>
     </form>
@@ -484,11 +486,11 @@
     <form id="gmach-form" class="stack-form">
       <div class="two-columns"><label><span>שם הגמ״ח</span><input id="gmach-name" required maxlength="90" placeholder="למשל: גמ״ח אירועים משפחת לוי"></label><label><span>סוג הגוף המפעיל</span><select id="gmach-organization-type" required><option value="private">אדם פרטי</option><option value="family">משפחה</option><option value="community">קהילה או בית כנסת</option><option value="nonprofit">עמותה</option><option value="business">עסק שמשאיל בחינם</option><option value="authority">רשות או מוסד</option></select></label></div><div class="two-columns"><label><span>תחום מרכזי</span><select id="gmach-category" required><option value="">בחירה</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option><option>כללי</option></select></label></div>
       <div class="two-columns"><label><span>עיר</span><input id="gmach-city" list="israel-cities" required autocomplete="address-level2"></label><label><span>שכונה <small>(רשות)</small></span><input id="gmach-neighborhood"></label></div>
-      <label><span>כתובת מלאה <small>(תימסר לאחר אישור הבקשה)</small></span><input id="gmach-address" autocomplete="street-address" required></label>
-      <label><span>אזור שירות</span><input id="gmach-service-area" maxlength="180" placeholder="למשל: פתח תקווה והסביבה"></label>
-      <div class="two-columns"><label><span>שעות פעילות</span><input id="gmach-hours" maxlength="60" placeholder="א׳–ה׳ 16:00–20:00" required></label><fieldset class="inline-options"><legend>אפשרויות מסירה</legend><label><input type="checkbox" name="gmach-pickup" value="pickup" checked> איסוף עצמי</label><label><input type="checkbox" name="gmach-pickup" value="delivery"> משלוח</label><label><input type="checkbox" name="gmach-pickup" value="coordination"> בתיאום</label></fieldset></div>
+      <label><span>כתובת מלאה <small>(זמינה למנהל הגמ״ח, אינה מוצגת לציבור)</small></span><input id="gmach-address" autocomplete="street-address" required></label>
+      <label><span>אזור שירות</span><select id="gmach-service-area"><option value="">בחירת אזור</option><option>כל הארץ</option><option>צפון</option><option>חיפה והקריות</option><option>השרון</option><option>גוש דן</option><option>ירושלים והסביבה</option><option>השפלה</option><option>דרום</option><option>אילת והערבה</option></select></label>
+      <fieldset class="hours-fieldset"><legend>ימי ושעות פעילות</legend><p>בחרו ימים ושעות פעילות</p><label class="hours-row"><input type="checkbox" data-hours-day="ראשון" checked><span>ראשון</span><input type="time" data-hours-start="ראשון" value="09:00" aria-label="פתיחה ראשון"><input type="time" data-hours-end="ראשון" value="17:00" aria-label="סגירה ראשון"></label><label class="hours-row"><input type="checkbox" data-hours-day="שני" checked><span>שני</span><input type="time" data-hours-start="שני" value="09:00" aria-label="פתיחה שני"><input type="time" data-hours-end="שני" value="17:00" aria-label="סגירה שני"></label><label class="hours-row"><input type="checkbox" data-hours-day="שלישי" checked><span>שלישי</span><input type="time" data-hours-start="שלישי" value="09:00" aria-label="פתיחה שלישי"><input type="time" data-hours-end="שלישי" value="17:00" aria-label="סגירה שלישי"></label><label class="hours-row"><input type="checkbox" data-hours-day="רביעי" checked><span>רביעי</span><input type="time" data-hours-start="רביעי" value="09:00" aria-label="פתיחה רביעי"><input type="time" data-hours-end="רביעי" value="17:00" aria-label="סגירה רביעי"></label><label class="hours-row"><input type="checkbox" data-hours-day="חמישי" checked><span>חמישי</span><input type="time" data-hours-start="חמישי" value="09:00" aria-label="פתיחה חמישי"><input type="time" data-hours-end="חמישי" value="17:00" aria-label="סגירה חמישי"></label><label class="hours-row"><input type="checkbox" data-hours-day="שישי"><span>שישי</span><input type="time" data-hours-start="שישי" value="09:00" max="17:00" aria-label="פתיחה שישי"><input type="time" data-hours-end="שישי" value="17:00" max="17:00" aria-label="סגירה שישי"></label><label class="hours-row"><input type="checkbox" data-hours-day="שבת"><span>שבת</span><input type="time" data-hours-start="שבת" value="20:00" min="20:00" aria-label="פתיחה שבת"><input type="time" data-hours-end="שבת" value="23:59" min="20:00" aria-label="סגירה שבת"></label></fieldset>
       <label><span>תיאור קצר</span><textarea id="gmach-description" rows="3" maxlength="600" required placeholder="מה אפשר להשאיל, למי מיועד ואיך מתאמים"></textarea></label>
-      <label><span>טלפון ליצירת קשר <small>(יימסר לאחר אישור הבקשה)</small></span><input id="gmach-phone" type="tel" inputmode="tel" dir="ltr" required></label>
+      <label><span>טלפון ליצירת קשר <small>(זמין למנהל הגמ״ח, אינו מוצג לציבור)</small></span><input id="gmach-phone" type="tel" inputmode="tel" dir="ltr" required></label>
       <label class="consent-row"><input id="gmach-consent" type="checkbox" required><span>אני מאשר/ת שהפעילות, הפריטים, הבקשות והתיאום ינוהלו בתוך גמ״ח ברגע; שהפריטים יוצעו ללא תשלום; ושקראתי את <button type="button" data-open-info="terms">תנאי השימוש</button> ואת <button type="button" data-open-info="privacy">מדיניות הפרטיות</button>.</span></label>
       <button class="button button-primary button-full" id="gmach-submit" type="submit">פתיחת גמ״ח</button>
     </form>
@@ -499,18 +501,18 @@
     <div class="dialog-heading align-start"><span class="section-kicker">פריט חדש</span><h2 id="item-form-title">מה תרצו להשאיל?</h2><p>פרטים מדויקים עוזרים למבקשים לדעת אם הפריט מתאים.</p></div>
     <form id="item-form" class="stack-form">
       <label><span>שייך לגמ״ח</span><select id="item-gmach" required><option value="">בחירת גמ״ח</option></select></label>
-      <div class="two-columns"><label><span>שם הפריט</span><input id="item-name" maxlength="120" required placeholder="למשל: סט קשתות פרחים לאירוע"></label><label><span>קטגוריה</span><select id="item-category" required><option value="">בחירה</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option></select><button class="link-button" id="suggest-category-button" type="button" aria-label="חסרה קטגוריה? הציעו קטגוריה חדשה">לא מצאתי קטגוריה — אפשר להציע חדשה</button></label></div>
+      <div class="two-columns"><label><span>שם הפריט</span><input id="item-name" maxlength="120" required placeholder="למשל: סט קשתות פרחים לאירוע"></label><label><span>קטגוריה</span><select id="item-category" required><option value="">בחירה</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option></select><button class="link-button" id="suggest-category-button" type="button" aria-label="חסרה קטגוריה? הציעו קטגוריה חדשה">לא מצאת קטגוריה? - אפשר להציע חדשה</button></label></div>
       <div class="two-columns"><label><span>מצב הפריט</span><select id="item-condition" required><option>חדש</option><option>כמו חדש</option><option selected>מצב טוב</option><option>מצב סביר</option><option>בלאי נראה לעין</option></select></label><label><span>כמות זמינה</span><input id="item-quantity" type="number" min="1" max="999" value="1" required></label></div>
-      <div class="two-columns"><label><span>סוג</span><select id="item-type"><option value="loan">השאלה</option><option value="donation">מסירה</option><option value="service">שירות</option></select></label><label><span>אופן קבלה</span><select id="item-pickup"><option value="pickup">איסוף עצמי</option><option value="delivery">משלוח</option><option value="coordination">בתיאום</option></select></label></div>
+      <div class="two-columns"><label><span>סוג</span><select id="item-type"><option value="loan">השאלה</option><option value="donation">מסירה</option></select></label></div>
       <div class="two-columns"><label><span>קטגוריית משנה</span><input id="item-subcategory" maxlength="80" placeholder="למשל: עגלות"></label><label><span>תגיות</span><input id="item-tags" maxlength="250" placeholder="תינוק, עגלה, נסיעות"></label></div>
       <label><span>תיאור והוראות שימוש</span><textarea id="item-description" rows="4" maxlength="1200" required></textarea></label>
-      <label><span>תנאי השאלה <small>(רשות)</small></span><input id="item-conditions" maxlength="300" placeholder="למשל: איסוף עצמי, החזרה תוך 3 ימים"></label>
+      <label><span>תנאי השאלה <small>(רשות)</small></span><input id="item-conditions" maxlength="300" placeholder="למשל: החזרה תוך 3 ימים"></label>
       <div class="two-columns"><label><span>משך השאלה מינימלי</span><span class="duration-field"><input id="item-min-loan" type="number" min="1" max="525600" value="1" required aria-label="משך מינימלי"><select id="item-min-loan-unit" aria-label="יחידת זמן למשך מינימלי"><option value="60">שעות</option><option value="1440">ימים</option><option value="1">דקות</option></select></span></label><label><span>משך השאלה מקסימלי</span><span class="duration-field"><input id="item-max-loan" type="number" min="1" max="525600" value="7" required aria-label="משך מקסימלי"><select id="item-max-loan-unit" aria-label="יחידת זמן למשך מקסימלי"><option value="1440">ימים</option><option value="60">שעות</option><option value="1">דקות</option></select></span></label></div>
-      <div class="two-columns"><label><span>כמה זמן מראש להזמין (דקות)</span><input id="item-booking-notice" type="number" min="0" max="525600" value="0" required></label><label><span>זמן התארגנות בין השאלות (דקות)</span><input id="item-turnaround" type="number" min="0" max="10080" value="0" required></label></div>
-      <div class="two-columns"><label><span>עד כמה ימים מראש ניתן להזמין</span><input id="item-booking-horizon" type="number" min="1" max="1095" value="365" required></label><label><span>אישור הזמנה</span><select id="item-approval-mode"><option value="manual">אישור מנהל הגמ״ח</option><option value="automatic">אישור אוטומטי אם יש מלאי</option></select></label></div><div class="two-columns"><label><span>פרסום עתידי <small>(רשות)</small></span><input id="item-publish-at" type="datetime-local"></label><label><span>מקסימום יחידות למשתמש <small>(רשות)</small></span><input id="item-max-per-user" type="number" min="1" max="999"></label></div><div class="two-columns"><label><span>זמן הכנה נוסף (דקות)</span><input id="item-preparation" type="number" min="0" max="10080" value="0"></label><label><span>מקסימום ימי השאלה <small>(רשות)</small></span><input id="item-max-loan-days" type="number" min="1" max="3650"></label></div><label><span>רדיוס שירות בקילומטרים <small>(רשות)</small></span><input id="item-service-radius" type="number" min="0.1" max="500" step="0.1"></label>
+      <div class="two-columns"><label><span>כמה זמן מראש להזמין</span><span class="duration-field"><input id="item-booking-notice" type="number" min="0" max="525600" value="0" required><select id="item-booking-notice-unit" aria-label="יחידת זמן להזמנה מראש"><option value="1">דקות</option><option value="60">שעות</option><option value="1440">ימים</option></select></span></label><label><span>זמן בין השאלות</span><span class="duration-field"><input id="item-turnaround" type="number" min="0" max="10080" value="0" required><select id="item-turnaround-unit" aria-label="יחידת זמן בין השאלות"><option value="1">דקות</option><option value="60">שעות</option><option value="1440">ימים</option></select></span></label></div>
+      <div class="two-columns"><label><span>עד כמה זמן מראש ניתן להזמין</span><span class="duration-field"><input id="item-booking-horizon" type="number" min="1" max="1576800" value="365" required><select id="item-booking-horizon-unit" aria-label="יחידת זמן לטווח הזמנה"><option value="1440">ימים</option><option value="60">שעות</option><option value="1">דקות</option></select></span></label><label><span>אישור הזמנה</span><select id="item-approval-mode"><option value="manual">אישור מנהל הגמ״ח</option><option value="automatic">אישור אוטומטי אם יש מלאי</option></select></label></div><div class="two-columns"><label><span>פרסום עתידי <small>(רשות)</small></span><input id="item-publish-at" type="datetime-local"></label><label><span>מקסימום יחידות למשתמש <small>(רשות)</small></span><input id="item-max-per-user" type="number" min="1" max="999"></label></div><div class="two-columns"><label><span>זמן הכנה נוסף (דקות)</span><input id="item-preparation" type="number" min="0" max="10080" value="0"></label><label><span>מקסימום ימי השאלה <small>(רשות)</small></span><input id="item-max-loan-days" type="number" min="1" max="3650"></label></div><label><span>רדיוס שירות בקילומטרים <small>(רשות)</small></span><input id="item-service-radius" type="number" min="0.1" max="500" step="0.1"></label>
       <label class="consent-row"><input id="item-deposit-required" type="checkbox"><span>נדרש פיקדון להבטחת החזרת המוצר כפי שנלקח (לא כתשלום עבור ההשאלה).</span></label>
       <label id="item-deposit-amount-row" hidden><span>סכום הפיקדון (₪)</span><input id="item-deposit-amount" type="number" min="0" max="1000000" step="0.01" value="0"></label>
-      <p>לא ניתן לקבוע איסוף או החזרה מיום שישי בשעה 17:00 ועד שבת בשעה 21:00.</p>
+      
       <label><span>תמונות הפריט <small>(אפשר עד 12 תמונות, כל תמונה עד 5MB)</small></span><input id="item-images" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
       <label class="consent-row"><input id="item-free" type="checkbox" checked required><span>הפריט מוצע להשאלה חינמית בלבד.</span></label>
       <button class="button button-primary button-full" id="item-submit" type="submit">פרסום הפריט</button>
@@ -537,7 +539,7 @@
       <textarea id="chat-message" rows="2" maxlength="1000" required placeholder="כתבו הודעה לשואל/ת או למנהל/ת הגמ״ח"></textarea>
       <button class="button button-primary" type="submit">שליחה</button>
     </form>
-    <p class="form-note">השיחה זמינה רק לשואל/ת, למנהל/ת הגמ״ח ולמנהל האתר.</p>
+    <p class="form-note">השיחה זמינה רק לשואל/ת, למנהל/ת הגמ״ח ולהנהלת האתר.</p>
   </dialog>
 
   <dialog class="modal modal-medium" id="notifications-dialog" aria-labelledby="notifications-title">
@@ -549,7 +551,7 @@
 
   <dialog class="modal modal-narrow" id="report-dialog" aria-labelledby="report-title">
     <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת הדיווח">×</button>
-    <div class="dialog-heading align-start"><span class="section-kicker">שומרים על הקהילה</span><h2 id="report-title">דיווח על פריט</h2><p>הדיווח נשלח למנהל האתר ואינו מוצג למפרסם.</p></div>
+    <div class="dialog-heading align-start"><span class="section-kicker">שומרים על הקהילה</span><h2 id="report-title">דיווח על פריט</h2><p>הדיווח נשלח להנהלת האתר ואינו מוצג למפרסם.</p></div>
     <form id="report-form" class="stack-form">
       <input id="report-item-id" type="hidden">
       <label><span>מה הבעיה?</span><select id="report-reason" required><option value="">בחירה</option><option value="incorrect">מידע לא נכון</option><option value="unsafe">פריט לא בטיחותי</option><option value="commercial">בקשת תשלום</option><option value="unavailable">הפריט אינו זמין</option><option value="other">אחר</option></select></label>
