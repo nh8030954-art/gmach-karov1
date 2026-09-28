@@ -19,7 +19,7 @@ function toast(msg,bad=false){
 }
 function dialog(){
  let d=$("#admin-control-center");if(!d){d=document.createElement("dialog");d.id="admin-control-center";d.className="modal modal-wide";document.body.append(d)}
- d.innerHTML='<button class="dialog-close" type="button" aria-label="'+t("סגירה","Close")+'">×</button><div class="dialog-heading align-start"><span class="section-kicker">'+t("מנהל האתר","Site administrator")+'</span><h2>'+t("מרכז בקרת האתר","Site control center")+'</h2><p>'+t("ניהול תפעול, תוכן, קטגוריות והגדרות במקום אחד.","Manage operations, content, categories and settings in one place.")+'</p></div><nav class="dashboard-tabs" data-control-tabs></nav><div class="launch-body" data-control-body></div>';
+ d.innerHTML='<button class="dialog-close" type="button" aria-label="'+t("סגירה","Close")+'">×</button><div class="dialog-heading align-start"><span class="section-kicker">'+t("הנהלת האתר","Site administrator")+'</span><h2>'+t("מרכז בקרת האתר","Site control center")+'</h2><p>'+t("ניהול תפעול, תוכן, קטגוריות והגדרות במקום אחד.","Manage operations, content, categories and settings in one place.")+'</p></div><nav class="dashboard-tabs" data-control-tabs></nav><div class="launch-body" data-control-body></div>';
  $(".dialog-close",d).onclick=()=>d.close();return d;
 }
 const sections=[

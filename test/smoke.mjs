@@ -289,7 +289,7 @@ try {
   assert.equal(result.data.proposals.length,1);
   result = await request(`/api/items/${itemId}/availability-check?from=2026-10-02T18%3A00&until=2026-10-04T10%3A00`);
   assert.equal(result.response.status, 400);
-  result = await request(`/api/items/${itemId}/availability-check?from=2026-10-03T20%3A00&until=2026-10-04T10%3A00`);
+  result = await request(`/api/items/${itemId}/availability-check?from=2026-10-03T19%3A00&until=2026-10-04T10%3A00`);
   assert.equal(result.response.status, 400);
   result = await request(`/api/items/${itemId}/availability-check?from=2026-10-03T21%3A00&until=2026-10-04T10%3A00`);
   assert.equal(result.response.status, 200);

@@ -150,12 +150,12 @@
     const contact=document.createElement('button');
     contact.type='button';
     contact.setAttribute('aria-label','יצירת קשר');
-    contact.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v12H8l-4 3Z"/><path d="M8 9h8M8 13h5"/></svg><span>קשר</span>';
+    contact.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v12H8l-4 3Z"/><path d="M8 9h8M8 13h5"/></svg><span>יצירת קשר</span>';
     contact.addEventListener('click',()=>document.getElementById('support-form-button')?.click());
     const account=document.createElement('button');
     account.type='button';
     account.setAttribute('aria-label','אזור אישי, כניסה או הרשמה');
-    account.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c.7-5 3.1-7 7.5-7s6.8 2 7.5 7"/></svg><span>אישי</span>';
+    account.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4.5 21c.7-5 3.1-7 7.5-7s6.8 2 7.5 7"/></svg><span>אזור אישי</span>';
     account.addEventListener('click',()=>document.getElementById('dashboard-button')?.click());
     shortcuts.append(contact,account);
     header.append(shortcuts);

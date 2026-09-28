@@ -84,7 +84,7 @@
   ];
   let profile=null, active="profile";
   const tabbar=$(".pt-tabs",dialog), body=$(".pt-body",dialog);
-  tabs.forEach(([id,label])=>{const b=document.createElement("button");b.textContent=label;b.dataset.tab=id;b.onclick=()=>render(id);tabbar.appendChild(b);});
+  tabs.forEach(([id,label])=>{const b=document.createElement("button");b.textContent=label;b.dataset.tab=id;if(id==="admin")b.hidden=true;b.onclick=()=>render(id);tabbar.appendChild(b);});
 
   function setStatus(msg,error=false){let el=$(".pt-status",body);if(!el){el=document.createElement("div");el.className="pt-status";body.appendChild(el)}el.textContent=window.GmachTranslate?.(msg)||msg||"";el.style.color=error?"#a11":"inherit";}
   async function render(id){
@@ -93,7 +93,8 @@
     body.innerHTML="<p>טוענים…</p>";
     try{
       if(!profile) profile=(await api("/api/me/profile")).profile;
-      if(id==="admin" && profile.role!=="admin"){body.innerHTML="<p>המסך זמין למנהל האתר בלבד.</p>";return;}
+      const adminTab=tabbar.querySelector('[data-tab="admin"]');if(adminTab)adminTab.hidden=profile.role!=="admin";
+      if(id==="admin" && profile.role!=="admin"){await render("profile");return;}
       await ({profile:renderProfile,transfers:renderTransfers,privacy:renderPrivacy,addresses:renderAddresses,devices:renderDevices,notifications:renderNotifications,favorites:renderFavorites,calendar:renderCalendar,searches:renderSearches,categories:renderSavedCategories,support:renderSupport,admin:renderAdmin}[id])();
 
     }catch(e){body.innerHTML=`<p role="alert">${esc(e.message)}</p>`;}

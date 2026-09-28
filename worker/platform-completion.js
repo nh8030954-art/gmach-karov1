@@ -155,19 +155,7 @@ export async function platformPreflight(request,env,url){
   if(block) return json({error:"הגישה הוגבלה זמנית בעקבות פעילות חריגה",blockedUntil:block.blocked_until},429);
   if(!["POST","PUT","PATCH","DELETE"].includes(request.method.toUpperCase())) return null;
   await requireAdminActionChallenge(request,env,url);
-  if(!env.TURNSTILE_SECRET_KEY) return null;
-  let needsTurnstile=["/api/auth/register","/api/support"].includes(url.pathname),body={};
-  if(url.pathname==="/api/auth/login"){
-    const ipHash=await sha256(request.headers.get("CF-Connecting-IP")||"unknown");
-    const failures=await qfirst(env,"SELECT COUNT(*) AS n FROM security_events WHERE ip_hash=? AND event_type IN ('login_failed','turnstile_failed') AND created_at>datetime('now','-1 hour')",[ipHash]);
-    needsTurnstile=Number(failures?.n||0)>=2;
-  }
-  if(!needsTurnstile)return null;
-  try{body=await request.clone().json();}catch{return null;}
-  const token=String(body.turnstileToken||"").trim();
-  if(!token) return json({error:url.pathname==="/api/auth/login"?"נדרש אימות אנושי לפני ניסיון כניסה נוסף":"נדרש אימות אנושי",turnstileRequired:true},428);
-  const ok=await verifyTurnstile(env,token,request.headers.get("CF-Connecting-IP"));
-  if(!ok){await recordSecurityFailure(request,env,"turnstile_failed");return json({error:"האימות האנושי נכשל. נסו שוב",turnstileRequired:true},400);}
+  // Request and account rate limits continue to protect this endpoint.
   return null;
 }
 
@@ -189,8 +177,8 @@ export async function handlePlatformCompletionApi(request,env,ctx,url){
   const method=request.method.toUpperCase(),path=url.pathname;
   if(method==="GET"&&path==="/api/platform/features") return json({
     release:"complete-platform-2026-09-27.10",
-    turnstileEnabled:Boolean(env.TURNSTILE_SECRET_KEY&&env.TURNSTILE_SITE_KEY),
-    turnstileSiteKey:env.TURNSTILE_SITE_KEY||null,
+    turnstileEnabled:false,
+    turnstileSiteKey:null,
     pushConfigured:Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY),
     vapidPublicKey:env.VAPID_PUBLIC_KEY||null,geocoding:true,backups:true,calendar:true,chatMedia:true
   });

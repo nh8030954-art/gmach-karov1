@@ -407,6 +407,7 @@ async function ensureAdvancedBookingSchema(env) {
     ["booking_notice_minutes","INTEGER NOT NULL DEFAULT 0 CHECK (booking_notice_minutes >= 0)"],
     ["turnaround_minutes","INTEGER NOT NULL DEFAULT 0 CHECK (turnaround_minutes >= 0)"],
     ["booking_horizon_days","INTEGER NOT NULL DEFAULT 365 CHECK (booking_horizon_days BETWEEN 1 AND 1095)"],
+    ["booking_horizon_minutes","INTEGER CHECK (booking_horizon_minutes BETWEEN 1 AND 1576800)"],
     ["approval_mode","TEXT NOT NULL DEFAULT 'manual' CHECK (approval_mode IN ('manual','automatic'))"],
     ["deposit_required","INTEGER NOT NULL DEFAULT 0 CHECK (deposit_required IN (0,1))"],
     ["deposit_amount_agorot","INTEGER NOT NULL DEFAULT 0 CHECK (deposit_amount_agorot >= 0)"]
@@ -1005,7 +1006,7 @@ async function logoutAll(request, env, url) {
 
 async function getProfile(request, env) {
   const user = await requireUser(request, env);
-  return json({ profile: { ...publicUser(user), phone:user.phone||null, city:user.city||null, preferredLanguage:user.preferred_language||"he", preferredNavigation:user.preferred_navigation||"google", operationalEmails:Boolean(user.operational_emails_accepted), communityEmails:Boolean(user.community_emails_accepted), deletionRequestedAt:user.deletion_requested_at||null, consentVersion:user.consent_version||null } });
+  return json({ profile: { ...publicUser(user), phone:user.phone||null, city:user.city||null, address:await decryptPrivateValue(user.address_cipher,env), preferredLanguage:user.preferred_language||"he", preferredNavigation:user.preferred_navigation||"google", operationalEmails:Boolean(user.operational_emails_accepted), communityEmails:Boolean(user.community_emails_accepted), deletionRequestedAt:user.deletion_requested_at||null, consentVersion:user.consent_version||null } });
 }
 
 async function updateProfile(request, env) {
@@ -1724,6 +1725,7 @@ async function createItem(request, env) {
     body.maxLoanDays?positiveInt(body.maxLoanDays,1,1,3650,"ימי השאלה מרביים"):null,
     body.serviceRadiusKm?Math.max(0.1,Math.min(500,Number(body.serviceRadiusKm))):null
   ).run();
+  if(body.bookingHorizonMinutes!==undefined)await env.DB.prepare("UPDATE items SET booking_horizon_minutes=? WHERE id=?").bind(positiveInt(body.bookingHorizonMinutes,525600,1,1576800,"טווח הזמנה"),id).run();
   const publishAt=body.publishAt?validateDateTime(body.publishAt,"מועד פרסום"):null;
   const publishStatus=publishAt&&Date.parse(publishAt)>Date.now()?"pending":"active";
   if(publishStatus!=="active") await env.DB.prepare("UPDATE items SET status='pending' WHERE id=?").bind(id).run();
@@ -1798,6 +1800,7 @@ async function updateItem(request, env, id) {
     positiveInt(body.turnaroundMinutes,Number(existing.turnaround_minutes||0),0,10080,"זמן התארגנות"),
     positiveInt(body.bookingHorizonDays,Number(existing.booking_horizon_days||365),1,1095,"טווח הזמנה"),
     body.approvalMode==="automatic"?"automatic":"manual",body.depositRequired?1:0,body.depositRequired?moneyAgorot(body.depositAmount):0,publishAt,maxPerUser,preparationMinutes,maxLoanDays,serviceRadiusKm,nextStatus,id).run();
+  if(body.bookingHorizonMinutes!==undefined)await env.DB.prepare("UPDATE items SET booking_horizon_minutes=? WHERE id=?").bind(positiveInt(body.bookingHorizonMinutes,Number(existing.booking_horizon_minutes||existing.booking_horizon_days*1440),1,1576800,"טווח הזמנה"),id).run();
   return json({ item: { id, status:nextStatus,publishAt,maxPerUser,preparationMinutes,maxLoanDays,serviceRadiusKm } });
 }
 
@@ -1892,8 +1895,8 @@ function assertAllowedPickupReturnTime(value, label) {
   // weekday in UTC so DST/host timezone can never shift the stated local hour.
   const day = new Date(Date.UTC(Number(year),Number(month)-1,Number(dayOfMonth))).getUTCDay();
   const minutes = Number(hour)*60+Number(minute);
-  if ((day === 5 && minutes >= 17*60) || (day === 6 && minutes < 21*60)) {
-    throw new HttpError(400, `לא ניתן לקבוע ${label} מיום שישי בשעה 17:00 ועד שבת בשעה 21:00`);
+  if ((day === 5 && minutes >= 17*60) || (day === 6 && minutes < 20*60)) {
+    throw new HttpError(400, `לא ניתן לקבוע ${label} מיום שישי בשעה 17:00 ועד שבת בשעה 20:00`);
   }
 }
 async function availableQuantityForRange(env,itemId,from,until,turnaroundMinutes=0,excludeRequestId=null) {
@@ -2007,7 +2010,7 @@ async function createLoanRequest(request, env) {
   const itemId = cleanText(body.itemId, 1, 100, "פריט");
   const item = await env.DB.prepare(`
     SELECT i.id,i.title,i.quantity,i.availability_status,i.min_loan_minutes,i.max_loan_minutes,
-      i.booking_notice_minutes,i.booking_horizon_days,i.turnaround_minutes,i.approval_mode,
+      i.booking_notice_minutes,i.booking_horizon_days,i.booking_horizon_minutes,i.turnaround_minutes,i.approval_mode,
       i.deposit_required,i.deposit_amount_agorot,i.max_per_user,i.service_radius_km,i.preparation_minutes,i.max_loan_days,o.owner_id,o.id AS organization_id
     FROM items i JOIN organizations o ON o.id=i.organization_id
     WHERE i.id=? AND i.status='active' AND i.is_free=1 AND o.status='approved'
@@ -2030,7 +2033,7 @@ async function createLoanRequest(request, env) {
   const now = Date.now();
   const fromMs = Date.parse(from);
   if (fromMs < now + (Number(item.booking_notice_minutes)+Number(item.preparation_minutes||0)) * 60000) throw new HttpError(400, "מועד האיסוף מוקדם מדי לפי זמן ההזמנה וההכנה של הגמ״ח");
-  if (fromMs > now + Number(item.booking_horizon_days) * 86400000) throw new HttpError(400, "מועד האיסוף רחוק מדי לפי תנאי הגמ״ח");
+  if (fromMs > now + Number(item.booking_horizon_minutes||Number(item.booking_horizon_days)*1440) * 60000) throw new HttpError(400, "מועד האיסוף רחוק מדי לפי תנאי הגמ״ח");
 
   const quantity = Number(body.quantity || 1);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > Number(item.quantity)) throw new HttpError(400, "הכמות המבוקשת אינה תקינה");
@@ -3072,6 +3075,7 @@ function mapItem(row) {
     bookingNoticeMinutes: Number(row.booking_notice_minutes || 0),
     turnaroundMinutes: Number(row.turnaround_minutes || 0),
     bookingHorizonDays: Number(row.booking_horizon_days || 365),
+    bookingHorizonMinutes: Number(row.booking_horizon_minutes || Number(row.booking_horizon_days||365)*1440),
     approvalMode: row.approval_mode || "manual",
     depositRequired: Boolean(row.deposit_required),
     depositAmountAgorot: Number(row.deposit_amount_agorot || 0),
@@ -3226,8 +3230,8 @@ function sanitizePickupOptions(value) {
   return JSON.stringify([...new Set(values)].slice(0,3).length ? [...new Set(values)].slice(0,3) : ["pickup"]);
 }
 
-function sanitizeItemType(value) { return ["loan","donation","service"].includes(value) ? value : "loan"; }
-function sanitizePickupMethod(value) { return ["pickup","delivery","coordination"].includes(value) ? value : "pickup"; }
+function sanitizeItemType(value) { return ["loan","donation"].includes(value) ? value : "loan"; }
+function sanitizePickupMethod(value) { return "coordination"; }
 function sanitizeTags(value) {
   const list = Array.isArray(value) ? value : String(value || "").split(",");
   return [...new Set(list.map(item => String(item).trim()).filter(item => item.length >= 2 && item.length <= 30))].slice(0,10);
@@ -3304,6 +3308,18 @@ async function encryptPrivateValue(value, env) {
   const iv=crypto.getRandomValues(new Uint8Array(12));
   const encrypted=new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(value)));
   return `v1.${bytesToBase64Url(iv)}.${bytesToBase64Url(encrypted)}`;
+}
+
+async function decryptPrivateValue(cipher,env) {
+  if(!cipher)return null;
+  const [version,ivText,dataText]=String(cipher).split(".");
+  if(version!=="v1"||!ivText||!dataText)throw new HttpError(503,"לא ניתן לקרוא את הכתובת השמורה");
+  const secret=String(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY||"");
+  if(secret.length<24)throw new HttpError(503,"מפתח הצפנת הנתונים הפרטיים אינו מוגדר");
+  const decode=value=>Uint8Array.from(atob(value.replaceAll("-","+").replaceAll("_","/").padEnd(Math.ceil(value.length/4)*4,"=")),c=>c.charCodeAt(0));
+  const keyBytes=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(secret));
+  const key=await crypto.subtle.importKey("raw",keyBytes,{name:"AES-GCM"},false,["decrypt"]);
+  try{return new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:decode(ivText)},key,decode(dataText)))}catch{throw new HttpError(503,"לא ניתן לקרוא את הכתובת השמורה")}
 }
 
 function bytesToBase64Url(bytes){let binary="";for(const byte of bytes)binary+=String.fromCharCode(byte);return btoa(binary).replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,"");}
