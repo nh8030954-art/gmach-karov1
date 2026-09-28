@@ -22,7 +22,7 @@ jobs:
       QA_URL: https://gmach-karov1-qa.nh8030954.workers.dev
       QA_R2_BUCKET: gmach-karov-images-qa
       QA_BACKUP_BUCKET: gmach-karov-backups-qa
-      QA_RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      QA_RESEND_API_KEY: ${{ secrets.RESEND_API_KEY || secrets.GMACH_BEREGA_QA }}
       QA_DATA_ENCRYPTION_KEY: ${{ secrets.DATA_ENCRYPTION_KEY }}
     steps:
       - name: Check QA configuration
