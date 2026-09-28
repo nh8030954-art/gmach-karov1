@@ -2824,6 +2824,7 @@ async function requireUser(request, env) {
 async function requireAdmin(request, env) {
   const user = await requireUser(request, env);
   if (user.role !== "admin") throw new HttpError(403, "הפעולה מיועדת למנהלי האתר");
+  if (Number(user.totp_enabled || 0) !== 1) throw new HttpError(403, "יש להפעיל אימות דו שלבי באפליקציית Authenticator לפני כניסה להנהלת האתר");
   return user;
 }
 

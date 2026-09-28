@@ -46,7 +46,7 @@ async function currentUser(request,env){
   return await env.DB.prepare(`SELECT u.*,s.token_hash AS current_session_hash FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?`).bind(await hash(token),new Date().toISOString()).first();
 }
 async function requireUser(request,env){const u=await currentUser(request,env);if(!u)throw new FinalError(401,"יש להתחבר כדי להמשיך");return u}
-async function requireAdmin(request,env){const u=await requireUser(request,env);if(u.role!=="admin")throw new FinalError(403,"נדרשת הרשאת מנהל");return u}
+async function requireAdmin(request,env){const u=await requireUser(request,env);if(u.role!=="admin")throw new FinalError(403,"נדרשת הרשאת מנהל");if(Number(u.totp_enabled||0)!==1)throw new FinalError(403,"יש להפעיל אימות דו שלבי לפני כניסה להנהלת האתר");return u;}
 async function orgAccess(request,env,orgId,allowed=["owner","requests","inventory","reports"]){
   const u=await requireUser(request,env);if(u.role==="admin")return{user:u,role:"admin"};
   const org=await env.DB.prepare("SELECT owner_id FROM organizations WHERE id=? AND deleted_at IS NULL").bind(orgId).first();

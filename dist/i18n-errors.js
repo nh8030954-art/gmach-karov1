@@ -1,4 +1,6 @@
-window.GmachEnglish = Object.freeze({...window.GmachEnglish,...{
+window.GmachEnglish = Object.freeze({
+  "יש להפעיל אימות דו שלבי לפני כניסה להנהלת האתר":"Enable two-factor authentication before accessing site administration",
+  "יש להפעיל אימות דו שלבי באפליקציית Authenticator לפני כניסה להנהלת האתר":"Enable Authenticator two-factor authentication before accessing site administration",...window.GmachEnglish,...{
   "JSON לא תקין": "Invalid JSON",
   "אחת הקטגוריות אינה זמינה": "One of the categories is unavailable",
   "אי אפשר להזמין פריט מהגמ״ח שלכם": "You cannot borrow an item from your own gmach",
@@ -207,4 +209,6 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,...{
   "תוכן הבקשה אינו תקין": "Invalid request content",
   "תפקיד המנהל אינו תקין": "Invalid manager role"
 }});
-window.GmachEnglish = Object.freeze({...window.GmachEnglish,"שירות התרגום אינו זמין כרגע":"Translation service is currently unavailable","יש לשלוח עד 12 קטעי טקסט, באורך כולל של עד 4,500 תווים":"Send up to 12 text excerpts with a combined length of 4,500 characters","התרגום אינו זמין כרגע. אפשר לנסות שוב מאוחר יותר":"Translation is currently unavailable. Try again later"});
+window.GmachEnglish = Object.freeze({
+  "יש להפעיל אימות דו שלבי לפני כניסה להנהלת האתר":"Enable two-factor authentication before accessing site administration",
+  "יש להפעיל אימות דו שלבי באפליקציית Authenticator לפני כניסה להנהלת האתר":"Enable Authenticator two-factor authentication before accessing site administration",...window.GmachEnglish,"שירות התרגום אינו זמין כרגע":"Translation service is currently unavailable","יש לשלוח עד 12 קטעי טקסט, באורך כולל של עד 4,500 תווים":"Send up to 12 text excerpts with a combined length of 4,500 characters","התרגום אינו זמין כרגע. אפשר לנסות שוב מאוחר יותר":"Translation is currently unavailable. Try again later"});

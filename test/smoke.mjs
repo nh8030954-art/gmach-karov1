@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import miniflare from "miniflare";
 const { FormData: WorkerFormData, Miniflare } = miniflare;
@@ -85,6 +85,8 @@ try {
   }
 
   let result = await request("/api/health?deep=1");
+  const provisionedAdmin = await (await mf.getD1Database("DB")).prepare("SELECT role,email_verified,totp_enabled FROM users WHERE email=?").bind("netanelhirsh@gmail.com").first();
+  assert.deepEqual([provisionedAdmin?.role, provisionedAdmin?.email_verified, provisionedAdmin?.totp_enabled],["admin",1,0],"Requested admin account must be provisioned and require Authenticator setup");
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(result.data.database, "D1");
   assert.equal(result.data.email, true);
@@ -114,6 +116,18 @@ try {
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
   const adminCookie = await verifyLatestEmail("admin@example.org");
   adminSessionCookie = adminCookie;
+  result = await request("/api/admin/pending", { cookie: adminCookie });
+  assert.equal(result.response.status, 403, "Admin actions require Authenticator enrollment");
+  result = await request("/api/auth/2fa/setup", { method: "POST", cookie: adminCookie, body: {} });
+  assert.equal(result.response.status, 200);
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567", secret = new URL(result.data.otpauthUri).searchParams.get("secret");
+  let buffer = 0, bits = 0; const bytes = [];
+  for (const char of secret) { buffer = (buffer << 5) | alphabet.indexOf(char); bits += 5; if (bits >= 8) { bits -= 8; bytes.push((buffer >>> bits) & 255); } }
+  const counter = Buffer.alloc(8); counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)));
+  const digest = createHmac("sha1", Buffer.from(bytes)).update(counter).digest(), offset = digest.at(-1) & 15;
+  const code = String((digest.readUInt32BE(offset) & 0x7fffffff) % 1000000).padStart(6, "0");
+  result = await request("/api/auth/2fa/confirm", { method: "POST", cookie: adminCookie, body: { code } });
+  assert.equal(result.response.status, 200);
   result = await request("/api/auth/register", { method: "POST", body: { fullName: "English Member", phone: "052-1234578", city: "Jerusalem", address: "10 Example Street, Jerusalem", email: "english@example.org", password: "EnglishUserPass!456", preferredLanguage: "en", termsAccepted: true, operationalEmailsAccepted: true } });
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
   const englishVerification = sentEmails.at(-1);
@@ -224,9 +238,8 @@ try {
   assert.equal(result.data.customizations[0].key, "#hero-title");
   result = await request("/api/admin/content", { cookie: adminCookie });
   assert.equal(Array.isArray(result.data.visualVersions), true);
-  result = await request("/api/auth/2fa/setup", { method: "POST", cookie: adminCookie, body: {} });
-  assert.equal(result.response.status, 200);
-  assert.match(result.data.otpauthUri, /^otpauth:\/\/totp\//);
+  result = await request("/api/auth/me", { cookie: adminCookie });
+  assert.equal(result.data.user.twoFactorEnabled, true);
 
   result = await request("/api/organizations", { method: "POST", cookie: adminCookie, body: { name: "גמ״ח בדיקה", primaryCategory: "אירועים", city: "ירושלים", neighborhood: "מרכז", address: "רחוב הבדיקה 1, ירושלים", serviceArea: "ירושלים והסביבה", hours: { "ראשון": "09:00–17:00", "שני": "09:00–17:00" }, description: "ציוד חינמי לאירועים קהילתיים ולשמחות משפחתיות.", phone: "050-1234567" } });
   assert.equal(result.response.status, 201);

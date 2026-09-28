@@ -1,4 +1,7 @@
 window.GmachEnglish = Object.freeze({
+  "אבטחת חשבון הנהלת האתר":"Site administration account security",
+  "כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.":"Scan the code in an Authenticator app and enable two-factor authentication to access site administration.",
+  "הפעלת אימות דו שלבי":"Enable two-factor authentication",
   "הנהלת האתר":"Site administration",
   "חפשו דירוגים, זמן פעילות אחרון ועדכון מלאי.":"Check ratings, recent activity and inventory updates.",
   "השיחה זמינה רק לשואל/ת, למנהל/ת הגמ״ח ולהנהלת האתר.":"The chat is available only to the borrower, gmach manager and site administration.",
@@ -511,6 +514,9 @@ window.GmachEnglish = Object.freeze({
   "מזהה המוצר לשיתוף:":"Product ID to share:"
 });
 window.GmachEnglish = Object.freeze({
+  "אבטחת חשבון הנהלת האתר":"Site administration account security",
+  "כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.":"Scan the code in an Authenticator app and enable two-factor authentication to access site administration.",
+  "הפעלת אימות דו שלבי":"Enable two-factor authentication",
   "הנהלת האתר":"Site administration",...window.GmachEnglish,
   "חדש":"New","מצב סביר":"Fair condition","בלאי נראה לעין":"Visible wear",
   "סוג הגוף המפעיל":"Operator type","אדם פרטי":"Individual","משפחה":"Family",
@@ -522,6 +528,9 @@ window.GmachEnglish = Object.freeze({
 });
 
 window.GmachEnglish = Object.freeze({
+  "אבטחת חשבון הנהלת האתר":"Site administration account security",
+  "כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.":"Scan the code in an Authenticator app and enable two-factor authentication to access site administration.",
+  "הפעלת אימות דו שלבי":"Enable two-factor authentication",
   "הנהלת האתר":"Site administration",...window.GmachEnglish,
   "סיור קצר":"Quick tour",
   "סיור קצר באזור האישי":"Quick account tour",
@@ -539,6 +548,9 @@ window.GmachEnglish = Object.freeze({
 });
 
 window.GmachEnglish = Object.freeze({
+  "אבטחת חשבון הנהלת האתר":"Site administration account security",
+  "כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.":"Scan the code in an Authenticator app and enable two-factor authentication to access site administration.",
+  "הפעלת אימות דו שלבי":"Enable two-factor authentication",
   "הנהלת האתר":"Site administration",...window.GmachEnglish,
   "זמינות חלקית":"Partial availability",
   "לקבל את הכמות הזמינה":"Use available quantity",
@@ -551,6 +563,9 @@ window.GmachEnglish = Object.freeze({
 });
 
 window.GmachEnglish = Object.freeze({
+  "אבטחת חשבון הנהלת האתר":"Site administration account security",
+  "כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.":"Scan the code in an Authenticator app and enable two-factor authentication to access site administration.",
+  "הפעלת אימות דו שלבי":"Enable two-factor authentication",
   "הנהלת האתר":"Site administration",...window.GmachEnglish,
   "ביצועים - 7 ימים":"Performance - 7 days",
   "טעינת עמוד":"Page load",
@@ -566,6 +581,9 @@ window.GmachEnglish = Object.freeze({
 });
 
 window.GmachEnglish = Object.freeze({
+  "אבטחת חשבון הנהלת האתר":"Site administration account security",
+  "כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.":"Scan the code in an Authenticator app and enable two-factor authentication to access site administration.",
+  "הפעלת אימות דו שלבי":"Enable two-factor authentication",
   "הנהלת האתר":"Site administration",...window.GmachEnglish,
   "חיפוש גמ״חים מתקדם":"Advanced gmach search",
   "חיפוש גמחים מתקדם":"Advanced gmach search",
@@ -579,6 +597,9 @@ window.GmachEnglish = Object.freeze({
 // The QA catalog is intentionally fictional. Translate its fixed labels as a
 // whole so English reviews never show mixed Hebrew and English sentences.
 window.GmachEnglish = Object.freeze({
+  "אבטחת חשבון הנהלת האתר":"Site administration account security",
+  "כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.":"Scan the code in an Authenticator app and enable two-factor authentication to access site administration.",
+  "הפעלת אימות דו שלבי":"Enable two-factor authentication",
   "הנהלת האתר":"Site administration",...window.GmachEnglish,
   "פריט מתאים אחד נמצא":"One matching item found",
   "פריטים":"items",

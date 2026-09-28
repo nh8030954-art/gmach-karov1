@@ -26,7 +26,7 @@ function cookieValue(request,name){for(const p of String(request.headers.get("Co
 async function sha256(v){const bytes=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(String(v))));let out="";for(const b of bytes)out+=String.fromCharCode(b);return btoa(out).replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,"")}
 async function currentUser(request,env){const token=cookieValue(request,SESSION_COOKIE);if(!token)return null;return env.DB.prepare("SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?").bind(await sha256(token),new Date().toISOString()).first()}
 async function requireUser(request,env){const u=await currentUser(request,env);if(!u)throw new DistributionError(401,"יש להתחבר");return u}
-async function requireAdmin(request,env){const u=await requireUser(request,env);if(u.role!=="admin")throw new DistributionError(403,"נדרשת הרשאת מנהל");return u}
+async function requireAdmin(request,env){const u=await requireUser(request,env);if(u.role!=="admin")throw new DistributionError(403,"נדרשת הרשאת מנהל");if(Number(u.totp_enabled||0)!==1)throw new DistributionError(403,"יש להפעיל אימות דו שלבי לפני כניסה להנהלת האתר");return u;}
 async function body(request){try{const b=await request.json();return b&&typeof b==="object"?b:{}}catch{throw new DistributionError(400,"תוכן הבקשה אינו תקין")}}
 const clean=(v,max=500)=>{const s=String(v??"").trim();return s?s.slice(0,max):null};
 function safe(v,f={}){try{return JSON.parse(v||"")}catch{return f}}

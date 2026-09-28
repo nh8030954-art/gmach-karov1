@@ -20,7 +20,7 @@ function b64(bytes){let out="";for(const b of bytes)out+=String.fromCharCode(b);
 async function hash(v){return b64(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(String(v)))))}
 async function currentUser(request,env){const token=cookie(request,SESSION_COOKIE);if(!token)return null;return await env.DB.prepare("SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=? AND s.expires_at>?").bind(await hash(token),new Date().toISOString()).first()}
 async function requireUser(request,env){const u=await currentUser(request,env);if(!u)throw new RemainingError(401,"יש להתחבר כדי להמשיך");return u}
-async function requireAdmin(request,env){const u=await requireUser(request,env);if(u.role!=="admin")throw new RemainingError(403,"נדרשת הרשאת מנהל");return u}
+async function requireAdmin(request,env){const u=await requireUser(request,env);if(u.role!=="admin")throw new RemainingError(403,"נדרשת הרשאת מנהל");if(Number(u.totp_enabled||0)!==1)throw new RemainingError(403,"יש להפעיל אימות דו שלבי לפני כניסה להנהלת האתר");return u;}
 async function body(request){try{return await request.json()}catch{throw new RemainingError(400,"בקשה לא תקינה")}}
 function clean(v,min=0,max=1000,label="ערך"){const s=String(v??"").trim();if(s.length<min||s.length>max)throw new RemainingError(400,label+" אינו תקין");return s}
 function safe(v,f=[]){try{return JSON.parse(v||"")??f}catch{return f}}
