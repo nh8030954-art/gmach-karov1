@@ -1431,10 +1431,9 @@ async function getPublicOrganization(env, id) {
     FROM organizations o LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
     WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 AND EXISTS (SELECT 1 FROM items pi WHERE pi.organization_id=o.id AND pi.status='active' AND pi.deleted_at IS NULL) GROUP BY o.id`).bind(id).first();
   if (!organization) throw new HttpError(404, "הגמ״ח לא נמצא");
-  const schemaReady = await Promise.all([ensureCompletePlatformSchema(env),ensureFinalFeaturesSchema(env)]).then(() => true).catch(error => {
-    console.error("Optional public organization schema unavailable", { organizationId: id, error });
-    return false;
-  });
+  // Repair a missing category relation for older deployments, while allowing
+  // valid public sections to load if unrelated optional schema work fails.
+  await ensureCompletePlatformSchema(env).catch(error => console.error("Public organization relation repair unavailable", { organizationId: id, error }));
   const queries = [
     env.DB.prepare(`SELECT i.*,o.id AS org_id,o.name AS org_name,o.last_active_at AS org_last_active_at,
       NULL AS org_rating,0 AS org_review_count,
@@ -1482,7 +1481,7 @@ async function getPublicOrganization(env, id) {
     }
   }
   const categories = categoriesResult.status === "fulfilled" ? categoriesResult.value.results : [];
-  return json({ organization: { ...organization, verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options), categories }, items, reviews, partial: !schemaReady || [itemsResult,reviewsResult,categoriesResult].some(result => result.status === "rejected") });
+  return json({ organization: { ...organization, verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options), categories }, items, reviews, partial: [itemsResult,reviewsResult,categoriesResult].some(result => result.status === "rejected") });
 }
 
 async function toggleSavedOrganization(request, env, organizationId, save) {
