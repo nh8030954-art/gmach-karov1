@@ -228,7 +228,7 @@ try {
   assert.equal(result.response.status, 200);
   assert.match(result.data.otpauthUri, /^otpauth:\/\/totp\//);
 
-  result = await request("/api/organizations", { method: "POST", cookie: adminCookie, body: { name: "גמ״ח בדיקה", primaryCategory: "אירועים", city: "ירושלים", neighborhood: "מרכז", address: "רחוב הבדיקה 1, ירושלים", hours: { "שעות": "א׳–ה׳ 09:00–17:00" }, description: "ציוד חינמי לאירועים קהילתיים ולשמחות משפחתיות.", phone: "050-1234567" } });
+  result = await request("/api/organizations", { method: "POST", cookie: adminCookie, body: { name: "גמ״ח בדיקה", primaryCategory: "אירועים", city: "ירושלים", neighborhood: "מרכז", address: "רחוב הבדיקה 1, ירושלים", serviceArea: "ירושלים והסביבה", hours: { "ראשון": "09:00–17:00", "שני": "09:00–17:00" }, description: "ציוד חינמי לאירועים קהילתיים ולשמחות משפחתיות.", phone: "050-1234567" } });
   assert.equal(result.response.status, 201);
   const organizationId = result.data.organization.id;
 

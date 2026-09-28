@@ -18,7 +18,7 @@
     return nodes.slice(0, 12);
   }
   async function translate() {
-    if (busy || requests >= 8) return;
+    if (busy || requests >= 20) return;
     const group = candidates();
     if (!group.length) return;
     busy = true;
@@ -44,7 +44,7 @@
       group.forEach(({ node }) => ignored.add(node));
     } finally {
       busy = false;
-      if (requests < 8 && candidates().length) schedule();
+      if (requests < 20 && candidates().length) schedule();
     }
   }
   function schedule() { if (!timer) timer = setTimeout(() => { timer = 0; translate(); }, 450); }

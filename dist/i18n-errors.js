@@ -59,7 +59,7 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,...{
   "הודעה שנמחקה אינה ניתנת לעריכה": "Deleted messages cannot be edited",
   "החיבור פג": "Your session has expired",
   "החיפוש השמור לא נמצא": "Saved search not found",
-  "החשבון הושעה. יש לפנות למנהל האתר": "Your account has been suspended. Contact the site administrator",
+  "החשבון הושעה. יש לפנות להנהלת האתר": "Your account has been suspended. Contact the site administrator",
   "היחידה לא נמצאה": "Unit not found",
   "הכמות המבוקשת אינה תקינה": "Invalid requested quantity",
   "הכתובת לא נמצאה": "Address not found",

@@ -479,7 +479,7 @@ async function showAddressMap(){
  $("#map-current",d).onclick=()=>navigator.geolocation?.getCurrentPosition(pos=>renderMap(pos.coords.latitude,pos.coords.longitude,"המיקום הנוכחי"),()=>toast("לא התקבלה הרשאת מיקום",true),{enableHighAccuracy:false,timeout:8000,maximumAge:60000});
 }
 function installMapEntry(){
- if($("#map-entry"))return;const host=$(".site-actions,.header-actions,.top-actions,header nav");if(!host)return;const b=document.createElement("button");b.id="map-entry";b.type="button";b.className="button button-secondary";b.textContent=lang==="en"?"Map":"מפה";b.onclick=showAddressMap;host.append(b);
+ if($("#map-entry"))return;const host=$(".site-actions,.header-actions,.top-actions,header nav");if(!host)return;const b=document.createElement("button");b.id="map-entry";b.type="button";b.className="button button-secondary";b.textContent=lang==="en"?"Map":"מפה";b.onclick=showAddressMap;host.append(b);const bell=$("#notifications-button"),account=$("#dashboard-button");if(bell&&account&&bell.parentElement===host){account.after(bell);bell.after(b)}
 }
 async function openCategoryManager(type,id){
   const d=dialog("category-manager-dialog",lang==="en"?"Categories":"קטגוריות"),b=$(".remaining-body",d);b.innerHTML="<p>טוענים…</p>";d.showModal();

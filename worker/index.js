@@ -889,7 +889,7 @@ async function login(request, env, ctx, url) {
   await enforceAuthRateLimit(env, email, "login", ctx);
   const user = await env.DB.prepare("SELECT * FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
   if (!user) { await recordSecurityFailure(request,env,"login_failed"); throw new HttpError(401, "האימייל או הסיסמה אינם נכונים"); }
-  if (user.account_status === "suspended") throw new HttpError(403, "החשבון הושעה. יש לפנות למנהל האתר");
+  if (user.account_status === "suspended") throw new HttpError(403, "החשבון הושעה. יש לפנות להנהלת האתר");
   const candidate = await derivePassword(password, user.password_salt, user.password_iterations);
   if (!constantTimeEqual(candidate, user.password_hash)) { await recordSecurityFailure(request,env,"login_failed"); throw new HttpError(401, "האימייל או הסיסמה אינם נכונים"); }
   if (Number(user.email_verified || 0) !== 1) return json({ error: "יש לאמת את כתובת האימייל לפני הכניסה", verificationRequired: true, email: user.email }, 403);
@@ -1621,7 +1621,7 @@ async function createOrganization(request, env) {
     description: cleanText(body.description, 10, 600, "תיאור"),
     phone: validatePhone(body.phone),
     address: cleanText(body.address, 5, 180, "כתובת מלאה"),
-    serviceArea: cleanOptional(body.serviceArea, 180),
+    serviceArea: requiredServiceArea(body.serviceArea),
     hoursJson: requiredHours(body.hours),
     pickupOptions: sanitizePickupOptions(body.pickupOptions)
   };
@@ -1657,7 +1657,7 @@ async function updateOrganization(request, env, id) {
     description: cleanText(body.description, 10, 600, "תיאור"),
     phone: validatePhone(body.phone),
     address: cleanText(body.address, 5, 180, "כתובת מלאה"),
-    serviceArea: cleanOptional(body.serviceArea, 180), hoursJson: requiredHours(body.hours), pickupOptions: sanitizePickupOptions(body.pickupOptions)
+    serviceArea: requiredServiceArea(body.serviceArea), hoursJson: requiredHours(body.hours), pickupOptions: sanitizePickupOptions(body.pickupOptions)
   };
   const status = existing.status === "rejected" && user.role !== "admin" ? "rejected" : "approved";
   const now = new Date().toISOString();
@@ -2387,7 +2387,7 @@ async function createReport(request, env) {
       await env.DB.batch([
         env.DB.prepare("UPDATE items SET status='pending',updated_at=? WHERE id=? AND status='active'").bind(new Date().toISOString(),itemId),
         env.DB.prepare("INSERT INTO content_reports(id,entity_type,entity_id,reporter_id,reason,severity,status) VALUES(?,?,?,?,?,'critical','pending')").bind(crypto.randomUUID(),"item",itemId,user.id,reason),
-        owner?.owner_id ? env.DB.prepare("INSERT INTO notifications(id,user_id,type,title,body) VALUES(?,?,'system',?,?)").bind(crypto.randomUUID(),owner.owner_id,"הפריט הוסתר לבדיקה",`הפריט ${owner.title||""} הוסתר זמנית בעקבות דיווח בטיחות/מספר דיווחים וייבדק על ידי מנהל האתר.`) : env.DB.prepare("SELECT 1")
+        owner?.owner_id ? env.DB.prepare("INSERT INTO notifications(id,user_id,type,title,body) VALUES(?,?,'system',?,?)").bind(crypto.randomUUID(),owner.owner_id,"הפריט הוסתר לבדיקה",`הפריט ${owner.title||""} הוסתר זמנית בעקבות דיווח בטיחות/מספר דיווחים וייבדק על ידי הנהלת האתר.`) : env.DB.prepare("SELECT 1")
       ]);
     }
     return json({ report: { id, status: "pending", temporarilyHidden:shouldHide } }, 201);
@@ -3221,13 +3221,22 @@ function sanitizeHours(value) {
 function requiredHours(value){
   const hours=sanitizeHours(value),parsed=JSON.parse(hours);
   if(!Object.values(parsed).some(entry=>String(entry||"").trim().length>=3))throw new HttpError(400,"יש להזין שעות פעילות");
+  for(const [day,range] of Object.entries(parsed)){
+    if(!["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"].includes(day))throw new HttpError(400,"יש לבחור יום פעילות מהרשימה");
+    const match=range.match(/^(\d{2}:\d{2})[–-](\d{2}:\d{2})$/);
+    if(!match||match[1]>=match[2]||match[2]>"23:59"||(day==="שישי"&&match[2]>"17:00")||(day==="שבת"&&match[1]<"20:00"))throw new HttpError(400,"שעות הפעילות אינן תקינות");
+  }
   return hours;
 }
 
+function requiredServiceArea(value){
+  const area=cleanOptional(value,180);
+  if(!["כל הארץ","צפון","חיפה והקריות","השרון","גוש דן","ירושלים והסביבה","השפלה","דרום","אילת והערבה"].includes(area))throw new HttpError(400,"יש לבחור אזור שירות מהרשימה");
+  return area;
+}
+
 function sanitizePickupOptions(value) {
-  const allowed = new Set(["pickup","delivery","coordination"]);
-  const values = Array.isArray(value) ? value.filter(item => allowed.has(item)) : ["pickup"];
-  return JSON.stringify([...new Set(values)].slice(0,3).length ? [...new Set(values)].slice(0,3) : ["pickup"]);
+  return JSON.stringify(["coordination"]);
 }
 
 function sanitizeItemType(value) { return ["loan","donation"].includes(value) ? value : "loan"; }

@@ -269,7 +269,7 @@ html.a11y-high-contrast :focus-visible { outline-color: #ffdf00 !important; }
 }
 .hero-copy { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; text-align: center; }
 /* Reveal the saved copy only after site settings have been applied. */
-.site-copy-pending .hero-copy, .site-copy-pending .brand-copy { visibility: hidden; }
+.site-copy-pending .hero-copy, .site-copy-pending .brand-copy { visibility: visible; }
 .eyebrow, .section-kicker {
   color: var(--teal);
   font-size: .78rem;
@@ -807,10 +807,8 @@ html.a11y-high-contrast :focus-visible { outline-color: #ffdf00 !important; }
 .community-board-filters{display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin:18px 0}.community-board-filters label{display:grid;gap:5px;flex:1 1 170px;font-weight:600}.community-board-filters input,.community-board-filters select,.community-offer-form textarea{width:100%;padding:10px;border:1px solid #cbd7df;border-radius:10px;background:#fff;color:#183b4e}.community-board-results{display:grid;gap:12px;max-height:52vh;overflow:auto}.community-board-card{border:1px solid #dce5eb;border-radius:16px;padding:16px;background:#fff}.community-board-card h3{margin:0 0 8px}.community-board-card p{margin:8px 0;white-space:pre-wrap}.community-board-card small{color:#576c78}.community-board-actions,.community-board-pages{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px}.community-offer-form{display:grid;gap:8px;margin-top:12px}.community-offer-form[hidden]{display:none}.community-board-pages{justify-content:center}
 
 [lang="en"] .audience-paths button{text-align:left}
-#translate-user-content { font-size: .8rem; white-space: normal; max-width: 190px; line-height: 1.2; }
-@media (max-width: 700px) {
-  .header-actions #translate-user-content { display: inline-flex; position: fixed; right: 16px; bottom: 82px; z-index: 1090; max-width: 155px; padding: 9px 11px; background: #fff; box-shadow: 0 5px 18px rgba(18,42,76,.17); }
-}
+
+
 
 
 /* Live visual QA fixes: English desktop header and dialog title clearance. */
@@ -876,3 +874,16 @@ html, body { max-width: 100%; overflow-x: clip; }
   .mobile-header-fill span { white-space: nowrap; font-size: .6rem !important; }
   .search-field-category { grid-column: 1 / -1; }
 }
+
+/* Keep primary actions readable on one line at desktop widths. */
+@media (min-width: 1050px) { .desktop-nav { flex-wrap: nowrap; white-space: nowrap; } .desktop-nav a, .desktop-nav button { white-space: nowrap; } }
+@media (max-width: 700px) { #mobile-language-switch { display: block !important; } .mobile-header-fill { width: auto !important; left: 46px !important; gap: 4px; } .mobile-header-fill a, .mobile-header-fill button { width: auto !important; min-width: 70px; } .mobile-header-fill span { font-size: .75rem !important; } }
+/* Compact loan rules and keep inputs inside the item editor at narrow widths. */
+#item-form-dialog .stack-form { gap: 12px; }
+#item-form-dialog .two-columns { grid-template-columns: repeat(2,minmax(0,1fr)); }
+#item-form-dialog .two-columns > label { min-width: 0; overflow-wrap: anywhere; }
+#item-form-dialog .duration-field { display: grid; grid-template-columns: minmax(0,1fr) minmax(92px,35%); width: 100%; }
+#item-form-dialog .duration-field > * { max-width: 100%; box-sizing: border-box; }
+@media (max-width: 700px) { #item-form-dialog .two-columns { grid-template-columns: minmax(0,1fr); } }
+.organization-card[role="link"] { cursor: pointer; }
+.organization-card[role="link"]:focus-visible { outline: 3px solid var(--teal); outline-offset: 4px; }

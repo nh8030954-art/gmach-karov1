@@ -1,4 +1,4 @@
-const CACHE_NAME="gmach-shell-v3";
+const CACHE_NAME="gmach-shell-v4";
 const SHELL=["/","/index.html","/manifest.webmanifest","/release-shell.js"];
 self.addEventListener("install",event=>event.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(SHELL)).catch(()=>{}).then(()=>self.skipWaiting())));
 self.addEventListener("activate",event=>event.waitUntil(Promise.all([self.clients.claim(),caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith("gmach-shell-")&&k!==CACHE_NAME).map(k=>caches.delete(k))))])));

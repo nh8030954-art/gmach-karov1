@@ -287,7 +287,7 @@ async function unifiedModeration(request,env,url){
   if(timeCol)await env.DB.prepare("UPDATE "+table+" SET status=?,"+timeCol+"=? WHERE id=?").bind(statusValue,now,id).run();
   else await env.DB.prepare("UPDATE "+table+" SET status=? WHERE id=?").bind(statusValue,id).run();
   if(source==="review_report"&&statusValue==="removed"){const rr=await env.DB.prepare("SELECT review_id FROM review_reports WHERE id=?").bind(id).first();if(rr)await env.DB.prepare("UPDATE reviews SET status='hidden' WHERE id=?").bind(rr.review_id).run()}
-  if((source==="message_report"||source==="chat_report")&&statusValue==="removed"){const tableName=source==="message_report"?"message_reports":"chat_reports";const rr=await env.DB.prepare("SELECT message_id FROM "+tableName+" WHERE id=?").bind(id).first();if(rr)await env.DB.prepare("UPDATE request_messages SET body='הודעה הוסרה על ידי מנהל האתר',media_url=NULL,deleted_at=? WHERE id=?").bind(now,rr.message_id).run()}
+  if((source==="message_report"||source==="chat_report")&&statusValue==="removed"){const tableName=source==="message_report"?"message_reports":"chat_reports";const rr=await env.DB.prepare("SELECT message_id FROM "+tableName+" WHERE id=?").bind(id).first();if(rr)await env.DB.prepare("UPDATE request_messages SET body='הודעה הוסרה על ידי הנהלת האתר',media_url=NULL,deleted_at=? WHERE id=?").bind(now,rr.message_id).run()}
   await env.DB.prepare("INSERT INTO audit_log(id,actor_id,action,entity_type,entity_id,metadata_json) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),admin.id,"moderation."+statusValue,source,id,JSON.stringify({source,action:statusValue})).run().catch(()=>{});
   return json({ok:true,status:statusValue});
 }
