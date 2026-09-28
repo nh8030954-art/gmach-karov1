@@ -1,40 +1,7 @@
-sha=ebab6d479c2f7aed8428ed5d108b26033d10d553
-install=success
-syntax=success
-tests=failure
-smoke=failure
-live=success
-
-> gmach-karov@1.0.0 test
-> node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
-
-Final completion static release gate passed.
-node:internal/modules/run_main:107
-    triggerUncaughtException(
-    ^
-
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:139:83 {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
-
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790574239548:139:83 {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-09-28T05:44:00.038Z"}
+sha=921327beb5a831c2113d650c025f42fca548a0fd
+install=cancelled
+syntax=skipped
+tests=skipped
+smoke=skipped
+live=skipped
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":true,"turnstileSiteKey":"0x4AAAAAAFFH6u5mz0ZekN2Q","pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
