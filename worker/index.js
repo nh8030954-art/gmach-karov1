@@ -1426,9 +1426,9 @@ async function discovery(env, url) {
 
 async function getPublicOrganization(env, id) {
   const organization = await env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,
-    o.address,o.website_url,o.hours_json,o.service_area,o.pickup_options,o.last_active_at,o.verified_phone,o.verified_address,c.contact_phone,
+    o.website_url,o.hours_json,o.service_area,o.pickup_options,o.last_active_at,o.verified_phone,o.verified_address,
     ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
-    FROM organizations o LEFT JOIN organization_contacts c ON c.organization_id=o.id LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
+    FROM organizations o LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
     WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 AND EXISTS (SELECT 1 FROM items pi WHERE pi.organization_id=o.id AND pi.status='active' AND pi.deleted_at IS NULL) GROUP BY o.id`).bind(id).first();
   if (!organization) throw new HttpError(404, "הגמ״ח לא נמצא");
   const schemaReady = await Promise.all([ensureCompletePlatformSchema(env),ensureFinalFeaturesSchema(env)]).then(() => true).catch(error => {
