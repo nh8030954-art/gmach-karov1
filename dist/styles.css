@@ -709,7 +709,7 @@ html.a11y-high-contrast :focus-visible { outline-color: #ffdf00 !important; }
   .item-card h3 { font-size: .98rem; }
   .item-card p { font-size: .76rem; }
   .item-card-footer { margin-top: auto; padding-top: 9px; }
-  .item-card-open { display: none; }
+  .item-card-open { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding-inline: 8px; }
   .steps-section { padding: 46px 0; }
   .steps-grid { grid-template-columns: 1fr; }
   .steps-grid li { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 16px; text-align: right; }
