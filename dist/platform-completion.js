@@ -64,9 +64,9 @@
     .pt-tabs button[aria-selected="true"]{font-weight:700;border-color:#7e8b95}
     .pt-body{padding:18px 22px;max-height:68vh;overflow:auto}.pt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
     .pt-card{border:1px solid #e4e9ee;border-radius:14px;padding:14px;background:#fff}.pt-card h3{margin-top:0}
-    .pt-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pt-form{display:grid;gap:10px}.pt-form[hidden]{display:none}.pt-form input,.pt-form select,.pt-form textarea{width:100%;padding:10px;border:1px solid #ccd5dc;border-radius:10px}
+    .pt-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pt-form{display:grid;gap:10px}.pt-form[hidden]{display:none}.pt-form input:not([type="checkbox"]),.pt-form select,.pt-form textarea{width:100%;padding:10px;border:1px solid #ccd5dc;border-radius:10px}.pt-form input[type="checkbox"]{width:19px;height:19px;min-width:19px;margin:0;accent-color:#173a4d}.pt-form label:has(>input[type="checkbox"]){display:flex;gap:10px;align-items:center}.pt-form label:has(>input[type="checkbox"]) input{flex:none}
     .pt-btn{border:0;border-radius:10px;padding:9px 13px;cursor:pointer;background:#e9eef2}.pt-btn.primary{background:#173a4d;color:#fff}.pt-btn.danger{background:#fff0f0;color:#9f1d1d}
-    .pt-muted{color:#667681;font-size:.92rem}.pt-status{min-height:1.4em;margin-top:8px}.pt-list{display:grid;gap:10px}.pt-list[hidden]{display:none}
+    .pt-muted{color:#667681;font-size:.92rem}.pt-status{min-height:1.4em;margin-top:8px}.pt-list{display:grid;gap:10px}.pt-list[hidden],.pt-list .pt-row[hidden]{display:none}
     @media(max-width:700px){.platform-tools{width:100vw;max-width:100vw;border-radius:18px 18px 0 0;margin:auto 0 0}.pt-body{max-height:72vh}}
   `;
   document.head.appendChild(style);
@@ -116,7 +116,24 @@
 
   async function renderTransfers(){const data=await api("/api/me/organization-transfers");body.innerHTML=`<h3>העברות בעלות</h3><h4>הזמנות שקיבלת</h4><div class="pt-list">${(data.incoming||[]).map(x=>`<div class="pt-card"><strong>${esc(x.organization_name)}</strong><div class="pt-muted">מאת ${esc(x.from_name)} · ${esc(x.status)} · בתוקף עד ${esc(x.expires_at)}</div>${x.status==="pending"?`<div class="pt-row"><button class="pt-btn primary" data-transfer-accept="${esc(x.id)}">קבלת בעלות</button><button class="pt-btn danger" data-transfer-decline="${esc(x.id)}">דחייה</button></div>`:""}</div>`).join("")||'<p class="pt-muted">אין הזמנות ממתינות.</p>'}</div><h4>העברות ששלחת</h4><div class="pt-list">${(data.outgoing||[]).map(x=>`<div class="pt-card"><strong>${esc(x.organization_name)}</strong><div class="pt-muted">אל ${esc(x.to_name||x.to_email)} · ${esc(x.status)} · בתוקף עד ${esc(x.expires_at)}</div></div>`).join("")||'<p class="pt-muted">אין העברות שנשלחו.</p>'}</div><div class="pt-status"></div>`;const respond=async(id,accept)=>{try{await api("/api/organization-transfers/"+encodeURIComponent(id)+"/respond",{method:"POST",body:{accept}});setStatus(accept?"הבעלות הועברה לחשבון שלך.":"ההזמנה נדחתה.");await renderTransfers()}catch(e){setStatus(e.message,true)}};body.querySelectorAll("[data-transfer-accept]").forEach(b=>b.onclick=()=>respond(b.dataset.transferAccept,true));body.querySelectorAll("[data-transfer-decline]").forEach(b=>b.onclick=()=>respond(b.dataset.transferDecline,false))}
 
-  async function renderPrivacy(){body.innerHTML=`<div class="pt-grid"><section class="pt-card"><h3>הנתונים שלי</h3><p>אפשר לייצא עותק מקיף של נתוני החשבון, ההשאלות, ההודעות, ההסכמות, המועדפים, החיפושים, האבטחה והתמיכה, או לפתוח בקשת עיון ותיקון.</p><div class="pt-row"><button class="pt-btn" id="pt-export-data">ייצוא הנתונים שלי</button><button class="pt-btn" id="pt-data-access">בקשת עיון</button><button class="pt-btn" id="pt-data-correct">בקשת תיקון</button></div></section><section class="pt-card"><h3>מחיקת חשבון</h3><p>בקשת מחיקה מתחילה תקופת המתנה של שבעה ימים. אם יש השאלות פעילות, הטיפול ימתין לסגירתן.</p><button class="pt-btn danger" id="pt-request-deletion">בקשת מחיקת חשבון</button></section></div><div class="pt-status"></div>`;$("#pt-export-data",body).onclick=async()=>{try{const response=await fetch("/api/me/export",{credentials:"same-origin"});if(!response.ok)throw new Error("הייצוא נכשל");const blob=await response.blob(),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="gmach-my-data.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setStatus("קובץ הנתונים נוצר.")}catch(e){setStatus(e.message,true)}};const request=async type=>{const details=translatedPrompt(type==="access"?"מה תרצו לקבל בבקשת העיון?":"איזה מידע תרצו לתקן?")||"";if(!details)return;try{await api("/api/me/data-request",{method:"POST",body:{type,details}});setStatus("הבקשה נשלחה ותופיע במערכת התמיכה.")}catch(e){setStatus(e.message,true)}};$("#pt-data-access",body).onclick=()=>request("access");$("#pt-data-correct",body).onclick=()=>request("correction");$("#pt-request-deletion",body).onclick=async()=>{if(!translatedConfirm("להתחיל תהליך מחיקת חשבון? ניתן לבטל במשך שבעה ימים."))return;try{await api("/api/me/account/request-deletion",{method:"POST",body:{}});setStatus("בקשת המחיקה נקלטה. אפשר לבטל אותה דרך לשונית הפרופיל.")}catch(e){setStatus(e.message,true)}}}
+  async function renderPrivacy(){
+    body.innerHTML=`<div class="pt-grid">
+      <section class="pt-card"><h3>הנתונים שלי</h3><p>אפשר לייצא עותק של נתוני החשבון או לשלוח בקשה לעיון ולתיקון מידע.</p><div class="pt-row"><button class="pt-btn" id="pt-export-data" type="button">ייצוא הנתונים שלי</button><button class="pt-btn" id="pt-data-access" type="button">בקשת עיון</button><button class="pt-btn" id="pt-data-correct" type="button">בקשת תיקון</button></div>
+      <form class="pt-form" id="pt-data-request-form" hidden><h4 id="pt-data-request-title"></h4><label for="pt-data-request-details">פרטי הבקשה</label><textarea id="pt-data-request-details" name="details" rows="4" maxlength="2000" minlength="5" required></textarea><div class="pt-row"><button class="pt-btn primary" type="submit">שליחת הבקשה</button><button class="pt-btn" type="button" id="pt-data-request-cancel">ביטול</button></div></form></section>
+      <section class="pt-card"><h3>מחיקת חשבון</h3><p>בקשת מחיקה מתחילה תקופת המתנה של שבעה ימים. אם יש השאלות פעילות, הטיפול ימתין לסגירתן.</p><button class="pt-btn danger" id="pt-request-deletion" type="button">בקשת מחיקת חשבון</button>
+      <form class="pt-form" id="pt-deletion-form" hidden><p>לאחר שליחת הבקשה אפשר לבטל אותה במשך שבעה ימים בלשונית הפרופיל.</p><label><input type="checkbox" required> הבנתי ואני מבקש/ת להתחיל בתהליך מחיקת החשבון</label><div class="pt-row"><button class="pt-btn danger" type="submit">אישור בקשת המחיקה</button><button class="pt-btn" type="button" id="pt-deletion-cancel">ביטול</button></div></form></section></div><div class="pt-status" role="status" aria-live="polite"></div>`;
+    $("#pt-export-data",body).onclick=async()=>{try{const response=await fetch("/api/me/export",{credentials:"same-origin"});if(!response.ok)throw new Error("הייצוא נכשל");const blob=await response.blob(),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="gmach-my-data.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setStatus("קובץ הנתונים נוצר.")}catch(e){setStatus(e.message,true)}};
+    const form=$("#pt-data-request-form",body);
+    for(const [id,type,title] of [["pt-data-access","access","מה תרצו לקבל בבקשת העיון?"],["pt-data-correct","correction","איזה מידע תרצו לתקן?"]]){
+      $("#"+id,body).onclick=()=>{form.reset();form.dataset.requestType=type;$("#pt-data-request-title",body).textContent=title;form.hidden=false;$("#pt-data-request-details",body).focus()};
+    }
+    $("#pt-data-request-cancel",body).onclick=()=>{form.reset();form.hidden=true};
+    form.onsubmit=async event=>{event.preventDefault();const button=form.querySelector('[type="submit"]');button.disabled=true;try{await api("/api/me/data-request",{method:"POST",body:{type:form.dataset.requestType,details:form.elements.namedItem("details").value.trim()}});form.reset();form.hidden=true;setStatus("הבקשה נשלחה ותופיע במערכת התמיכה.")}catch(e){setStatus(e.message,true)}finally{button.disabled=false}};
+    const deletion=$("#pt-deletion-form",body);
+    $("#pt-request-deletion",body).onclick=()=>{deletion.hidden=false};
+    $("#pt-deletion-cancel",body).onclick=()=>{deletion.reset();deletion.hidden=true};
+    deletion.onsubmit=async event=>{event.preventDefault();const button=deletion.querySelector('[type="submit"]');button.disabled=true;try{await api("/api/me/account/request-deletion",{method:"POST",body:{}});deletion.reset();deletion.hidden=true;setStatus("בקשת המחיקה נקלטה. אפשר לבטל אותה דרך לשונית הפרופיל.")}catch(e){setStatus(e.message,true)}finally{button.disabled=false}};
+  }
 
   async function renderAddresses(){
     const data=await api("/api/me/addresses");
@@ -140,7 +157,7 @@
   async function renderDevices(){
     const data=await api("/api/me/sessions");
     body.innerHTML=`<div class="pt-list" id="pt-devices"></div><div class="pt-status"></div>`;const list=$("#pt-devices",body);
-    for(const s of data.sessions){const d=document.createElement("div");d.className="pt-card";d.innerHTML=`<strong>${esc(s.deviceLabel||"מכשיר")}</strong> ${s.current?"· המכשיר הנוכחי":""}<div class="pt-muted">פעילות אחרונה: ${esc(s.lastSeenAt||"")}</div>${!s.current?'<button class="pt-btn danger" data-revoke>ניתוק המכשיר</button>':""}`;d.querySelector("[data-revoke]")?.addEventListener("click",async()=>{await api("/api/me/sessions/"+encodeURIComponent(s.id),{method:"DELETE"});renderDevices()});list.appendChild(d);}
+    for(const s of data.sessions){const d=document.createElement("div");d.className="pt-card";d.innerHTML=`<strong>${esc(s.deviceLabel||"מכשיר")}</strong> ${s.current?"· המכשיר הנוכחי":""}<div class="pt-muted">פעילות אחרונה: ${esc(s.lastSeenAt?new Intl.DateTimeFormat(document.documentElement.lang==="en"?"en-GB":"he-IL",{dateStyle:"medium",timeStyle:"short"}).format(new Date(s.lastSeenAt)):"לא ידוע")}</div>${!s.current?'<button class="pt-btn danger" data-revoke>ניתוק המכשיר</button>':""}`;d.querySelector("[data-revoke]")?.addEventListener("click",async()=>{await api("/api/me/sessions/"+encodeURIComponent(s.id),{method:"DELETE"});renderDevices()});list.appendChild(d);}
   }
 
   async function renderNotifications(){
@@ -184,7 +201,7 @@
   async function renderSavedCategories(){
     const [all,saved]=await Promise.all([api("/api/categories?locale="+(document.documentElement.lang==="en"?"en":"he")),api("/api/me/saved-categories")]);
     const savedIds=new Set((saved.categories||[]).map(category=>category.id));
-    body.innerHTML='<h3>קטגוריות שמורות</h3><p class="pt-muted">בחרו קטגוריות שתרצו למצוא בקלות.</p><div class="pt-list" id="pt-category-list"></div><div class="pt-status" role="status"></div>';
+    body.innerHTML='<h3>קטגוריות שמורות</h3><p class="pt-muted">בחרו קטגוריות שתרצו למצוא בקלות.</p><label class="pt-form">חיפוש קטגוריה<input id="pt-category-filter" type="search" autocomplete="off" placeholder="שם קטגוריה"></label><div class="pt-list" id="pt-category-list"></div><div class="pt-status" role="status"></div>';
     const list=$("#pt-category-list",body);
     for(const category of all.categories||[]){
       const row=document.createElement("div");row.className="pt-card pt-row";
@@ -195,6 +212,7 @@
       row.append(title,button);list.append(row);
     }
     if(!list.children.length)list.innerHTML='<p class="pt-muted">אין קטגוריות זמינות כרגע.</p>';
+    $("#pt-category-filter",body).oninput=event=>{const term=event.currentTarget.value.trim().toLocaleLowerCase();for(const row of list.children)row.hidden=!row.querySelector("strong")?.textContent.toLocaleLowerCase().includes(term)};
   }
 
   async function renderSupport(){

@@ -538,6 +538,10 @@ html.a11y-high-contrast :focus-visible { outline-color: #ffdf00 !important; }
   resize: vertical;
 }
 .stack-form textarea { min-height: 100px; }
+.stack-form .duration-field { display: grid; grid-template-columns: minmax(0,1fr) minmax(96px, 32%); gap: 8px; }
+.stack-form .duration-field input, .stack-form .duration-field select { min-width: 0; }
+.stack-form .calendar-picker-button { margin-top: 8px; width: 100%; }
+.form-hint { margin: 0; color: var(--ink-soft); font-size: .88rem; line-height: 1.6; }
 .stack-form input:focus, .stack-form select:focus, .stack-form textarea:focus { border-color: var(--teal); background: #fff; outline-color: var(--accent); }
 .two-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 .consent-row { width:100%; display:grid; grid-template-columns:22px minmax(0,1fr); align-items:start; gap:10px; color:var(--ink-soft); font-size:.82rem; line-height:1.65; cursor:pointer; }
@@ -561,6 +565,14 @@ html.a11y-high-contrast :focus-visible { outline-color: #ffdf00 !important; }
 .dashboard-subsection .form-grid label { display: grid; gap: 6px; font-weight: 700; }
 .dashboard-subsection .form-grid label.check { display: flex; align-items: center; }
 .dashboard-subsection .form-grid input:not([type="checkbox"]) { width: 100%; min-height: 44px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; }
+.modal .form-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:14px;margin:14px 0; }
+.modal .form-grid label { display:grid;gap:7px;min-width:0;color:var(--ink-soft);font-weight:700; }
+.modal .form-grid input:not([type="checkbox"]),.modal .form-grid select,.modal .form-grid textarea { box-sizing:border-box;width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink); }
+.modal .form-grid input[type="checkbox"] { width:19px;height:19px;accent-color:var(--teal); }
+.modal .form-grid .wide { grid-column:1/-1; }
+.modal .dashboard-row { min-width:0; }
+.modal .dashboard-row-actions { display:flex;flex-wrap:wrap;gap:8px;align-items:center; }
+.modal .dashboard-row-actions select { min-height:42px;border:1px solid var(--line);border-radius:10px;padding:8px; }
 .contact-detail { color: var(--teal); font-weight: 750; }
 .free-note { margin: -4px 0 0; display: flex; justify-content: center; align-items: center; gap: 6px; color: var(--success); font-size: .78rem; font-weight: 800; }
 .free-note svg { width: 17px; height: 17px; }
