@@ -1,6 +1,6 @@
 (()=>{'use strict';
   if(document.documentElement.lang!=='en')return;
-  const selector='.item-detail-description,.organization-hero>p,.review-list blockquote p,.chat-message p,.community-board-card>h3,.community-board-card>p';
+  const selector='.item-detail-description,#item-dialog-title,.item-card h3,.item-card p,.organization-hero>p,.review-list blockquote p,.chat-message p,.community-board-card>h3,.community-board-card>p';
   const translated=new Map();
   const button=document.createElement('button');
   button.type='button';button.id='translate-user-content';button.className='button button-secondary';
@@ -35,7 +35,7 @@
     const attach=()=>{
       const description=itemDialog.querySelector('.item-detail-description');
       if(!description||itemDialog.querySelector('#translate-item-description'))return;
-      const local=document.createElement('button');local.type='button';local.id='translate-item-description';local.className='button button-secondary';local.textContent='Translate item description';
+      const local=document.createElement('button');local.type='button';local.id='translate-item-description';local.className='button button-secondary';local.textContent='Translate item details';
       local.onclick=async()=>{await button.onclick();local.textContent=button.textContent};
       description.insertAdjacentElement('afterend',local);
     };
