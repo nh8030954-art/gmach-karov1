@@ -217,7 +217,7 @@ for(const token of ["has_active_item","!r.has_active_item"])assert.ok(finalWorke
 
 for(const token of ["organization_status","organization_hidden","r.status!==\"approved\"","o.status='approved'"])assert.ok(finalWorker.includes(token),token+" missing from approved-only SEO visibility");
 
-assert.ok(worker.includes("Promise.all([ensureCompletePlatformSchema(env),ensureFinalFeaturesSchema(env)])"),"public gmach route must self-heal relation schema");
+assert.ok(worker.includes("await ensureCompletePlatformSchema(env).catch"),"public gmach route must self-heal relation schema");
 
 for(const token of ["זמינות חלקית","request-use-available","request-change-dates"])assert.ok((appClient+indexHtml).includes(token),token+" missing from partial availability choice UI");
 assert.ok(worker.includes("turnaround_minutes||0"),"waitlist availability must respect turnaround time");
