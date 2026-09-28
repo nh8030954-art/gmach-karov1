@@ -7,6 +7,7 @@ const SEED_SPECS=["INSERT OR IGNORE INTO holiday_rules(id,hebrew_month,hebrew_da
 // Reconcile rating columns that were added by a later migration. Older live
 // databases can already contain the reviews table without these columns.
 ALTER_SPECS.unshift(
+  {table:"reviews",column:"item_id",sql:"ALTER TABLE reviews ADD COLUMN item_id TEXT REFERENCES items(id) ON DELETE CASCADE"},
   {table:"reviews",column:"item_rating",sql:"ALTER TABLE reviews ADD COLUMN item_rating INTEGER CHECK (item_rating BETWEEN 1 AND 5)"},
   {table:"reviews",column:"service_rating",sql:"ALTER TABLE reviews ADD COLUMN service_rating INTEGER CHECK (service_rating BETWEEN 1 AND 5)"},
   {table:"reviews",column:"branch_rating",sql:"ALTER TABLE reviews ADD COLUMN branch_rating INTEGER CHECK (branch_rating BETWEEN 1 AND 5)"}
