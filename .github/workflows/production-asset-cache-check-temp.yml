@@ -1,0 +1,33 @@
+name: Temporary production asset cache check
+on:
+  push:
+    branches: [qa]
+    paths:
+      - ".github/workflows/production-asset-cache-check-temp.yml"
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Inspect live English assets
+        run: |
+          set -euo pipefail
+          URL='https://gmach-karov1.nh8030954.workers.dev'
+          echo '--- index headers ---'
+          curl -sS -D - -o /tmp/index.html "$URL/" | sed -n '1,30p'
+          echo '--- remaining-features headers ---'
+          curl -sS -D /tmp/h1 -o /tmp/rem.js "$URL/remaining-features.js"
+          sed -n '1,30p' /tmp/h1
+          echo '--- live marker ---'
+          grep -o 'Translate English document metadata before language switch guard' /tmp/rem.js || true
+          grep -o 'Contact details are shared only after the request is approved' /tmp/rem.js || true
+          grep -o 'if(lang==="en"){document.title=translateText(document.title)' /tmp/rem.js || true
+          echo '--- source length ---'
+          wc -c /tmp/rem.js
+          echo '--- cache-busted marker ---'
+          curl -sS -o /tmp/rem2.js "$URL/remaining-features.js?audit=202609280542"
+          grep -o 'Contact details are shared only after the request is approved' /tmp/rem2.js || true
+          grep -o 'if(lang==="en"){document.title=translateText(document.title)' /tmp/rem2.js || true
+          wc -c /tmp/rem2.js
