@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  if (document.documentElement.lang !== 'en') return;
+  let started = false;
   const selector = '.item-detail-description,#item-dialog-title,.item-card h3,.item-card p,.organization-hero h2,.organization-hero>p,.organization-card h3,.organization-card p,.review-list blockquote p,.chat-message p,.community-board-card>h3,.community-board-card>p';
   const cache = new Map(), ignored = new WeakSet();
   let timer = 0, busy = false, requests = 0;
@@ -48,6 +48,12 @@
     }
   }
   function schedule() { if (!timer) timer = setTimeout(() => { timer = 0; translate(); }, 450); }
-  new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
-  schedule();
+  function start() {
+    if (started || document.documentElement.lang !== 'en') return;
+    started = true;
+    new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true });
+    schedule();
+  }
+  window.addEventListener('gmach-language-change', start);
+  start();
 })();
