@@ -1,4 +1,4 @@
-sha=456ed3f0920e2a9a74c6a39b1e4f23ad04633f03
+sha=59781384fc7e1f420c7bfa7494bd0790ca3266ea
 install=success
 syntax=success
 tests=success
@@ -24,17 +24,17 @@ Public organization section unavailable {
         at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:217:26)
   }
 }
-      at async cloudflare-internal:d1-api:374:41
-      ... 2 lines matching cause stack trace ...
-      at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:217:26) {
-    [cause]: Error: no such column: r.branch_rating at offset 52: SQLITE_ERROR
-        at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:147:24)
-        at async cloudflare-internal:d1-api:374:41
-        at async Promise.allSettled (index 1)
-        at async getPublicOrganization (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:1455:56)
-        at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:217:26)
-  }
-}
+Community chat retention static release gate passed.
+QR scanning, structured SEO and accessibility shell gate passed.
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+Full requirements regression extensions passed.
+remaining-features Error: Backup checksum mismatch
+    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
+    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:314:91)
+    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:719:37)
+    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:217:26)
 Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-09-28T10:27:06.713Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-09-28T10:32:41.609Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":true,"turnstileSiteKey":"0x4AAAAAAFFH6u5mz0ZekN2Q","pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
