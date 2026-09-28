@@ -513,6 +513,8 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
 // The QA catalog is intentionally fictional. Translate its fixed labels as a
 // whole so English reviews never show mixed Hebrew and English sentences.
 window.GmachEnglish = Object.freeze({...window.GmachEnglish,
+  "פריט מתאים אחד נמצא":"One matching item found",
+  "פריטים":"items",
   "פריטים מתאימים נמצאו":"matching items found",
   "גמ״ח הדגמה":"Demo gmach",
   "פריט הדגמה בלבד. מופיע כדי להמחיש חיפוש, סינון ועמוד גמ״ח בסביבת הבדיקות.":"Demo item only. Shown to preview search, filters and gmach pages in the test environment.",
