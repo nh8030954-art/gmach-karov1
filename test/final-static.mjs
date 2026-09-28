@@ -202,8 +202,8 @@ for(const token of ["openSupportForError","data-support-organization","dashboard
 
 
 for(const token of ["login_failed","recordSecurityFailure"])assert.ok(worker.includes(token),token+" missing from adaptive login security");
-assert.ok(platform.includes("turnstileRequired:true"),"repeated suspicious login attempts should require Turnstile");
-assert.ok(platformClient.includes("requireLogin"),"the UI should render a login Turnstile only when required");
+assert.ok(platform.includes("turnstileEnabled:false"),"the branded verification widget must be disabled");
+assert.ok(worker.includes("enforceAuthRateLimit"),"login must keep server-side rate limiting");
 assert.ok(appClient.includes('location.hash === "#/community"'),"community board should have a direct route");
 for(const token of ["events-stages","medical-ramps","community-projectors"])assert.ok(platform.includes(token),token+" missing from expanded category catalog");
 

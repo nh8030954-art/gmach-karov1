@@ -1,4 +1,8 @@
 window.GmachEnglish = Object.freeze({
+  "אבטחת חשבון הנהלת האתר":"Site administration account security",
+  "כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.":"Scan the code in an Authenticator app and enable two-factor authentication to access site administration.",
+  "הפעלת אימות דו שלבי":"Enable two-factor authentication",
+  "הנהלת האתר":"Site administration",
   "חפשו דירוגים, זמן פעילות אחרון ועדכון מלאי.":"Check ratings, recent activity and inventory updates.",
   "השיחה זמינה רק לשואל/ת, למנהל/ת הגמ״ח ולהנהלת האתר.":"The chat is available only to the borrower, gmach manager and site administration.",
   "הדיווח נשלח להנהלת האתר ואינו מוצג למפרסם.":"The report goes to site administration and is not shown to the listing owner.",
@@ -181,10 +185,10 @@ window.GmachEnglish = Object.freeze({
   "הודעה לשואל/ת":"Message to borrower","אישור הבקשה":"Approve request","סגירת השיחה":"Close chat",
   "שיחה פרטית":"Private chat","תיאום ההשאלה":"Coordinate the loan","כתיבת הודעה":"Write a message",
   "כתבו הודעה לשואל/ת או למנהל/ת הגמ״ח":"Write to the borrower or gmach manager","שליחה":"Send",
-  "השיחה זמינה רק לשואל/ת, למנהל/ת הגמ״ח ולמנהל האתר.":"Only the borrower, gmach manager and site administrator can access this chat.",
+  "השיחה זמינה רק לשואל/ת, למנהל/ת הגמ״ח ולהנהלת האתר.":"Only the borrower, gmach manager and site administrator can access this chat.",
   "סגירת ההתראות":"Close notifications","נשארים מעודכנים":"Stay informed","סימון הכול כנקרא":"Mark all as read",
   "סגירת הדיווח":"Close report","שומרים על הקהילה":"Keeping the community safe","דיווח על פריט":"Report item",
-  "הדיווח נשלח למנהל האתר ואינו מוצג למפרסם.":"The report goes to site administration and is not shown to the listing owner.",
+  "הדיווח נשלח להנהלת האתר ואינו מוצג למפרסם.":"The report goes to site administration and is not shown to the listing owner.",
   "מה הבעיה?":"What is the problem?","מידע לא נכון":"Incorrect information","פריט לא בטיחותי":"Unsafe item",
   "בקשת תשלום":"Payment requested","הפריט אינו זמין":"Item unavailable","אחר":"Other","פרטים נוספים":"Additional details",
   "שליחת דיווח":"Send report","עזרה הדדית":"Community support","לוח בקשות הקהילה":"Community request board",
@@ -488,7 +492,7 @@ window.GmachEnglish = Object.freeze({
   "מעדכנים…":"Updating…",
   "הבקשה עודכנה והשואל/ת קיבל/ה התראה":"Request updated and borrower notified",
   "לא הצלחנו לשלוח את ההודעה":"Could not send the message",
-  "הדיווח התקבל וייבדק על ידי מנהל האתר":"Report received for administrator review",
+  "הדיווח התקבל וייבדק על ידי הנהלת האתר":"Report received for administrator review",
   "לא הצלחנו לשלוח את הדיווח":"Could not send the report",
   "יצאתם מהחשבון":"You signed out",
   "מחיקת החשבון תסיר גם פרסומים, בקשות ושיחות המקושרים אליו. להמשיך?":"Deleting your account also removes related listings, requests and chats. Continue?",
@@ -509,7 +513,11 @@ window.GmachEnglish = Object.freeze({
   "תיאור התקלה:":"Issue description:",
   "מזהה המוצר לשיתוף:":"Product ID to share:"
 });
-window.GmachEnglish = Object.freeze({...window.GmachEnglish,
+window.GmachEnglish = Object.freeze({
+  "אבטחת חשבון הנהלת האתר":"Site administration account security",
+  "כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.":"Scan the code in an Authenticator app and enable two-factor authentication to access site administration.",
+  "הפעלת אימות דו שלבי":"Enable two-factor authentication",
+  "הנהלת האתר":"Site administration",...window.GmachEnglish,
   "חדש":"New","מצב סביר":"Fair condition","בלאי נראה לעין":"Visible wear",
   "סוג הגוף המפעיל":"Operator type","אדם פרטי":"Individual","משפחה":"Family",
   "קהילה או בית כנסת":"Community or synagogue","עמותה":"Nonprofit","עסק שמשאיל בחינם":"Business lending for free","רשות או מוסד":"Public authority or institution",
@@ -519,7 +527,11 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
   "תמונות הפריט":"Item photos","(אפשר עד 12 תמונות, כל תמונה עד 5MB)":"(Up to 12 photos, 5 MB each)","דירוג הסניף":"Branch rating","מתי צריך?":"When do you need it?","עד מתי?":"Until when?","טווח חיפוש בק\"מ":"Search radius in km","למשל 20":"For example, 20"
 });
 
-window.GmachEnglish = Object.freeze({...window.GmachEnglish,
+window.GmachEnglish = Object.freeze({
+  "אבטחת חשבון הנהלת האתר":"Site administration account security",
+  "כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.":"Scan the code in an Authenticator app and enable two-factor authentication to access site administration.",
+  "הפעלת אימות דו שלבי":"Enable two-factor authentication",
+  "הנהלת האתר":"Site administration",...window.GmachEnglish,
   "סיור קצר":"Quick tour",
   "סיור קצר באזור האישי":"Quick account tour",
   "שלושה צעדים כדי להתחיל להשתמש בגמ\"ח ברגע.":"Three steps to get started with Gmach Berega.",
@@ -535,7 +547,11 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
   "הסיור לא יוצג שוב במכשיר הזה":"The tour will not be shown again on this device"
 });
 
-window.GmachEnglish = Object.freeze({...window.GmachEnglish,
+window.GmachEnglish = Object.freeze({
+  "אבטחת חשבון הנהלת האתר":"Site administration account security",
+  "כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.":"Scan the code in an Authenticator app and enable two-factor authentication to access site administration.",
+  "הפעלת אימות דו שלבי":"Enable two-factor authentication",
+  "הנהלת האתר":"Site administration",...window.GmachEnglish,
   "זמינות חלקית":"Partial availability",
   "לקבל את הכמות הזמינה":"Use available quantity",
   "רשימת המתנה לכמות המלאה":"Waitlist for full quantity",
@@ -546,7 +562,11 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
   "נוספתם לרשימת ההמתנה. נעדכן אתכם כשהכמות שביקשתם תתפנה.":"You joined the waitlist. We will notify you when the quantity you requested becomes available."
 });
 
-window.GmachEnglish = Object.freeze({...window.GmachEnglish,
+window.GmachEnglish = Object.freeze({
+  "אבטחת חשבון הנהלת האתר":"Site administration account security",
+  "כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.":"Scan the code in an Authenticator app and enable two-factor authentication to access site administration.",
+  "הפעלת אימות דו שלבי":"Enable two-factor authentication",
+  "הנהלת האתר":"Site administration",...window.GmachEnglish,
   "ביצועים - 7 ימים":"Performance - 7 days",
   "טעינת עמוד":"Page load",
   "שגיאות JavaScript":"JavaScript errors",
@@ -560,7 +580,11 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
   "התמונה נשלחה לבדיקת תוכן נוספת לפני טיפול מנהל.":"The image was sent for additional content review."
 });
 
-window.GmachEnglish = Object.freeze({...window.GmachEnglish,
+window.GmachEnglish = Object.freeze({
+  "אבטחת חשבון הנהלת האתר":"Site administration account security",
+  "כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.":"Scan the code in an Authenticator app and enable two-factor authentication to access site administration.",
+  "הפעלת אימות דו שלבי":"Enable two-factor authentication",
+  "הנהלת האתר":"Site administration",...window.GmachEnglish,
   "חיפוש גמ״חים מתקדם":"Advanced gmach search",
   "חיפוש גמחים מתקדם":"Advanced gmach search",
   "חיפוש גמ״חים":"Search gmach organizations",
@@ -572,7 +596,11 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
 
 // The QA catalog is intentionally fictional. Translate its fixed labels as a
 // whole so English reviews never show mixed Hebrew and English sentences.
-window.GmachEnglish = Object.freeze({...window.GmachEnglish,
+window.GmachEnglish = Object.freeze({
+  "אבטחת חשבון הנהלת האתר":"Site administration account security",
+  "כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.":"Scan the code in an Authenticator app and enable two-factor authentication to access site administration.",
+  "הפעלת אימות דו שלבי":"Enable two-factor authentication",
+  "הנהלת האתר":"Site administration",...window.GmachEnglish,
   "פריט מתאים אחד נמצא":"One matching item found",
   "פריטים":"items",
   "פריטים מתאימים נמצאו":"matching items found",
