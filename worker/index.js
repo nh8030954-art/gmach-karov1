@@ -1301,9 +1301,9 @@ async function updateSavedSearch(request,env,id){
 }
 
 async function listItems(env, url) {
-  // Keep this hot public path read-only and fast. Schema reconciliation runs
-  // from health/scheduled maintenance; the compatible query below keeps older
-  // databases readable while that maintenance catches up.
+  // Repair the legacy review relation once per Worker isolate; then the
+  // primary catalog query can return item ratings without a fallback.
+  await ensureReviewBranchRatingSchema(env).catch(error => console.error("Review relation repair unavailable", error));
   const params = [];
   const maximumCatalogLimit = env.QA_CATALOG_LIMIT === "300" ? 300 : 100;
   const requestedCatalogLimit = Number.parseInt(url.searchParams.get("limit") || "", 10);
@@ -1383,6 +1383,7 @@ async function listItems(env, url) {
 }
 
 async function getItem(env, id) {
+  await ensureReviewBranchRatingSchema(env).catch(error => console.error("Review relation repair unavailable", error));
   const row = await env.DB.prepare(`
     SELECT i.*, o.id AS org_id, o.name AS org_name,
       o.last_active_at AS org_last_active_at,
@@ -1431,6 +1432,7 @@ async function getPublicOrganization(env, id) {
     FROM organizations o LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
     WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 AND EXISTS (SELECT 1 FROM items pi WHERE pi.organization_id=o.id AND pi.status='active' AND pi.deleted_at IS NULL) GROUP BY o.id`).bind(id).first();
   if (!organization) throw new HttpError(404, "הגמ״ח לא נמצא");
+  await ensureReviewBranchRatingSchema(env).catch(error => console.error("Review relation repair unavailable", error));
   // Repair a missing category relation for older deployments, while allowing
   // valid public sections to load if unrelated optional schema work fails.
   await ensureCompletePlatformSchema(env).catch(error => console.error("Public organization relation repair unavailable", { organizationId: id, error }));
@@ -1544,12 +1546,18 @@ let reviewBranchRatingSchemaPromise = null;
 async function ensureReviewBranchRatingSchema(env) {
   if (reviewBranchRatingSchemaPromise) return reviewBranchRatingSchemaPromise;
   reviewBranchRatingSchemaPromise = (async () => {
-    const columns = await env.DB.prepare("PRAGMA table_info(reviews)").all();
-    if ((columns.results || []).some(column => column.name === "branch_rating")) return true;
-    try {
-      await env.DB.prepare("ALTER TABLE reviews ADD COLUMN branch_rating INTEGER CHECK (branch_rating BETWEEN 1 AND 5)").run();
-    } catch (error) {
-      if (!/duplicate column name/i.test(String(error))) throw error;
+    const columns = new Set((await env.DB.prepare("PRAGMA table_info(reviews)").all()).results.map(column => column.name));
+    for (const [name, sql] of [
+      ["item_id", "ALTER TABLE reviews ADD COLUMN item_id TEXT REFERENCES items(id) ON DELETE CASCADE"],
+      ["branch_rating", "ALTER TABLE reviews ADD COLUMN branch_rating INTEGER CHECK (branch_rating BETWEEN 1 AND 5)"]
+    ]) {
+      if (columns.has(name)) continue;
+      try { await env.DB.prepare(sql).run(); }
+      catch (error) { if (!/duplicate column name/i.test(String(error))) throw error; }
+    }
+    if (!columns.has("item_id")) {
+      await env.DB.prepare("UPDATE reviews SET item_id=(SELECT lr.item_id FROM loan_requests lr WHERE lr.id=reviews.request_id) WHERE item_id IS NULL AND request_id IS NOT NULL").run();
+      await env.DB.prepare("CREATE INDEX IF NOT EXISTS reviews_item_idx ON reviews(item_id,status,created_at DESC)").run();
     }
     return true;
   })().catch(error => {
