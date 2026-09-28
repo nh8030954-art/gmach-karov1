@@ -54,7 +54,7 @@ async function availabilityCalendar(request,env,itemId,url){
    const unavailable=blocks.results.reduce((sum,b)=>sum+(b.starts_at<z.toISOString()&&b.ends_at>a.toISOString()?Number(b.quantity||0):0),0);
    const available=Math.max(0,Number(item.quantity||0)-reserved-unavailable);const rec={date:dayKey(a),available,blocked:unavailable>0};out.push(rec);if(!nearest&&available>0)nearest=rec.date;
  }
- return json({itemId,days:out,nearestAvailableDate:nearest,maxPerUser:item.max_per_user||item.quantity,preparationMinutes:item.preparation_minutes||0,turnaroundMinutes:item.turnaround_minutes||0});
+ return json({itemId,days:out,busyIntervals:[...requests.results.map(row=>({from:row.requested_from,until:row.requested_until,quantity:Number(row.quantity||1),type:"loan"})),...blocks.results.map(row=>({from:row.starts_at,until:row.ends_at,quantity:Number(row.quantity||1),type:"block"}))],totalQuantity:Number(item.quantity||0),nearestAvailableDate:nearest,maxPerUser:item.max_per_user||item.quantity,preparationMinutes:item.preparation_minutes||0,turnaroundMinutes:item.turnaround_minutes||0});
 }
 async function similarItems(env,itemId,url){
  const item=await env.DB.prepare("SELECT id,category,city,title FROM items WHERE id=?").bind(itemId).first();if(!item)throw new RemainingError(404,"הפריט לא נמצא");
