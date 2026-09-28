@@ -119,6 +119,15 @@ try{
     }
   }
 
+  for(const device of ["desktop","mobile"]){
+    for(const lang of ["he","en"]){
+      await auditPage(browser,{target:"production",base:PROD,device,lang,route:"#/catalog",label:"item-dialog",afterLoad:async page=>{
+        const b=page.locator("[data-open-item]").first();
+        if(await b.count() && await b.isVisible()) await b.click();
+      }});
+    }
+  }
+
   for(const lang of ["he","en"]){
     await auditPage(browser,{target:"production",base:PROD,device:"desktop",lang,route:"#/",label:"accessibility-dialog",afterLoad:async page=>{
       const b=page.locator("#accessibility-button");
