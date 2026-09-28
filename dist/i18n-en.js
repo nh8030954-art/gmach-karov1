@@ -509,3 +509,29 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
   "מה תרצו לקבל היום?":"What would you like to borrow today?",
   "מה תרצו לשאול היום?":"What would you like to borrow today?"
 });
+
+// The QA catalog is intentionally fictional. Translate its fixed labels as a
+// whole so English reviews never show mixed Hebrew and English sentences.
+window.GmachEnglish = Object.freeze({...window.GmachEnglish,
+  "פריטים מתאימים נמצאו":"matching items found",
+  "גמ״ח הדגמה":"Demo gmach",
+  "פריט הדגמה בלבד. מופיע כדי להמחיש חיפוש, סינון ועמוד גמ״ח בסביבת הבדיקות.":"Demo item only. Shown to preview search, filters and gmach pages in the test environment.",
+  "נתוני הדגמה בלבד בסביבת הבדיקות. אין לפנות לגמ״ח זה לצורך השאלה אמיתית.":"Test data only. This gmach does not accept real loan requests.",
+  "ציוד לאירועים":"Event equipment","תינוקות וילדים":"Babies and children","רפואה ושיקום":"Medical and rehabilitation",
+  "כלי עבודה":"Tools","נסיעות וטיולים":"Travel and camping","ספרים ולימוד":"Books and learning",
+  "ירושלים":"Jerusalem","תל אביב-יפו":"Tel Aviv-Jaffa","בני ברק":"Bnei Brak","חיפה":"Haifa",
+  "פתח תקווה":"Petah Tikva","בית שמש":"Beit Shemesh","אשדוד":"Ashdod","נתניה":"Netanya",
+  "באר שבע":"Be'er Sheva","מודיעין עילית":"Modi'in Illit",
+  "שולחן מתקפל":"Folding table","כיסאות מתקפלים":"Folding chairs","מיחם לשבת":"Hot water urn",
+  "רמקול נייד":"Portable speaker","מקרן ומסך":"Projector and screen","סט כלים לאירוע":"Event tableware set",
+  "עגלת תינוק":"Baby stroller","לול מתקפל":"Folding playpen","כיסא בטיחות":"Car seat",
+  "משאבת חלב":"Breast pump","טרמפולינה לתינוק":"Baby bouncer","מיטת מעבר":"Toddler bed",
+  "כיסא גלגלים":"Wheelchair","הליכון מתקפל":"Folding walker","קביים":"Crutches",
+  "מכשיר אינהלציה":"Nebulizer","מיטה סיעודית":"Care bed","מד לחץ דם":"Blood pressure monitor",
+  "מקדחה נטענת":"Cordless drill","סולם מתקפל":"Folding ladder","ארגז כלי עבודה":"Toolbox",
+  "מכונת שטיפה":"Pressure washer","מברגה חשמלית":"Electric screwdriver","מסור ידני":"Hand saw",
+  "מזוודה גדולה":"Large suitcase","תיק גב לטיול":"Hiking backpack","צידנית חשמלית":"Electric cooler",
+  "אוהל משפחתי":"Family tent","מנשא תינוק":"Baby carrier","גגון לרכב":"Roof rack",
+  "ספרי לימוד":"Textbooks","ערכת יצירה":"Craft kit","מחשבון מדעי":"Scientific calculator",
+  "סט ספרי ילדים":"Children's book set","לוח מחיק":"Whiteboard","עמדת קריאה":"Reading stand"
+});
