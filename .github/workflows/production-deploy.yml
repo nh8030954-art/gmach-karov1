@@ -135,6 +135,24 @@ jobs:
             sleep 5
           done
           exit 1
+      - name: Verify public gmach data is complete
+        run: |
+          origin='https://gmach-karov1.nh8030954.workers.dev'
+          org_id="$(curl --fail --silent --show-error --max-time 20 "$origin/api/discovery" | jq -r '.organizations[0].id // empty')"
+          if [ -z "$org_id" ]; then
+            echo "No listed gmach to verify."
+            exit 0
+          fi
+          for attempt in 1 2 3; do
+            body="$(curl --fail --silent --show-error --max-time 20 "$origin/api/organizations/$org_id/public")"
+            if printf '%s' "$body" | jq -e '.partial == false and (.items | length) > 0 and (.organization | has("contact_phone") | not) and (.organization | has("address") | not)' >/dev/null; then
+              echo "Public gmach details and contact privacy verified."
+              exit 0
+            fi
+            printf '%s' "$body" | jq '{partial,partialSections,itemCount:(.items|length)}'
+            sleep 5
+          done
+          exit 1
       - name: Read-only production load gate
         if: github.event_name == 'workflow_dispatch'
         env:
