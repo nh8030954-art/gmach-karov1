@@ -1,21 +1,64 @@
-deploy_sha=029ea6f1270d93cf26fb23f98ab2e8cff4c2f9e7
+deploy_sha=1838946a494c9e35529180e724a4d01619ab4775
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
 > node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
 
 Final completion static release gate passed.
+Requirements expansion static release gate passed.
+Launch readiness static release gate passed.
+Distribution completion static release gate passed.
+Navigation admin static release gate passed.
+Privacy availability static release gate passed.
+Release hardening static gate passed.
+Release experience static release gate passed.
+Admin control center static release gate passed.
+Privacy purge static release gate passed.
+Community chat retention static release gate passed.
+QR scanning, structured SEO and accessibility shell gate passed.
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+Full requirements regression extensions passed.
+Static English interface coverage 100.0% (425/425)
+remaining-features Error: Backup checksum mismatch
+    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
+    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:314:91)
+    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:719:37)
+    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:217:26)
+Public organization section unavailable {
+  organizationId: 'a27102c5-fce5-4549-a135-cd9cdc2b4c15',
+  section: 'reviews',
+  error: Error: D1_ERROR: no such column: r.branch_rating at offset 52: SQLITE_ERROR
+      at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:146:19)
+      at async cloudflare-internal:d1-api:374:41
+      ... 2 lines matching cause stack trace ...
+      at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:217:26) {
+    [cause]: Error: no such column: r.branch_rating at offset 52: SQLITE_ERROR
+        at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:147:24)
+        at async cloudflare-internal:d1-api:374:41
+        at async Promise.allSettled (index 1)
+        at async getPublicOrganization (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:1455:56)
+        at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:217:26)
+  }
+}
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:139:83 {
-  generatedMessage: false,
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ undefined
+- 'רחוב הבדיקה 1, ירושלים'
+
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:376:10
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: true,
   code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
+  actual: undefined,
+  expected: 'רחוב הבדיקה 1, ירושלים',
+  operator: 'strictEqual',
   diff: 'simple'
 }
 
