@@ -292,19 +292,19 @@ try {
 
   result = await request(`/api/favorites/${itemId}`, { method: "POST", cookie: borrowerCookie });
   assert.equal(result.response.status, 200);
-  result = await request("/api/loan-requests", { method: "POST", cookie: borrowerCookie, body: { itemId, requestedFrom: "2026-10-01T10:00", requestedUntil: "2026-10-02T12:00", quantity: 1, depositAccepted: true, phone: "052-7654321", note: "לאירוע משפחתי" } });
+  result = await request("/api/loan-requests", { method: "POST", cookie: borrowerCookie, body: { itemId, requestedFrom: "2026-10-08T10:00", requestedUntil: "2026-10-09T12:00", quantity: 1, depositAccepted: true, phone: "052-7654321", note: "לאירוע משפחתי" } });
   assert.equal(result.response.status, 201);
   const requestId = result.data.request.id;
-  result = await request(`/api/loan-requests/${requestId}/pickup-proposals`, { method:"POST",cookie:adminCookie,body:{startsAt:"2026-10-01T18:00:00Z",endsAt:"2026-10-01T19:00:00Z"} });
+  result = await request(`/api/loan-requests/${requestId}/pickup-proposals`, { method:"POST",cookie:adminCookie,body:{startsAt:"2026-10-08T18:00:00Z",endsAt:"2026-10-08T19:00:00Z"} });
   assert.equal(result.response.status,201,JSON.stringify(result.data));
   result = await request(`/api/loan-requests/${requestId}/timeline`, { cookie:borrowerCookie });
   assert.equal(result.response.status,200);
   assert.equal(result.data.proposals.length,1);
-  result = await request(`/api/items/${itemId}/availability-check?from=2026-10-02T18%3A00&until=2026-10-04T10%3A00`);
+  result = await request(`/api/items/${itemId}/availability-check?from=2026-10-09T18%3A00&until=2026-10-11T10%3A00`);
   assert.equal(result.response.status, 400);
-  result = await request(`/api/items/${itemId}/availability-check?from=2026-10-03T19%3A00&until=2026-10-04T10%3A00`);
+  result = await request(`/api/items/${itemId}/availability-check?from=2026-10-10T19%3A00&until=2026-10-11T10%3A00`);
   assert.equal(result.response.status, 400);
-  result = await request(`/api/items/${itemId}/availability-check?from=2026-10-03T21%3A00&until=2026-10-04T10%3A00`);
+  result = await request(`/api/items/${itemId}/availability-check?from=2026-10-10T21%3A00&until=2026-10-11T10%3A00`);
   assert.equal(result.response.status, 200);
   assert.equal(result.data.available, true);
 
@@ -327,7 +327,7 @@ try {
   assert.equal(result.data.requests[0].borrower_phone, "052-7654321");
   result = await request(`/api/loan-requests/${requestId}/status`, { method: "PATCH", cookie: adminCookie, body: { status: "approved", managerNote: "איסוף מהכניסה בשעה 19:00" } });
   assert.equal(result.response.status, 200);
-  result = await request(`/api/items/${itemId}/availability-calendar?from=2026-10-01&days=7`);
+  result = await request(`/api/items/${itemId}/availability-calendar?from=2026-10-08&days=7`);
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(result.data.days.length, 7);
   assert.equal(result.data.days[0].available, 0);
