@@ -30,6 +30,7 @@ const sections=[
  ["emails",t("תבניות מייל","Email templates")],
  ["moderation",t("מודרציה","Moderation")],
  ["security",t("אבטחה","Security")],
+ ["backups",t("גיבויים","Backups")],
  ["exports",t("ייצוא נתונים","Data exports")]
 ];
 async function openCenter(){
@@ -46,6 +47,7 @@ async function openCenter(){
      if(id==="emails")await renderEmails(body);
      if(id==="moderation")await renderModeration(body);
      if(id==="security")await renderSecurity(body);
+     if(id==="backups")await renderBackups(body);
      if(id==="exports")await renderExports(body);
    }catch(e){body.innerHTML='<div class="dashboard-empty"><strong>'+t("לא הצלחנו לטעון את המסך","Could not load this screen")+'</strong><p>'+esc(e.message)+'</p></div>'}
  }
@@ -110,6 +112,17 @@ async function renderModeration(root){
 async function renderSecurity(root){
  const x=await api("/api/admin/security-events"),rows=x.events||[];
  root.innerHTML='<div class="dashboard-section"><h3>'+t("אירועי אבטחה","Security events")+'</h3><div style="display:grid;gap:8px">'+rows.map(r=>'<article class="dashboard-row"><div><strong>'+esc(r.event_type)+' · '+esc(r.severity)+'</strong><p>'+esc(r.device_label||"")+'</p><small>'+esc(fmt(r.created_at))+' · '+esc(r.user_id||"")+'</small></div></article>').join("")||"<p>"+t("אין אירועי אבטחה.","No security events.")+"</p>"+'</div></div>';
+}
+function backupManifest(row){try{return JSON.parse(row?.manifest_json||"{}")}catch{return{}}}
+function backupBytes(n){n=Number(n||0);if(!n)return"—";const u=["B","KB","MB","GB"],i=Math.min(Math.floor(Math.log(n)/Math.log(1024)),u.length-1);return (n/Math.pow(1024,i)).toFixed(i?1:0)+" "+u[i]}
+function backupStatus(row){if(row?.status==="completed")return'<span class="status-chip active">'+t("תקין","Healthy")+'</span>';if(row?.status==="failed")return'<span class="status-chip declined">'+t("נכשל","Failed")+'</span>';return'<span class="status-chip pending">'+t("בתהליך","Running")+'</span>'}
+async function renderBackups(root){
+ const data=await api("/api/admin/backups"),all=Array.isArray(data.backups)?data.backups:[],completed=all.filter(x=>x.status==="completed"),current=completed[0]||null,previous=completed[1]||null;
+ const card=(title,row)=>{if(!row)return'<article class="dashboard-empty"><strong>'+esc(title)+'</strong><p>'+t("עדיין אין גיבוי במקום הזה.","No backup is available here yet.")+'</p></article>';const m=backupManifest(row),v=row.validation;return'<article class="dashboard-row"><div><strong>'+esc(title)+'</strong><p>'+esc(fmt(row.finished_at||row.completed_at||row.started_at||row.created_at))+' · '+esc(backupBytes(row.size_bytes||m.bytes))+'</p><small>'+t("טבלאות","Tables")+': '+Number((m.tables||[]).length)+' · R2: '+Number(m.r2ObjectCount||0)+' · '+(m.separateStorage?t("אחסון גיבוי נפרד","Separate backup storage"):t("אחסון משותף","Shared storage"))+'</small>'+(m.checksum?'<p><code>SHA-256 '+esc(String(m.checksum).slice(0,16))+'…</code></p>':"")+'</div><div>'+backupStatus(row)+'<p>'+(v?.status==="success"?t("בדיקת תקינות עברה","Integrity check passed"):v?.status==="failed"?t("בדיקת תקינות נכשלה","Integrity check failed"):t("טרם נבדק","Not yet validated"))+'</p></div><div class="dashboard-row-actions"><button class="button button-secondary button-small" data-validate-backup="'+esc(row.id)+'">'+t("בדיקת תקינות","Validate")+'</button></div></article>'};
+ root.innerHTML='<div class="dashboard-section"><div class="section-heading"><div><h3>'+t("גיבויי מערכת","System backups")+'</h3><p>'+t("גיבוי של כל טבלאות D1 וקבצי המדיה נשמר ב־R2 ייעודי. שחזור ל־Production אינו אוטומטי.","All D1 tables and media files are backed up to dedicated R2 storage. Production restore is never automatic.")+'</p></div><div class="dashboard-row-actions"><button class="button button-primary" type="button" id="admin-backup-now">'+t("צור גיבוי עכשיו","Create backup now")+'</button><button class="button button-secondary" type="button" id="admin-backup-refresh">'+t("רענון","Refresh")+'</button></div></div><div class="stats-grid" style="margin-block:16px"><article><span>'+t("גיבויים רשומים","Recorded backups")+'</span><strong>'+all.length+'</strong></article><article><span>'+t("גיבוי מוצלח אחרון","Last successful backup")+'</span><strong style="font-size:1rem">'+esc(current?fmt(current.finished_at||current.completed_at||current.started_at):"—")+'</strong></article><article><span>'+t("שמירה אוטומטית","Automatic retention")+'</span><strong style="font-size:1rem">'+t("14 גיבויים יומיים","14 daily backups")+'</strong></article></div><div style="display:grid;gap:12px">'+card("CURRENT — "+t("הגיבוי המוצלח האחרון","Latest successful backup"),current)+card("PREVIOUS — "+t("הגיבוי המוצלח שלפניו","Previous successful backup"),previous)+'</div><div class="dashboard-note" style="margin-top:14px">'+t("הבדיקה מאמתת checksum של בסיס הנתונים וגם את קיום וגודל קבצי המדיה שהועתקו לגיבוי. סודות מערכת אינם נשלחים לדפדפן.","Validation checks the database checksum and the presence/size of backed-up media. System secrets are never sent to the browser.")+'</div></div>';
+ $("#admin-backup-now",root).onclick=async()=>{const b=$("#admin-backup-now",root);b.disabled=true;b.textContent=t("יוצר גיבוי…","Creating backup…");try{await api("/api/admin/backups",{method:"POST",body:{}});toast(t("הגיבוי נוצר ונשמר באחסון הגיבויים","Backup created and stored"));await renderBackups(root)}catch(e){toast(e.message,true);b.disabled=false;b.textContent=t("צור גיבוי עכשיו","Create backup now")}};
+ $("#admin-backup-refresh",root).onclick=()=>renderBackups(root);
+ $$("[data-validate-backup]",root).forEach(b=>b.onclick=async()=>{b.disabled=true;b.textContent=t("בודק…","Validating…");try{const x=await api("/api/admin/backups/"+encodeURIComponent(b.dataset.validateBackup)+"/validate",{method:"POST",body:{}});toast(t("בדיקת התקינות עברה","Integrity check passed")+" · "+Number(x.validation?.tableCount||0)+" "+t("טבלאות","tables")+" · "+Number(x.validation?.mediaVerified||0)+" R2");await renderBackups(root)}catch(e){toast(e.message,true);await renderBackups(root)}});
 }
 function renderExports(root){
  const rows=[

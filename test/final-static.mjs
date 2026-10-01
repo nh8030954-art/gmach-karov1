@@ -456,3 +456,10 @@ assert.ok(worker.includes('path==="/api/items/import"'),"item import backend mis
 assert.ok(worker.includes("bulk_inventory_jobs"),"bulk inventory audit/job record missing");
 
 for(const token of ["openItemImageEditor","data-images-item","/image-edits","blurRegions","rotation"])assert.ok(appClient.includes(token),token+" missing from product image editor UI");
+
+const adminControlClient=await readFile("dist/admin-control-center.js","utf8");
+assert.ok(adminControlClient.includes('["backups",t("גיבויים","Backups")]'),"backup admin tab missing");
+assert.ok(adminControlClient.includes("admin-backup-now"),"manual backup control missing");
+assert.ok(adminControlClient.includes("data-validate-backup"),"backup validation control missing");
+assert.ok(appClient.includes("refreshUser(hydrate=true)"),"lightweight auth bootstrap missing");
+assert.ok(appClient.includes("Promise.race([siteCopyReady,delay(280)])"),"fast first-paint guard missing");

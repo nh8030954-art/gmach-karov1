@@ -170,9 +170,17 @@ async function validateBackup(request,env,id){
   const tables=Object.keys(dump.tables).sort();
   if(!tables.length||tables.some(name=>!/^[A-Za-z0-9_]+$/.test(name)||!Array.isArray(dump.tables[name])))throw new Error("Backup rows are invalid");
   if(JSON.stringify(tables)!==JSON.stringify([...(manifest.tables||[])].sort()))throw new Error("Backup table list mismatch");
-  const rows=tables.reduce((sum,name)=>sum+dump.tables[name].length,0);
-  await env.DB.prepare("UPDATE restore_validations SET table_count=?,row_count=?,checksum=?,status='success',details_json=?,finished_at=? WHERE id=?").bind(tables.length,rows,checksum,JSON.stringify({manifest,artifactVerified:true,restorePerformed:false}),new Date().toISOString(),vid).run();
-  return json({validation:{id:vid,status:"success",tableCount:tables.length,rowCount:rows,checksum,restorePerformed:false}});
+  const rows=tables.reduce((sum,name)=>sum+dump.tables[name].length,0),expectedObjects=Array.isArray(dump.r2Manifest)?dump.r2Manifest:[];
+  let verifiedObjects=0;
+  if(expectedObjects.length){
+    const prefix=String(manifest.objectPrefix||((expectedObjects[0]?.backupKey&&expectedObjects[0]?.sourceKey)?String(expectedObjects[0].backupKey).slice(0,-String(expectedObjects[0].sourceKey).length):""));
+    if(!prefix)throw new Error("Backup object prefix is missing");
+    const found=new Map();let cursor;
+    do{const page=await backupStorage.list({prefix,limit:1000,cursor});for(const o of page.objects||[])found.set(String(o.key),Number(o.size||0));cursor=page.truncated?page.cursor:undefined}while(cursor);
+    for(const item of expectedObjects){if(!found.has(String(item.backupKey)))throw new Error("Backup media object is missing: "+String(item.sourceKey||item.backupKey));if(Number(item.size||0)!==Number(found.get(String(item.backupKey))))throw new Error("Backup media size mismatch: "+String(item.sourceKey||item.backupKey));verifiedObjects++}
+  }
+  await env.DB.prepare("UPDATE restore_validations SET table_count=?,row_count=?,checksum=?,status='success',details_json=?,finished_at=? WHERE id=?").bind(tables.length,rows,checksum,JSON.stringify({manifest,artifactVerified:true,mediaVerified:verifiedObjects,restorePerformed:false}),new Date().toISOString(),vid).run();
+  return json({validation:{id:vid,status:"success",tableCount:tables.length,rowCount:rows,checksum,mediaVerified:verifiedObjects,restorePerformed:false}});
  }catch(e){await env.DB.prepare("UPDATE restore_validations SET status='failed',details_json=?,finished_at=? WHERE id=?").bind(JSON.stringify({error:String(e)}),new Date().toISOString(),vid).run();throw e}
 }
 async function externalStatus(request,env){

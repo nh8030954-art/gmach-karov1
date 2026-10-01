@@ -523,9 +523,9 @@
   async function finishAuthentication(user, form = null) {
     state.user = user; state.pendingVerificationEmail = ""; if(user?.preferredLanguage && !localStorage.getItem("gmach-language")) localStorage.setItem("gmach-language", user.preferredLanguage); updateAuthUI(); await refreshAccountSnapshot(); await refreshNotifications(true); form?.reset(); closeDialog($("#auth-dialog")); const action = state.pendingAction; state.pendingAction = null; action?.();
   }
-  async function refreshUser() {
-    try { const data = await api("/api/auth/me"); state.user = data.user; if(state.user?.preferredLanguage && !localStorage.getItem("gmach-language")) localStorage.setItem("gmach-language",state.user.preferredLanguage); updateAuthUI(); if (state.user) { await refreshAccountSnapshot(); await refreshNotifications(true); } }
-    catch { state.user = null; updateAuthUI(); }
+  async function refreshUser(hydrate=true) {
+    try { const data = await api("/api/auth/me"); state.user = data.user; if(state.user?.preferredLanguage && !localStorage.getItem("gmach-language")) localStorage.setItem("gmach-language",state.user.preferredLanguage); updateAuthUI(); if (state.user && hydrate) { await refreshAccountSnapshot(); await refreshNotifications(true); } return state.user; }
+    catch { state.user = null; updateAuthUI(); return null; }
   }
   async function refreshAccountSnapshot() {
     if (!state.user) return null; const data = await api("/api/me/dashboard"); state.dashboard = data; state.myOrganizations = data.organizations || []; state.favorites = new Set(data.favorites || []); renderItems(); return data;
@@ -1168,22 +1168,46 @@
     },true);
   }
   async function init() {
-    setupEvents(); installFormErrorFocus(); installDashboardToolOrganizer(); setAuthMode("login"); updateAuthUI(); installAdvancedGmachSearch();
-    const siteCopyReady = Promise.allSettled([loadSiteSettings(), loadPageCustomizations()]);
-    await detectServer();
-    await Promise.allSettled([siteCopyReady, loadPublicConfig(), loadDiscovery(), loadCategoryAliases(), refreshUser(), loadItems()]);
-    window.setInterval(async () => {
-      if (state.serverAvailable || document.visibilityState !== "visible") return;
-      await detectServer();
-      if (state.serverAvailable) await Promise.allSettled([loadPublicConfig(), loadDiscovery(), loadCategoryAliases(), loadItems(), refreshUser()]);
-    }, 30000);
-    const seoRoute=document.body.dataset.seoRoute||""; if(seoRoute.startsWith("item:")) await openItem(seoRoute.slice(5)); else if(seoRoute.startsWith("organization:")) await openOrganization(seoRoute.slice(13)); else if(seoRoute.startsWith("category:")) { const id=seoRoute.slice(9); const cat=(state.discovery?.categories||[]).find(x=>x.id===id); const label=cat?.name_he||id; $("#category-filter").value=label; state.activeCategory=label; applyFilters(); window.setTimeout(()=>$("#catalog").scrollIntoView(),0); } else if(seoRoute.startsWith("area:")) { const city=seoRoute.slice(5); $("#city-filter").value=city; applyFilters(); window.setTimeout(()=>$("#catalog").scrollIntoView(),0); } registerWebMCP();
-    window.setInterval(() => { if (state.user && document.visibilityState === "visible") refreshNotifications(true); }, 30000);
-    const sharedHelp=new URLSearchParams(location.search).get("help");if(sharedHelp){await openCommunityBoard(1,sharedHelp);}
-    const inviteMatch=location.hash.match(/^#\/invite\/([^/?]+)/); if(inviteMatch){if(!state.user){openAuth("login");toast("יש להתחבר כדי לקבל את הזמנת הניהול")}else{try{const accepted=await api("/api/organization-invitations/"+encodeURIComponent(decodeURIComponent(inviteMatch[1]))+"/accept",{method:"POST",body:{}});toast("הצטרפת לצוות הניהול");history.replaceState(null,"","#/dashboard");await refreshAccountSnapshot();showDashboard("gmachim")}catch(e){toast(e.message,"error")}}return}
-    if (location.hash === "#/dashboard") { if(state.user) await showDashboard(); else requireAuth(() => showDashboard()); } else if (location.hash === "#/catalog") window.setTimeout(() => $("#catalog").scrollIntoView(), 0); else if (location.hash === "#/community") window.setTimeout(() => openCommunityBoard(1), 0);
-    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    setupEvents(); installFormErrorFocus(); installDashboardToolOrganizer(); setAuthMode("login"); updateAuthUI(); installAdvancedGmachSearch(); registerWebMCP();
+    const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+    const siteCopyReady=Promise.allSettled([loadSiteSettings(),loadPageCustomizations()]);
+    const publicReady=Promise.allSettled([loadPublicConfig(),loadDiscovery(),loadCategoryAliases(),loadItems()]);
+    const connectionReady=detectServer();
+    const authReady=refreshUser(false);
+    const hash=location.hash||"#/";
+    if(hash==="#/dashboard"){
+      $("#home-view").hidden=true;$("#organization-page-view").hidden=true;$("#dashboard-view").hidden=false;
+      $("#dashboard-content").innerHTML='<div class="skeleton-card" aria-hidden="true"></div>';
+    }
+    await Promise.race([siteCopyReady,delay(280)]);
+    await new Promise(resolve=>requestAnimationFrame(resolve));
     document.documentElement.classList.remove("site-copy-pending","app-booting");
+
+    const routeAfterAuth=async()=>{
+      await authReady;
+      if(hash==="#/dashboard"){ if(state.user) showDashboard(); else requireAuth(()=>showDashboard()); }
+      else if(state.user){ Promise.allSettled([refreshAccountSnapshot(),refreshNotifications(true)]); }
+      const inviteMatch=hash.match(/^#\/invite\/([^/?]+)/);
+      if(inviteMatch){
+        if(!state.user){openAuth("login");toast("יש להתחבר כדי לקבל את הזמנת הניהול");return}
+        try{await api("/api/organization-invitations/"+encodeURIComponent(decodeURIComponent(inviteMatch[1]))+"/accept",{method:"POST",body:{}});toast("הצטרפת לצוות הניהול");history.replaceState(null,"","#/dashboard");await refreshAccountSnapshot();showDashboard("gmachim")}catch(e){toast(e.message,"error")}
+      }
+    };
+    routeAfterAuth().catch(error=>console.warn("Account route hydration failed",error));
+
+    Promise.allSettled([publicReady,connectionReady]).then(async()=>{
+      const seoRoute=document.body.dataset.seoRoute||"";
+      if(seoRoute.startsWith("item:")) await openItem(seoRoute.slice(5));
+      else if(seoRoute.startsWith("organization:")) await openOrganization(seoRoute.slice(13));
+      else if(seoRoute.startsWith("category:")){const id=seoRoute.slice(9),cat=(state.discovery?.categories||[]).find(x=>x.id===id),label=cat?.name_he||id;$("#category-filter").value=label;state.activeCategory=label;applyFilters();window.setTimeout(()=>$("#catalog").scrollIntoView(),0)}
+      else if(seoRoute.startsWith("area:")){const city=seoRoute.slice(5);$("#city-filter").value=city;applyFilters();window.setTimeout(()=>$("#catalog").scrollIntoView(),0)}
+      if(hash==="#/catalog")window.setTimeout(()=>$("#catalog").scrollIntoView(),0);
+      else if(hash==="#/community")window.setTimeout(()=>openCommunityBoard(1),0);
+      const sharedHelp=new URLSearchParams(location.search).get("help");if(sharedHelp)await openCommunityBoard(1,sharedHelp);
+    }).catch(error=>console.warn("Background page hydration failed",error));
+
+    window.setInterval(async()=>{if(state.serverAvailable||document.visibilityState!=="visible")return;await detectServer();if(state.serverAvailable)await Promise.allSettled([loadPublicConfig(),loadDiscovery(),loadCategoryAliases(),loadItems(),refreshUser()])},30000);
+    window.setInterval(()=>{if(state.user&&document.visibilityState==="visible")refreshNotifications(true)},30000);
   }
   init().catch(error => { document.documentElement.classList.remove("site-copy-pending","app-booting"); console.error("App initialization failed", error); toast("אירעה תקלה בטעינת האתר. נסו לרענן את הדף.", "error"); });
 })();
