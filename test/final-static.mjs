@@ -358,10 +358,11 @@ for(const token of ["beforeinstallprompt","serviceWorker.register","connection-s
 for(const token of ["CACHE_NAME","caches.open","req.mode===\"navigate\"","notificationclick"])assert.ok(swClient.includes(token),token+" missing from service worker");
 assert.ok(indexHtml.includes('rel="manifest"'),"web app manifest is not linked");
 assert.ok(indexHtml.includes("./release-shell.js"),"release shell is not loaded");
-assert.ok(indexHtml.includes('class="app-booting site-copy-pending"'),"boot guard class missing");
-assert.ok(indexHtml.includes('id="app-boot-guard"'),"first-paint boot guard missing");
 assert.ok(indexHtml.includes("./app.js?v="),"app cache-busting version missing");
-assert.ok(appClient.includes('classList.remove("site-copy-pending","app-booting")'),"app does not reveal after bootstrap");
+assert.ok(!indexHtml.includes('id="app-boot-guard"'),"full-page boot loader must stay disabled");
+assert.ok(!indexHtml.includes('class="app-booting site-copy-pending"'),"boot-hiding classes must stay disabled");
+const motionCss=await readFile("dist/motion.css","utf8");
+assert.ok(motionCss.includes("Instant hero: no startup fade or design flash"),"instant hero override missing");
 assert.ok(swClient.includes('CACHE_NAME="gmach-shell-v5"'),"service worker cache version not updated");
 assert.ok(swClient.includes('/\\.(?:js|css)$/i.test(url.pathname)')||swClient.includes('js|css'),"runtime assets are not network-first");
 assert.equal(JSON.parse(manifestText).display,"standalone");
@@ -454,4 +455,3 @@ assert.ok(adminControlClient.includes('["backups",t("גיבויים","Backups")]
 assert.ok(adminControlClient.includes("admin-backup-now"),"manual backup control missing");
 assert.ok(adminControlClient.includes("data-validate-backup"),"backup validation control missing");
 assert.ok(appClient.includes("refreshUser(hydrate=true)"),"lightweight auth bootstrap missing");
-assert.ok(appClient.includes("Promise.race([siteCopyReady,delay(280)])"),"fast first-paint guard missing");

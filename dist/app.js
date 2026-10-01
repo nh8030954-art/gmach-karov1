@@ -1169,7 +1169,6 @@
   }
   async function init() {
     setupEvents(); installFormErrorFocus(); installDashboardToolOrganizer(); setAuthMode("login"); updateAuthUI(); installAdvancedGmachSearch(); registerWebMCP();
-    const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     const siteCopyReady=Promise.allSettled([loadSiteSettings(),loadPageCustomizations()]);
     const publicReady=Promise.allSettled([loadPublicConfig(),loadDiscovery(),loadCategoryAliases(),loadItems()]);
     const connectionReady=detectServer();
@@ -1179,9 +1178,6 @@
       $("#home-view").hidden=true;$("#organization-page-view").hidden=true;$("#dashboard-view").hidden=false;
       $("#dashboard-content").innerHTML='<div class="skeleton-card" aria-hidden="true"></div>';
     }
-    await Promise.race([siteCopyReady,delay(280)]);
-    await new Promise(resolve=>requestAnimationFrame(resolve));
-    document.documentElement.classList.remove("site-copy-pending","app-booting");
 
     const routeAfterAuth=async()=>{
       await authReady;
