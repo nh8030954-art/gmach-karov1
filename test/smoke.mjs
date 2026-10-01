@@ -386,7 +386,7 @@ try {
   result = await request(`/api/organizations/${organizationId}/public`);
   assert.equal(result.response.status, 200);
   assert.equal(result.data.items.length, 1);
-  assert.equal(Object.hasOwn(result.data.organization, "address"), false);
+  assert.equal(result.data.organization.address, "רחוב הבדיקה 1, ירושלים");
   assert.equal(Object.hasOwn(result.data.organization, "contact_phone"), false);
   assert.equal(result.data.partial, false, "Public gmach details must not degrade on a migrated database");
   result = await request("/api/organizations/nonexistent/public");

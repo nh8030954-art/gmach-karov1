@@ -145,8 +145,8 @@ jobs:
           fi
           for attempt in 1 2 3; do
             body="$(curl --fail --silent --show-error --max-time 20 "$origin/api/organizations/$org_id/public")"
-            if printf '%s' "$body" | jq -e '.partial == false and (.items | length) > 0 and (.organization | has("contact_phone") | not) and (.organization | has("address") | not)' >/dev/null; then
-              echo "Public gmach details and contact privacy verified."
+            if printf '%s' "$body" | jq -e '.partial == false and (.items | length) > 0 and (.organization | has("contact_phone") | not) and (.organization.address | type == "string" and length > 0)' >/dev/null; then
+              echo "Public gmach address and contact privacy verified."
               exit 0
             fi
             printf '%s' "$body" | jq '{partial,partialSections,itemCount:(.items|length)}'

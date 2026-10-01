@@ -1427,7 +1427,7 @@ async function discovery(env, url) {
 }
 
 async function getPublicOrganization(env, id) {
-  const organization = await env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,
+  const organization = await env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.address,o.description,o.status,
     o.website_url,o.hours_json,o.service_area,o.pickup_options,o.last_active_at,o.verified_phone,o.verified_address,
     ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
     FROM organizations o LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
