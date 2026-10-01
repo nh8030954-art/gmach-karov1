@@ -390,39 +390,22 @@ async function sitemap(env,url){
   return new Response(xml,{headers:{"Content-Type":"application/xml; charset=utf-8","Cache-Control":"public, max-age=1800"}});
 }
 async function logicalBackup(request,env){
-  const a=await requireAdmin(request,env),id=crypto.randomUUID(),started=new Date().toISOString(),day=started.slice(0,10);
+  const a=await requireAdmin(request,env),id=crypto.randomUUID(),started=new Date().toISOString();
   await env.DB.prepare("INSERT INTO backup_runs(id,backup_type,status,started_at) VALUES(?,'manual','started',?)").bind(id,started).run();
   try{
-    const backupStorage=env.BACKUP_STORAGE||env.ITEM_IMAGES;if(!backupStorage?.put)throw new Error("Backup storage unavailable");
-    const tableRows=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('auth_events','rate_limits') ORDER BY name").all();
-    const dump={version:3,createdAt:started,tables:{}},tables=[];
-    for(const row of tableRows.results||[]){const name=String(row.name||"");if(!/^[A-Za-z0-9_]+$/.test(name))continue;const rows=await env.DB.prepare("SELECT * FROM "+name).all();dump.tables[name]=rows.results||[];tables.push(name)}
-    const copies=[];
-    if(env.ITEM_IMAGES?.list){
-      let cursor;
-      do{
-        const page=await env.ITEM_IMAGES.list({limit:1000,cursor});
-        for(const object of page.objects||[]){
-          const sourceKey=String(object.key||"");if(!sourceKey||sourceKey.startsWith("_system-backups/")||sourceKey.startsWith("d1/")||sourceKey.startsWith("r2/")||sourceKey.startsWith("backups/"))continue;
-          const source=await env.ITEM_IMAGES.get(sourceKey);if(!source)continue;
-          const backupKey=`_system-backups/objects/${day}/${id}/${sourceKey}`;
-          await backupStorage.put(backupKey,source.body,{httpMetadata:source.httpMetadata,customMetadata:{sourceKey,backupRunId:id,sourceEtag:object.etag||""}});
-          copies.push({sourceKey,backupKey,size:Number(object.size||0),etag:object.etag||null});
-        }
-        cursor=page.truncated?page.cursor:undefined;
-      }while(cursor);
-    }
-    dump.r2Manifest=copies;
-    const raw=JSON.stringify(dump),bytes=new TextEncoder().encode(raw),checksum=await hash(raw),key=`_system-backups/manual/${day}-${id}.json`;
-    await backupStorage.put(key,raw,{httpMetadata:{contentType:"application/json"},customMetadata:{backupRunId:id}});
-    const manifest={storageKey:key,bytes:bytes.length,checksum,tables,r2ObjectCount:copies.length,objectPrefix:`_system-backups/objects/${day}/${id}/`,separateStorage:Boolean(env.BACKUP_STORAGE)};
+    const tables=["users","organizations","organization_branches","items","item_units","loan_requests","notifications","reviews","help_requests","support_tickets","categories","site_settings"];
+    const dump={version:1,createdAt:started,tables:{}};
+    for(const t of tables){const rows=await env.DB.prepare(`SELECT * FROM ${t}`).all();dump.tables[t]=rows.results}
+    const raw=JSON.stringify(dump),checksum=await hash(raw),key=`_system-backups/${started.replace(/[:.]/g,"-")}-${id}.json`;
+    if(!env.ITEM_IMAGES?.put)throw new Error("R2 unavailable");
+    await env.ITEM_IMAGES.put(key,raw,{httpMetadata:{contentType:"application/json"}});
     await env.DB.batch([
-      env.DB.prepare("UPDATE backup_runs SET status='completed',completed_at=?,finished_at=?,row_count=?,size_bytes=?,manifest_json=?,backup_key=? WHERE id=?").bind(new Date().toISOString(),new Date().toISOString(),tables.reduce((sum,name)=>sum+(dump.tables[name]?.length||0),0),bytes.length,JSON.stringify(manifest),key,id),
-      env.DB.prepare("INSERT OR REPLACE INTO backup_objects(backup_run_id,storage_key,object_type,size_bytes,checksum) VALUES(?,?,?,?,?)").bind(id,key,"database+r2-manifest",bytes.length,checksum)
+      env.DB.prepare("UPDATE backup_runs SET status='completed',completed_at=?,finished_at=?,manifest_json=? WHERE id=?").bind(new Date().toISOString(),new Date().toISOString(),JSON.stringify({storageKey:key,bytes:new TextEncoder().encode(raw).length,checksum,tables}),id),
+      env.DB.prepare("INSERT INTO backup_objects(backup_run_id,storage_key,object_type,size_bytes,checksum) VALUES(?,?,?,?,?)").bind(id,key,"database-json",new TextEncoder().encode(raw).length,checksum)
     ]);
-    await audit(env,a,"backup.manual","backup_run",id,{storageKey:key,tables:tables.length,r2Objects:copies.length,separateStorage:Boolean(env.BACKUP_STORAGE)},null,null,null,request);
-    return json({backup:{id,status:"completed",storageKey:key,manifest}},200);
-  }catch(e){await env.DB.prepare("UPDATE backup_runs SET status='failed',completed_at=?,finished_at=?,error=? WHERE id=?").bind(new Date().toISOString(),new Date().toISOString(),String(e?.message||e).slice(0,1000),id).run();throw e}
+    await audit(env,a,"backup.manual","backup_run",id,{storageKey:key},null,null,null,request);
+    return json({backup:{id,status:"completed",storageKey:key}});
+  }catch(e){await env.DB.prepare("UPDATE backup_runs SET status='failed',completed_at=?,finished_at=?,error=? WHERE id=?").bind(new Date().toISOString(),new Date().toISOString(),String(e.message||e).slice(0,1000),id).run();throw e}
 }
 async function backupList(request,env){
   await requireAdmin(request,env);
