@@ -1,31 +1,19 @@
-sha=4dbf4db63bd52045e68b7fc6d1e213c74780e043
+sha=9a9004f3125edc4bffec0d0b479b01390e925281
 install=success
 syntax=success
 tests=failure
 smoke=failure
 live=success
+    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:217:26)
+node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: English static UI is missing translations: הבקשות, הפריטים והגמ״חים שלך במקום אחד. | החשבון שלי | כלים נוספים | שמורים | (מוצגת לציבור בעמוד הגמ״ח) | לא ניתן להגדיר שעות פעילות מיום שישי בשעה 17:00 ועד שבת בשעה 20:00. | תיאור קצר של הפריט | הגדרות נוספות | לא חובה · ברירת מחדל: השאלה, שעה עד 7 ימים, אישור מנהל וללא פיקדון | נדרש פיקדון להבטחת החזרת המוצר כפי שנלקח. | פתיחת החשבון שלי | סיכום פעילות | מה הפריט, מה מצבו ומה חשוב לדעת לפני שמבקשים | למשל: החזרה נקייה ובזמן
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
 
-14 !== 0
+400 !== 201
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/i18n-static.mjs:33:8
-    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
-    at async node:internal/modules/esm/loader:647:26
-    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: 14,
-  expected: 0,
-  operator: 'strictEqual',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
-
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790866955382:296:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:296:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: true,
   code: 'ERR_ASSERTION',
@@ -36,5 +24,17 @@ Node.js v24.21.0
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-01T15:02:39.812Z"}
+
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790867046646:296:10
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 400,
+  expected: 201,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-01T15:04:12.484Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
