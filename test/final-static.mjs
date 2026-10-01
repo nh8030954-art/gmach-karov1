@@ -307,8 +307,9 @@ assert.ok(productionDeploy.includes("Ensure dedicated backup R2 bucket"),"produc
 assert.ok(wranglerConfig.includes('"binding": "BACKUP_STORAGE"'),"dedicated backup R2 binding missing");
 for(const backupFile of [".github/workflows/full-production-backup.yml",".github/workflows/verify-full-backup.yml",".github/scripts/gmach-full-backup.sh","BACKUP-RESTORE.md"]) await access(backupFile);
 const fullBackupWorkflow=await readFile(".github/workflows/full-production-backup.yml","utf8");
+const fullBackupScript=await readFile(".github/scripts/gmach-full-backup.sh","utf8");
 assert.ok(fullBackupWorkflow.includes("schedule:")&&fullBackupWorkflow.includes("workflow_dispatch:"),"full backup workflow must be daily and manually runnable");
-assert.ok(fullBackupWorkflow.includes("CURRENT.json")&&fullBackupWorkflow.includes("PREVIOUS.json"),"full backup must retain CURRENT and PREVIOUS pointers");
+assert.ok(fullBackupScript.includes("CURRENT.json")&&fullBackupScript.includes("PREVIOUS.json"),"full backup must retain CURRENT and PREVIOUS pointers");
 assert.ok(finalWorker.includes("/api/admin/backups/archive-status")&&finalWorker.includes("archiveBackupDownload"),"authenticated archive backup routes missing");
 assert.ok(remainingWorker.includes("system_alerts")&&!remainingWorker.includes("INSERT INTO operational_alerts"),"backup failure alert must use system_alerts");
 console.log("Release hardening static gate passed.");
