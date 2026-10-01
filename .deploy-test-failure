@@ -1,23 +1,22 @@
-deploy_sha=68d064abc3b9ba579551133a685963f4e7b35d95
+deploy_sha=1151ea5a07fff2031650da81748fea32e97b55ac
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
 > node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
 
-file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:251
-const launchClient=await readFile("dist/launch-readiness.js","utf8");
-      ^
+Final completion static release gate passed.
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
 
-SyntaxError: Identifier 'launchClient' has already been declared
-    at compileSourceTextModule (node:internal/modules/esm/utils:319:16)
-    at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:89:18)
-    at #translate (node:internal/modules/esm/loader:438:20)
-    at afterLoad (node:internal/modules/esm/loader:506:29)
-    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:511:12)
-    at #getOrCreateModuleJobAfterResolve (node:internal/modules/esm/loader:564:36)
-    at afterResolve (node:internal/modules/esm/loader:611:52)
-    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:617:12)
-    at node:internal/modules/esm/loader:636:32
-    at TracingChannel.tracePromise (node:diagnostics_channel:362:14)
+AssertionError [ERR_ASSERTION]: single-element selector used with forEach: $('[data-edit-org]').forEach
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:75:11 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
 
 Node.js v24.21.0
