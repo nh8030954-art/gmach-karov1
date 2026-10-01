@@ -18,7 +18,7 @@ async function api(path,options={}){
 }
 function notice(message,error=false){
   let n=$("#final-feature-notice");if(!n){n=document.createElement("div");n.id="final-feature-notice";n.setAttribute("role","status");n.style.cssText="position:fixed;z-index:100000;left:16px;right:16px;bottom:16px;max-width:620px;margin:auto;padding:12px 16px;border-radius:12px;color:#fff;box-shadow:0 10px 40px #0003";document.body.append(n)}
-  n.style.background=error?"#8b1e2d":"#17365d";n.textContent=window.GmachTranslate?.(message)||message;n.hidden=false;clearTimeout(n._t);n._t=setTimeout(()=>n.hidden=true,4200);
+  n.style.background=error?"#8b1e2d":"#17365d";n.textContent=window.GmachTranslate?.(message)||message;n.hidden=false;window.GmachEnsureTopLayerToast?.(n);clearTimeout(n._t);n._t=setTimeout(()=>{window.GmachHideTopLayerToast?.(n);n.hidden=true},4200);
 }
 function modal(title,html){
   let d=$("#final-feature-dialog");if(!d){d=document.createElement("dialog");d.id="final-feature-dialog";d.className="platform-dialog";document.body.append(d)}
