@@ -626,3 +626,21 @@ window.GmachEnglish = Object.freeze({
   "סט ספרי ילדים":"Children's book set","לוח מחיק":"Whiteboard","עמדת קריאה":"Reading stand",
   "מיקום כללי":"General location"
 });
+
+window.GmachEnglish = Object.freeze({
+  ...window.GmachEnglish,
+  "הבקשות, הפריטים והגמ״חים שלך במקום אחד.":"Your requests, items and gmachs in one place.",
+  "החשבון שלי":"My account",
+  "כלים נוספים":"More tools",
+  "שמורים":"Saved",
+  "(מוצגת לציבור בעמוד הגמ״ח)":"(shown publicly on the gmach page)",
+  "לא ניתן להגדיר שעות פעילות מיום שישי בשעה 17:00 ועד שבת בשעה 20:00.":"Opening hours cannot be set from Friday 17:00 until Saturday 20:00.",
+  "תיאור קצר של הפריט":"Short item description",
+  "הגדרות נוספות":"Additional settings",
+  "לא חובה · ברירת מחדל: השאלה, שעה עד 7 ימים, אישור מנהל וללא פיקדון":"Optional · Default: loan, 1 hour to 7 days, manager approval, no deposit",
+  "נדרש פיקדון להבטחת החזרת המוצר כפי שנלקח.":"A deposit is required to help ensure the item is returned in the condition received.",
+  "פתיחת החשבון שלי":"Open my account",
+  "סיכום פעילות":"Activity summary",
+  "מה הפריט, מה מצבו ומה חשוב לדעת לפני שמבקשים":"What the item is, its condition, and what borrowers should know",
+  "למשל: החזרה נקייה ובזמן":"For example: return clean and on time"
+});
