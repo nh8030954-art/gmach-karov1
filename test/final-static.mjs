@@ -324,7 +324,8 @@ assert.ok(expansionClient.includes("data-copy-branch"),"branch copy-address acti
 console.log("Release experience static release gate passed.");
 
 const adminControlCenter=await readFile("dist/admin-control-center.js","utf8");
-for(const token of ["מרכז בקרת האתר","/api/admin/site-settings","/api/admin/categories","/api/admin/category-suggestions","/api/admin/closures","/api/admin/holiday-rules","/api/admin/email-templates","/api/admin/moderation","/api/admin/security-events","mergeInto"]) assert.ok(adminControlCenter.includes(token),token+" missing from admin control center");
+for(const token of ["מרכז ניהול־על","/api/admin/site-settings","/api/admin/categories","/api/admin/category-suggestions","/api/admin/closures","/api/admin/holiday-rules","/api/admin/email-templates","/api/admin/moderation","/api/admin/security-events","/api/admin/users","/api/admin/content","/api/admin/loan-requests","/api/admin/support-tickets","/api/admin/audit"]) assert.ok(adminControlCenter.includes(token),token+" missing from admin control center");
+assert.ok(!adminControlCenter.includes("data-merge-category"),"destructive category merge must not be exposed in super-admin UI");
 assert.ok(indexHtml.includes("./admin-control-center.js"),"admin control center client not loaded");
 for(const token of ["optionalReportQuery","sources:{items:items.length","/api/me/reports"]) assert.ok(expansionWorker.includes(token),token+" missing from resilient report tracking");
 console.log("Admin control center static release gate passed.");
