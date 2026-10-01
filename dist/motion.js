@@ -189,14 +189,15 @@
   };
 
   const init=()=>{
-    root.classList.add('motion-ready','motion-active');
+    // Apply the final hero state in the same frame so already-rendered content never fades out and back in.
+    root.classList.add('motion-ready','motion-active','motion-loaded');
     setupScenes(); setupCategoryScene(); setupReveal(); setupSkeletons(); setupCounts(); setupActions(); setupMobileHeaderFill(); setupOneTimeCta(); syncEmptySections();
     addEventListener('scroll',requestDraw,{passive:true});
     addEventListener('resize',rebuild,{passive:true});
     reduceQuery.addEventListener?.('change',requestDraw);
     new MutationObserver(requestDraw).observe(root,{attributes:true,attributeFilter:['class']});
     document.addEventListener('visibilitychange',()=>{state.active=!document.hidden;if(state.active)requestDraw();});
-    requestAnimationFrame(()=>requestAnimationFrame(()=>{root.classList.add('motion-loaded');requestDraw();}));
+    requestDraw();
   };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
