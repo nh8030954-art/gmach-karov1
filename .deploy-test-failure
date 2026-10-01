@@ -1,42 +1,21 @@
-deploy_sha=4164d83340a5c68c675fa419c533853a7885142e
+deploy_sha=d0ccdec8f081a482c09cce15f7eb397a28b44dba
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
 > node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
 
 Final completion static release gate passed.
-Requirements expansion static release gate passed.
-Launch readiness static release gate passed.
-Distribution completion static release gate passed.
-Navigation admin static release gate passed.
-Privacy availability static release gate passed.
-Release hardening static gate passed.
-Release experience static release gate passed.
-Admin control center static release gate passed.
-Privacy purge static release gate passed.
-Community chat retention static release gate passed.
-QR scanning, structured SEO and accessibility shell gate passed.
-Excel export and QR image scanner gate passed.
-Voice message recording gate passed.
-Excel export, accessible admin status and QR image scanning gate passed.
-Full requirements regression extensions passed.
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: English static UI is missing translations: (מוצגת לציבור בעמוד הגמ״ח) | לא ניתן להגדיר שעות פעילות מיום שישי בשעה 17:00 ועד שבת בשעה 20:00. | תיאור קצר של הפריט | הגדרות נוספות | לא חובה · ברירת מחדל: השאלה, שעה עד 7 ימים, אישור מנהל וללא פיקדון | נדרש פיקדון להבטחת החזרת המוצר כפי שנלקח. | מה הפריט, מה מצבו ומה חשוב לדעת לפני שמבקשים | למשל: החזרה נקייה ובזמן
-
-8 !== 0
-
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/i18n-static.mjs:33:8
-    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
-    at async node:internal/modules/esm/loader:647:26
-    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+AssertionError [ERR_ASSERTION]: single-element selector used as collection
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:139:83 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 8,
-  expected: 0,
-  operator: 'strictEqual',
+  actual: false,
+  expected: true,
+  operator: '==',
   diff: 'simple'
 }
 
