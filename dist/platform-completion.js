@@ -59,41 +59,58 @@
     .platform-tools::backdrop{background:rgba(9,18,30,.55)}
     .pt-head{display:flex;align-items:center;justify-content:space-between;padding:20px 22px;border-bottom:1px solid #e8edf2}
     .pt-head h2{margin:0}.pt-close{border:0;background:transparent;font-size:28px;cursor:pointer}
-    .pt-tabs{display:flex;gap:8px;overflow:auto;padding:12px 18px;border-bottom:1px solid #eef2f5}
-    .pt-tabs button{white-space:nowrap;border:1px solid #dfe6ec;background:#fff;border-radius:999px;padding:8px 13px;cursor:pointer}
-    .pt-tabs button[aria-selected="true"]{font-weight:700;border-color:#7e8b95}
-    .pt-body{padding:18px 22px;max-height:68vh;overflow:auto}.pt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+    .pt-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:14px 18px;border-bottom:1px solid #eef2f5;background:#f8fafb}
+    .pt-nav-group{min-width:0;padding:10px;border:1px solid #e5eaee;border-radius:14px;background:#fff}
+    .pt-nav-group>strong{display:block;margin:0 4px 8px;color:#667681;font-size:.76rem}
+    .pt-nav-buttons{display:grid;gap:6px}
+    .pt-tabs button{width:100%;text-align:start;border:0;background:transparent;border-radius:10px;padding:9px 10px;cursor:pointer;color:#173a4d}
+    .pt-tabs button:hover{background:#f2f6f7}
+    .pt-tabs button[aria-selected="true"]{font-weight:800;background:#173a4d;color:#fff}
+    .pt-body{padding:22px;max-height:62vh;overflow:auto}.pt-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
     .pt-card{border:1px solid #e4e9ee;border-radius:14px;padding:14px;background:#fff}.pt-card h3{margin-top:0}
     .pt-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pt-form{display:grid;gap:10px}.pt-form[hidden]{display:none}.pt-form input:not([type="checkbox"]),.pt-form select,.pt-form textarea{width:100%;padding:10px;border:1px solid #ccd5dc;border-radius:10px}.pt-form input[type="checkbox"]{width:19px;height:19px;min-width:19px;margin:0;accent-color:#173a4d}.pt-form label:has(>input[type="checkbox"]){display:flex;gap:10px;align-items:center}.pt-form label:has(>input[type="checkbox"]) input{flex:none}
     .pt-btn{border:0;border-radius:10px;padding:9px 13px;cursor:pointer;background:#e9eef2}.pt-btn.primary{background:#173a4d;color:#fff}.pt-btn.danger{background:#fff0f0;color:#9f1d1d}
     .pt-muted{color:#667681;font-size:.92rem}.pt-status{min-height:1.4em;margin-top:8px}.pt-list{display:grid;gap:10px}.pt-list[hidden],.pt-list .pt-row[hidden]{display:none}
-    @media(max-width:700px){.platform-tools{width:100vw;max-width:100vw;border-radius:18px 18px 0 0;margin:auto 0 0}.pt-body{max-height:72vh}}
+    @media(max-width:820px){.pt-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:700px){.platform-tools{width:100vw;max-width:100vw;border-radius:18px 18px 0 0;margin:auto 0 0}.pt-tabs{grid-template-columns:1fr 1fr;padding:10px}.pt-nav-group{padding:8px}.pt-tabs button{padding:8px}.pt-body{max-height:64vh;padding:16px}}
+    @media(max-width:420px){.pt-tabs{grid-template-columns:1fr}.pt-nav-buttons{grid-template-columns:1fr 1fr}.pt-nav-group>strong{margin-bottom:6px}}
   `;
   document.head.appendChild(style);
 
   const dialog=document.createElement("dialog");
   dialog.className="platform-tools";
   dialog.id="platform-tools-dialog";
-  dialog.innerHTML=`<div class="pt-head"><div><h2>מרכז הגדרות וניהול</h2><div class="pt-muted">חשבון, פרטיות, מכשירים וכלי ניהול</div></div><button class="pt-close" aria-label="סגירה">×</button></div><div class="pt-tabs" role="tablist"></div><div class="pt-body"></div>`;
+  dialog.innerHTML=`<div class="pt-head"><div><h2>החשבון שלי</h2><div class="pt-muted">פרטים אישיים, העדפות, שמורים ותמיכה</div></div><button class="pt-close" aria-label="סגירה">×</button></div><div class="pt-tabs" aria-label="ניווט בחשבון"></div><div class="pt-body"></div>`;
   document.body.appendChild(dialog);
   $(".pt-close",dialog).onclick=()=>dialog.close();
 
-  const tabs=[
-    ["profile","פרופיל"],["transfers","העברות בעלות"],["privacy","פרטיות ונתונים"],["addresses","כתובות"],["devices","מכשירים"],["notifications","התראות"],["favorites","מועדפים"],["calendar","יומן"],["searches","חיפושים שמורים"],["categories","קטגוריות שמורות"],["support","תמיכה"],["admin","ניהול־על"]
-
+  const accountGroups=[
+    ["החשבון שלי",[["profile","פרטים אישיים"],["addresses","כתובות"],["devices","מכשירים"],["privacy","פרטיות ונתונים"]]],
+    ["העדפות",[["notifications","התראות"],["calendar","יומן"]]],
+    ["שמורים",[["favorites","מועדפים"],["searches","חיפושים שמורים"],["categories","קטגוריות שמורות"]]],
+    ["תמיכה",[["support","הפניות שלי"]]]
   ];
   let profile=null, active="profile";
   const tabbar=$(".pt-tabs",dialog), body=$(".pt-body",dialog);
-  tabs.forEach(([id,label])=>{const b=document.createElement("button");b.textContent=label;b.dataset.tab=id;if(id==="admin")b.hidden=true;b.onclick=()=>render(id);tabbar.appendChild(b);});
+  accountGroups.forEach(([groupLabel,tabs])=>{
+    const group=document.createElement("section");group.className="pt-nav-group";
+    group.innerHTML=`<strong>${esc(groupLabel)}</strong><div class="pt-nav-buttons"></div>`;
+    const host=$(".pt-nav-buttons",group);
+    tabs.forEach(([id,label])=>{const b=document.createElement("button");b.type="button";b.textContent=label;b.dataset.tab=id;b.onclick=()=>render(id);host.appendChild(b)});
+    tabbar.appendChild(group);
+  });
+  const adminGroup=document.createElement("section");adminGroup.className="pt-nav-group";adminGroup.hidden=true;adminGroup.dataset.adminGroup="1";
+  adminGroup.innerHTML='<strong>הנהלת האתר</strong><div class="pt-nav-buttons"><button type="button" data-tab="admin">ניהול־על</button></div>';
+  adminGroup.querySelector("button").onclick=()=>render("admin");tabbar.appendChild(adminGroup);
 
   function setStatus(msg,error=false){let el=$(".pt-status",body);if(!el){el=document.createElement("div");el.className="pt-status";body.appendChild(el)}el.textContent=window.GmachTranslate?.(msg)||msg||"";el.style.color=error?"#a11":"inherit";}
   async function render(id){
     active=id;
-    [...tabbar.children].forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===id)));
+    tabbar.querySelectorAll("[data-tab]").forEach(b=>b.setAttribute("aria-selected",String(b.dataset.tab===id)));
     body.innerHTML="<p>טוענים…</p>";
     try{
       if(!profile) profile=(await api("/api/me/profile")).profile;
-      const adminTab=tabbar.querySelector('[data-tab="admin"]');if(adminTab)adminTab.hidden=profile.role!=="admin";
+      const adminGroup=tabbar.querySelector("[data-admin-group]");if(adminGroup)adminGroup.hidden=profile.role!=="admin";
       if(id==="admin" && profile.role!=="admin"){await render("profile");return;}
       await ({profile:renderProfile,transfers:renderTransfers,privacy:renderPrivacy,addresses:renderAddresses,devices:renderDevices,notifications:renderNotifications,favorites:renderFavorites,calendar:renderCalendar,searches:renderSearches,categories:renderSavedCategories,support:renderSupport,admin:renderAdmin}[id])();
 
@@ -249,12 +266,13 @@
     $("#pt-close-form",body).onsubmit=async e=>{e.preventDefault();const f=e.currentTarget;try{await api("/api/admin/closures",{method:"POST",body:{titleHe:f.title.value,titleEn:f.titleEn.value||null,startsAt:new Date(f.startsAt.value).toISOString(),endsAt:new Date(f.endsAt.value).toISOString(),closureType:f.closureType.value}});await renderAdmin()}catch(err){setStatus(err.message,true)}};
   }
 
-  async function openTools(){
-    try{profile=(await api("/api/me/profile")).profile;if(!dialog.open)dialog.showModal();await render(active);}catch(e){translatedAlert(e.message)}
+  async function openTools(tab=active){
+    try{profile=(await api("/api/me/profile")).profile;active=tab||"profile";if(!dialog.open)dialog.showModal();await render(active);}catch(e){translatedAlert(e.message)}
   }
+  window.GmachAccountCenter={open:openTools};
   function installEntry(){
     const dash=$("#dashboard-view");if(!dash||$("#platform-tools-entry"))return;
-    const b=document.createElement("button");b.id="platform-tools-entry";b.type="button";b.className="button button-secondary";b.textContent="הגדרות וניהול";b.addEventListener("click",openTools);
+    const b=document.createElement("button");b.id="platform-tools-entry";b.type="button";b.className="button button-secondary";b.textContent="החשבון שלי";b.addEventListener("click",()=>openTools("profile"));
     const host=dash.querySelector(".dashboard-actions,.dashboard-header,.section-heading")||dash;host.prepend(b);
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>{installEntry();setupTurnstile();},{once:true});else{installEntry();setupTurnstile();}
