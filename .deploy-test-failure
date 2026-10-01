@@ -1,4 +1,4 @@
-deploy_sha=9a9004f3125edc4bffec0d0b479b01390e925281
+deploy_sha=77864f692929d6480c1a79492debeaa03fdf862d
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -32,14 +32,14 @@ node:internal/modules/run_main:107
 
 AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
 
-400 !== 201
+201 !== 409
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:296:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:363:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: true,
   code: 'ERR_ASSERTION',
-  actual: 400,
-  expected: 201,
+  actual: 201,
+  expected: 409,
   operator: 'strictEqual',
   diff: 'simple'
 }
