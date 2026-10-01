@@ -459,7 +459,7 @@ for(const token of ["openItemImageEditor","data-images-item","/image-edits","blu
 
 const adminControlClient=await readFile("dist/admin-control-center.js","utf8");
 assert.ok(adminControlClient.includes('["backups",t("גיבויים","Backups")]'),"backup admin tab missing");
-assert.ok(adminControlClient.includes("admin-backup-now"),"manual backup control missing");
+assert.ok(adminControlClient.includes("full-production-backup.yml"),"manual full-backup workflow control missing");
 assert.ok(adminControlClient.includes("CURRENT — "),"CURRENT backup slot missing");
 assert.ok(adminControlClient.includes("PREVIOUS — "),"PREVIOUS backup slot missing");
 assert.ok(adminControlClient.includes("/api/admin/backups/archive/current"),"backup download route missing from UI");
