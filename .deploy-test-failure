@@ -1,4 +1,4 @@
-deploy_sha=0f8c82307fd19d8d09196cc116ba8507464fb887
+deploy_sha=295b4104f1cfe2976016de9f2ffcde13f17b647b
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -12,12 +12,20 @@ Navigation admin static release gate passed.
 Privacy availability static release gate passed.
 Release hardening static gate passed.
 Release experience static release gate passed.
+Admin control center static release gate passed.
+Privacy purge static release gate passed.
+Community chat retention static release gate passed.
+QR scanning, structured SEO and accessibility shell gate passed.
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+Full requirements regression extensions passed.
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: mergeInto missing from admin control center
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:327:275 {
+AssertionError [ERR_ASSERTION]: manual backup control missing
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:462:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
