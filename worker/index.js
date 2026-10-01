@@ -3225,7 +3225,9 @@ function requiredHours(value){
   for(const [day,range] of Object.entries(parsed)){
     if(!["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"].includes(day))throw new HttpError(400,"יש לבחור יום פעילות מהרשימה");
     const match=range.match(/^(\d{2}:\d{2})[–-](\d{2}:\d{2})$/);
-    if(!match||match[1]>=match[2]||match[2]>"23:59"||(day==="שישי"&&match[2]>"17:00")||(day==="שבת"&&match[1]<"20:00"))throw new HttpError(400,"שעות הפעילות אינן תקינות");
+    if(!match||match[1]>=match[2]||match[2]>"23:59")throw new HttpError(400,`שעות הפעילות ביום ${day} אינן תקינות`);
+    if(day==="שישי"&&(match[1]>"17:00"||match[2]>"17:00"))throw new HttpError(400,"ביום שישי ניתן להגדיר שעות פעילות רק עד 17:00");
+    if(day==="שבת"&&(match[1]<"20:00"||match[2]<"20:00"))throw new HttpError(400,"בשבת ניתן להגדיר שעות פעילות רק החל מ־20:00");
   }
   return hours;
 }
