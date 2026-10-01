@@ -1,0 +1,97 @@
+name: Verify Gmach Full Backup
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 1 * * 0'
+  workflow_run:
+    workflows: ["Gmach Full Production Backup"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gmach-full-backup-verify
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BACKUP_BUCKET: gmach-karov-backups
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Install verification tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq jq unzip
+      - name: Download CURRENT pointer and archive
+        id: current
+        run: |
+          set -Eeuo pipefail
+          npx wrangler r2 object get "$BACKUP_BUCKET/CURRENT.json" --file "$RUNNER_TEMP/CURRENT.json" --remote
+          key="$(jq -r '.key // empty' "$RUNNER_TEMP/CURRENT.json")"
+          sha="$(jq -r '.sha256 // empty' "$RUNNER_TEMP/CURRENT.json")"
+          size="$(jq -r '.size // 0' "$RUNNER_TEMP/CURRENT.json")"
+          test -n "$key"; test -n "$sha"; test "$size" -gt 0
+          archive="$RUNNER_TEMP/current-backup.zip"
+          npx wrangler r2 object get "$BACKUP_BUCKET/$key" --file "$archive" --remote
+          [ "$(stat -c '%s' "$archive")" = "$size" ]
+          [ "$(sha256sum "$archive" | awk '{print $1}')" = "$sha" ]
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+      - name: Verify archive structure and every internal checksum
+        env:
+          ARCHIVE: ${{ steps.current.outputs.archive }}
+        run: |
+          set -Eeuo pipefail
+          unzip -tq "$ARCHIVE" >/dev/null
+          root="$RUNNER_TEMP/restore-check"
+          mkdir -p "$root"
+          unzip -q "$ARCHIVE" -d "$root"
+          test -s "$root/manifest.json"
+          test -s "$root/SHA256SUMS"
+          test -s "$root/database/full.sql"
+          test -s "$root/storage/manifest.json"
+          test -s "$root/site/repository-head.zip"
+          test -s "$root/site/repository.bundle"
+          test -s "$root/config/wrangler.jsonc"
+          (cd "$root" && sha256sum -c SHA256SUMS)
+          jq -e '.backup_type == "gmach-full-production" and .secret_values_included == false' "$root/manifest.json" >/dev/null
+          jq -e 'type == "array"' "$root/storage/manifest.json" >/dev/null
+          git bundle verify "$root/site/repository.bundle" >/dev/null 2>&1
+      - name: Publish verification success
+        if: success()
+        run: |
+          set -Eeuo pipefail
+          jq -n \
+            --arg status "success" \
+            --arg verified_at "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --arg key "${{ steps.current.outputs.key }}" \
+            --arg sha256 "${{ steps.current.outputs.sha }}" \
+            --arg run_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{status:$status,verified_at:$verified_at,key:$key,sha256:$sha256,run_url:$run_url,scope:"archive-integrity"}' > "$RUNNER_TEMP/VERIFY.json"
+          npx wrangler r2 object put "$BACKUP_BUCKET/VERIFY.json" --file "$RUNNER_TEMP/VERIFY.json" --remote --content-type application/json --force
+      - name: Publish verification failure
+        if: failure()
+        run: |
+          set +e
+          jq -n \
+            --arg status "failed" \
+            --arg attempted_at "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --arg run_url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            '{status:$status,attempted_at:$attempted_at,run_url:$run_url,scope:"archive-integrity"}' > "$RUNNER_TEMP/VERIFY.json"
+          npx wrangler r2 object put "$BACKUP_BUCKET/VERIFY.json" --file "$RUNNER_TEMP/VERIFY.json" --remote --content-type application/json --force

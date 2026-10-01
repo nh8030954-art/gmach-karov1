@@ -407,6 +407,24 @@ async function logicalBackup(request,env){
     return json({backup:{id,status:"completed",storageKey:key}});
   }catch(e){await env.DB.prepare("UPDATE backup_runs SET status='failed',completed_at=?,finished_at=?,error=? WHERE id=?").bind(new Date().toISOString(),new Date().toISOString(),String(e.message||e).slice(0,1000),id).run();throw e}
 }
+async function archiveBackupStatus(request,env){
+  await requireAdmin(request,env);
+  if(!env.BACKUP_STORAGE)throw new FinalError(503,"אחסון הגיבויים הייעודי אינו זמין");
+  const read=async key=>{const o=await env.BACKUP_STORAGE.get(key);if(!o)return null;try{return JSON.parse(await o.text())}catch{return null}};
+  const [status,current,previous,verify]=await Promise.all([read("STATUS.json"),read("CURRENT.json"),read("PREVIOUS.json"),read("VERIFY.json")]);
+  return json({status:status||{status:"unknown",retention:2},current,previous,verify});
+}
+async function archiveBackupDownload(request,env,slot){
+  await requireAdmin(request,env);
+  if(!env.BACKUP_STORAGE)throw new FinalError(503,"אחסון הגיבויים הייעודי אינו זמין");
+  const pointerKey=slot==="previous"?"PREVIOUS.json":"CURRENT.json",pointerObject=await env.BACKUP_STORAGE.get(pointerKey);
+  if(!pointerObject)throw new FinalError(404,"לא נמצא גיבוי להורדה");
+  let pointer;try{pointer=JSON.parse(await pointerObject.text())}catch{throw new FinalError(500,"מצביע הגיבוי אינו תקין")}
+  const key=String(pointer?.key||"");if(!/^backups\/gmach-full-[A-Za-z0-9TZ_-]+\.zip$/.test(key))throw new FinalError(500,"נתיב הגיבוי אינו תקין");
+  const object=await env.BACKUP_STORAGE.get(key);if(!object)throw new FinalError(404,"קובץ הגיבוי אינו קיים");
+  const headers=new Headers();object.writeHttpMetadata(headers);headers.set("Content-Type","application/zip");headers.set("Content-Disposition",'attachment; filename="'+key.split("/").pop().replace(/[^A-Za-z0-9._-]/g,"_")+'"');headers.set("Cache-Control","no-store");headers.set("X-Backup-SHA256",String(pointer.sha256||""));
+  return new Response(object.body,{headers});
+}
 async function backupList(request,env){
   await requireAdmin(request,env);
   const rows=await env.DB.prepare("SELECT * FROM backup_runs ORDER BY COALESCE(started_at,created_at) DESC LIMIT 100").all();
@@ -487,6 +505,8 @@ export async function handleFinalFeatures(request,env,ctx,url){
     if(path==="/api/faqs"&&method==="GET")return await faq(env,url.searchParams.get("lang")==="en"?"en":"he");
     if(path==="/api/performance"&&method==="POST")return await performance(request,env);
     m=path.match(/^\/api\/seo\/(item|organization)\/([^/]+)$/);if(m&&method==="GET")return await seoMeta(env,m[1],decodeURIComponent(m[2]),url);
+    if(path==="/api/admin/backups/archive-status"&&method==="GET")return await archiveBackupStatus(request,env);
+    m=path.match(/^\/api\/admin\/backups\/archive\/(current|previous)$/);if(m&&method==="GET")return await archiveBackupDownload(request,env,m[1]);
     if(path==="/api/admin/backups"&&method==="GET")return await backupList(request,env);
     if(path==="/api/admin/backups"&&method==="POST")return await logicalBackup(request,env);
     return null;

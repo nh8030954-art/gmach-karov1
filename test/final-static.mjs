@@ -305,6 +305,11 @@ for(const token of ["release-readiness","restore-drill","system_alert_deliveries
 for(const token of ["מוכנות להפצה","Release readiness","data-run-restore-drill","data-test-alert"])assert.ok(hardeningClient.includes(token),token+" missing from release hardening UI");
 assert.ok(productionDeploy.includes("Ensure dedicated backup R2 bucket"),"production deploy must provision backup bucket");
 assert.ok(wranglerConfig.includes('"binding": "BACKUP_STORAGE"'),"dedicated backup R2 binding missing");
+for(const backupFile of [".github/workflows/full-production-backup.yml",".github/workflows/verify-full-backup.yml",".github/scripts/gmach-full-backup.sh","BACKUP-RESTORE.md"]) await access(backupFile);
+const fullBackupWorkflow=await readFile(".github/workflows/full-production-backup.yml","utf8");
+assert.ok(fullBackupWorkflow.includes("schedule:")&&fullBackupWorkflow.includes("workflow_dispatch:"),"full backup workflow must be daily and manually runnable");
+assert.ok(fullBackupWorkflow.includes("CURRENT.json")&&fullBackupWorkflow.includes("PREVIOUS.json"),"full backup must retain CURRENT and PREVIOUS pointers");
+assert.ok(finalWorker.includes("/api/admin/backups/archive-status")&&finalWorker.includes("archiveBackupDownload"),"authenticated archive backup routes missing");
 assert.ok(remainingWorker.includes("system_alerts")&&!remainingWorker.includes("INSERT INTO operational_alerts"),"backup failure alert must use system_alerts");
 console.log("Release hardening static gate passed.");
 
@@ -453,5 +458,7 @@ for(const token of ["openItemImageEditor","data-images-item","/image-edits","blu
 const adminControlClient=await readFile("dist/admin-control-center.js","utf8");
 assert.ok(adminControlClient.includes('["backups",t("גיבויים","Backups")]'),"backup admin tab missing");
 assert.ok(adminControlClient.includes("admin-backup-now"),"manual backup control missing");
-assert.ok(adminControlClient.includes("data-validate-backup"),"backup validation control missing");
+assert.ok(adminControlClient.includes("CURRENT — "),"CURRENT backup slot missing");
+assert.ok(adminControlClient.includes("PREVIOUS — "),"PREVIOUS backup slot missing");
+assert.ok(adminControlClient.includes("/api/admin/backups/archive/current"),"backup download route missing from UI");
 assert.ok(appClient.includes("refreshUser(hydrate=true)"),"lightweight auth bootstrap missing");
