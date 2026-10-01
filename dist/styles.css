@@ -994,3 +994,35 @@ html, body { max-width: 100%; overflow-x: clip; }
   #item-dialog .loan-policy-panel{padding:14px}
   #item-dialog .loan-policy-chip{flex:1 1 calc(50% - 6px);justify-content:center}
 }
+
+/* Simplified item form */
+.item-advanced-settings{
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:color-mix(in srgb,var(--canvas) 45%,#fff);
+  overflow:hidden;
+}
+.item-advanced-settings summary{
+  list-style:none;cursor:pointer;padding:15px 16px;
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  color:var(--navy);
+}
+.item-advanced-settings summary::-webkit-details-marker{display:none}
+.item-advanced-settings summary::after{content:"＋";font-size:1.2rem;font-weight:500;color:var(--teal)}
+.item-advanced-settings[open] summary::after{content:"−"}
+.item-advanced-settings summary span{display:grid;gap:2px}
+.item-advanced-settings summary strong{font-size:.92rem}
+.item-advanced-settings summary small{color:var(--ink-soft);font-size:.74rem;font-weight:500}
+.item-advanced-content{
+  padding:16px;border-top:1px solid var(--line);
+  display:grid;gap:16px;background:#fff;
+}
+.availability-explainer{
+  margin:0 0 14px;padding:12px 14px;border-radius:13px;
+  background:var(--canvas);color:var(--ink-soft);font-size:.84rem;line-height:1.6;
+}
+.pa-rule-fields{display:grid;gap:12px;grid-column:1/-1}
+.pa-days{display:flex;flex-wrap:wrap;gap:8px}
+.pa-days label{display:inline-flex!important;align-items:center;gap:5px;padding:7px 9px;border:1px solid var(--line);border-radius:999px;background:#fff;font-weight:650!important}
+.pa-rule-preview{color:var(--ink-soft);font-size:.8rem}
+@media(max-width:590px){.item-advanced-content{padding:13px}.item-advanced-settings summary{padding:13px 14px}}
