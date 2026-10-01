@@ -360,7 +360,7 @@ try {
   result = await request(`/api/loan-requests/${requestId}/messages`, { cookie: secondCookie });
   assert.equal(result.response.status, 403);
   result = await request("/api/loan-requests", { method: "POST", cookie: secondCookie, body: { itemId, requestedFrom: "2026-10-09T10:00", requestedUntil: "2026-10-11T10:00", quantity: 1, depositAccepted: true, phone: "054-1112233", note: "צריך לאירוע נוסף" } });
-  assert.equal(result.response.status, 409);
+  assert.equal(result.response.status, 201, "A second overlapping request is allowed because the item has two tracked units");
 
   result = await request("/api/reports", { method: "POST", cookie: borrowerCookie, body: { itemId, reason: "incorrect", details: "בדיקת זרימת הדיווח" } });
   assert.equal(result.response.status, 201);

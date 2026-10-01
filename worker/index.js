@@ -231,6 +231,12 @@ export default {
         return withSecurityHeaders(response);
       }
       const response = await env.ASSETS.fetch(request);
+      if ((response.headers.get("Content-Type")||"").includes("text/html")) {
+        const headers=new Headers(response.headers);
+        headers.set("Cache-Control","no-store, max-age=0");
+        headers.set("Pragma","no-cache");
+        return withSecurityHeaders(new Response(response.body,{status:response.status,statusText:response.statusText,headers}));
+      }
       return withSecurityHeaders(response);
     } catch (error) {
       const status = error instanceof HttpError ? error.status : 500;
