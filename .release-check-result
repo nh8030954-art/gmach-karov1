@@ -1,4 +1,4 @@
-sha=6d0224c586374182e64da84c2a8baf43727077ae
+sha=4164d83340a5c68c675fa419c533853a7885142e
 install=success
 syntax=success
 tests=failure
@@ -7,9 +7,9 @@ live=success
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: English static UI is missing translations: לא ניתן להגדיר שעות פעילות מיום שישי בשעה 17:00 ועד שבת בשעה 20:00. | תיאור קצר של הפריט | הגדרות נוספות | לא חובה · ברירת מחדל: השאלה, שעה עד 7 ימים, אישור מנהל וללא פיקדון | נדרש פיקדון להבטחת החזרת המוצר כפי שנלקח. | מה הפריט, מה מצבו ומה חשוב לדעת לפני שמבקשים | למשל: החזרה נקייה ובזמן
+AssertionError [ERR_ASSERTION]: English static UI is missing translations: (מוצגת לציבור בעמוד הגמ״ח) | לא ניתן להגדיר שעות פעילות מיום שישי בשעה 17:00 ועד שבת בשעה 20:00. | תיאור קצר של הפריט | הגדרות נוספות | לא חובה · ברירת מחדל: השאלה, שעה עד 7 ימים, אישור מנהל וללא פיקדון | נדרש פיקדון להבטחת החזרת המוצר כפי שנלקח. | מה הפריט, מה מצבו ומה חשוב לדעת לפני שמבקשים | למשל: החזרה נקייה ובזמן
 
-7 !== 0
+8 !== 0
 
     at file:///home/runner/work/gmach-karov1/gmach-karov1/test/i18n-static.mjs:33:8
     at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
@@ -17,7 +17,7 @@ AssertionError [ERR_ASSERTION]: English static UI is missing translations: לא 
     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 7,
+  actual: 8,
   expected: 0,
   operator: 'strictEqual',
   diff: 'simple'
@@ -25,7 +25,7 @@ AssertionError [ERR_ASSERTION]: English static UI is missing translations: לא 
 
 Node.js v24.21.0
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790863087937:296:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790863533246:296:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: true,
   code: 'ERR_ASSERTION',
@@ -36,5 +36,5 @@ Node.js v24.21.0
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-01T13:58:12.071Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-01T14:05:44.097Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
