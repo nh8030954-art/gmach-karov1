@@ -58,13 +58,28 @@
     catch { return ""; }
   }
   function iconSvg(icon = "box") { return `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[icon] || ICONS.box}</svg>`; }
+  function ensureToastTopLayer(element){
+    if(!element||typeof element.showPopover!=="function")return;
+    try{
+      if(!element.hasAttribute("popover"))element.setAttribute("popover","manual");
+      if(!element.style.top)element.style.top="auto";
+      if(!element.style.right)element.style.right="auto";
+      if(!element.style.margin)element.style.margin="0";
+      if(!element.style.border)element.style.border="0";
+      if(!element.matches(":popover-open"))element.showPopover();
+    }catch{}
+  }
+  function hideToastTopLayer(element){try{if(element?.matches?.(":popover-open"))element.hidePopover()}catch{}}
+  window.GmachEnsureTopLayerToast=ensureToastTopLayer;
+  window.GmachHideTopLayerToast=hideToastTopLayer;
   function toast(message, type = "success") {
     message=window.GmachTranslate?.(message)||message;
     const region = $("#toast-region");
+    ensureToastTopLayer(region);
     if ([...region.children].some(el => el.textContent === message && el.classList.contains("error") === (type === "error"))) return;
     const el = document.createElement("div"); el.className = `toast ${type === "error" ? "error" : ""}`; el.textContent = message; region.append(el);
     while (region.children.length > 2) region.firstElementChild.remove();
-    window.setTimeout(() => el.remove(), 4200);
+    window.setTimeout(() => { el.remove(); if(!region.children.length)hideToastTopLayer(region); }, 4200);
   }
   function setButtonBusy(button, busy, busyText = "שולח…") {
     if (!button) return;
