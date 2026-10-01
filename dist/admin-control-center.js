@@ -8,8 +8,8 @@ const fmt=v=>{if(!v)return"";try{return new Intl.DateTimeFormat(en()?"en-GB":"he
 async function api(path,opt={}){
  const init={credentials:"same-origin",headers:{"Accept":"application/json",...(opt.headers||{})},...opt};
  if(opt.body!==undefined&&typeof opt.body!=="string"){init.headers["Content-Type"]="application/json";init.body=JSON.stringify(opt.body)}
- const r=await fetch(path,init);let data={};try{data=await r.json()}catch{}
- if(!r.ok)throw new Error(data.error||t("הפעולה נכשלה","Action failed"));
+ let r;try{r=await fetch(path,init)}catch(e){throw new Error(window.GmachDescribeNetworkError?window.GmachDescribeNetworkError(e):t("לא ניתן להתחבר לשרת","Could not connect to the server"))}let data={};try{data=await r.json()}catch{}
+ if(!r.ok)throw new Error(window.GmachDescribeHttpError?window.GmachDescribeHttpError(r,data):(data.error||t("הפעולה נכשלה","Action failed")));
  return data;
 }
 function toast(msg,bad=false){
