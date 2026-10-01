@@ -10,9 +10,10 @@ const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 async function api(path,options={}){
   const init={credentials:"same-origin",...options,headers:{...(options.headers||{})}};
   if(options.body && !(options.body instanceof FormData)){init.headers["Content-Type"]="application/json";init.body=JSON.stringify(options.body)}
-  const r=await fetch(path,init),type=r.headers.get("content-type")||"";
+  let r;try{r=await fetch(path,init)}catch(e){throw new Error(window.GmachDescribeNetworkError?window.GmachDescribeNetworkError(e):"לא ניתן להתחבר לשרת")}
+  const type=r.headers.get("content-type")||"";
   const data=type.includes("application/json")?await r.json():await r.text();
-  if(!r.ok)throw new Error(data?.error||data||"הפעולה נכשלה");
+  if(!r.ok)throw new Error(window.GmachDescribeHttpError?window.GmachDescribeHttpError(r,data):(data?.error||data||"הפעולה נכשלה"));
   return data;
 }
 function notice(message,error=false){
