@@ -15,7 +15,7 @@ async function api(path,opt={}){
 function toast(msg,bad=false){
  const fn=window.showToast||window.toast;if(typeof fn==="function"){fn(msg,bad?"error":"success");return}
  let x=$("#admin-control-toast");if(!x){x=document.createElement("div");x.id="admin-control-toast";x.setAttribute("role","status");x.setAttribute("aria-live","polite");x.setAttribute("aria-atomic","true");x.style.cssText="position:fixed;z-index:99999;bottom:20px;left:20px;max-width:360px;padding:12px 16px;border-radius:12px;background:#111;color:#fff;box-shadow:0 8px 30px #0003";document.body.append(x)}
- x.textContent=msg;x.hidden=false;clearTimeout(x._timer);x._timer=setTimeout(()=>x.hidden=true,3500);
+ x.textContent=msg;x.hidden=false;window.GmachEnsureTopLayerToast?.(x);clearTimeout(x._timer);x._timer=setTimeout(()=>{window.GmachHideTopLayerToast?.(x);x.hidden=true},3500);
 }
 function dialog(){
  let d=$("#admin-control-center");if(!d){d=document.createElement("dialog");d.id="admin-control-center";d.className="modal modal-wide";document.body.append(d)}
