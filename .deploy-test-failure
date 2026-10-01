@@ -1,4 +1,4 @@
-deploy_sha=295b4104f1cfe2976016de9f2ffcde13f17b647b
+deploy_sha=ef871a9809344a4cfb05591428d2f6f7881b2e94
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -24,8 +24,8 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: manual backup control missing
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:462:8 {
+AssertionError [ERR_ASSERTION]: backup download route missing from UI
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:465:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
