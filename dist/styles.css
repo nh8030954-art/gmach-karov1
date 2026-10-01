@@ -889,3 +889,68 @@ html, body { max-width: 100%; overflow-x: clip; }
 .organization-card[role="link"]:focus-visible { outline: 3px solid var(--teal); outline-offset: 4px; }
 
 @media (min-width: 1181px) { .header-inner { grid-template-columns: minmax(195px,.7fr) minmax(0,1.3fr) auto; gap: 12px; } .header-actions { gap: 6px; white-space: nowrap; } .header-actions .button { padding-inline: 10px; } }
+
+
+/* Loan policy presentation */
+.loan-policy-panel{
+  margin-top:18px;
+  padding:20px;
+  border:1px solid color-mix(in srgb,var(--navy) 12%,var(--line));
+  border-radius:22px;
+  background:linear-gradient(180deg,#fff 0%,color-mix(in srgb,var(--canvas) 48%,#fff) 100%);
+}
+.loan-policy-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:14px}
+.loan-policy-heading h3{margin:2px 0 0;color:var(--navy);font-size:1.15rem}
+.loan-policy-kicker{display:block;color:var(--ink-soft);font-size:.74rem;font-weight:650}
+.loan-policy-summary{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.loan-policy-chip{
+  display:inline-flex;align-items:baseline;gap:7px;
+  min-height:38px;padding:8px 11px;border-radius:999px;
+  background:color-mix(in srgb,var(--navy) 7%,#fff);
+  border:1px solid color-mix(in srgb,var(--navy) 10%,var(--line));
+}
+.loan-policy-chip small{color:var(--ink-soft);font-size:.72rem}
+.loan-policy-chip strong{color:var(--navy);font-size:.9rem;white-space:nowrap}
+.loan-policy-groups{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.loan-policy-group{
+  padding:2px 14px 6px;
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:#fff;
+}
+.loan-policy-group h4{
+  margin:0 -2px;padding:12px 2px 9px;
+  color:var(--navy);font-size:.9rem;
+  border-bottom:1px solid var(--line);
+}
+.loan-policy-row{
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  min-height:45px;padding:9px 2px;border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent);
+}
+.loan-policy-row:last-child{border-bottom:0}
+.loan-policy-row span{color:var(--ink-soft);font-size:.8rem}
+.loan-policy-row strong{color:var(--navy);font-size:.9rem;text-align:end}
+.loan-policy-row strong.is-muted{
+  color:var(--ink-soft);font-size:.8rem;font-weight:650;
+  padding:4px 8px;border-radius:999px;background:var(--canvas);
+}
+.loan-policy-deposit{
+  display:grid;grid-template-columns:auto auto 1fr;align-items:center;gap:9px;
+  margin-top:14px;padding:12px 14px;border-radius:14px;
+  background:color-mix(in srgb,var(--accent) 16%,#fff);
+  border:1px solid color-mix(in srgb,var(--accent) 32%,var(--line));
+}
+.loan-policy-deposit span{font-size:.8rem;font-weight:700;color:var(--ink-soft)}
+.loan-policy-deposit strong{color:var(--navy);font-size:1rem;white-space:nowrap}
+.loan-policy-deposit small{color:var(--ink-soft);font-size:.74rem}
+.loan-policy-notes{margin-top:14px;padding-top:13px;border-top:1px dashed var(--line)}
+.loan-policy-notes strong{color:var(--navy);font-size:.82rem}
+.loan-policy-notes p{margin:4px 0 0;color:var(--ink-soft);font-size:.82rem;line-height:1.65}
+@media(max-width:700px){
+  .loan-policy-panel{padding:16px;border-radius:18px}
+  .loan-policy-groups{grid-template-columns:1fr}
+  .loan-policy-summary{gap:6px}
+  .loan-policy-chip{padding:7px 9px}
+  .loan-policy-deposit{grid-template-columns:auto 1fr}
+  .loan-policy-deposit small{grid-column:1/-1}
+}

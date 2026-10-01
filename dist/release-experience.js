@@ -16,20 +16,31 @@ async function enrichItemPolicy(){
   const {item}=await api("/api/items/"+encodeURIComponent(itemId));if(!item)return;
   const copy=$(".item-detail-copy",host);if(!copy)return;
   const section=document.createElement("section");section.dataset.releasePolicy="1";section.className="organization-facts";
-  const rows=[
+  const timingRows=[
    [tr("משך מינימלי","Minimum duration"),minutes(item.minLoanMinutes)],
    [tr("משך מרבי","Maximum duration"),minutes(item.maxLoanMinutes)],
    [tr("הזמנה מראש","Advance notice"),minutes(item.bookingNoticeMinutes)],
    [tr("זמן הכנה","Preparation time"),minutes(item.preparationMinutes)],
    [tr("זמן בין השאלות","Turnaround time"),minutes(item.turnaroundMinutes)],
-   [tr("אופק הזמנה","Booking horizon"),Number(item.bookingHorizonDays||0)+" "+tr("ימים","days")],
+   [tr("אופק הזמנה","Booking horizon"),Number(item.bookingHorizonDays||0)+" "+tr("ימים","days")]
+  ];
+  const ruleRows=[
    [tr("אישור בקשה","Request approval"),item.approvalMode==="automatic"?tr("אוטומטי","Automatic"):tr("ידני","Manual")],
    [tr("מקסימום למשתמש","Maximum per user"),item.maxPerUser?String(item.maxPerUser):tr("ללא מגבלה נוספת","No additional limit")],
    [tr("רדיוס שירות","Service radius"),item.serviceRadiusKm?item.serviceRadiusKm+" "+tr('ק"מ',"km"):tr("לא הוגדר","Not set")]
   ];
-  if(item.depositRequired)rows.push([tr("פיקדון","Deposit"),moneyAgorot(item.depositAmountAgorot)]);
-  if(item.recurringAllowed)rows.push([tr("בקשה מחזורית","Recurring request"),tr("נתמכת","Supported")]);
-  section.innerHTML='<section style="grid-column:1/-1"><h3>'+tr("תנאי השאלה וזמינות","Loan terms and availability")+'</h3><div class="platform-kpis" style="margin-top:10px">'+rows.map(([a,b])=>'<article><span>'+esc(a)+'</span><strong>'+esc(b)+'</strong></article>').join("")+'</div>'+(item.loan_conditions?'<p style="margin-top:12px"><strong>'+tr("תנאים נוספים: ","Additional terms: ")+'</strong>'+esc(item.loan_conditions)+'</p>':'')+'</section>';
+  if(item.recurringAllowed)ruleRows.push([tr("בקשה מחזורית","Recurring request"),tr("נתמכת","Supported")]);
+  const emptyValues=new Set([tr("ללא","None"),tr("ללא מגבלה נוספת","No additional limit"),tr("לא הוגדר","Not set")]);
+  const renderRows=rows=>rows.map(([label,value])=>'<div class="loan-policy-row"><span>'+esc(label)+'</span><strong class="'+(emptyValues.has(String(value))?'is-muted':'')+'">'+esc(value)+'</strong></div>').join("");
+  const horizon=Number(item.bookingHorizonDays||0)+" "+tr("ימים","days");
+  const approval=item.approvalMode==="automatic"?tr("אוטומטי","Automatic"):tr("ידני","Manual");
+  const summary=[
+    [tr("עד","Up to"),minutes(item.maxLoanMinutes)],
+    [tr("אישור","Approval"),approval],
+    [tr("הזמנה עד","Book up to"),horizon]
+  ];
+  if(item.depositRequired)summary.push([tr("פיקדון","Deposit"),moneyAgorot(item.depositAmountAgorot)]);
+  section.innerHTML='<section class="loan-policy-panel" style="grid-column:1/-1"><div class="loan-policy-heading"><div><span class="loan-policy-kicker">'+tr("מידע חשוב לפני שמבקשים","Important before requesting")+'</span><h3>'+tr("תנאי השאלה וזמינות","Loan terms and availability")+'</h3></div></div><div class="loan-policy-summary">'+summary.map(([label,value])=>'<span class="loan-policy-chip"><small>'+esc(label)+'</small><strong>'+esc(value)+'</strong></span>').join("")+'</div><div class="loan-policy-groups"><section class="loan-policy-group"><h4>'+tr("זמנים","Timing")+'</h4>'+renderRows(timingRows)+'</section><section class="loan-policy-group"><h4>'+tr("כללי בקשה","Request rules")+'</h4>'+renderRows(ruleRows)+'</section></div>'+(item.depositRequired?'<div class="loan-policy-deposit"><span>'+tr("פיקדון","Deposit")+'</span><strong>'+esc(moneyAgorot(item.depositAmountAgorot))+'</strong><small>'+tr("הפיקדון אינו תשלום עבור ההשאלה.","The deposit is not a fee for the loan.")+'</small></div>':'')+(item.loan_conditions?'<div class="loan-policy-notes"><strong>'+tr("תנאים נוספים","Additional terms")+'</strong><p>'+esc(item.loan_conditions)+'</p></div>':'')+'</section>';
   copy.insertBefore(section,$(".gmach-owner",copy)||$(".detail-actions",copy));
  }catch{}
 }
