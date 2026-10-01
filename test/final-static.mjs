@@ -66,6 +66,17 @@ assert.ok(remainingClient.includes("Saved items & recurring requests"));
 assert.ok(remainingClient.includes("Advanced operations"));
 
 const appClient=await readFile("dist/app.js","utf8");
+const launchClient=await readFile("dist/launch-readiness.js","utf8");
+for(const bad of [
+  "$('[data-edit-org]').forEach",
+  "$('[data-manage-org]').forEach",
+  "$('[data-org-transfers]').forEach",
+  "$('[data-org-advanced]').forEach"
+]) assert.ok(!appClient.includes(bad),"single-element selector used with forEach: "+bad);
+for(const bad of [
+  '$("[data-entity-edit]",out).forEach',
+  '$("[data-support-open]",out).forEach'
+]) assert.ok(!launchClient.includes(bad),"single-element selector used with forEach: "+bad);
 for(const token of ["openOrganizationManager","data-manage-org","org-branch-form","org-member-form","openUnitManager","data-units-item","print-unit-qrs","data-unit-history"])assert.ok(appClient.includes(token),token+" missing from app client");
 
 const indexHtml=await readFile("dist/index.html","utf8");
