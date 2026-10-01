@@ -1,40 +1,40 @@
-sha=1151ea5a07fff2031650da81748fea32e97b55ac
+sha=e2b933e39b9ac3f9ad8fbb41f2dd3af6f941deb9
 install=success
 syntax=success
 tests=failure
 smoke=failure
 live=success
-
-> gmach-karov@1.0.0 test
-> node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
-
-Final completion static release gate passed.
-node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: single-element selector used with forEach: $('[data-edit-org]').forEach
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:75:11 {
+AssertionError [ERR_ASSERTION]: English static UI is missing translations: הבקשות, הפריטים והגמ״חים שלך במקום אחד. | החשבון שלי | כלים נוספים | שמורים | (מוצגת לציבור בעמוד הגמ״ח) | לא ניתן להגדיר שעות פעילות מיום שישי בשעה 17:00 ועד שבת בשעה 20:00. | תיאור קצר של הפריט | הגדרות נוספות | לא חובה · ברירת מחדל: השאלה, שעה עד 7 ימים, אישור מנהל וללא פיקדון | נדרש פיקדון להבטחת החזרת המוצר כפי שנלקח. | פתיחת החשבון שלי | סיכום פעילות | מה הפריט, מה מצבו ומה חשוב לדעת לפני שמבקשים | למשל: החזרה נקייה ובזמן
+
+14 !== 0
+
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/i18n-static.mjs:33:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
+  actual: 14,
+  expected: 0,
+  operator: 'strictEqual',
   diff: 'simple'
 }
 
 Node.js v24.21.0
 
-AssertionError [ERR_ASSERTION]: single-element selector used with forEach: $('[data-edit-org]').forEach
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790866601037:75:11 {
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790866670312:221:10
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
+  actual: 500,
+  expected: 200,
+  operator: 'strictEqual',
   diff: 'simple'
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-01T14:56:41.710Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-01T14:57:53.942Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
