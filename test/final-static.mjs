@@ -366,6 +366,12 @@ for(const token of ["beforeinstallprompt","serviceWorker.register","connection-s
 for(const token of ["CACHE_NAME","caches.open","req.mode===\"navigate\"","notificationclick"])assert.ok(swClient.includes(token),token+" missing from service worker");
 assert.ok(indexHtml.includes('rel="manifest"'),"web app manifest is not linked");
 assert.ok(indexHtml.includes("./release-shell.js"),"release shell is not loaded");
+assert.ok(indexHtml.includes('class="app-booting site-copy-pending"'),"boot guard class missing");
+assert.ok(indexHtml.includes('id="app-boot-guard"'),"first-paint boot guard missing");
+assert.ok(indexHtml.includes("./app.js?v="),"app cache-busting version missing");
+assert.ok(appClient.includes('classList.remove("site-copy-pending","app-booting")'),"app does not reveal after bootstrap");
+assert.ok(swClient.includes('CACHE_NAME="gmach-shell-v5"'),"service worker cache version not updated");
+assert.ok(swClient.includes('/\\.(?:js|css)$/i.test(url.pathname)')||swClient.includes('js|css'),"runtime assets are not network-first");
 assert.equal(JSON.parse(manifestText).display,"standalone");
 assert.ok((await readFile("worker/launch-readiness.js","utf8")).includes("/api/admin/export.csv"),"admin CSV export route missing");
 assert.ok((await readFile("dist/admin-control-center.js","utf8")).includes("ייצוא נתונים"),"admin export UI missing");

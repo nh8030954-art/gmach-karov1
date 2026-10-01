@@ -1169,10 +1169,8 @@
   }
   async function init() {
     setupEvents(); installFormErrorFocus(); installDashboardToolOrganizer(); setAuthMode("login"); updateAuthUI(); installAdvancedGmachSearch();
-    const siteCopyReady = Promise.allSettled([loadSiteSettings(), loadPageCustomizations()])
-      .finally(() => document.documentElement.classList.remove("site-copy-pending"));
+    const siteCopyReady = Promise.allSettled([loadSiteSettings(), loadPageCustomizations()]);
     await detectServer();
-    document.documentElement.classList.remove("app-booting");
     await Promise.allSettled([siteCopyReady, loadPublicConfig(), loadDiscovery(), loadCategoryAliases(), refreshUser(), loadItems()]);
     window.setInterval(async () => {
       if (state.serverAvailable || document.visibilityState !== "visible") return;
@@ -1183,9 +1181,11 @@
     window.setInterval(() => { if (state.user && document.visibilityState === "visible") refreshNotifications(true); }, 30000);
     const sharedHelp=new URLSearchParams(location.search).get("help");if(sharedHelp){await openCommunityBoard(1,sharedHelp);}
     const inviteMatch=location.hash.match(/^#\/invite\/([^/?]+)/); if(inviteMatch){if(!state.user){openAuth("login");toast("יש להתחבר כדי לקבל את הזמנת הניהול")}else{try{const accepted=await api("/api/organization-invitations/"+encodeURIComponent(decodeURIComponent(inviteMatch[1]))+"/accept",{method:"POST",body:{}});toast("הצטרפת לצוות הניהול");history.replaceState(null,"","#/dashboard");await refreshAccountSnapshot();showDashboard("gmachim")}catch(e){toast(e.message,"error")}}return}
-    if (location.hash === "#/dashboard") state.user ? showDashboard() : requireAuth(() => showDashboard()); else if (location.hash === "#/catalog") window.setTimeout(() => $("#catalog").scrollIntoView(), 0); else if (location.hash === "#/community") window.setTimeout(() => openCommunityBoard(1), 0);
+    if (location.hash === "#/dashboard") { if(state.user) await showDashboard(); else requireAuth(() => showDashboard()); } else if (location.hash === "#/catalog") window.setTimeout(() => $("#catalog").scrollIntoView(), 0); else if (location.hash === "#/community") window.setTimeout(() => openCommunityBoard(1), 0);
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    document.documentElement.classList.remove("site-copy-pending","app-booting");
   }
-  init().catch(error => { document.documentElement.classList.remove("app-booting"); console.error("App initialization failed", error); toast("אירעה תקלה בטעינת האתר. נסו לרענן את הדף.", "error"); });
+  init().catch(error => { document.documentElement.classList.remove("site-copy-pending","app-booting"); console.error("App initialization failed", error); toast("אירעה תקלה בטעינת האתר. נסו לרענן את הדף.", "error"); });
 })();
 
 // In-site support form
