@@ -1,0 +1,2 @@
+status=error
+message=Requires permission "com.cloudflare.api.account.zone.create" to create zones for the selected account
