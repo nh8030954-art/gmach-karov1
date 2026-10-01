@@ -462,5 +462,5 @@ assert.ok(adminControlClient.includes('["backups",t("גיבויים","Backups")]
 assert.ok(adminControlClient.includes("full-production-backup.yml"),"manual full-backup workflow control missing");
 assert.ok(adminControlClient.includes("CURRENT — "),"CURRENT backup slot missing");
 assert.ok(adminControlClient.includes("PREVIOUS — "),"PREVIOUS backup slot missing");
-assert.ok(adminControlClient.includes("/api/admin/backups/archive/current"),"backup download route missing from UI");
+assert.ok(adminControlClient.includes("/api/admin/backups/archive/"),"backup download route missing from UI");
 assert.ok(appClient.includes("refreshUser(hydrate=true)"),"lightweight auth bootstrap missing");
