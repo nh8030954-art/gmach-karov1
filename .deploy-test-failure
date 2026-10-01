@@ -1,4 +1,4 @@
-deploy_sha=26d40b6c153bc739751c015890bf94d2af3848a4
+deploy_sha=0f8c82307fd19d8d09196cc116ba8507464fb887
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -10,12 +10,14 @@ Launch readiness static release gate passed.
 Distribution completion static release gate passed.
 Navigation admin static release gate passed.
 Privacy availability static release gate passed.
+Release hardening static gate passed.
+Release experience static release gate passed.
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: full backup must retain CURRENT and PREVIOUS pointers
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:311:8 {
+AssertionError [ERR_ASSERTION]: mergeInto missing from admin control center
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:327:275 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
