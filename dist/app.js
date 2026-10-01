@@ -74,6 +74,65 @@
   function openDialog(dialog) { if (!dialog) return; if (!dialog.open && typeof dialog.showModal === "function") dialog.showModal(); document.body.classList.add("dialog-open"); }
   function closeDialog(dialog) { if (!dialog) return; if (dialog.open) dialog.close(); if (!$("dialog[open]")) document.body.classList.remove("dialog-open"); }
 
+  function uiIsEnglish(){return String(document.documentElement.lang||"").toLowerCase().startsWith("en")}
+  function visibleFieldLabel(el){
+    const clean=value=>String(value||"").replace(/\s*\((?:רשות|optional)\)\s*/gi," ").replace(/\s+/g," ").trim();
+    let label=el.closest?.("label")||null;
+    if(!label&&el.id){try{label=document.querySelector('label[for="'+CSS.escape(el.id)+'"]')}catch{}}
+    const preferred=label?.querySelector?.("span")?.textContent||el.getAttribute?.("aria-label")||el.getAttribute?.("placeholder")||label?.textContent||el.name||el.id||"";
+    const name=clean(preferred);
+    return name|| (uiIsEnglish()?"this field":"השדה הזה");
+  }
+  function formValidationMessage(el){
+    const name=visibleFieldLabel(el),v=el.validity||{},en=uiIsEnglish(),quoted="„"+name+"”";
+    if(v.valueMissing){
+      if(el.type==="checkbox"||el.type==="radio")return en?"Please confirm "+quoted+".":"יש לאשר "+quoted+".";
+      if(el.tagName==="SELECT")return en?"Please select "+quoted+".":"יש לבחור "+quoted+".";
+      if(el.type==="file")return en?"Please choose a file for "+quoted+".":"יש לבחור קובץ עבור "+quoted+".";
+      return en?quoted+" is required.":"השדה "+quoted+" הוא שדה חובה.";
+    }
+    if(v.typeMismatch){
+      if(el.type==="email")return en?"Enter a valid email address in "+quoted+".":"יש להזין כתובת אימייל תקינה בשדה "+quoted+".";
+      if(el.type==="url")return en?"Enter a valid web address in "+quoted+".":"יש להזין כתובת אתר תקינה בשדה "+quoted+".";
+      return en?"Enter a valid value in "+quoted+".":"יש להזין ערך תקין בשדה "+quoted+".";
+    }
+    if(v.tooShort)return en?quoted+" must contain at least "+el.minLength+" characters.":"בשדה "+quoted+" יש להזין לפחות "+el.minLength+" תווים.";
+    if(v.tooLong)return en?quoted+" can contain at most "+el.maxLength+" characters.":"בשדה "+quoted+" ניתן להזין עד "+el.maxLength+" תווים.";
+    if(v.rangeUnderflow)return en?quoted+" must be at least "+el.min+".":"הערך בשדה "+quoted+" חייב להיות לפחות "+el.min+".";
+    if(v.rangeOverflow)return en?quoted+" must be at most "+el.max+".":"הערך בשדה "+quoted+" יכול להיות לכל היותר "+el.max+".";
+    if(v.stepMismatch)return en?"Enter a permitted value in "+quoted+".":"יש להזין ערך מותר בשדה "+quoted+".";
+    if(v.badInput)return en?"Enter a valid value in "+quoted+".":"יש להזין ערך תקין בשדה "+quoted+".";
+    if(v.patternMismatch){
+      const hint=String(el.getAttribute?.("title")||"").trim();
+      return hint?(en?quoted+" has an invalid format. "+hint:"הערך בשדה "+quoted+" אינו בפורמט הנדרש. "+hint):(en?quoted+" has an invalid format.":"הערך בשדה "+quoted+" אינו בפורמט הנדרש.");
+    }
+    return en?"Check "+quoted+" and try again.":"יש לבדוק את "+quoted+" ולנסות שוב.";
+  }
+  function describeHttpError(response,data){
+    const raw=typeof data==="string"?data:String(data?.error||data?.message||"").trim();
+    if(raw&&!/^\s*</.test(raw))return window.GmachTranslate?.(raw)||raw;
+    const en=uiIsEnglish(),status=Number(response?.status||0),requestId=String(data?.requestId||response?.headers?.get?.("X-Request-Id")||"").trim();
+    let message;
+    if(status===400)message=en?"The request is invalid. Check the entered details.":"הבקשה אינה תקינה. יש לבדוק את הפרטים שהוזנו.";
+    else if(status===401)message=en?"Your session is missing or has expired. Sign in and try again.":"החיבור לחשבון חסר או פג. יש להתחבר ולנסות שוב.";
+    else if(status===403)message=en?"You do not have permission to perform this action.":"אין הרשאה לבצע את הפעולה.";
+    else if(status===404)message=en?"The requested item or page was not found.":"הפריט או העמוד המבוקש לא נמצא.";
+    else if(status===409)message=en?"The action conflicts with a newer change. Refresh and try again.":"הפעולה מתנגשת עם שינוי חדש יותר. יש לרענן ולנסות שוב.";
+    else if(status===413)message=en?"The submitted file or request is too large.":"הקובץ או הבקשה שנשלחו גדולים מדי.";
+    else if(status===429)message=en?"Too many attempts. Please try again later.":"בוצעו יותר מדי ניסיונות. יש לנסות שוב מאוחר יותר.";
+    else if(status>=500)message=en?"A temporary server error occurred.":"אירעה תקלה זמנית בשרת.";
+    else message=en?"The action could not be completed.":"הפעולה לא הושלמה.";
+    if(requestId)message+=" "+(en?"Error reference: ":"מספר תקלה: ")+requestId;
+    return message;
+  }
+  function describeNetworkError(error){
+    if(error?.name==="AbortError")return uiIsEnglish()?"The server is taking too long to respond. Try again shortly.":"השרת מתעכב. אפשר לנסות שוב בעוד רגע.";
+    if(error instanceof TypeError)return uiIsEnglish()?"Could not connect to the server. Check the internet connection and try again.":"לא ניתן להתחבר לשרת. יש לבדוק את החיבור לאינטרנט ולנסות שוב.";
+    return String(error?.message||error|| (uiIsEnglish()?"An unexpected error occurred.":"אירעה שגיאה לא צפויה."));
+  }
+  window.GmachDescribeHttpError=describeHttpError;
+  window.GmachDescribeNetworkError=describeNetworkError;
+
   async function api(path, options = {}) {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), Number(options.timeoutMs || 12000));
@@ -81,11 +140,11 @@
     if (options.body && !(options.body instanceof FormData) && typeof options.body !== "string") { init.headers.set("Content-Type", "application/json"); init.body = JSON.stringify(options.body); }
     try {
       const response = await fetch(path, init); const type = response.headers.get("content-type") || ""; const data = type.includes("application/json") ? await response.json() : null;
-      if (!response.ok) { const error = new Error(data?.error || "הפעולה לא הושלמה"); if (data && typeof data === "object") Object.assign(error, data); throw error; }
+      if (!response.ok) { const error = new Error(describeHttpError(response,data)); if (data && typeof data === "object") Object.assign(error, data); error.status=response.status; error.requestId=error.requestId||response.headers.get("X-Request-Id")||""; throw error; }
       if (data && typeof data === "object" && response.headers.get("X-Data-Stale") === "1") data._stale = true;
       return data;
     } catch (error) {
-      if (error?.name === "AbortError") throw new Error("השרת מתעכב. אפשר להמשיך לעיין ולנסות שוב בעוד רגע.");
+      if (error?.name === "AbortError" || error instanceof TypeError) throw new Error(describeNetworkError(error));
       throw error;
     } finally { window.clearTimeout(timeout); }
   }
@@ -972,7 +1031,23 @@
     window.addEventListener("pagehide", () => controller.abort(), { once: true });
   }
 
-  function installFormErrorFocus(){document.addEventListener("invalid",event=>{const el=event.target;if(!(el instanceof HTMLElement))return;el.setAttribute("aria-invalid","true");el.addEventListener("input",()=>el.removeAttribute("aria-invalid"),{once:true});requestAnimationFrame(()=>{el.focus({preventScroll:true});el.scrollIntoView({behavior:"smooth",block:"center"})})},true);document.addEventListener("submit",event=>{const form=event.target;if(!(form instanceof HTMLFormElement)||form.checkValidity())return;const first=form.querySelector(":invalid");if(first){first.setAttribute("aria-invalid","true");first.focus({preventScroll:true});first.scrollIntoView({behavior:"smooth",block:"center"})}},true)}
+  function installFormErrorFocus(){
+    const pendingForms=new WeakSet();
+    document.addEventListener("invalid",event=>{
+      const el=event.target;if(!(el instanceof HTMLElement))return;
+      event.preventDefault();el.setAttribute("aria-invalid","true");
+      const clear=()=>el.removeAttribute("aria-invalid");el.addEventListener("input",clear,{once:true});el.addEventListener("change",clear,{once:true});
+      const form=el.form;
+      if(form&&!pendingForms.has(form)){pendingForms.add(form);toast(formValidationMessage(el),"error");setTimeout(()=>pendingForms.delete(form),0)}
+      else if(!form)toast(formValidationMessage(el),"error");
+      requestAnimationFrame(()=>{el.focus({preventScroll:true});el.scrollIntoView({behavior:"smooth",block:"center"})});
+    },true);
+    document.addEventListener("submit",event=>{
+      const form=event.target;if(!(form instanceof HTMLFormElement)||form.checkValidity())return;
+      event.preventDefault();const first=form.querySelector(":invalid");
+      if(first){first.setAttribute("aria-invalid","true");toast(formValidationMessage(first),"error");first.focus({preventScroll:true});first.scrollIntoView({behavior:"smooth",block:"center"})}
+    },true);
+  }
   async function init() {
     setupEvents(); installFormErrorFocus(); setAuthMode("login"); updateAuthUI(); installAdvancedGmachSearch();
     const siteCopyReady = Promise.allSettled([loadSiteSettings(), loadPageCustomizations()])
