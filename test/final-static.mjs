@@ -363,7 +363,7 @@ assert.ok(!indexHtml.includes('id="app-boot-guard"'),"full-page boot loader must
 assert.ok(!indexHtml.includes('class="app-booting site-copy-pending"'),"boot-hiding classes must stay disabled");
 const motionCss=await readFile("dist/motion.css","utf8");
 assert.ok(motionCss.includes("Instant hero: no startup fade or design flash"),"instant hero override missing");
-assert.ok(swClient.includes('CACHE_NAME="gmach-shell-v5"'),"service worker cache version not updated");
+assert.ok(swClient.includes('CACHE_NAME="gmach-shell-v6"'),"service worker cache version not updated");
 assert.ok(swClient.includes('/\\.(?:js|css)$/i.test(url.pathname)')||swClient.includes('js|css'),"runtime assets are not network-first");
 assert.equal(JSON.parse(manifestText).display,"standalone");
 assert.ok((await readFile("worker/launch-readiness.js","utf8")).includes("/api/admin/export.csv"),"admin CSV export route missing");
