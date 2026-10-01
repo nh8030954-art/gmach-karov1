@@ -67,16 +67,8 @@ assert.ok(remainingClient.includes("Advanced operations"));
 
 const appClient=await readFile("dist/app.js","utf8");
 const launchSelectorClient=await readFile("dist/launch-readiness.js","utf8");
-for(const bad of [
-  "$('[data-edit-org]').forEach",
-  "$('[data-manage-org]').forEach",
-  "$('[data-org-transfers]').forEach",
-  "$('[data-org-advanced]').forEach"
-]) assert.ok(!appClient.includes(bad),"single-element selector used with forEach: "+bad);
-for(const bad of [
-  '$("[data-entity-edit]",out).forEach',
-  '$("[data-support-open]",out).forEach'
-]) assert.ok(!launchSelectorClient.includes(bad),"single-element selector used with forEach: "+bad);
+assert.ok(!/(?<!\$)\$\('\[data-(?:edit-org|manage-org|org-transfers|org-advanced)\]'\)\.forEach/.test(appClient),"single-element selector used with forEach in organization controls");
+assert.ok(!/(?<!\$)\$\("\[data-(?:entity-edit|support-open)\]",out\)\.forEach/.test(launchSelectorClient),"single-element selector used with forEach in launch controls");
 for(const token of ["openOrganizationManager","data-manage-org","org-branch-form","org-member-form","openUnitManager","data-units-item","print-unit-qrs","data-unit-history"])assert.ok(appClient.includes(token),token+" missing from app client");
 
 const indexHtml=await readFile("dist/index.html","utf8");
