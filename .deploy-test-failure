@@ -1,4 +1,4 @@
-deploy_sha=77864f692929d6480c1a79492debeaa03fdf862d
+deploy_sha=8417a0823dc2d7d10bc6b5f2d5bfe1c9d8800d90
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -15,32 +15,17 @@ Release experience static release gate passed.
 Admin control center static release gate passed.
 Privacy purge static release gate passed.
 Community chat retention static release gate passed.
-QR scanning, structured SEO and accessibility shell gate passed.
-Excel export and QR image scanner gate passed.
-Voice message recording gate passed.
-Excel export, accessible admin status and QR image scanning gate passed.
-Full requirements regression extensions passed.
-Static English interface coverage 100.0% (452/452)
-remaining-features Error: Backup checksum mismatch
-    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
-    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:336:91)
-    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:720:37)
-    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:217:26)
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-
-201 !== 409
-
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:363:10
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
-  generatedMessage: true,
+AssertionError [ERR_ASSERTION]: service worker cache version not updated
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:366:8 {
+  generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 201,
-  expected: 409,
-  operator: 'strictEqual',
+  actual: false,
+  expected: true,
+  operator: '==',
   diff: 'simple'
 }
 
