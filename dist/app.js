@@ -639,9 +639,37 @@
     return api(`/api/items/${encodeURIComponent(itemId)}/images`, { method: "POST", body: form });
   }
 
+  function organizeDashboardTools(){
+    const actions=$("#dashboard-view .dashboard-actions"),details=$("#dashboard-more-tools"),list=$("#dashboard-more-tools-list");
+    if(!actions||!details||!list)return;
+    [...actions.children].forEach(child=>{
+      if(child.id==="add-item-button"||child.id==="dashboard-add-gmach"||child.id==="dashboard-more-tools")return;
+      if(child instanceof HTMLButtonElement)list.appendChild(child);
+    });
+    details.hidden=list.children.length===0;
+  }
+  function installDashboardToolOrganizer(){
+    const actions=$("#dashboard-view .dashboard-actions");if(!actions||actions.dataset.toolsOrganizer==="1")return;
+    actions.dataset.toolsOrganizer="1";organizeDashboardTools();
+    new MutationObserver(organizeDashboardTools).observe(actions,{childList:true});
+  }
+  async function renderDashboardSaved(){
+    const data=await api("/api/me/favorites-overview"),saved=data.saved||[];
+    const groups={
+      favorites:saved.filter(x=>x.type==="item"||x.type==="organization"),
+      searches:saved.filter(x=>x.type==="search"),
+      categories:saved.filter(x=>x.type==="category"),
+      help:saved.filter(x=>x.type==="help_request")
+    };
+    const preview=list=>list.slice(0,3).map(x=>escapeHTML(x.label||"שמירה")).join(" · ");
+    $("#dashboard-content").innerHTML=`<section class="dashboard-subsection"><div class="section-heading"><div><h2>השמורים שלי</h2><p>כל מה שסימנת כדי לחזור אליו במהירות.</p></div></div><div class="dashboard-saved-grid"><article class="dashboard-saved-card"><span class="saved-count">${groups.favorites.length}</span><h3>מועדפים</h3><p>${groups.favorites.length?preview(groups.favorites):"עוד לא שמרת פריטים או גמ״חים."}</p><button class="button button-secondary button-small" type="button" data-open-account-tab="favorites">פתיחת המועדפים</button></article><article class="dashboard-saved-card"><span class="saved-count">${groups.searches.length}</span><h3>חיפושים שמורים</h3><p>${groups.searches.length?preview(groups.searches):"שמרו חיפוש כדי לחזור לאותם סינונים."}</p><button class="button button-secondary button-small" type="button" data-open-account-tab="searches">פתיחת החיפושים</button></article><article class="dashboard-saved-card"><span class="saved-count">${groups.categories.length}</span><h3>קטגוריות שמורות</h3><p>${groups.categories.length?preview(groups.categories):"קטגוריות שתשמרו יופיעו כאן."}</p><button class="button button-secondary button-small" type="button" data-open-account-tab="categories">פתיחת הקטגוריות</button></article><article class="dashboard-saved-card"><span class="saved-count">${groups.help.length}</span><h3>בקשות קהילה שמורות</h3><p>${groups.help.length?preview(groups.help):"אין כרגע בקשות קהילה שמורות."}</p><button class="button button-secondary button-small" type="button" id="saved-open-community">לוח הבקשות</button></article></div></section>`;
+    $("[data-open-account-tab]",$("#dashboard-content")).forEach(button=>button.addEventListener("click",()=>window.GmachAccountCenter?.open(button.dataset.openAccountTab)));
+    $("#saved-open-community")?.addEventListener("click",()=>openCommunityBoard(1));
+  }
+
   async function showDashboard(tab = state.dashboardTab) {
     if (!state.user) { requireAuth(() => showDashboard(tab)); return; } if (state.user.role === "admin" && !state.user.twoFactorEnabled) tab = "profile"; else if (tab === "admin" && state.user.role !== "admin") tab = "requests"; state.dashboardTab = tab; $("#home-view").hidden = true; $("#organization-page-view").hidden = true; $("#dashboard-view").hidden = false; window.scrollTo({ top: 0, behavior: "smooth" }); history.replaceState(null, "", "#/dashboard"); $$('[data-dashboard-tab]').forEach(button => button.setAttribute("aria-selected", String(button.dataset.dashboardTab === tab))); $("#dashboard-content").innerHTML = '<div class="skeleton-card" aria-hidden="true"></div>';
-    try { const data = await refreshAccountSnapshot(); $("#stat-requests").textContent = data.stats.activeRequests; $("#stat-items").textContent = data.stats.items; $("#stat-completed").textContent = data.stats.completed; if (tab === "requests") renderDashboardRequests(data.requests || []); if (tab === "items") renderDashboardItems(data.items || []); if (tab === "gmachim") renderDashboardOrganizations(data.organizations || []); if (tab === "addresses") await renderAddresses(); if (tab === "sessions") await renderSessions(); if (tab === "searches") await renderSavedSearches(); if (tab === "profile") { await renderProfile(); if(state.user.role==="admin"&&!state.user.twoFactorEnabled){const panel=document.createElement("section");panel.className="dashboard-empty";panel.innerHTML=`<h2>אבטחת חשבון הנהלת האתר</h2><p>כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.</p><button class="button button-primary" type="button" id="admin-enable-2fa">הפעלת אימות דו שלבי</button><div id="two-factor-setup"></div>`;$("#dashboard-content").prepend(panel);$("#admin-enable-2fa").addEventListener("click",beginTwoFactorSetup)}}; if (tab === "notifications") await renderNotificationPreferences(); if (tab === "admin") await renderAdmin(); }
+    try { const data = await refreshAccountSnapshot(); $("#stat-requests").textContent = data.stats.activeRequests; $("#stat-items").textContent = data.stats.items; $("#stat-completed").textContent = data.stats.completed; if (tab === "requests") renderDashboardRequests(data.requests || []); if (tab === "items") renderDashboardItems(data.items || []); if (tab === "gmachim") renderDashboardOrganizations(data.organizations || []); if (tab === "saved") await renderDashboardSaved(); if (tab === "addresses") await renderAddresses(); if (tab === "sessions") await renderSessions(); if (tab === "searches") await renderSavedSearches(); if (tab === "profile") { await renderProfile(); if(state.user.role==="admin"&&!state.user.twoFactorEnabled){const panel=document.createElement("section");panel.className="dashboard-empty";panel.innerHTML=`<h2>אבטחת חשבון הנהלת האתר</h2><p>כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.</p><button class="button button-primary" type="button" id="admin-enable-2fa">הפעלת אימות דו שלבי</button><div id="two-factor-setup"></div>`;$("#dashboard-content").prepend(panel);$("#admin-enable-2fa").addEventListener("click",beginTwoFactorSetup)}}; if (tab === "notifications") await renderNotificationPreferences(); if (tab === "admin") await renderAdmin(); organizeDashboardTools(); }
     catch (error) { console.error("Dashboard error", error); $("#dashboard-content").innerHTML = `<div class="dashboard-empty"><p>${escapeHTML(error.message || "לא הצלחנו לטעון את האזור האישי")}</p>${error.requestId?`<small>מספר תקלה לתמיכה: ${escapeHTML(error.requestId)}</small>`:""}<button class="button button-secondary" type="button" id="dashboard-support-error">פנייה לתמיכה עם פרטי התקלה</button></div>`;$("#dashboard-support-error")?.addEventListener("click",()=>openSupportForError(error,"תקלה בטעינת האזור האישי")); }
   }
   async function renderSessions() {
@@ -1139,7 +1167,7 @@
     },true);
   }
   async function init() {
-    setupEvents(); installFormErrorFocus(); setAuthMode("login"); updateAuthUI(); installAdvancedGmachSearch();
+    setupEvents(); installFormErrorFocus(); installDashboardToolOrganizer(); setAuthMode("login"); updateAuthUI(); installAdvancedGmachSearch();
     const siteCopyReady = Promise.allSettled([loadSiteSettings(), loadPageCustomizations()])
       .finally(() => document.documentElement.classList.remove("site-copy-pending"));
     await detectServer();

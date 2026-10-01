@@ -304,19 +304,25 @@
     <section class="organization-page section-shell" id="organization-page-view" hidden aria-label="עמוד גמ״ח"><button class="back-link" type="button" data-go-home>→ חזרה לקטלוג</button><div id="organization-page-content"></div></section>
     <section class="dashboard-view section-shell" id="dashboard-view" hidden aria-labelledby="dashboard-title">
       <div class="dashboard-header">
-        <div><button class="back-link" type="button" data-go-home>→ חזרה לקטלוג</button><span class="section-kicker">האזור שלי</span><h1 id="dashboard-title">שלום, <span id="dashboard-name">חבר/ה</span></h1><p>כל ההשאלות והפריטים שלך במקום אחד.</p></div>
-        <div class="dashboard-actions"><button class="button button-secondary" id="dashboard-add-gmach" type="button">פתיחת גמ״ח</button><button class="button button-primary" id="add-item-button" type="button">הוספת פריט</button></div>
+        <div class="dashboard-intro">
+          <button class="back-link" type="button" data-go-home>→ חזרה לקטלוג</button>
+          <div class="dashboard-title-line">
+            <div><span class="section-kicker">האזור שלי</span><h1 id="dashboard-title">שלום, <span id="dashboard-name">חבר/ה</span></h1><p>הבקשות, הפריטים והגמ״חים שלך במקום אחד.</p></div>
+            <button class="dashboard-account-link" id="dashboard-account-button" type="button" aria-label="פתיחת החשבון שלי"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg><span>החשבון שלי</span></button>
+          </div>
+        </div>
+        <div class="dashboard-actions">
+          <button class="button button-accent dashboard-primary-action" id="add-item-button" type="button">הוספת פריט</button>
+          <button class="button button-secondary" id="dashboard-add-gmach" type="button">פתיחת גמ״ח</button>
+          <details class="dashboard-more-tools" id="dashboard-more-tools" hidden><summary>כלים נוספים</summary><div class="dashboard-more-tools-list" id="dashboard-more-tools-list"></div></details>
+        </div>
       </div>
-      <div class="stats-grid"><article><span>בקשות פעילות</span><strong id="stat-requests">0</strong></article><article><span>פריטים שהוספתי</span><strong id="stat-items">0</strong></article><article><span>השאלות שהושלמו</span><strong id="stat-completed">0</strong></article></div>
+      <div class="stats-grid dashboard-stats" aria-label="סיכום פעילות"><article><span class="dashboard-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h5"/></svg></span><div><strong id="stat-requests">0</strong><span>בקשות פעילות</span></div></article><article><span class="dashboard-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m4 8 8-4 8 4-8 4zM4 8v8l8 4 8-4V8"/></svg></span><div><strong id="stat-items">0</strong><span>פריטים</span></div></article><article><span class="dashboard-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg></span><div><strong id="stat-completed">0</strong><span>השאלות שהושלמו</span></div></article></div>
       <div class="dashboard-tabs" role="tablist" aria-label="תוכן האזור האישי">
         <button role="tab" aria-selected="true" data-dashboard-tab="requests">הבקשות שלי</button>
         <button role="tab" aria-selected="false" data-dashboard-tab="items">הפריטים שלי</button>
         <button role="tab" aria-selected="false" data-dashboard-tab="gmachim">הגמ״חים שלי</button>
-        <button role="tab" aria-selected="false" data-dashboard-tab="addresses">הכתובות שלי</button>
-        <button role="tab" aria-selected="false" data-dashboard-tab="sessions">מכשירים מחוברים</button>
-        <button role="tab" aria-selected="false" data-dashboard-tab="searches">חיפושים שמורים</button>
-        <button role="tab" aria-selected="false" data-dashboard-tab="profile">פרופיל והגדרות</button>
-        <button role="tab" aria-selected="false" data-dashboard-tab="notifications">העדפות התראות</button>
+        <button role="tab" aria-selected="false" data-dashboard-tab="saved">שמורים</button>
         <button role="tab" aria-selected="false" data-dashboard-tab="admin" id="admin-tab" hidden>הנהלת האתר</button>
       </div>
       <div id="dashboard-content" class="dashboard-content"></div>

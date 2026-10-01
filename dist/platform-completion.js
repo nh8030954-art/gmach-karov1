@@ -271,7 +271,10 @@
   }
   window.GmachAccountCenter={open:openTools};
   function installEntry(){
-    const dash=$("#dashboard-view");if(!dash||$("#platform-tools-entry"))return;
+    const dash=$("#dashboard-view");if(!dash)return;
+    const existing=$("#dashboard-account-button",dash);
+    if(existing){if(existing.dataset.accountCenterBound!=="1"){existing.dataset.accountCenterBound="1";existing.addEventListener("click",()=>openTools("profile"))}return}
+    if($("#platform-tools-entry"))return;
     const b=document.createElement("button");b.id="platform-tools-entry";b.type="button";b.className="button button-secondary";b.textContent="החשבון שלי";b.addEventListener("click",()=>openTools("profile"));
     const host=dash.querySelector(".dashboard-actions,.dashboard-header,.section-heading")||dash;host.prepend(b);
   }
