@@ -359,7 +359,7 @@ try {
   assert.ok(result.data.includes("ערכת קישוטים לבדיקה"));
   result = await request(`/api/loan-requests/${requestId}/messages`, { cookie: secondCookie });
   assert.equal(result.response.status, 403);
-  result = await request("/api/loan-requests", { method: "POST", cookie: secondCookie, body: { itemId, requestedFrom: "2026-10-02T10:00", requestedUntil: "2026-10-04T10:00", quantity: 1, depositAccepted: true, phone: "054-1112233", note: "צריך לאירוע נוסף" } });
+  result = await request("/api/loan-requests", { method: "POST", cookie: secondCookie, body: { itemId, requestedFrom: "2026-10-09T10:00", requestedUntil: "2026-10-11T10:00", quantity: 1, depositAccepted: true, phone: "054-1112233", note: "צריך לאירוע נוסף" } });
   assert.equal(result.response.status, 409);
 
   result = await request("/api/reports", { method: "POST", cookie: borrowerCookie, body: { itemId, reason: "incorrect", details: "בדיקת זרימת הדיווח" } });
