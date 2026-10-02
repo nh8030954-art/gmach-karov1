@@ -5,6 +5,17 @@ const isEn=()=>document.documentElement.lang==="en"||document.documentElement.di
 async function api(path,opts={}){const init={credentials:"same-origin",...opts,headers:{...(opts.headers||{})}};if(opts.body&&!(opts.body instanceof FormData)){init.headers["Content-Type"]="application/json";init.body=JSON.stringify(opts.body)}let r;try{r=await fetch(path,init)}catch(e){throw new Error(window.GmachDescribeNetworkError?window.GmachDescribeNetworkError(e):t("לא ניתן להתחבר לשרת","Could not connect to the server"))}const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(window.GmachDescribeHttpError?window.GmachDescribeHttpError(r,d):(d.error||t("הפעולה לא הושלמה","Action failed")));return d}
 function dialog(){let d=$("#navigation-admin-dialog");if(!d){d=document.createElement("dialog");d.id="navigation-admin-dialog";d.className="modal modal-wide";document.body.append(d)}return d}
 function toast(msg,bad=false){let x=$("#navigation-toast");if(!x){x=document.createElement("div");x.id="navigation-toast";x.setAttribute("role","status");x.style.cssText="position:fixed;z-index:100003;left:50%;bottom:18px;transform:translateX(-50%);padding:12px 16px;border-radius:12px;color:#fff;background:#173a4d";document.body.append(x)}x.style.background=bad?"#8f1d27":"#173a4d";x.textContent=msg;x.hidden=false;window.GmachEnsureTopLayerToast?.(x);clearTimeout(x._t);x._t=setTimeout(()=>{window.GmachHideTopLayerToast?.(x);x.hidden=true},3000)}
+function cleanPublicHref(href){
+ const value=String(href||"");
+ if(value==="#/"||value==="#")return "/";
+ if(value==="#/catalog")return "/catalog";
+ if(value==="#/community")return "/community";
+ if(value==="#/dashboard")return "/dashboard";
+ if(value.startsWith("#/gmach/"))return "/gmach/"+value.slice(8);
+ if(value==="#how-it-works")return "/how-it-works";
+ if(value==="#gmachim")return "/gmachim";
+ return value
+}
 function runNavigationAction(href){
  if(href==="#action:support"){document.getElementById("support-form-button")?.click();return true}
  if(href==="#action:accessibility"){document.querySelector("[data-open-accessibility-statement]")?.click();return true}
@@ -17,7 +28,7 @@ async function applyPublicLinks(){
  try{
   const x=await api("/api/navigation-links"),groups={footer_find:document.querySelector(".footer-links>div:nth-child(1)"),footer_share:document.querySelector(".footer-links>div:nth-child(2)"),footer_info:document.querySelector(".footer-links>div:nth-child(3)")},byLocation=new Map();
   for(const l of x.links||[]){if(!byLocation.has(l.location))byLocation.set(l.location,[]);byLocation.get(l.location).push(l)}
-  for(const [location,host] of Object.entries(groups)){if(!host)continue;const links=byLocation.get(location)||[];if(!links.length)continue;[...host.children].filter(n=>n.tagName!=="STRONG").forEach(n=>{if(!n.dataset.navigationOriginal){n.dataset.navigationOriginal="1";n.hidden=true}});host.querySelectorAll("[data-dynamic-navigation]").forEach(n=>n.remove());for(const l of links){const a=document.createElement("a");a.dataset.dynamicNavigation="1";a.textContent=isEn()&&l.labelEn?l.labelEn:l.labelHe;a.href=l.href;if(l.openNewTab){a.target="_blank";a.rel="noopener"}a.addEventListener("click",e=>{if(runNavigationAction(l.href)){e.preventDefault()}});host.append(a)}}
+  for(const [location,host] of Object.entries(groups)){if(!host)continue;const links=byLocation.get(location)||[];if(!links.length)continue;[...host.children].filter(n=>n.tagName!=="STRONG").forEach(n=>{if(!n.dataset.navigationOriginal){n.dataset.navigationOriginal="1";n.hidden=true}});host.querySelectorAll("[data-dynamic-navigation]").forEach(n=>n.remove());for(const l of links){const a=document.createElement("a");a.dataset.dynamicNavigation="1";a.textContent=isEn()&&l.labelEn?l.labelEn:l.labelHe;const cleanHref=cleanPublicHref(l.href);a.href=cleanHref;if(l.openNewTab){a.target="_blank";a.rel="noopener"}a.addEventListener("click",e=>{if(runNavigationAction(l.href)){e.preventDefault()}});host.append(a)}}
  }catch{}
 }
 async function openAdmin(){
