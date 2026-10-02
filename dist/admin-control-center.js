@@ -111,20 +111,43 @@ async function renderSettings(root){
 }
 async function renderCategories(root){
  const [x,sug]=await Promise.all([api("/api/admin/categories"),api("/api/admin/category-suggestions")]);
- const cats=x.categories||[],suggestions=sug.suggestions||[];
- root.innerHTML='<div class="dashboard-section"><div class="section-heading"><div><h3>'+t("ניהול קטגוריות מלא","Full category management")+'</h3><p>'+t("יצירה, תרגום, מילים נרדפות, סדר, הסתרה ומיזוג.","Create, translate, manage synonyms, ordering, hiding and merging.")+'</p></div><button class="button button-primary" data-new-category>'+t("קטגוריה חדשה","New category")+'</button></div><div data-categories style="display:grid;gap:8px">'+cats.map(c=>'<article class="dashboard-row"><div><strong>'+esc(c.name_he)+' '+(c.name_en?'· '+esc(c.name_en):"")+'</strong><p>'+esc((c.synonyms||[]).join(", "))+'</p><small>'+esc(c.id)+' · '+esc(c.status)+' · #'+Number(c.sort_order||0)+'</small></div><div class="dashboard-row-actions"><button class="button button-secondary button-small" data-edit-category="'+esc(c.id)+'">'+t("עריכה","Edit")+'</button></div></article>').join("")+'</div></div><div class="dashboard-section"><h3>'+t("הצעות קטגוריה מהקהילה","Community category suggestions")+'</h3><div style="display:grid;gap:8px">'+suggestions.map(s=>'<article class="dashboard-row"><div><strong>'+esc(s.name)+'</strong><p>'+esc(s.description||"")+'</p><small>'+esc(s.status)+' · '+esc(fmt(s.created_at))+'</small></div>'+(s.status==="pending"?'<div class="dashboard-row-actions"><button class="button button-primary button-small" data-category-suggestion="'+esc(s.id)+'" data-status="approved">'+t("אישור","Approve")+'</button><button class="button button-secondary button-small" data-category-suggestion="'+esc(s.id)+'" data-status="rejected">'+t("דחייה","Reject")+'</button></div>':"")+'</article>').join("")||"<p>"+t("אין הצעות ממתינות.","No pending suggestions.")+"</p>"+'</div></div>';
- function editor(row){
+ const cats=x.categories||[],suggestions=sug.suggestions||[],parents=cats.filter(c=>!c.parent_id),childrenOf=id=>cats.filter(c=>String(c.parent_id||"")===String(id));
+ const notifyChange=()=>window.dispatchEvent(new CustomEvent("gmach:categories-changed"));
+ const rowHtml=c=>'<article class="dashboard-row" style="align-items:center"><div><strong>'+esc(c.name_he)+' '+(c.name_en?'· '+esc(c.name_en):"")+'</strong><p>'+esc((c.synonyms||[]).join(", "))+'</p><small>'+esc(c.id)+' · '+esc(c.status)+' · #'+Number(c.sort_order||0)+'</small></div><div class="dashboard-row-actions"><button class="button button-secondary button-small" data-edit-category="'+esc(c.id)+'">'+t("עריכה","Edit")+'</button><button class="button button-danger button-small" data-delete-category="'+esc(c.id)+'">'+t("הסרה","Remove")+'</button></div></article>';
+ root.innerHTML='<div class="dashboard-section"><div class="section-heading"><div><h3>'+t("ניהול קטגוריות וקטגוריות משנה","Category & subcategory management")+'</h3><p>'+t("כל שינוי כאן חל מיד על טפסים, חיפוש, סינון וקטלוג בכל האתר.","Every change here applies immediately to forms, search, filters and the catalog site-wide.")+'</p></div><button class="button button-primary" data-new-category>'+t("קטגוריה ראשית חדשה","New top-level category")+'</button></div><div data-categories style="display:grid;gap:14px">'+parents.map(p=>'<section class="dashboard-section" style="margin:0"><div class="section-heading"><div><h4>'+esc(p.name_he)+'</h4><small>'+esc(p.id)+' · '+esc(p.status)+'</small></div><div class="dashboard-row-actions"><button class="button button-primary button-small" data-new-subcategory="'+esc(p.id)+'">'+t("הוספת קטגוריית משנה","Add subcategory")+'</button><button class="button button-secondary button-small" data-edit-category="'+esc(p.id)+'">'+t("עריכת ראשית","Edit top-level")+'</button><button class="button button-danger button-small" data-delete-category="'+esc(p.id)+'">'+t("הסרת ראשית","Remove top-level")+'</button></div></div><div style="display:grid;gap:8px;padding-inline-start:18px">'+(childrenOf(p.id).map(rowHtml).join("")||'<p>'+t("אין קטגוריות משנה.","No subcategories.")+'</p>')+'</div></section>').join("")+'</div></div><div class="dashboard-section"><h3>'+t("הצעות קטגוריה מהקהילה","Community category suggestions")+'</h3><div style="display:grid;gap:8px">'+suggestions.map(s=>'<article class="dashboard-row"><div><strong>'+esc(s.name)+'</strong><p>'+esc(s.description||"")+'</p><small>'+esc(s.status)+' · '+esc(fmt(s.created_at))+'</small></div>'+(s.status==="pending"?'<div class="dashboard-row-actions"><button class="button button-primary button-small" data-category-suggestion="'+esc(s.id)+'" data-status="approved">'+t("אישור","Approve")+'</button><button class="button button-secondary button-small" data-category-suggestion="'+esc(s.id)+'" data-status="rejected">'+t("דחייה","Reject")+'</button></div>':"")+'</article>').join("")||"<p>"+t("אין הצעות ממתינות.","No pending suggestions.")+"</p>"+'</div></div>';
+ function editor(row,parentOverride){
   const nameHe=prompt(t("שם בעברית","Hebrew name"),row?.name_he||"");if(!nameHe)return;
   const nameEn=prompt(t("שם באנגלית","English name"),row?.name_en||"")||"";
-  const parentId=prompt(t("מזהה קטגוריית אב, ריק לראשית","Parent category ID, blank for top level"),row?.parent_id||"")||null;
-  const icon=prompt(t("שם סמל","Icon name"),row?.icon||"")||"";
-  const imageUrl=prompt(t("כתובת תמונה","Image URL"),row?.image_url||"")||"";
+  let parentId=parentOverride!==undefined?parentOverride:(row?.parent_id||null);
+  if(row&&row.parent_id){
+    const options=parents.map(p=>p.id+" = "+p.name_he).join("\n");
+    parentId=prompt(t("מזהה קטגוריה ראשית שאליה שייכת קטגוריית המשנה:","Top-level parent category ID:")+"\n"+options,parentId||"")||null;
+  }
+  const icon=prompt(t("שם סמל (רשות)","Icon name (optional)"),row?.icon||"")||"";
+  const imageUrl=prompt(t("כתובת תמונה (רשות)","Image URL (optional)"),row?.image_url||"")||"";
   const synonyms=(prompt(t("מילים נרדפות, מופרדות בפסיקים","Synonyms, comma separated"),(row?.synonyms||[]).join(", "))||"").split(",").map(v=>v.trim()).filter(Boolean);
   const sortOrder=Number(prompt(t("סדר תצוגה","Sort order"),String(row?.sort_order||0))||0);
   return {nameHe,nameEn,parentId,icon,imageUrl,synonyms,sortOrder};
  }
- $("[data-new-category]",root).onclick=async()=>{const body=editor(null);if(!body)return;try{await api("/api/admin/categories",{method:"POST",body});toast(t("הקטגוריה נוצרה","Category created"));await renderCategories(root)}catch(e){toast(e.message,true)}};
- $$("[data-edit-category]",root).forEach(b=>b.onclick=async()=>{const row=cats.find(c=>String(c.id)===String(b.dataset.editCategory)),body=editor(row);if(!body)return;body.status=confirm(t("להציג את הקטגוריה לציבור?","Show this category publicly?"))?"active":"hidden";try{await api("/api/admin/categories/"+encodeURIComponent(row.id),{method:"PATCH",body});toast(t("הקטגוריה עודכנה","Category updated"));await renderCategories(root)}catch(e){toast(e.message,true)}}); $$("[data-category-suggestion]",root).forEach(b=>b.onclick=async()=>{try{await api("/api/admin/category-suggestions/"+encodeURIComponent(b.dataset.categorySuggestion),{method:"PATCH",body:{status:b.dataset.status}});toast(t("ההצעה עודכנה","Suggestion updated"));await renderCategories(root)}catch(e){toast(e.message,true)}});
+ async function refresh(message){toast(message);notifyChange();await renderCategories(root)}
+ $("[data-new-category]",root).onclick=async()=>{const body=editor(null,null);if(!body)return;try{await api("/api/admin/categories",{method:"POST",body});await refresh(t("הקטגוריה הראשית נוצרה","Top-level category created"))}catch(e){toast(e.message,true)}};
+ $$("[data-new-subcategory]",root).forEach(b=>b.onclick=async()=>{const body=editor(null,b.dataset.newSubcategory);if(!body)return;try{await api("/api/admin/categories",{method:"POST",body});await refresh(t("קטגוריית המשנה נוצרה","Subcategory created"))}catch(e){toast(e.message,true)}});
+ $$("[data-edit-category]",root).forEach(b=>b.onclick=async()=>{const row=cats.find(c=>String(c.id)===String(b.dataset.editCategory)),body=editor(row);if(!body)return;body.status=confirm(t("להציג את הקטגוריה לציבור? אישור = פעילה, ביטול = מוסתרת","Show this category publicly? OK = active, Cancel = hidden"))?"active":"hidden";try{await api("/api/admin/categories/"+encodeURIComponent(row.id),{method:"PATCH",body});await refresh(t("הקטגוריה עודכנה בכל האתר","Category updated site-wide"))}catch(e){toast(e.message,true)}});
+ $$("[data-delete-category]",root).forEach(b=>b.onclick=async()=>{
+   const row=cats.find(c=>String(c.id)===String(b.dataset.deleteCategory));if(!row)return;
+   if(!confirm(t('להסיר את "'+row.name_he+'" מהאתר?','Remove "'+row.name_he+'" from the site?')))return;
+   const endpoint="/api/admin/categories/"+encodeURIComponent(row.id);
+   try{await api(endpoint,{method:"DELETE"});await refresh(t("הקטגוריה הוסרה מכל האתר","Category removed site-wide"))}
+   catch(e){
+     if(!row.parent_id&&/חלופית|replacement|בשימוש/.test(String(e.message||""))){
+       const options=parents.filter(p=>p.id!==row.id).map(p=>p.id+" = "+p.name_he).join("\n");
+       const replacementId=prompt(t("הקטגוריה בשימוש. בחרו מזהה קטגוריה ראשית חלופית להעברת הפריטים וקטגוריות המשנה:","Category is in use. Enter a replacement top-level category ID:")+"\n"+options);
+       if(!replacementId)return;
+       try{await api(endpoint+"?replacementId="+encodeURIComponent(replacementId),{method:"DELETE"});await refresh(t("הקטגוריה הוסרה והמידע הועבר לקטגוריה החלופית","Category removed and data moved to replacement"))}catch(err){toast(err.message,true)}
+     }else toast(e.message,true)
+   }
+ });
+ $$("[data-category-suggestion]",root).forEach(b=>b.onclick=async()=>{try{await api("/api/admin/category-suggestions/"+encodeURIComponent(b.dataset.categorySuggestion),{method:"PATCH",body:{status:b.dataset.status}});toast(t("ההצעה עודכנה","Suggestion updated"));await renderCategories(root)}catch(e){toast(e.message,true)}});
 }
 async function renderClosures(root){
  const x=await api("/api/admin/closures"),rows=x.closures||[];
