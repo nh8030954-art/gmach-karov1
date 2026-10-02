@@ -372,12 +372,25 @@ export default {
         return withSecurityHeaders(response || new Response("Not found",{status:404}));
       }
       if (url.pathname === "/robots.txt") {
-        const body="User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /#/dashboard\nDisallow: /#/admin\nSitemap: "+url.origin+"/sitemap.xml\n";
+        const body="User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /dashboard\nDisallow: /admin\nSitemap: "+url.origin+"/sitemap.xml\n";
         return withSecurityHeaders(new Response(body,{headers:{"Content-Type":"text/plain; charset=utf-8","Cache-Control":"public, max-age=3600"}}));
       }
       if (url.pathname.startsWith("/media/")) {
         const response = await serveMedia(request, env, url);
         return withSecurityHeaders(response);
+      }
+      if (request.method === "GET" || request.method === "HEAD") {
+        const seoEntity = await serveSeoEntityPage(request, env, url);
+        if (seoEntity) return withSecurityHeaders(seoEntity);
+        const cleanAppRoute = ["/catalog","/dashboard","/community","/how-it-works","/gmachim"].includes(url.pathname) || /^\/invite\/[^/]+$/.test(url.pathname);
+        if (cleanAppRoute) {
+          const shellUrl = new URL("/", url.origin);
+          const shellResponse = await env.ASSETS.fetch(new Request(shellUrl.toString(), { method:request.method, headers:request.headers }));
+          const headers = new Headers(shellResponse.headers);
+          headers.set("Cache-Control","no-store, max-age=0");
+          headers.set("Pragma","no-cache");
+          return withSecurityHeaders(new Response(shellResponse.body,{status:shellResponse.status,statusText:shellResponse.statusText,headers}));
+        }
       }
       const response = await env.ASSETS.fetch(request);
       if ((response.headers.get("Content-Type")||"").includes("text/html")) {
