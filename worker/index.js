@@ -2750,8 +2750,19 @@ async function createOrganizationInvitation(request,env,organizationId,url){
     try{
       const org=await env.DB.prepare("SELECT name FROM organizations WHERE id=?").bind(organizationId).first();
       const recipient=await env.DB.prepare("SELECT preferred_language,full_name FROM users WHERE email=? COLLATE NOCASE LIMIT 1").bind(invitedEmail).first();
-      const name=String(org?.name||"Gmach"),language=recipient?.preferred_language==="en"?"en":"he",en=language==="en";
-      const mail=await managedEmailTemplate(env,"manager_invite",language,{subject:en?"Invitation to manage {{organization_name}}":"הזמנה לניהול {{organization_name}}",text:en?"You were invited to manage {{organization_name}}. This invitation expires in seven days.":"הוזמנת להצטרף כמנהל/ת של {{organization_name}}. הקישור בתוקף לשבעה ימים."},{organization_name:name,invite_url:inviteUrl,full_name:recipient?.full_name||""},inviteUrl);
+      const name=String(org?.name||"Gmach"),vars={organization_name:name,invite_url:inviteUrl,full_name:recipient?.full_name||""};
+      let mail;
+      if(recipient){
+        const language=recipient.preferred_language==="en"?"en":"he",en=language==="en";
+        mail=await managedEmailTemplate(env,"manager_invite",language,{subject:en?"Invitation to manage {{organization_name}}":"הזמנה לניהול {{organization_name}}",text:en?"You were invited to manage {{organization_name}}. This invitation expires in seven days.":"הוזמנת להצטרף כמנהל/ת של {{organization_name}}. הקישור בתוקף לשבעה ימים."},vars,inviteUrl);
+      }else{
+        const [he,en]=await Promise.all([
+          managedEmailTemplate(env,"manager_invite","he",{subject:"הזמנה לניהול {{organization_name}}",text:"הוזמנת להצטרף כמנהל/ת של {{organization_name}}. הקישור בתוקף לשבעה ימים."},vars,inviteUrl),
+          managedEmailTemplate(env,"manager_invite","en",{subject:"Invitation to manage {{organization_name}}",text:"You were invited to manage {{organization_name}}. This invitation expires in seven days."},vars,inviteUrl)
+        ]);
+        if(he&&en)mail={subject:"Invitation to manage a gmach | הזמנה לניהול גמ״ח",text:en.text+"\n\n"+he.text,html:'<div dir="ltr">'+en.html+'</div><div dir="rtl">'+he.html+"</div>"};
+        else mail=en||he;
+      }
       if(mail){const deliver=env.RESEND_SERVICE?.fetch?env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE):fetch;const res=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[invitedEmail],...mail})});emailSent=res.ok;}
     }catch(error){console.error("manager invitation email failed",{organizationId,invitedEmail,error});}
   }
