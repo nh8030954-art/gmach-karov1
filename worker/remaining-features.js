@@ -189,6 +189,25 @@ async function externalStatus(request,env){
  ];for(const [k,ok] of checks)await env.DB.prepare("INSERT INTO external_service_status(service_key,status,details_json,checked_at) VALUES(?,?,?,?) ON CONFLICT(service_key) DO UPDATE SET status=excluded.status,details_json=excluded.details_json,checked_at=excluded.checked_at").bind(k,ok?"configured":"missing","{}",new Date().toISOString()).run();return json({services:Object.fromEntries(checks)});
 }
 
+async function osmTile(request,url,zText,xText,yText){
+  const z=Number(zText),x=Number(xText),y=Number(yText),limit=2**z;
+  if(!Number.isInteger(z)||z<0||z>19||!Number.isInteger(x)||!Number.isInteger(y)||x<0||y<0||x>=limit||y>=limit)throw new RemainingError(400,"אריח מפה לא תקין");
+  const upstream=new URL(`https://tile.openstreetmap.org/${z}/${x}/${y}.png`);
+  const contact=String(url.origin||"https://gmach-berega.co.il");
+  let response;
+  try{
+    response=await fetch(upstream.toString(),{headers:{"User-Agent":`GmachBerega/1.0 (+${contact})`,"Referer":contact+"/","Accept":"image/png,image/*;q=0.8"},signal:AbortSignal.timeout(8000)});
+  }catch{throw new RemainingError(503,"אריחי המפה אינם זמינים כרגע")}
+  if(!response.ok)throw new RemainingError(response.status===404?404:503,"אריחי המפה אינם זמינים כרגע");
+  const headers=new Headers();
+  headers.set("Content-Type",response.headers.get("Content-Type")||"image/png");
+  headers.set("Cache-Control",response.headers.get("Cache-Control")||"public, max-age=86400");
+  const etag=response.headers.get("ETag");if(etag)headers.set("ETag",etag);
+  const expires=response.headers.get("Expires");if(expires)headers.set("Expires",expires);
+  headers.set("X-Map-Attribution","© OpenStreetMap contributors");
+  return new Response(response.body,{status:200,headers});
+}
+
 async function explicitGeocode(request,env,url){
   const q=clean(url.searchParams.get("q"),3,180,"כתובת"),key=(await hash(q.toLowerCase())).slice(0,40),now=new Date();
   const cached=await env.DB.prepare("SELECT result_json FROM geocode_cache WHERE query_key=? AND expires_at>?").bind(key,now.toISOString()).first();
@@ -336,7 +355,7 @@ export async function handleRemainingFeatures(request,env,ctx,url){
   m=path.match(/^\/api\/admin\/backups\/([^/]+)\/validate$/);if(m&&method==="POST")return await validateBackup(request,env,decodeURIComponent(m[1]));
   if(path==="/api/admin/external-services"&&method==="GET")return await externalStatus(request,env);
   if(path==="/api/admin/moderation-unified"&&(method==="GET"||method==="PATCH"))return await unifiedModeration(request,env,url);
-  if(path==="/api/maps/geocode"&&method==="GET")return await explicitGeocode(request,env,url);
+  m=path.match(/^\/api\/maps\/tiles\/(\d+)\/(\d+)\/(\d+)\.png$/);if(m&&method==="GET")return await osmTile(request,url,m[1],m[2],m[3]);\n  if(path==="/api/maps/geocode"&&method==="GET")return await explicitGeocode(request,env,url);
   return null;
  }catch(e){const status=e instanceof RemainingError?e.status:500;if(status>=500)console.error("remaining-features",e);return json({error:e instanceof RemainingError?e.message:"אירעה תקלה בשכבת ההשלמה"},status)}
 }
