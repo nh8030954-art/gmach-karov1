@@ -2294,6 +2294,7 @@ async function dashboard(request, env) {
       FROM organizations o LEFT JOIN organization_contacts c ON c.organization_id = o.id WHERE o.owner_id = ? ORDER BY o.created_at DESC`).bind(user.id),
     env.DB.prepare(`SELECT i.id,i.organization_id,i.title,i.category,i.description,i.condition,i.condition_detail,i.quantity,i.loan_conditions,i.image_urls,
       i.status,i.availability_status,i.created_at,o.name AS org_name,i.item_type,i.subcategory,i.tags_json,i.pickup_method,i.inventory_updated_at,
+      (SELECT COUNT(*) FROM item_units iu WHERE iu.item_id=i.id AND iu.status!='retired') AS unit_count,
       i.min_loan_minutes,i.max_loan_minutes,i.booking_notice_minutes,i.turnaround_minutes,i.booking_horizon_days,i.approval_mode,i.deposit_required,i.deposit_amount_agorot
       FROM items i JOIN organizations o ON o.id = i.organization_id WHERE o.owner_id = ? ORDER BY i.created_at DESC`).bind(user.id),
     env.DB.prepare(`SELECT lr.id,lr.item_id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,lr.manager_note,lr.created_at,lr.quantity,lr.deposit_required_snapshot,lr.deposit_amount_agorot_snapshot,lr.workflow_status,lr.extension_status,lr.extension_until,lr.change_pending_json,lr.cancellation_undo_until,
@@ -2761,8 +2762,8 @@ async function restorePageCustomizationVersion(request, env, versionId) {
 async function adminContent(request, env) {
   await requireAdmin(request, env);
   const [organizations, items, requests, reports, versions] = await env.DB.batch([
-    env.DB.prepare(`SELECT o.id,o.name,o.city,o.neighborhood,o.status,o.verified,o.is_hidden,o.created_at,u.full_name AS owner_name,u.email AS owner_email FROM organizations o LEFT JOIN users u ON u.id=o.owner_id ORDER BY o.created_at DESC LIMIT 500`),
-    env.DB.prepare(`SELECT i.id,i.title,i.category,i.condition,i.quantity,i.status,i.availability_status,i.created_at,o.name AS organization_name FROM items i JOIN organizations o ON o.id=i.organization_id ORDER BY i.created_at DESC LIMIT 1000`),
+    env.DB.prepare(`SELECT o.id,o.name,o.city,o.neighborhood,o.status,o.verified,o.is_hidden,o.created_at,u.full_name AS owner_name,u.email AS owner_email,osc.code AS gmach_code FROM organizations o LEFT JOIN users u ON u.id=o.owner_id LEFT JOIN organization_serial_codes osc ON osc.organization_id=o.id ORDER BY o.created_at DESC LIMIT 500`),
+    env.DB.prepare(`SELECT i.id,i.title,i.category,i.condition,i.quantity,i.status,i.availability_status,i.created_at,o.name AS organization_name,(SELECT COUNT(*) FROM item_units iu WHERE iu.item_id=i.id AND iu.status!='retired') AS unit_count FROM items i JOIN organizations o ON o.id=i.organization_id ORDER BY i.created_at DESC LIMIT 1000`),
     env.DB.prepare(`SELECT lr.id,lr.status,lr.requested_from,lr.requested_until,lr.created_at,i.title AS item_title,b.full_name AS borrower_name,b.email AS borrower_email,o.name AS organization_name FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN users b ON b.id=lr.borrower_id JOIN organizations o ON o.id=i.organization_id ORDER BY lr.created_at DESC LIMIT 1000`),
     env.DB.prepare(`SELECT r.id,r.reason,r.status,r.created_at,i.title AS item_title,u.full_name AS reporter_name FROM reports r JOIN items i ON i.id=r.item_id JOIN users u ON u.id=r.reporter_id ORDER BY r.created_at DESC LIMIT 500`),
     env.DB.prepare(`SELECT v.id,v.created_at,u.full_name AS created_by_name FROM page_customization_versions v LEFT JOIN users u ON u.id=v.created_by ORDER BY v.created_at DESC LIMIT 100`)
@@ -2997,7 +2998,12 @@ async function serialIdentityCodes(env,item){
     env.DB.prepare("CREATE TABLE IF NOT EXISTS item_serial_codes_v2 (item_id TEXT PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE, organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, code INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), UNIQUE(organization_id,code))"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS item_serial_codes_v2_org_idx ON item_serial_codes_v2(organization_id, code)")
   ]);
-  await env.DB.prepare("INSERT OR IGNORE INTO organization_serial_codes(organization_id) VALUES(?)").bind(item.organization_id).run();
+  const existingOrgCode=await env.DB.prepare("SELECT code FROM organization_serial_codes WHERE organization_id=?").bind(item.organization_id).first();
+  if(!existingOrgCode){
+    const nextOrgCode=await env.DB.prepare("SELECT MAX(code) AS max_code FROM organization_serial_codes").first();
+    const proposedOrgCode=Math.max(100001,Number(nextOrgCode?.max_code||100000)+1);
+    await env.DB.prepare("INSERT OR IGNORE INTO organization_serial_codes(code,organization_id) VALUES(?,?)").bind(proposedOrgCode,item.organization_id).run();
+  }
   let itemRow=await env.DB.prepare("SELECT code FROM item_serial_codes_v2 WHERE item_id=?").bind(item.id).first();
   if(!itemRow){
     const next=await env.DB.prepare("SELECT COALESCE(MAX(code),0)+1 AS code FROM item_serial_codes_v2 WHERE organization_id=?").bind(item.organization_id).first();
@@ -3059,12 +3065,20 @@ async function listItemUnits(request,env,itemId){
 async function createItemUnit(request,env,itemId){
   const item=await itemOrganization(env,itemId);if(!item)throw new HttpError(404,"הפריט לא נמצא");
   const {user}=await requireOrganizationRole(request,env,item.organization_id,["owner","inventory"]),body=await readJson(request);
-  const count=positiveInt(body.count,1,1,100,"כמות יחידות");
+  const count=positiveInt(body.count,1,1,100,"כמות יחידות"),branchId=body.branchId?String(body.branchId):null,condition=cleanOptional(body.condition,50);
+  if(branchId){
+    const branch=await env.DB.prepare("SELECT id FROM organization_branches WHERE id=? AND organization_id=? AND status!='archived'").bind(branchId,item.organization_id).first();
+    if(!branch)throw new HttpError(400,"הסניף שנבחר אינו שייך לגמ״ח או שאינו פעיל");
+  }
   const currentQuantity=Math.max(1,Number(item.quantity||1)),nextQuantity=currentQuantity+count,now=new Date().toISOString();
   await env.DB.prepare("UPDATE items SET quantity=?,inventory_updated_at=?,updated_at=? WHERE id=?").bind(nextQuantity,now,now,itemId).run();
-  const synced=await syncItemUnitsToQuantity(env,itemId,nextQuantity);
-  await auditStatement(env,user.id,"item.units.create","item",itemId,{count,previousQuantity:currentQuantity,quantity:nextQuantity}).run();
-  return json({units:synced.created.slice(0,count),quantity:nextQuantity},201);
+  const synced=await syncItemUnitsToQuantity(env,itemId,nextQuantity),created=synced.created.slice(0,count);
+  if(created.length&&(branchId||condition)){
+    const statements=created.map(unit=>env.DB.prepare("UPDATE item_units SET branch_id=?,condition=COALESCE(?,condition),updated_at=? WHERE id=?").bind(branchId,condition,now,unit.id));
+    await env.DB.batch(statements);
+  }
+  await auditStatement(env,user.id,"item.units.create","item",itemId,{count,previousQuantity:currentQuantity,quantity:nextQuantity,branchId}).run();
+  return json({units:created,quantity:nextQuantity},201);
 }
 
 async function markReviewHelpful(request,env,reviewId){const user=await requireUser(request,env);const exists=await env.DB.prepare("SELECT id FROM reviews WHERE id=? AND status='published'").bind(reviewId).first();if(!exists)throw new HttpError(404,"הביקורת לא נמצאה");await env.DB.batch([env.DB.prepare("INSERT OR IGNORE INTO review_helpful_votes(review_id,user_id) VALUES(?,?)").bind(reviewId,user.id),env.DB.prepare("UPDATE reviews SET helpful_count=(SELECT COUNT(*) FROM review_helpful_votes WHERE review_id=?) WHERE id=?").bind(reviewId,reviewId)]);return json({helpful:true});}
