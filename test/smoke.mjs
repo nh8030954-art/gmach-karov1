@@ -249,6 +249,11 @@ try {
   assert.equal(result.response.status, 201);
   const itemId = result.data.item.id;
 
+  result = await request(`/api/items/${itemId}/units`, { cookie: adminCookie });
+  assert.equal(result.response.status,200,JSON.stringify(result.data));
+  assert.equal(result.data.units.length,1,"A quantity-1 item must receive exactly one automatic serial number");
+  assert.ok(String(result.data.units[0].serial_number||"").length>4,"Automatic serial number missing");
+
   result = await request(`/api/organizations/${organizationId}/branches`, { method:"POST", cookie:adminCookie, body:{ name:"סניף מרכזי",address:"רחוב הבדיקה 1",city:"ירושלים",phone:"050-1234567",inventoryMode:"separate",hours:{sun:"09:00-17:00"} } });
   assert.equal(result.response.status,201,JSON.stringify(result.data));
   result = await request(`/api/items/${itemId}/units`, { method:"POST",cookie:adminCookie,body:{count:1,condition:"חדש"} });
