@@ -1,6 +1,6 @@
-sha=a9937c952f3fbb94f1f7c08e782e00fe0a4a1711
-install=skipped
-syntax=skipped
+sha=ab0fac4600fbe6793d162e1a4b8889a3561a7eea
+install=success
+syntax=failure
 tests=skipped
 smoke=skipped
 live=skipped
