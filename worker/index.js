@@ -1956,6 +1956,11 @@ async function updateItem(request, env, id) {
   if (!categoryRow && !CATEGORIES.has(category)) throw new HttpError(400, "נא לבחור קטגוריה תקינה");
   const quantity = Number(body.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw new HttpError(400, "כמות הפריטים אינה תקינה");
+  const existingUnits=await env.DB.prepare("SELECT COUNT(*) AS count FROM item_units WHERE item_id=? AND status!='retired'").bind(id).first();
+  if(Number(existingUnits?.count||0)>quantity){
+    const removable=await env.DB.prepare("SELECT COUNT(*) AS count FROM item_units u WHERE u.item_id=? AND u.status='available' AND NOT EXISTS(SELECT 1 FROM loan_unit_assignments a WHERE a.unit_id=u.id AND a.returned_at IS NULL)").bind(id).first();
+    if(Number(existingUnits.count)-quantity>Number(removable?.count||0))throw new HttpError(409,"אי אפשר להקטין את הכמות כרגע כי חלק מהיחידות מושאלות או מוקצות לבקשה פעילה");
+  }
   const values = {
     title: cleanText(body.title, 2, 120, "שם הפריט"),
     description: cleanText(body.description, 10, 1200, "תיאור"),
@@ -3054,6 +3059,36 @@ async function reportReviewContent(request,env,reviewId){const user=await requir
 async function loanAccess(request,env,requestId){
   const user=await requireUser(request,env);const loan=await env.DB.prepare(`SELECT lr.*,i.organization_id,o.owner_id FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id LEFT JOIN organization_members m ON m.organization_id=o.id AND m.user_id=? WHERE lr.id=? AND (lr.borrower_id=? OR o.owner_id=? OR m.user_id IS NOT NULL OR ?='admin')`).bind(user.id,requestId,user.id,user.id,user.role).first();
   if(!loan)throw new HttpError(404,"ההשאלה לא נמצאה או שאין הרשאה לצפות בה");return {user,loan};
+}
+
+async function manageLoanUnits(request,env,requestId,write=false){
+  const {user,loan}=await loanAccess(request,env,requestId);
+  await requireOrganizationRole(request,env,loan.organization_id,["owner","inventory","requests"]);
+  const stock=await env.DB.prepare("SELECT quantity FROM items WHERE id=?").bind(loan.item_id).first();
+  await syncItemUnitsToQuantity(env,loan.item_id,Number(stock?.quantity||1));
+  if(!["approved","collected"].includes(loan.status))throw new HttpError(409,"אפשר לנהל יחידות רק בבקשה שאושרה או נאספה");
+  if(!write){
+    const rows=await env.DB.prepare("SELECT u.id,u.serial_number,u.status,u.condition,u.branch_id,EXISTS(SELECT 1 FROM loan_unit_assignments a WHERE a.request_id=? AND a.unit_id=u.id AND a.returned_at IS NULL) AS assigned FROM item_units u WHERE u.item_id=? AND u.status!='retired' AND (u.status='available' OR EXISTS(SELECT 1 FROM loan_unit_assignments a2 WHERE a2.request_id=? AND a2.unit_id=u.id AND a2.returned_at IS NULL)) ORDER BY u.serial_number").bind(requestId,loan.item_id,requestId).all();
+    return json({units:(rows.results||[]).map(row=>({...row,assigned:Boolean(row.assigned)})),requiredQuantity:Number(loan.quantity||1)});
+  }
+  const body=await readJson(request),unitIds=Array.isArray(body.unitIds)?[...new Set(body.unitIds.map(String).filter(Boolean))]:[];
+  const required=Math.max(1,Number(loan.quantity||1));
+  if(unitIds.length!==required)throw new HttpError(400,"יש לבחור בדיוק "+required+" יחידות לאיסוף");
+  const placeholders=unitIds.map(()=>"?").join(",");
+  const valid=await env.DB.prepare("SELECT id FROM item_units WHERE item_id=? AND id IN ("+placeholders+") AND status IN ('available','loaned')").bind(loan.item_id,...unitIds).all();
+  if((valid.results||[]).length!==unitIds.length)throw new HttpError(409,"אחת היחידות שנבחרו אינה זמינה");
+  const conflict=await env.DB.prepare("SELECT COUNT(*) AS count FROM loan_unit_assignments WHERE unit_id IN ("+placeholders+") AND request_id<>? AND returned_at IS NULL").bind(...unitIds,requestId).first();
+  if(Number(conflict?.count||0)>0)throw new HttpError(409,"אחת היחידות כבר מוקצית להשאלה אחרת");
+  const previous=await env.DB.prepare("SELECT unit_id FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL").bind(requestId).all();
+  const now=new Date().toISOString(),statements=[env.DB.prepare("DELETE FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL").bind(requestId)];
+  for(const row of previous.results||[])if(!unitIds.includes(String(row.unit_id)))statements.push(env.DB.prepare("UPDATE item_units SET status='available',updated_at=? WHERE id=? AND status='loaned'").bind(now,row.unit_id));
+  for(const unitId of unitIds){
+    statements.push(env.DB.prepare("INSERT INTO loan_unit_assignments(request_id,unit_id,assigned_at) VALUES(?,?,?)").bind(requestId,unitId,now));
+    statements.push(env.DB.prepare("UPDATE item_units SET status='loaned',updated_at=? WHERE id=?").bind(now,unitId));
+  }
+  await env.DB.batch(statements);
+  await auditStatement(env,user.id,"loan.units.assign","loan_request",requestId,{unitIds}).run().catch(()=>{});
+  return json({ok:true,unitIds});
 }
 async function getLoanTimeline(request,env,requestId){const {loan}=await loanAccess(request,env,requestId);const [events,proposals,ranges]=await env.DB.batch([env.DB.prepare("SELECT status,note,created_at FROM loan_status_events WHERE request_id=? ORDER BY created_at").bind(requestId),env.DB.prepare("SELECT id,starts_at,ends_at,status,created_at FROM pickup_proposals WHERE request_id=? ORDER BY created_at DESC").bind(requestId),env.DB.prepare("SELECT id,requested_from,requested_until,status FROM loan_date_ranges WHERE request_id=? ORDER BY requested_from").bind(requestId)]);return json({request:{id:loan.id,status:loan.status,workflowStatus:loan.workflow_status,requestedFrom:loan.requested_from,requestedUntil:loan.requested_until},events:events.results,proposals:proposals.results,dateRanges:ranges.results});}
 async function createPickupProposal(request,env,requestId){const {user,loan}=await loanAccess(request,env,requestId),body=await readJson(request),start=validateDateTime(body.startsAt,"תחילת חלון האיסוף"),end=validateDateTime(body.endsAt,"סיום חלון האיסוף");if(end<=start)throw new HttpError(400,"סיום חלון האיסוף חייב להיות אחרי תחילתו");const id=crypto.randomUUID(),now=new Date().toISOString();await env.DB.batch([env.DB.prepare("UPDATE pickup_proposals SET status='rejected' WHERE request_id=? AND status='pending'").bind(requestId),env.DB.prepare("INSERT INTO pickup_proposals(id,request_id,proposed_by,starts_at,ends_at) VALUES(?,?,?,?,?)").bind(id,requestId,user.id,start,end),env.DB.prepare("UPDATE loan_requests SET workflow_status='pickup_time_proposed',proposed_from=?,proposed_until=?,updated_at=? WHERE id=?").bind(start,end,now,requestId),env.DB.prepare("INSERT INTO loan_status_events(id,request_id,status,actor_id,note) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),requestId,"pickup_time_proposed",user.id,null)]);const recipient=user.id===loan.borrower_id?loan.owner_id:loan.borrower_id;await notificationStatement(env,recipient,"pickup_proposed","הוצע זמן איסוף","נשלחה הצעה חדשה לחלון איסוף.",requestId).run();return json({proposal:{id,startsAt:start,endsAt:end,status:"pending"}},201);}
