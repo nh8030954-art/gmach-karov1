@@ -207,7 +207,7 @@ for(const token of ["openSupportForError","data-support-organization","dashboard
 for(const token of ["login_failed","recordSecurityFailure"])assert.ok(worker.includes(token),token+" missing from adaptive login security");
 assert.ok(platform.includes("turnstileEnabled:false"),"the branded verification widget must be disabled");
 assert.ok(worker.includes("enforceAuthRateLimit"),"login must keep server-side rate limiting");
-assert.ok(appClient.includes('location.hash === "#/community"'),"community board should have a direct route");
+assert.ok(appClient.includes('path==="/community"')||appClient.includes('location.pathname==="/community"'),"community board should have a clean direct route");
 for(const token of ["events-stages","medical-ramps","community-projectors"])assert.ok(platform.includes(token),token+" missing from expanded category catalog");
 
 for(const token of ["overlapping_requests","dateCompatible","requestedFrom:hr.requested_from","distanceKm:hr.distance_km"])assert.ok(finalWorker.includes(token),token+" missing from date-aware community matching");
