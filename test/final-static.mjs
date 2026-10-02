@@ -502,3 +502,8 @@ assert.ok(appClient.includes("openPickupScreen(button.dataset.pickupRequest)"),"
 assert.ok(appClient.includes('updateRequestStatus(button.dataset.noShow,"no_show")'),"no-show button must be wired");
 assert.ok(worker.includes("async function manageLoanUnits("),"pickup unit endpoint implementation missing");
 assert.ok(worker.includes('storedStatus=target==="no_show"?"cancelled":target'),"no-show must respect loan_requests status constraint");
+
+assert.ok(worker.includes("remaining=Math.max(0,Number(item.quantity||0)-Number(existing?.count||0))"),"serial units must never exceed item quantity");
+assert.ok(worker.includes("reconcileSerializedQuantity"),"legacy serialized inventory must reconcile to canonical quantity");
+assert.ok(worker.includes("tracked_count")&&worker.includes("usable_tracked"),"availability must account for fully serialized units that are inactive or under repair");
+assert.ok(worker.includes("Number(trackedUnits?.count||0)>quantity"),"item quantity cannot be reduced below active serial-unit count");
