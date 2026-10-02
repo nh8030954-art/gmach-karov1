@@ -485,14 +485,76 @@ function osmEmbed(lat,lon){
  const span=.018,bbox=[lon-span,lat-span,lon+span,lat+span].join("%2C");
  return "https://www.openstreetmap.org/export/embed.html?bbox="+bbox+"&layer=mapnik&marker="+encodeURIComponent(lat+","+lon);
 }
+let leafletPromise=null;
+function ensureLeaflet(){
+ if(window.L)return Promise.resolve(window.L);
+ if(leafletPromise)return leafletPromise;
+ leafletPromise=new Promise((resolve,reject)=>{
+   if(!document.querySelector('link[data-gmach-leaflet]')){
+     const css=document.createElement("link");css.rel="stylesheet";css.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";css.dataset.gmachLeaflet="1";document.head.append(css);
+   }
+   const existing=document.querySelector('script[data-gmach-leaflet]');
+   if(existing){existing.addEventListener("load",()=>resolve(window.L),{once:true});existing.addEventListener("error",()=>reject(new Error("טעינת המפה נכשלה")),{once:true});return}
+   const script=document.createElement("script");script.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";script.async=true;script.dataset.gmachLeaflet="1";
+   script.onload=()=>resolve(window.L);script.onerror=()=>reject(new Error("טעינת המפה נכשלה"));document.head.append(script);
+ });
+ return leafletPromise;
+}
+async function geocodeGmachOrganizations(rows){
+ const cache=new Map(),resolved=new Array(rows.length),queue=rows.map((row,index)=>({row,index}));
+ async function worker(){
+   while(queue.length){
+     const {row,index}=queue.shift(),address=[row.address,row.city].filter(Boolean).join(", ")||row.city;
+     if(!address)continue;
+     try{
+       let point=cache.get(address);
+       if(!point){
+         const data=await api("/api/maps/geocode?q="+encodeURIComponent(address));
+         const first=data.results?.[0];
+         point=first?{lat:Number(first.lat),lon:Number(first.lon)}:null;
+         cache.set(address,point);
+       }
+       if(point&&Number.isFinite(point.lat)&&Number.isFinite(point.lon))resolved[index]={...row,...point};
+     }catch{}
+   }
+ }
+ await Promise.all(Array.from({length:Math.min(6,Math.max(1,rows.length))},()=>worker()));
+ return resolved.filter(Boolean);
+}
 async function showAddressMap(){
- const d=dialog("map-dialog",lang==="en"?"Map & location":"מפה ומיקום"),b=$(".remaining-body",d);
+ const d=dialog("map-dialog",lang==="en"?"Gmach map":"מפת הגמ״חים"),b=$(".remaining-body",d);
  let navPref=localStorage.getItem("gmach-navigation-app")||"google";try{const pref=await api("/api/me/navigation-preferences");navPref=pref.preferences?.preferred_app||navPref}catch{}
- b.innerHTML=`<label style="display:block;margin-bottom:10px">${lang==="en"?"Preferred navigation app":"אפליקציית ניווט מועדפת"}<select id="map-nav-pref"><option value="google" ${navPref==="google"?"selected":""}>Google Maps</option><option value="waze" ${navPref==="waze"?"selected":""}>Waze</option><option value="apple" ${navPref==="apple"?"selected":""}>Apple Maps</option></select></label><form id="map-search" autocomplete="off" style="display:grid;grid-template-columns:1fr auto;gap:8px"><input name="q" type="search" autocomplete="off" minlength="3" aria-label="כתובת לחיפוש" placeholder="עיר, רחוב ומספר" required><button class="button button-primary">חיפוש</button></form><p class="platform-note">החיפוש מופעל רק בלחיצה. אפשר גם להשתמש במיקום הנוכחי באופן חד־פעמי.</p><button type="button" class="button button-secondary" id="map-current">המיקום הנוכחי</button><div id="map-results" role="status" aria-live="polite" style="display:grid;gap:8px;margin-top:12px"></div><div id="map-frame" style="margin-top:12px"></div><small>© OpenStreetMap contributors</small>`;
- d.showModal();const form=$("#map-search",d),results=$("#map-results",d),frame=$("#map-frame",d);$("#map-nav-pref",d).onchange=async e=>{navPref=e.target.value;localStorage.setItem("gmach-navigation-app",navPref);try{await api("/api/me/navigation-preferences",{method:"PUT",body:{preferredApp:navPref}})}catch{};toast(lang==="en"?"Navigation preference saved":"העדפת הניווט נשמרה")};
- const renderMap=(lat,lon,label)=>{frame.innerHTML=`<iframe title="${esc(label||"מפה")}" src="${osmEmbed(Number(lat),Number(lon))}" style="width:100%;height:360px;border:0;border-radius:14px" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><a class="button ${navPref==="google"?"button-primary":"button-secondary"}" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lat+","+lon)}">Google Maps</a><a class="button ${navPref==="waze"?"button-primary":"button-secondary"}" target="_blank" rel="noopener" href="https://waze.com/ul?ll=${encodeURIComponent(lat+","+lon)}&navigate=yes">Waze</a><a class="button ${navPref==="apple"?"button-primary":"button-secondary"}" target="_blank" rel="noopener" href="https://maps.apple.com/?ll=${encodeURIComponent(lat+","+lon)}&q=${encodeURIComponent(label||"יעד")}">Apple Maps</a><button class="button button-secondary" type="button" data-copy-map-address>העתקת כתובת</button></div>`;frame.querySelector("[data-copy-map-address]")?.addEventListener("click",async()=>{await navigator.clipboard.writeText(label||String(lat)+","+String(lon));toast("הכתובת הועתקה")})};
- form.onsubmit=async e=>{e.preventDefault();results.innerHTML="<p>מחפשים…</p>";try{const x=await api("/api/maps/geocode?q="+encodeURIComponent(form.q.value));results.innerHTML=x.results.length?x.results.map((r,i)=>`<button type="button" class="button button-secondary" data-map-i="${i}" style="text-align:start">${esc(r.displayName)}</button>`).join(""):"<p>לא נמצאה כתובת.</p>";$$("[data-map-i]",results).forEach(btn=>btn.onclick=()=>{const r=x.results[Number(btn.dataset.mapI)];renderMap(r.lat,r.lon,r.displayName)})}catch(e){results.innerHTML="<p role=alert>"+esc(e.message)+"</p>"}};
- $("#map-current",d).onclick=()=>navigator.geolocation?.getCurrentPosition(pos=>renderMap(pos.coords.latitude,pos.coords.longitude,"המיקום הנוכחי"),()=>toast("לא התקבלה הרשאת מיקום",true),{enableHighAccuracy:false,timeout:8000,maximumAge:60000});
+ b.innerHTML=`<section aria-labelledby="gmach-map-title"><div style="display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px"><div><h3 id="gmach-map-title" style="margin:0">${lang==="en"?"Gmachs near you":"גמ״חים על המפה"}</h3><p class="platform-note" style="margin:4px 0 0">${lang==="en"?"Click a large marker to see gmach details.":"לחצו על נקודת ציון כדי לראות פרטי גמ״ח."}</p></div><label style="min-width:190px">${lang==="en"?"Preferred navigation app":"אפליקציית ניווט מועדפת"}<select id="map-nav-pref"><option value="google" ${navPref==="google"?"selected":""}>Google Maps</option><option value="waze" ${navPref==="waze"?"selected":""}>Waze</option><option value="apple" ${navPref==="apple"?"selected":""}>Apple Maps</option></select></label></div><div id="gmach-map-canvas" style="width:100%;height:min(62vh,560px);min-height:430px;border:1px solid #d8dfdc;border-radius:18px;overflow:hidden;background:#eef3f1" aria-label="${lang==="en"?"Interactive gmach map":"מפת גמ״חים אינטראקטיבית"}"></div><div id="gmach-map-status" role="status" aria-live="polite" class="platform-note" style="margin-top:8px">${lang==="en"?"Loading gmachs…":"טוענים גמ״חים על המפה…"}</div></section><hr style="margin:18px 0;border:0;border-top:1px solid #e5e7eb"><details><summary style="cursor:pointer;font-weight:700">${lang==="en"?"Search another address":"חיפוש כתובת אחרת"}</summary><form id="map-search" autocomplete="off" style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px"><input name="q" type="search" autocomplete="off" minlength="3" aria-label="כתובת לחיפוש" placeholder="עיר, רחוב ומספר" required><button class="button button-primary">${lang==="en"?"Search":"חיפוש"}</button></form><button type="button" class="button button-secondary" id="map-current" style="margin-top:8px">${lang==="en"?"My current location":"המיקום הנוכחי"}</button><div id="map-results" role="status" aria-live="polite" style="display:grid;gap:8px;margin-top:12px"></div></details><small style="display:block;margin-top:12px">© OpenStreetMap contributors</small>`;
+ d.showModal();
+ const form=$("#map-search",d),results=$("#map-results",d),status=$("#gmach-map-status",d),canvas=$("#gmach-map-canvas",d);
+ $("#map-nav-pref",d).onchange=async e=>{navPref=e.target.value;localStorage.setItem("gmach-navigation-app",navPref);try{await api("/api/me/navigation-preferences",{method:"PUT",body:{preferredApp:navPref}})}catch{};toast(lang==="en"?"Navigation preference saved":"העדפת הניווט נשמרה")};
+ let map,L,focusMarker;
+ const navigationLinks=(lat,lon,label)=>`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><a class="button button-secondary button-small" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lat+","+lon)}">Google</a><a class="button button-secondary button-small" target="_blank" rel="noopener" href="https://waze.com/ul?ll=${encodeURIComponent(lat+","+lon)}&navigate=yes">Waze</a><a class="button button-secondary button-small" target="_blank" rel="noopener" href="https://maps.apple.com/?ll=${encodeURIComponent(lat+","+lon)}&q=${encodeURIComponent(label||"יעד")}">Apple</a></div>`;
+ const focusPoint=(lat,lon,label)=>{if(!map||!L)return;if(focusMarker)focusMarker.remove();focusMarker=L.marker([lat,lon],{zIndexOffset:1000}).addTo(map).bindPopup(`<strong>${esc(label||"יעד")}</strong>${navigationLinks(lat,lon,label)}`).openPopup();map.setView([lat,lon],15)};
+ try{
+   L=await ensureLeaflet();
+   map=L.map(canvas,{zoomControl:true,scrollWheelZoom:true}).setView([31.8,34.9],8);
+   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap contributors"}).addTo(map);
+   const discovery=await api("/api/discovery"),organizations=discovery.organizations||[];
+   const points=await geocodeGmachOrganizations(organizations);
+   const bounds=[];
+   points.forEach(org=>{
+     const marker=L.circleMarker([org.lat,org.lon],{radius:11,weight:3,fillOpacity:.9}).addTo(map);
+     bounds.push([org.lat,org.lon]);
+     const details=`<div dir="${lang==="en"?"ltr":"rtl"}" style="min-width:190px"><strong style="font-size:16px">${esc(org.name)}</strong><div style="margin-top:5px">📍 ${esc([org.city,org.neighborhood].filter(Boolean).join(" · "))}</div><div>📦 ${Number(org.item_count||0)} ${lang==="en"?"items":"פריטים"} · ✅ ${Number(org.available_items||0)} ${lang==="en"?"available":"זמינים"}</div>${org.description?`<p style="margin:7px 0">${esc(org.description)}</p>`:""}<button type="button" class="button button-primary button-small" data-map-open-org="${esc(org.id)}">${lang==="en"?"View gmach":"לפרטי הגמ״ח"}</button>${navigationLinks(org.lat,org.lon,org.name)}</div>`;
+     marker.bindPopup(details,{maxWidth:320});
+     marker.on("popupopen",()=>{
+       const popup=marker.getPopup()?.getElement(),button=popup?.querySelector("[data-map-open-org]");
+       if(button)button.onclick=()=>{const target=document.querySelector('[data-open-organization="'+CSS.escape(button.dataset.mapOpenOrg)+'"],[data-advanced-org="'+CSS.escape(button.dataset.mapOpenOrg)+'"]');if(target){d.close();target.click()}else toast(lang==="en"?"Open the gmach card from the list below the map.":"פרטי הגמ״ח מוצגים בנקודה; ניתן לפתוח אותו גם מרשימת הגמ״חים.")}
+     });
+   });
+   if(bounds.length)map.fitBounds(bounds,{padding:[34,34],maxZoom:13});
+   status.textContent=points.length?(lang==="en"?`${points.length} gmachs are shown. Click any marker for details.`:`${points.length} גמ״חים מוצגים על המפה. לחצו על נקודה לפרטים.`):(lang==="en"?"No gmach locations could be placed yet.":"עדיין לא נמצאו כתובות גמ״חים שניתן למקם על המפה.");
+   setTimeout(()=>map.invalidateSize(),80);
+ }catch(e){status.textContent=e.message||"טעינת המפה נכשלה";canvas.innerHTML=`<div class="dashboard-empty"><strong>${esc(status.textContent)}</strong></div>`}
+ form.onsubmit=async e=>{e.preventDefault();results.innerHTML="<p>מחפשים…</p>";try{const x=await api("/api/maps/geocode?q="+encodeURIComponent(form.q.value));results.innerHTML=x.results.length?x.results.map((r,i)=>`<button type="button" class="button button-secondary" data-map-i="${i}" style="text-align:start">${esc(r.displayName)}</button>`).join(""):"<p>לא נמצאה כתובת.</p>";$$("[data-map-i]",results).forEach(btn=>btn.onclick=()=>{const r=x.results[Number(btn.dataset.mapI)];focusPoint(Number(r.lat),Number(r.lon),r.displayName)})}catch(e){results.innerHTML="<p role=alert>"+esc(e.message)+"</p>"}};
+ $("#map-current",d).onclick=()=>navigator.geolocation?.getCurrentPosition(pos=>focusPoint(pos.coords.latitude,pos.coords.longitude,lang==="en"?"My current location":"המיקום הנוכחי"),()=>toast(lang==="en"?"Location permission was not granted":"לא התקבלה הרשאת מיקום",true),{enableHighAccuracy:false,timeout:8000,maximumAge:60000});
+ d.addEventListener("close",()=>{try{map?.remove()}catch{}},{once:true});
 }
 function installMapEntry(){
  if($("#map-entry"))return;const host=$(".header-actions");if(!host)return;const b=document.createElement("button");b.id="map-entry";b.type="button";b.className="button button-secondary";b.textContent=lang==="en"?"Map":"מפה";b.onclick=showAddressMap;host.append(b);const bell=$("#notifications-button"),account=$("#dashboard-button");if(bell&&account&&bell.parentElement===host){account.after(bell);bell.after(b)}
