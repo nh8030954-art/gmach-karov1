@@ -495,6 +495,9 @@ assert.ok(indexHtml.includes('id="subcategory-filter"'),"catalog subcategory fil
 for(const token of ["updateCatalogSubcategories","!subcategory || item.subcategory === subcategory","item.subcategory?","subcategory:$(\"#subcategory-filter\")?.value"])assert.ok(appClient.includes(token),token+" missing from category/subcategory separation UI");
 assert.ok(worker.includes("matchesSubcategory=!f.subcategory"),"saved-search subcategory separation missing");
 assert.ok(worker.includes("nextQuantity=currentQuantity+count"),"unit creation must increase item quantity");
+assert.ok(worker.includes("Math.max(150,Number(nextOrgCode?.max_code||149)+1)"),"gmach serial numbering must start at 150");
+assert.ok(worker.includes("יש להקצות בדיוק את היחידות הסידוריות שנמסרות לפני אישור האיסוף"),"serialized pickup must require exact unit allocation");
+assert.ok(appClient.includes("function requestProgress")&&appClient.includes("אישור שהמשתמש אסף")&&appClient.includes("אישור שהמשתמש החזיר"),"loan lifecycle progress and explicit manager confirmations missing");
 assert.ok(worker.includes("item_serial_codes_v2"),"item serial codes must be scoped per gmach");
 
 assert.ok(appClient.includes('$$("[data-open-account-tab]",$("#dashboard-content")).forEach'),"saved dashboard selector regression");
