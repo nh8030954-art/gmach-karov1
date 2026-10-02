@@ -253,14 +253,18 @@ try {
   assert.equal(result.response.status,200,JSON.stringify(result.data));
   assert.equal(result.data.units.length,1,"A quantity-1 item must receive exactly one automatic serial number");
   assert.ok(String(result.data.units[0].serial_number||"").length>4,"Automatic serial number missing");
+  assert.ok(Number(String(result.data.units[0].serial_number||"").split("-")[1])>=100001,"Gmach serial code must start in the high range");
 
   result = await request(`/api/organizations/${organizationId}/branches`, { method:"POST", cookie:adminCookie, body:{ name:"סניף מרכזי",address:"רחוב הבדיקה 1",city:"ירושלים",phone:"050-1234567",inventoryMode:"separate",hours:{sun:"09:00-17:00"} } });
   assert.equal(result.response.status,201,JSON.stringify(result.data));
-  result = await request(`/api/items/${itemId}/units`, { method:"POST",cookie:adminCookie,body:{count:1,condition:"חדש"} });
+  const branchId=result.data.branch.id;
+  result = await request(`/api/items/${itemId}/units`, { method:"POST",cookie:adminCookie,body:{count:1,condition:"חדש",branchId} });
   assert.equal(result.response.status,201,JSON.stringify(result.data));
   assert.equal(result.data.quantity,2,"adding one serialized unit must also increase item quantity");
   assert.equal(result.data.units.length,1,"adding one serialized unit must create exactly one new unit");
   assert.match(String(result.data.units[0].serialNumber||""),/^GB-\d+-\d+-2$/,"new unit serial must continue the item sequence");
+  result = await request(`/api/items/${itemId}/units`, { cookie: adminCookie });
+  assert.equal(result.data.units.find(u=>u.id===result.data.units[1]?.id)?.branch_id||result.data.units[1]?.branch_id,branchId,"new serialized unit must be assigned to the selected branch");
 
   const form = new WorkerFormData();
   form.append("images", new Blob([new Uint8Array([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82])], { type: "image/png" }), "sample.png");
