@@ -1,4 +1,4 @@
-deploy_sha=6ed746fa6e075a875c81b17b807c87caaac5a0fa
+deploy_sha=20dd0a84ed8e3755a01efccd7e18efb6b93c3d3c
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -20,19 +20,24 @@ Excel export and QR image scanner gate passed.
 Voice message recording gate passed.
 Excel export, accessible admin status and QR image scanning gate passed.
 Full requirements regression extensions passed.
-evalmachine.<anonymous>:648
-Object.assign(window.GmachEnglish,{"איך תרצו להשתמש באתר?":"How would you like to use the site?","משתמש/ת":"User","לחפש, לשמור ולשאול פריטים מגמ״חים.":"Search, save and borrow items from gmachs.","משתמש/ת וגם בעל/ת גמ״ח":"User and gmach owner","לאחר אימות המייל נפתח יחד גמ״ח. גם מנהל גמ״ח יכול לשאול פריטים מגמ״חים אחרים.":"After email verification, we will open your first gmach. Gmach managers can also borrow from other gmachs.","בתיאום מראש":"By prior arrangement","אין שעות פעילות קבועות.":"No fixed opening hours.","אם יש ימים ושעות קבועים, בטלו את הסימון ובחרו אותם. אפשר להשאיר ללא ימים קבועים.":"If you have fixed days and hours, clear the checkbox and choose them. You may leave this without fixed days.","הרשימה משתנה לפי הקטגוריה הראשית שבחרתם.":"The list changes according to the main category you choose.","בחרו קודם קטגוריה":"Choose a category first","ללא קטגוריית משנה":"No subcategory","אפשר לשאול פריטים וגם לנהל גמ״ח באותו חשבון. פתיחת גמ״ח לא מגבילה את השימוש הרגיל באתר.":"You can borrow items and manage a gmach with the same account. Opening a gmach does not limit normal site use.","לא מצאת קטגוריה? - אפשר להציע חדשה":"Can't find a category? Suggest a new one"});
-       ^
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
 
-TypeError: Cannot add property איך תרצו להשתמש באתר?, object is not extensible
-    at Object.assign (<anonymous>)
-    at evalmachine.<anonymous>:648:8
-    at Script.runInContext (node:vm:149:12)
-    at Script.runInNewContext (node:vm:154:17)
-    at Object.runInNewContext (node:vm:310:38)
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/i18n-static.mjs:6:30
+AssertionError [ERR_ASSERTION]: English static UI is missing translations: — אין שעות פעילות קבועות.
+
+1 !== 0
+
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/i18n-static.mjs:33:8
     at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
     at async node:internal/modules/esm/loader:647:26
-    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 1,
+  expected: 0,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
 
 Node.js v24.21.0
