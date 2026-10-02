@@ -3054,11 +3054,13 @@ async function listItemUnits(request,env,itemId){
 async function createItemUnit(request,env,itemId){
   const item=await itemOrganization(env,itemId);if(!item)throw new HttpError(404,"הפריט לא נמצא");
   const {user}=await requireOrganizationRole(request,env,item.organization_id,["owner","inventory"]),body=await readJson(request);
-  const count=positiveInt(body.count,1,1,100,"כמות יחידות"),nextQuantity=Number(item.quantity||0)+count;
-  await env.DB.prepare("UPDATE items SET quantity=?,inventory_updated_at=?,updated_at=? WHERE id=?").bind(nextQuantity,new Date().toISOString(),new Date().toISOString(),itemId).run();
-  const synced=await syncItemUnitsToQuantity(env,itemId,nextQuantity);
-  await auditStatement(env,user.id,"item.units.create","item",itemId,{count,nextQuantity}).run();
-  return json({units:synced.created,quantity:nextQuantity},201);
+  const count=positiveInt(body.count,1,1,100,"כמות יחידות");
+  const active=await env.DB.prepare("SELECT COUNT(*) AS count FROM item_units WHERE item_id=? AND status!='retired'").bind(itemId).first();
+  const remaining=Math.max(0,Number(item.quantity||0)-Number(active?.count||0));
+  if(count>remaining)throw new HttpError(409,"מספר היחידות הסידוריות לא יכול לעלות על כמות הפריט. יש לעדכן קודם את כמות הפריט");
+  const synced=await syncItemUnitsToQuantity(env,itemId,Number(item.quantity||1));
+  await auditStatement(env,user.id,"item.units.create","item",itemId,{count,quantity:Number(item.quantity||1)}).run();
+  return json({units:synced.created.slice(0,count),quantity:Number(item.quantity||1)},201);
 }
 
 async function markReviewHelpful(request,env,reviewId){const user=await requireUser(request,env);const exists=await env.DB.prepare("SELECT id FROM reviews WHERE id=? AND status='published'").bind(reviewId).first();if(!exists)throw new HttpError(404,"הביקורת לא נמצאה");await env.DB.batch([env.DB.prepare("INSERT OR IGNORE INTO review_helpful_votes(review_id,user_id) VALUES(?,?)").bind(reviewId,user.id),env.DB.prepare("UPDATE reviews SET helpful_count=(SELECT COUNT(*) FROM review_helpful_votes WHERE review_id=?) WHERE id=?").bind(reviewId,reviewId)]);return json({helpful:true});}
