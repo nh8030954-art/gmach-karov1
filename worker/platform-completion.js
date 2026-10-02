@@ -450,7 +450,19 @@ async function unitBySerial(request,env,serial){
   await requireOrg(request,env,u.organization_id,["owner","inventory","requests"]);
   return json({unit:{id:u.id,itemId:u.item_id,serialNumber:u.serial_number,status:u.status,condition:u.condition,branchId:u.branch_id,title:u.title}});
 }
-async function updateUnit(request,env,id){const u=await qfirst(env,"SELECT u.*,i.organization_id FROM item_units u JOIN items i ON i.id=u.item_id WHERE u.id=?",[id]);if(!u)throw new HttpError(404,"היחידה לא נמצאה");await requireOrg(request,env,u.organization_id,["owner","inventory"]);const b=await readJson(request),st=["available","held","loaned","repair","inactive","retired"].includes(b.status)?b.status:u.status,cond=b.condition===undefined?u.condition:clean(b.condition,2,50,"מצב");await qrun(env,"UPDATE item_units SET status=?,condition=?,branch_id=?,retired_at=CASE WHEN ?='retired' THEN COALESCE(retired_at,?) ELSE retired_at END,updated_at=? WHERE id=?",[st,cond,b.branchId===undefined?u.branch_id:optional(b.branchId,100),st,new Date().toISOString(),new Date().toISOString(),id]);if(st==="retired")await qrun(env,"INSERT OR IGNORE INTO retired_serials(serial_number,item_unit_id) VALUES(?,?)",[u.serial_number,id]);return json({ok:true,status:st});}
+async function updateUnit(request,env,id){
+  const u=await qfirst(env,"SELECT u.*,i.organization_id FROM item_units u JOIN items i ON i.id=u.item_id WHERE u.id=?",[id]);
+  if(!u)throw new HttpError(404,"היחידה לא נמצאה");
+  await requireOrg(request,env,u.organization_id,["owner","inventory"]);
+  const b=await readJson(request),st=["available","held","loaned","repair","inactive","retired"].includes(b.status)?b.status:u.status,cond=b.condition===undefined?u.condition:clean(b.condition,2,50,"מצב"),branchId=b.branchId===undefined?u.branch_id:optional(b.branchId,100);
+  if(branchId){
+    const branch=await qfirst(env,"SELECT id FROM organization_branches WHERE id=? AND organization_id=? AND status!='archived'",[branchId,u.organization_id]);
+    if(!branch)throw new HttpError(400,"הסניף שנבחר אינו שייך לגמ״ח או שאינו פעיל");
+  }
+  await qrun(env,"UPDATE item_units SET status=?,condition=?,branch_id=?,retired_at=CASE WHEN ?='retired' THEN COALESCE(retired_at,?) ELSE retired_at END,updated_at=? WHERE id=?",[st,cond,branchId,st,new Date().toISOString(),new Date().toISOString(),id]);
+  if(st==="retired")await qrun(env,"INSERT OR IGNORE INTO retired_serials(serial_number,item_unit_id) VALUES(?,?)",[u.serial_number,id]);
+  return json({ok:true,status:st,branchId});
+}
 async function unitQr(request,env,id,url){
   const u=await qfirst(env,"SELECT u.id,u.serial_number,u.status,i.title,i.organization_id FROM item_units u JOIN items i ON i.id=u.item_id WHERE u.id=?",[id]);
   if(!u)throw new HttpError(404,"היחידה לא נמצאה");
