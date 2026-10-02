@@ -10,7 +10,7 @@ const remainingWorker=await readFile("worker/remaining-features.js","utf8");
 const remainingClient=await readFile("dist/remaining-features.js","utf8");
 const migration=await readFile("migrations/0014_final_features.sql","utf8");
 
-for(const file of ["dist/sw.js","dist/platform-completion.js","migrations/0013_platform_completion.sql","migrations/0015_notification_delivery.sql","migrations/0018_backfill_missing_item_units.sql"]) await access(file);
+for(const file of ["dist/sw.js","dist/platform-completion.js","migrations/0013_platform_completion.sql","migrations/0015_notification_delivery.sql","migrations/0018_backfill_missing_item_units.sql","migrations/0022_reconcile_loan_unit_states.sql"]) await access(file);
 
 assert.match(worker,/handleFinalFeatures/);
 assert.match(worker,/runFinalMaintenance/);
@@ -497,6 +497,7 @@ assert.ok(worker.includes("matchesSubcategory=!f.subcategory"),"saved-search sub
 assert.ok(worker.includes("nextQuantity=currentQuantity+count"),"unit creation must increase item quantity");
 assert.ok(worker.includes("Math.max(150,Number(nextOrgCode?.max_code||149)+1)"),"gmach serial numbering must start at 150");
 assert.ok(worker.includes("יש להקצות בדיוק את היחידות הסידוריות שנמסרות לפני אישור האיסוף"),"serialized pickup must require exact unit allocation");
+assert.ok(worker.includes('["declined","cancelled","no_show"].includes(target)')&&worker.includes("UPDATE loan_unit_assignments SET returned_at=? WHERE request_id=? AND returned_at IS NULL"),"approved loans ending without pickup must release allocated units");
 assert.ok(appClient.includes("function requestProgress")&&appClient.includes("אישור שהמשתמש אסף")&&appClient.includes("אישור שהמשתמש החזיר"),"loan lifecycle progress and explicit manager confirmations missing");
 assert.ok(worker.includes("item_serial_codes_v2"),"item serial codes must be scoped per gmach");
 
