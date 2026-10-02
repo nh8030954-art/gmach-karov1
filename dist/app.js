@@ -110,15 +110,34 @@
   function hideToastTopLayer(element){try{if(element?.matches?.(":popover-open"))element.hidePopover()}catch{}}
   window.GmachEnsureTopLayerToast=ensureToastTopLayer;
   window.GmachHideTopLayerToast=hideToastTopLayer;
+  function extractIncidentNumber(message){
+    return String(message||"").match(/(?:מספר תקלה|Error reference)\s*:\s*([A-Za-z0-9-]{8,40})/i)?.[1]||"";
+  }
+  function createClientIncident(error,context="שגיאת דפדפן"){
+    const existing=String(error?.requestId||extractIncidentNumber(error?.message)||"").trim();if(existing)return existing;
+    const random=crypto.getRandomValues(new Uint32Array(1))[0]%100000,incident=String(Date.now())+String(random).padStart(5,"0");
+    window.GmachLastIncidentNumber=incident;
+    try{fetch("/api/client-errors",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({incidentNumber:incident,path:location.pathname+location.search,message:String(error?.message||context).slice(0,1000),stack:String(error?.stack||"").slice(0,3000)})}).catch(()=>{})}catch{}
+    return incident;
+  }
+  function technicalErrorMessage(message){
+    return /(?:is not a function|cannot read|undefined|null|referenceerror|typeerror|syntaxerror|unexpected token|failed to fetch|load failed|networkerror|אירעה שגיאה לא צפויה|תקלה זמנית|לא הצלחנו לטעון|הפעולה לא הושלמה)/i.test(String(message||""));
+  }
   function toast(message, type = "success") {
     message=window.GmachTranslate?.(message)||message;
+    if(type==="error"&&!extractIncidentNumber(message)&&technicalErrorMessage(message)){
+      const incident=createClientIncident(new Error(String(message)),"תקלה בממשק");
+      message+= (uiIsEnglish()?" Error reference: ":" מספר תקלה: ")+incident;
+    }
+    const incident=extractIncidentNumber(message);if(incident)window.GmachLastIncidentNumber=incident;
     const region = $("#toast-region");
-    ensureToastTopLayer(region);
+    ensureToastTopLayer(region);document.body.classList.add("toast-visible");
     if ([...region.children].some(el => el.textContent === message && el.classList.contains("error") === (type === "error"))) return;
     const el = document.createElement("div"); el.className = `toast ${type === "error" ? "error" : ""}`; el.textContent = message; region.append(el);
     while (region.children.length > 2) region.firstElementChild.remove();
-    window.setTimeout(() => { el.remove(); if(!region.children.length)hideToastTopLayer(region); }, 4200);
+    window.setTimeout(() => { el.remove(); if(!region.children.length){hideToastTopLayer(region);document.body.classList.remove("toast-visible")} }, 5200);
   }
+  window.GmachToast=toast;
   function setButtonBusy(button, busy, busyText = "שולח…") {
     if (!button) return;
     if (busy) { button.dataset.originalText = button.textContent; button.textContent = busyText; button.disabled = true; }
@@ -163,8 +182,13 @@
   }
   function describeHttpError(response,data){
     const raw=typeof data==="string"?data:String(data?.error||data?.message||"").trim();
-    if(raw&&!/^\s*</.test(raw))return window.GmachTranslate?.(raw)||raw;
     const en=uiIsEnglish(),status=Number(response?.status||0),requestId=String(data?.requestId||response?.headers?.get?.("X-Request-Id")||"").trim();
+    if(raw&&!/^\s*</.test(raw)){
+      let message=window.GmachTranslate?.(raw)||raw;
+      if(status>=500&&requestId&&!extractIncidentNumber(message))message+=" "+(en?"Error reference: ":"מספר תקלה: ")+requestId;
+      if(status>=500&&requestId)window.GmachLastIncidentNumber=requestId;
+      return message;
+    }
     let message;
     if(status===400)message=en?"The request is invalid. Check the entered details.":"הבקשה אינה תקינה. יש לבדוק את הפרטים שהוזנו.";
     else if(status===401)message=en?"Your session is missing or has expired. Sign in and try again.":"החיבור לחשבון חסר או פג. יש להתחבר ולנסות שוב.";
@@ -179,9 +203,12 @@
     return message;
   }
   function describeNetworkError(error){
-    if(error?.name==="AbortError")return uiIsEnglish()?"The server is taking too long to respond. Try again shortly.":"השרת מתעכב. אפשר לנסות שוב בעוד רגע.";
-    if(error instanceof TypeError)return uiIsEnglish()?"Could not connect to the server. Check the internet connection and try again.":"לא ניתן להתחבר לשרת. יש לבדוק את החיבור לאינטרנט ולנסות שוב.";
-    return String(error?.message||error|| (uiIsEnglish()?"An unexpected error occurred.":"אירעה שגיאה לא צפויה."));
+    const incident=createClientIncident(error,"תקלה בחיבור לשרת"),en=uiIsEnglish();
+    let message;
+    if(error?.name==="AbortError")message=en?"The server is taking too long to respond. Try again shortly.":"השרת מתעכב. אפשר לנסות שוב בעוד רגע.";
+    else if(error instanceof TypeError)message=en?"Could not connect to the server. Check the internet connection and try again.":"לא ניתן להתחבר לשרת. יש לבדוק את החיבור לאינטרנט ולנסות שוב.";
+    else message=String(error?.message||error|| (en?"An unexpected error occurred.":"אירעה שגיאה לא צפויה."));
+    return message+" "+(en?"Error reference: ":"מספר תקלה: ")+incident;
   }
   window.GmachDescribeHttpError=describeHttpError;
   window.GmachDescribeNetworkError=describeNetworkError;
@@ -197,14 +224,15 @@
       if (data && typeof data === "object" && response.headers.get("X-Data-Stale") === "1") data._stale = true;
       return data;
     } catch (error) {
-      if (error?.name === "AbortError" || error instanceof TypeError) throw new Error(describeNetworkError(error));
+      if (error?.name === "AbortError" || error instanceof TypeError) { const wrapped=new Error(describeNetworkError(error)); wrapped.requestId=extractIncidentNumber(wrapped.message); wrapped.systemFault=true; throw wrapped; }
+      if(Number(error?.status||0)>=500){error.systemFault=true;if(error.requestId)window.GmachLastIncidentNumber=error.requestId}
       throw error;
     } finally { window.clearTimeout(timeout); }
   }
 
   function openSupportForError(error,context="תקלה באתר"){
     const dialog=$("#support-dialog"),form=$("#support-form");if(!dialog||!form)return;
-    const requestId=String(error?.requestId||"").trim();
+    const requestId=String(error?.requestId||extractIncidentNumber(error?.message)||window.GmachLastIncidentNumber||"").trim();
     if(state.user?.fullName||state.user?.full_name)form.elements.name.value=state.user.fullName||state.user.full_name;
     if(state.user?.email)form.elements.email.value=state.user.email;
     form.elements.subject.value=context.slice(0,120);
@@ -536,7 +564,7 @@
       $$('[data-org-item]', $("#organization-page-content")).forEach(button => button.addEventListener("click", () => { openItem(button.dataset.orgItem); })); $$('[data-review-helpful]', $("#organization-page-content")).forEach(button=>button.addEventListener("click",()=>requireAuth(async()=>{try{await api("/api/reviews/"+encodeURIComponent(button.dataset.reviewHelpful)+"/helpful",{method:"POST",body:{}});button.disabled=true;toast("תודה על המשוב")}catch(e){toast(e.message,"error")}}))); $$('[data-review-report]', $("#organization-page-content")).forEach(button=>button.addEventListener("click",()=>requireAuth(async()=>{const reason=translatedPrompt("מה הבעיה בביקורת?");if(!reason)return;try{await api("/api/reviews/"+encodeURIComponent(button.dataset.reviewReport)+"/report",{method:"POST",body:{reason}});button.disabled=true;toast("הדיווח נשלח לבדיקה")}catch(e){toast(e.message,"error")}}))); showOrganizationPage(id);
     } catch (error) {
       const content = $("#organization-page-content");
-      content.innerHTML = `<div class="dashboard-empty" role="alert"><h2 id="organization-title">לא הצלחנו לטעון את עמוד הגמ״ח</h2><p>${escapeHTML(error.message)}</p>${error.requestId ? `<small>מספר תקלה לתמיכה: ${escapeHTML(error.requestId)}</small>` : ""}<div class="dashboard-row-actions"><button class="button button-secondary" type="button" data-retry-organization>ניסיון חוזר</button><button class="button button-secondary" type="button" data-support-organization>פנייה לתמיכה עם פרטי התקלה</button></div></div>`;
+      content.innerHTML = `<div class="dashboard-empty" role="alert"><h2 id="organization-title">לא הצלחנו לטעון את עמוד הגמ״ח</h2><p>${escapeHTML(error.message)}</p>${error.systemFault&&error.requestId ? `<small>מספר תקלה לתמיכה: ${escapeHTML(error.requestId)}</small>` : ""}<div class="dashboard-row-actions"><button class="button button-secondary" type="button" data-retry-organization>ניסיון חוזר</button><button class="button button-secondary" type="button" data-support-organization>פנייה לתמיכה עם פרטי התקלה</button></div></div>`;
       $("[data-retry-organization]", content).addEventListener("click", () => openOrganization(id));$("[data-support-organization]",content).addEventListener("click",()=>openSupportForError(error,"תקלה בטעינת עמוד גמ״ח"));
       showOrganizationPage(id);
     }
@@ -739,7 +767,7 @@
   async function showDashboard(tab = state.dashboardTab) {
     if (!state.user) { requireAuth(() => showDashboard(tab)); return; } if (state.user.role === "admin" && !state.user.twoFactorEnabled) tab = "profile"; else if (tab === "admin" && state.user.role !== "admin") tab = "requests"; state.dashboardTab = tab; $("#home-view").hidden = true; $("#organization-page-view").hidden = true; $("#dashboard-view").hidden = false; window.scrollTo({ top: 0, behavior: "smooth" }); history.replaceState({route:"dashboard"}, "", "/dashboard"); $$('[data-dashboard-tab]').forEach(button => button.setAttribute("aria-selected", String(button.dataset.dashboardTab === tab))); $("#dashboard-content").innerHTML = '<div class="skeleton-card" aria-hidden="true"></div>';
     try { const data = await refreshAccountSnapshot(); $("#stat-requests").textContent = data.stats.activeRequests; $("#stat-items").textContent = data.stats.items; $("#stat-completed").textContent = data.stats.completed; if (tab === "requests") renderDashboardRequests(data.requests || []); if (tab === "items") renderDashboardItems(data.items || []); if (tab === "gmachim") renderDashboardOrganizations(data.organizations || []); if (tab === "saved") await renderDashboardSaved(); if (tab === "addresses") await renderAddresses(); if (tab === "sessions") await renderSessions(); if (tab === "searches") await renderSavedSearches(); if (tab === "profile") { await renderProfile(); if(state.user.role==="admin"&&!state.user.twoFactorEnabled){const panel=document.createElement("section");panel.className="dashboard-empty";panel.innerHTML=`<h2>אבטחת חשבון הנהלת האתר</h2><p>כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.</p><button class="button button-primary" type="button" id="admin-enable-2fa">הפעלת אימות דו שלבי</button><div id="two-factor-setup"></div>`;$("#dashboard-content").prepend(panel);$("#admin-enable-2fa").addEventListener("click",beginTwoFactorSetup)}}; if (tab === "notifications") await renderNotificationPreferences(); if (tab === "admin") await renderAdmin(); organizeDashboardTools(); }
-    catch (error) { console.error("Dashboard error", error); $("#dashboard-content").innerHTML = `<div class="dashboard-empty"><p>${escapeHTML(error.message || "לא הצלחנו לטעון את האזור האישי")}</p>${error.requestId?`<small>מספר תקלה לתמיכה: ${escapeHTML(error.requestId)}</small>`:""}<button class="button button-secondary" type="button" id="dashboard-support-error">פנייה לתמיכה עם פרטי התקלה</button></div>`;$("#dashboard-support-error")?.addEventListener("click",()=>openSupportForError(error,"תקלה בטעינת האזור האישי")); }
+    catch (error) { console.error("Dashboard error", error); $("#dashboard-content").innerHTML = `<div class="dashboard-empty"><p>${escapeHTML(error.message || "לא הצלחנו לטעון את האזור האישי")}</p>${error.systemFault&&error.requestId?`<small>מספר תקלה לתמיכה: ${escapeHTML(error.requestId)}</small>`:""}<button class="button button-secondary" type="button" id="dashboard-support-error">פנייה לתמיכה עם פרטי התקלה</button></div>`;$("#dashboard-support-error")?.addEventListener("click",()=>openSupportForError(error,"תקלה בטעינת האזור האישי")); }
   }
   async function renderSessions() {
     const [{sessions = []},{events = []}] = await Promise.all([api("/api/me/sessions"),api("/api/me/security-events")]);
