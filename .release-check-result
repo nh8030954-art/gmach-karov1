@@ -1,40 +1,7 @@
-sha=85d7f218c0f704916cc6f7a7bcdffe5d5bc7ec9e
-install=success
-syntax=success
-tests=failure
-smoke=failure
-live=success
-      throw new MiniflareCoreError(
-            ^
-
-MiniflareCoreError [ERR_MODULE_RULE]: Unable to resolve "worker/platform-completion.js" dependency "qrcode-generator": no matching module rules.
-If you're trying to import an npm package, you'll need to bundle your Worker first.
-    at #visitModule (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91608:13)
-    at Object.ImportDeclaration (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91533:26)
-    at c2 (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91026:21)
-    at Object.skipThrough (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91031:3)
-    at visitNode (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91039:20)
-    at c2 (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91024:5)
-    at base.Program.base.BlockStatement.base.StaticBlock (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91045:5)
-    at visitNode (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91039:20)
-    at c2 (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91024:5)
-    at simple (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91028:5) {
-  code: 'ERR_MODULE_RULE',
-  cause: undefined
-}
-
-Node.js v24.21.0
-    at Object.skipThrough (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91031:3)
-    at visitNode (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91039:20)
-    at c2 (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91024:5)
-    at base.Program.base.BlockStatement.base.StaticBlock (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91045:5)
-    at visitNode (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91039:20)
-    at c2 (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91024:5)
-    at simple (/home/runner/work/gmach-karov1/gmach-karov1/node_modules/miniflare/dist/src/index.js:91028:5) {
-  code: 'ERR_MODULE_RULE',
-  cause: undefined
-}
-
-Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T11:32:45.481Z"}
+sha=756c9ced4547ed68f4ae0a2cdfa0c920668be1ea
+install=cancelled
+syntax=skipped
+tests=skipped
+smoke=skipped
+live=skipped
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
