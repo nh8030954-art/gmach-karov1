@@ -494,6 +494,9 @@ assert.ok(appClient.includes("updateItemSubcategories"),"subcategory dependency 
 assert.ok(indexHtml.includes('id="subcategory-filter"'),"catalog subcategory filter missing");
 for(const token of ["updateCatalogSubcategories","!subcategory || item.subcategory === subcategory","item.subcategory?","subcategory:$(\"#subcategory-filter\")?.value"])assert.ok(appClient.includes(token),token+" missing from category/subcategory separation UI");
 assert.ok(worker.includes("matchesSubcategory=!f.subcategory"),"saved-search subcategory separation missing");
+assert.ok(worker.includes("nextQuantity=currentQuantity+count"),"unit creation must increase item quantity");
+assert.ok(worker.includes("item_serial_codes_v2"),"item serial codes must be scoped per gmach");
+
 assert.ok(appClient.includes('$$("[data-open-account-tab]",$("#dashboard-content")).forEach'),"saved dashboard selector regression");
 assert.ok(worker.includes("function fixedSubcategory(value)")&&worker.includes("return cleanOptional(value,80)"),"subcategory sanitization missing");
 assert.ok(worker.includes('body.freeConfirmed!==true'),"server-side free confirmation missing");
