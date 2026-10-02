@@ -2249,7 +2249,7 @@ async function dashboard(request, env) {
   const [organizationsResult, itemsResult, requestsResult, favoritesResult, savedOrganizationsResult, helpRequestsResult, recentOrganizationsResult] = await env.DB.batch([
     env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,o.verified,o.is_hidden,o.created_at,c.contact_phone,o.address,o.website_url,o.service_area,o.hours_json,o.pickup_options
       FROM organizations o LEFT JOIN organization_contacts c ON c.organization_id = o.id WHERE o.owner_id = ? ORDER BY o.created_at DESC`).bind(user.id),
-    env.DB.prepare(`SELECT i.id,i.organization_id,i.title,i.category,i.description,i.condition,i.quantity,i.loan_conditions,i.image_urls,
+    env.DB.prepare(`SELECT i.id,i.organization_id,i.title,i.category,i.description,i.condition,i.condition_detail,i.quantity,i.loan_conditions,i.image_urls,
       i.status,i.availability_status,i.created_at,o.name AS org_name,i.item_type,i.subcategory,i.tags_json,i.pickup_method,i.inventory_updated_at,
       i.min_loan_minutes,i.max_loan_minutes,i.booking_notice_minutes,i.turnaround_minutes,i.booking_horizon_days,i.approval_mode,i.deposit_required,i.deposit_amount_agorot
       FROM items i JOIN organizations o ON o.id = i.organization_id WHERE o.owner_id = ? ORDER BY i.created_at DESC`).bind(user.id),
@@ -2270,7 +2270,7 @@ async function dashboard(request, env) {
       ORDER BY rv.viewed_at DESC LIMIT 8`).bind(user.id)
   ]);
   const organizations = organizationsResult.results.map(row => ({ ...row, verified: Boolean(row.verified), is_hidden: Boolean(row.is_hidden), hours: safeJsonObject(row.hours_json), pickupOptions: parseJsonArray(row.pickup_options) }));
-  const items = itemsResult.results.map(row => ({ ...row, image_urls: parseJsonArray(row.image_urls), tags: parseJsonArray(row.tags_json), organizations: { name: row.org_name } }));
+  const items = itemsResult.results.map(row => ({ ...row, condition: publicProductCondition(row.condition,row.condition_detail), image_urls: parseJsonArray(row.image_urls), tags: parseJsonArray(row.tags_json), organizations: { name: row.org_name } }));
   const requests = requestsResult.results.map(row => ({
     id: row.id,
     status: row.status,
