@@ -497,6 +497,10 @@ assert.ok(indexHtml.includes('id="item-subcategory" disabled'),"fixed item subca
 assert.ok(indexHtml.includes('id="item-free" type="checkbox" required')&&!indexHtml.includes('id="item-free" type="checkbox" checked required'),"free-loan confirmation must start unchecked");
 assert.ok(appClient.includes("updateItemSubcategories"),"subcategory dependency logic missing");
 assert.ok(indexHtml.includes('id="subcategory-filter"'),"catalog subcategory filter missing");
+assert.ok(!appClient.includes("ITEM_SUBCATEGORIES"),"site must not fall back to hardcoded subcategories");
+assert.ok(appClient.includes("state.categoryCatalog")&&appClient.includes("/api/categories"),"live category catalog must drive site-wide category UI");
+assert.ok(adminControlCenter.includes("ניהול קטגוריות וקטגוריות משנה")&&adminControlCenter.includes("data-new-subcategory")&&adminControlCenter.includes("data-delete-category"),"super-admin category CRUD UI missing");
+
 for(const token of ["updateCatalogSubcategories","!subcategory || item.subcategory === subcategory","item.subcategory?","subcategory:$(\"#subcategory-filter\")?.value"])assert.ok(appClient.includes(token),token+" missing from category/subcategory separation UI");
 assert.ok(worker.includes("matchesSubcategory=!f.subcategory"),"saved-search subcategory separation missing");
 assert.ok(worker.includes("nextQuantity=currentQuantity+count"),"unit creation must increase item quantity");
