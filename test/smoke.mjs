@@ -257,7 +257,10 @@ try {
   result = await request(`/api/organizations/${organizationId}/branches`, { method:"POST", cookie:adminCookie, body:{ name:"סניף מרכזי",address:"רחוב הבדיקה 1",city:"ירושלים",phone:"050-1234567",inventoryMode:"separate",hours:{sun:"09:00-17:00"} } });
   assert.equal(result.response.status,201,JSON.stringify(result.data));
   result = await request(`/api/items/${itemId}/units`, { method:"POST",cookie:adminCookie,body:{count:1,condition:"חדש"} });
-  assert.equal(result.response.status,409,"manual serial creation must be rejected when item quantity is already fully represented");
+  assert.equal(result.response.status,201,JSON.stringify(result.data));
+  assert.equal(result.data.quantity,2,"adding one serialized unit must also increase item quantity");
+  assert.equal(result.data.units.length,1,"adding one serialized unit must create exactly one new unit");
+  assert.match(String(result.data.units[0].serialNumber||""),/^GB-\d+-\d+-2$/,"new unit serial must continue the item sequence");
 
   const form = new WorkerFormData();
   form.append("images", new Blob([new Uint8Array([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82])], { type: "image/png" }), "sample.png");
