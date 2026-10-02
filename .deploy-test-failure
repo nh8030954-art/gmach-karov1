@@ -1,4 +1,4 @@
-deploy_sha=3d6acc5b077fa02848757c057082dcbc9988bf70
+deploy_sha=3d027eb2ae2d6268cbfe39acf7b91f2afd85ffb6
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -30,7 +30,7 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: {"error":"אפשר להוסיף עד 1 מספרים סידוריים בלבד, בהתאם לכמות המלאי של הפריט","requestId":"179093897672034989"}
+AssertionError [ERR_ASSERTION]: {"error":"אפשר להוסיף עד 1 מספרים סידוריים בלבד, בהתאם לכמות המלאי של הפריט","requestId":"179093900582791970"}
 
 409 !== 201
 
