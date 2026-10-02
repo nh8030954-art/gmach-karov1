@@ -124,7 +124,8 @@ for(const token of ["openHelpMatches","data-help-matches","data-offer-match"])as
 assert.ok(appClient.includes("data-counter-pickup"),"pickup counter proposal UI missing");
 
 for(const token of ["maps.apple.com","data-copy-map-address","navigator.geolocation","/api/maps/geocode"])assert.ok(remainingClient.includes(token),token+" missing from completed map/navigation UI");
-assert.ok(remainingClient.includes("createInteractiveOsmMap")&&remainingClient.includes("tile.openstreetmap.org")&&remainingClient.includes("showCountry"),"interactive full-country gmach map missing");
+assert.ok(remainingClient.includes("createInteractiveOsmMap")&&remainingClient.includes("/api/maps/tiles/")&&remainingClient.includes("showCountry"),"interactive full-country gmach map missing");
+assert.ok(remainingWorker.includes("/api/maps/tiles/")&&remainingWorker.includes("tile.openstreetmap.org"),"same-origin map tile proxy missing");
 
 for(const token of ["manageLoanUnits","const loanUnits =","loan_unit_assignments"])assert.ok(worker.includes(token),token+" missing from pickup unit assignment backend");
 
@@ -514,3 +515,5 @@ assert.ok(worker.includes("if(active.length<desired)")&&worker.includes("else if
 assert.ok(worker.includes("reconcileSerializedQuantity"),"legacy serialized inventory must reconcile to canonical quantity");
 assert.ok(worker.includes("tracked_count")&&worker.includes("usable_tracked"),"availability must account for fully serialized units that are inactive or under repair");
 assert.ok(worker.includes("Number(existingUnits?.count||0)>quantity")&&worker.includes("Number(existingUnits.count)-quantity>Number(removable?.count||0)"),"item quantity reduction must protect assigned or unavailable serial units");
+
+assert.ok(worker.includes("CREATE TABLE IF NOT EXISTS organization_serial_codes")&&worker.includes("CREATE TABLE IF NOT EXISTS item_serial_codes"),"serial identity tables must self-heal at runtime");
