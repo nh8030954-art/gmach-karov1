@@ -2990,9 +2990,11 @@ async function manageLoanUnits(request,env,requestId,write=false){
     const conflicts=await env.DB.prepare(`SELECT COUNT(*) AS count FROM loan_unit_assignments WHERE unit_id IN (${placeholders}) AND request_id<>? AND returned_at IS NULL`).bind(...unitIds,requestId).first();
     if(Number(conflicts?.count||0)>0)throw new HttpError(409,"אחת היחידות כבר מוקצית להשאלה אחרת");
   }
+  const previous=await env.DB.prepare("SELECT unit_id FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL").bind(requestId).all();
   const now=new Date().toISOString(),statements=[
     env.DB.prepare("DELETE FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL").bind(requestId)
   ];
+  for(const row of previous.results||[])if(!unitIds.includes(String(row.unit_id)))statements.push(env.DB.prepare("UPDATE item_units SET status='available',updated_at=? WHERE id=? AND status='loaned'").bind(now,row.unit_id));
   for(const unitId of unitIds){
     statements.push(env.DB.prepare("INSERT INTO loan_unit_assignments(request_id,unit_id,assigned_at) VALUES(?,?,?)").bind(requestId,unitId,now));
     statements.push(env.DB.prepare("UPDATE item_units SET status='loaned',updated_at=? WHERE id=?").bind(now,unitId));
