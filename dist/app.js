@@ -35,23 +35,12 @@
     discovery: { categories: [], cities: [], suggestions: [], organizations: [] }, categoryAliases: [], categoryCatalog: [], pendingCommunityItem: null, viewMode: "list"
   };
 
-  const ITEM_SUBCATEGORIES = Object.freeze({
-    "אירועים":["עיצוב וקישוט","שולחנות וכיסאות","תאורה והגברה","כלי הגשה","חופות וסוכות","מפות וטקסטיל"],
-    "כלי עבודה":["כלי עבודה חשמליים","כלי עבודה ידניים","כלי גינה","סולמות ופיגומים","ציוד ניקוי"],
-    "תינוקות":["עגלות וטיולונים","מושבי בטיחות","מיטות ולולים","האכלה והנקה","רחצה והחתלה","מנשאים"],
-    "רפואה":["ניידות וכיסאות גלגלים","הליכונים וקביים","ציוד טיפול ביתי","ציוד אורתופדי","ציוד החלמה"],
-    "טיולים":["קמפינג","טיולים והליכה","מזוודות ותיקים","צידניות וציוד אוכל","ים ובריכה"],
-    "בית ואירוח":["מכשירי חשמל","ריהוט מתקפל","מטבח ואפייה","אירוח ולינה","מעבר דירה"],
-    "כללי":["ספרים ולימוד","תשמישי קדושה","נגישות","ביגוד ותחפושות","ספורט ופנאי","אחר"]
-  });
   function itemSubcategoriesFor(category){
     const rows=Array.isArray(state.categoryCatalog)?state.categoryCatalog:[],parent=rows.find(row=>!row.parent_id&&(row.name_he===category||row.id===category));
-    const dynamic=parent?rows.filter(row=>row.parent_id===parent.id).map(row=>row.name_he).filter(Boolean):[];
-    return rows.length?dynamic:(ITEM_SUBCATEGORIES[category]||[]);
+    return parent?rows.filter(row=>row.parent_id===parent.id).map(row=>row.name_he).filter(Boolean):[];
   }
   function populateItemCategorySelector(){
     const parents=(state.categoryCatalog||[]).filter(row=>!row.parent_id&&row.name_he);
-    if(!parents.length)return;
     const populate=(selector,emptyLabel)=>{
       const select=$(selector);if(!select)return;
       const current=select.value;
