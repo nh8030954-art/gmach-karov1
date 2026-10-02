@@ -969,10 +969,14 @@ html, body { max-width: 100%; overflow-x: clip; }
 .availability-toolbar button:disabled { opacity: .3; cursor: default; }
 .availability-weekdays,.availability-month { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 5px; text-align: center; }
 .availability-weekdays { padding: 8px 0; font-weight: 700; }
-.availability-month button { aspect-ratio: 1; border: 1px solid #dce5e4; border-radius: 10px; background: #f3faf6; cursor: pointer; font: inherit; }
+.availability-month button { min-height: 82px; border: 1px solid #dce5e4; border-radius: 10px; background: #f3faf6; cursor: pointer; font: inherit; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:5px 3px; }
+.availability-month button strong { font-size:1rem; }
+.availability-month button small { display:block; font-size:.68rem; line-height:1.15; }
+.availability-month button.is-partial { background: #fff8e8; }
 .availability-month button.is-busy { background: #fff2ee; }
 .availability-month button:focus-visible { outline: 3px solid #176e61; }
-.availability-month i { display: block; width: 5px; height: 5px; margin: auto; border-radius: 50%; background: #176e61; }
+.availability-month i { display: block; width: 5px; height: 5px; margin-top:2px; border-radius: 50%; background: #176e61; }
+.availability-month .is-partial i { background:#b4822d; }
 .availability-month .is-busy i { background: #b84a3c; }
 #availability-day-detail { min-height: 58px; margin-top: 16px; }
 @media (max-width: 700px) {
