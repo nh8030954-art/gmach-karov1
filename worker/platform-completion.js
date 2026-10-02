@@ -216,6 +216,8 @@ export async function handlePlatformCompletionApi(request,env,ctx,url){
   m=path.match(/^\/api\/branch-transfers\/([^/]+)\/receive$/);
   if(m&&method==="POST") return receiveBranchTransfer(request,env,decodeURIComponent(m[1]));
 
+  m=path.match(/^\/api\/item-units\/by-serial\/([^/]+)$/);
+  if(m&&method==="GET") return unitBySerial(request,env,decodeURIComponent(m[1]));
   m=path.match(/^\/api\/item-units\/([^/]+)$/);
   if(m&&method==="PATCH") return updateUnit(request,env,decodeURIComponent(m[1]));
   m=path.match(/^\/api\/item-units\/([^/]+)\/qr$/);
@@ -442,12 +444,18 @@ async function createBranchTransfer(request,env,orgId){
 async function receiveBranchTransfer(request,env,id){const x=await qfirst(env,"SELECT * FROM branch_transfers WHERE id=?",[id]);if(!x)throw new HttpError(404,"ההעברה לא נמצאה");await requireOrg(request,env,x.organization_id,["owner","inventory"]);if(x.status!=="in_transit")throw new HttpError(409,"ההעברה כבר טופלה");const now=new Date().toISOString(),s=[env.DB.prepare("UPDATE branch_transfers SET status='received',received_at=? WHERE id=?").bind(now,id)];if(x.unit_id)s.push(env.DB.prepare("UPDATE item_units SET branch_id=?,status='available',updated_at=? WHERE id=?").bind(x.to_branch_id,now,x.unit_id));await env.DB.batch(s);return json({ok:true});}
 
 /* ---------- inventory ---------- */
+async function unitBySerial(request,env,serial){
+  const u=await qfirst(env,"SELECT u.id,u.item_id,u.serial_number,u.status,u.condition,u.branch_id,i.title,i.organization_id FROM item_units u JOIN items i ON i.id=u.item_id WHERE u.serial_number=? AND u.status!='retired' LIMIT 1",[serial]);
+  if(!u)throw new HttpError(404,"היחידה לא נמצאה");
+  await requireOrg(request,env,u.organization_id,["owner","inventory","requests"]);
+  return json({unit:{id:u.id,itemId:u.item_id,serialNumber:u.serial_number,status:u.status,condition:u.condition,branchId:u.branch_id,title:u.title}});
+}
 async function updateUnit(request,env,id){const u=await qfirst(env,"SELECT u.*,i.organization_id FROM item_units u JOIN items i ON i.id=u.item_id WHERE u.id=?",[id]);if(!u)throw new HttpError(404,"היחידה לא נמצאה");await requireOrg(request,env,u.organization_id,["owner","inventory"]);const b=await readJson(request),st=["available","held","loaned","repair","inactive","retired"].includes(b.status)?b.status:u.status,cond=b.condition===undefined?u.condition:clean(b.condition,2,50,"מצב");await qrun(env,"UPDATE item_units SET status=?,condition=?,branch_id=?,retired_at=CASE WHEN ?='retired' THEN COALESCE(retired_at,?) ELSE retired_at END,updated_at=? WHERE id=?",[st,cond,b.branchId===undefined?u.branch_id:optional(b.branchId,100),st,new Date().toISOString(),new Date().toISOString(),id]);if(st==="retired")await qrun(env,"INSERT OR IGNORE INTO retired_serials(serial_number,item_unit_id) VALUES(?,?)",[u.serial_number,id]);return json({ok:true,status:st});}
 async function unitQr(request,env,id,url){
   const u=await qfirst(env,"SELECT u.id,u.serial_number,u.status,i.title,i.organization_id FROM item_units u JOIN items i ON i.id=u.item_id WHERE u.id=?",[id]);
   if(!u)throw new HttpError(404,"היחידה לא נמצאה");
   await requireOrg(request,env,u.organization_id,["owner","inventory","requests"]);
-  const payload=`${url.origin}/#/unit/${encodeURIComponent(u.serial_number)}`;
+  const payload=`${url.origin}/dashboard?unit=${encodeURIComponent(u.serial_number)}`;
   const qr=qrcode(0,"M");
   qr.addData(payload);
   qr.make();
