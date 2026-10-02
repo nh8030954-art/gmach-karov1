@@ -1,4 +1,4 @@
-deploy_sha=280770bb527e76d8bcb65dbd6be3e912c187181d
+deploy_sha=c661cd1df30c42e91458fa4f5462bb4cbc923caf
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -24,8 +24,8 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: pickup unit selection must not use single-element selector
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:503:8 {
+AssertionError [ERR_ASSERTION]: pickup unit selection must use collection selector
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:502:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
