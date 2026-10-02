@@ -438,7 +438,7 @@
     let dialog = $("#compare-dialog");
     if (!dialog) { dialog = document.createElement("dialog"); dialog.id = "compare-dialog"; dialog.className = "modal compare-dialog"; document.body.append(dialog); dialog.addEventListener("close", () => { if (!$("dialog[open]")) document.body.classList.remove("dialog-open"); }); }
     const rows = [
-      ["גמ״ח", item => item.organizations?.name], ["קטגוריה", item => item.category], ["מצב", item => item.condition],
+      ["גמ״ח", item => item.organizations?.name], ["קטגוריה", item => item.category], ["מצב", item => displayCondition(item.condition)],
       ["זמינות", item => item.availability_status === "available" ? "זמין" : "בתיאום"], ["כמות זמינה", item => item.available_count ?? item.quantity],
       ["עיר", item => item.city], ["תנאי השאלה", item => item.loan_conditions]
     ];
