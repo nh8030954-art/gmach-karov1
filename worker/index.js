@@ -2994,16 +2994,19 @@ async function reconcileSerializedQuantity(env,itemId){
 async function serialIdentityCodes(env,item){
   await env.DB.batch([
     env.DB.prepare("CREATE TABLE IF NOT EXISTS organization_serial_codes (code INTEGER PRIMARY KEY AUTOINCREMENT, organization_id TEXT NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))"),
-    env.DB.prepare("CREATE TABLE IF NOT EXISTS item_serial_codes (code INTEGER PRIMARY KEY AUTOINCREMENT, item_id TEXT NOT NULL UNIQUE REFERENCES items(id) ON DELETE CASCADE, organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS item_serial_codes (item_id TEXT PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE, organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, code INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), UNIQUE(organization_id,code))"),
     env.DB.prepare("CREATE INDEX IF NOT EXISTS item_serial_codes_org_idx ON item_serial_codes(organization_id, code)")
   ]);
   await env.DB.prepare("INSERT OR IGNORE INTO organization_serial_codes(organization_id) VALUES(?)").bind(item.organization_id).run();
-  await env.DB.prepare("INSERT OR IGNORE INTO item_serial_codes(item_id,organization_id) VALUES(?,?)").bind(item.id,item.organization_id).run();
-  const [orgCode,itemCode]=await env.DB.batch([
-    env.DB.prepare("SELECT code FROM organization_serial_codes WHERE organization_id=?").bind(item.organization_id),
-    env.DB.prepare("SELECT code FROM item_serial_codes WHERE item_id=?").bind(item.id)
-  ]);
-  const org=orgCode.results?.[0]?.code,itemNo=itemCode.results?.[0]?.code;
+  let itemRow=await env.DB.prepare("SELECT code FROM item_serial_codes WHERE item_id=?").bind(item.id).first();
+  if(!itemRow){
+    const next=await env.DB.prepare("SELECT COALESCE(MAX(code),0)+1 AS code FROM item_serial_codes WHERE organization_id=?").bind(item.organization_id).first();
+    const proposed=Math.max(1,Number(next?.code||1));
+    await env.DB.prepare("INSERT OR IGNORE INTO item_serial_codes(item_id,organization_id,code) VALUES(?,?,?)").bind(item.id,item.organization_id,proposed).run();
+    itemRow=await env.DB.prepare("SELECT code FROM item_serial_codes WHERE item_id=?").bind(item.id).first();
+  }
+  const orgRow=await env.DB.prepare("SELECT code FROM organization_serial_codes WHERE organization_id=?").bind(item.organization_id).first();
+  const org=orgRow?.code,itemNo=itemRow?.code;
   if(!org||!itemNo)throw new Error("לא ניתן להקצות מזהה סידורי");
   return {orgCode:Number(org),itemCode:Number(itemNo)};
 }
@@ -3057,12 +3060,11 @@ async function createItemUnit(request,env,itemId){
   const item=await itemOrganization(env,itemId);if(!item)throw new HttpError(404,"הפריט לא נמצא");
   const {user}=await requireOrganizationRole(request,env,item.organization_id,["owner","inventory"]),body=await readJson(request);
   const count=positiveInt(body.count,1,1,100,"כמות יחידות");
-  const active=await env.DB.prepare("SELECT COUNT(*) AS count FROM item_units WHERE item_id=? AND status!='retired'").bind(itemId).first();
-  const remaining=Math.max(0,Number(item.quantity||0)-Number(active?.count||0));
-  if(count>remaining)throw new HttpError(409,"מספר היחידות הסידוריות לא יכול לעלות על כמות הפריט. יש לעדכן קודם את כמות הפריט");
-  const synced=await syncItemUnitsToQuantity(env,itemId,Number(item.quantity||1));
-  await auditStatement(env,user.id,"item.units.create","item",itemId,{count,quantity:Number(item.quantity||1)}).run();
-  return json({units:synced.created.slice(0,count),quantity:Number(item.quantity||1)},201);
+  const currentQuantity=Math.max(1,Number(item.quantity||1)),nextQuantity=currentQuantity+count,now=new Date().toISOString();
+  await env.DB.prepare("UPDATE items SET quantity=?,inventory_updated_at=?,updated_at=? WHERE id=?").bind(nextQuantity,now,now,itemId).run();
+  const synced=await syncItemUnitsToQuantity(env,itemId,nextQuantity);
+  await auditStatement(env,user.id,"item.units.create","item",itemId,{count,previousQuantity:currentQuantity,quantity:nextQuantity}).run();
+  return json({units:synced.created.slice(0,count),quantity:nextQuantity},201);
 }
 
 async function markReviewHelpful(request,env,reviewId){const user=await requireUser(request,env);const exists=await env.DB.prepare("SELECT id FROM reviews WHERE id=? AND status='published'").bind(reviewId).first();if(!exists)throw new HttpError(404,"הביקורת לא נמצאה");await env.DB.batch([env.DB.prepare("INSERT OR IGNORE INTO review_helpful_votes(review_id,user_id) VALUES(?,?)").bind(reviewId,user.id),env.DB.prepare("UPDATE reviews SET helpful_count=(SELECT COUNT(*) FROM review_helpful_votes WHERE review_id=?) WHERE id=?").bind(reviewId,reviewId)]);return json({helpful:true});}
