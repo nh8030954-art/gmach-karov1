@@ -14,7 +14,7 @@
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"גמ״ח ברגע","inLanguage":["he","en"],"description":"פלטפורמה קהילתית למציאת ציוד להשאלה וגמ״חים קרובים","potentialAction":{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"/catalog?q={search_term_string}"},"query-input":"required name=search_term_string"}}</script>
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com https://www.openstreetmap.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';">
 
-  <script src="./i18n-boot.js?v=20261002-1435"></script>
+  <script src="./i18n-boot.js?v=20261002-1505"></script>
   <script>
   (()=>{try{
     const raw=localStorage.getItem("gmach-site-settings-v1");if(!raw)return;
@@ -36,8 +36,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&family=Noto+Serif+Hebrew:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="icon" type="image/jpeg" href="./gmach-berega-logo.jpg">
-  <link rel="stylesheet" href="./styles.css?v=20261002-1435">
-  <link rel="stylesheet" href="./motion.css?v=20261002-1435">
+  <link rel="stylesheet" href="./styles.css?v=20261002-1505">
+  <link rel="stylesheet" href="./motion.css?v=20261002-1505">
 
 
 
@@ -548,7 +548,7 @@
           <div class="two-columns"><label><span>סוג</span><select id="item-type"><option value="loan">השאלה</option><option value="donation">מסירה</option></select></label><label><span>אישור הזמנה</span><select id="item-approval-mode"><option value="manual">אישור מנהל הגמ״ח</option><option value="automatic">אישור אוטומטי אם יש מלאי</option></select></label></div>
           <label><span>תגיות <small>(רשות)</small></span><input id="item-tags" maxlength="250" placeholder="תינוק, עגלה, נסיעות"></label>
           <label><span>תנאי השאלה <small>(רשות)</small></span><input id="item-conditions" maxlength="300" placeholder="למשל: החזרה נקייה ובזמן"></label>
-          <div class="two-columns"><label><span>משך השאלה מינימלי</span><span class="duration-field"><input id="item-min-loan" type="number" min="1" max="525600" value="1" required aria-label="משך מינימלי"><select id="item-min-loan-unit" aria-label="יחידת זמן למשך מינימלי"><option value="60">שעות</option><option value="1440">ימים</option><option value="1">דקות</option></select></span></label><label><span>משך השאלה מקסימלי</span><span class="duration-field"><input id="item-max-loan" type="number" min="1" max="525600" value="7" required aria-label="משך מקסימלי"><select id="item-max-loan-unit" aria-label="יחידת זמן למשך מקסימלי"><option value="1440">ימים</option><option value="60">שעות</option><option value="1">דקות</option></select></span></label></div>
+          <div class="two-columns"><label><span>משך השאלה מינימלי</span><span class="duration-field"><input id="item-min-loan" type="number" min="0.5" max="8760" step="0.5" value="1" required aria-label="משך מינימלי"><select id="item-min-loan-unit" aria-label="יחידת זמן למשך מינימלי"><option value="60">שעות</option><option value="1440">ימים</option></select></span></label><label><span>משך השאלה מקסימלי</span><span class="duration-field"><input id="item-max-loan" type="number" min="0.5" max="8760" step="0.5" value="7" required aria-label="משך מקסימלי"><select id="item-max-loan-unit" aria-label="יחידת זמן למשך מקסימלי"><option value="1440">ימים</option><option value="60">שעות</option></select></span></label></div>
           <div class="two-columns"><label><span>כמה זמן מראש להזמין</span><span class="duration-field"><input id="item-booking-notice" type="number" min="0" max="525600" value="0" required><select id="item-booking-notice-unit" aria-label="יחידת זמן להזמנה מראש"><option value="1">דקות</option><option value="60">שעות</option><option value="1440">ימים</option></select></span></label><label><span>זמן בין השאלות</span><span class="duration-field"><input id="item-turnaround" type="number" min="0" max="10080" value="0" required><select id="item-turnaround-unit" aria-label="יחידת זמן בין השאלות"><option value="1">דקות</option><option value="60">שעות</option><option value="1440">ימים</option></select></span></label></div>
           <div class="two-columns"><label><span>עד כמה זמן מראש ניתן להזמין</span><span class="duration-field"><input id="item-booking-horizon" type="number" min="1" max="1576800" value="365" required><select id="item-booking-horizon-unit" aria-label="יחידת זמן לטווח הזמנה"><option value="1440">ימים</option><option value="60">שעות</option><option value="1">דקות</option></select></span></label><label><span>פרסום עתידי <small>(רשות)</small></span><input id="item-publish-at" type="datetime-local"></label></div>
           <label><span>מקסימום יחידות למשתמש <small>(רשות)</small></span><input id="item-max-per-user" type="number" min="1" max="999"></label>
@@ -635,22 +635,22 @@
     <div id="info-dialog-content" class="legal-copy"></div>
   </dialog>
 
-  <script src="./vendor/qrcode.js?v=20261002-1435" defer></script>
-  <script src="./app.js?v=20261002-1435" defer></script>\n  <script src="./platform-completion.js?v=20261002-1435" defer></script>
-  <script src="./final-features.js?v=20261002-1435" defer></script>
-  <script src="./i18n-en.js?v=20261002-1435" defer></script>
-  <script src="./i18n-errors.js?v=20261002-1435" defer></script>
-  <script src="./remaining-features.js?v=20261002-1435" defer></script>
-  <script src="./requirements-expansion.js?v=20261002-1435" defer></script>
-  <script src="./release-experience.js?v=20261002-1435" defer></script>
-  <script src="./privacy-purge.js?v=20261002-1435" defer></script>
-  <script src="./launch-readiness.js?v=20261002-1435" defer></script>
-  <script src="./distribution-completion.js?v=20261002-1435" defer></script>
-  <script src="./navigation-admin.js?v=20261002-1435" defer></script>
-  <script src="./privacy-availability.js?v=20261002-1435" defer></script>
-  <script src="./admin-control-center.js?v=20261002-1435" defer></script>
-  <script src="./user-content-translation.js?v=20261002-1435" defer></script>
-  <script src="./motion.js?v=20261002-1435" defer></script>
+  <script src="./vendor/qrcode.js?v=20261002-1505" defer></script>
+  <script src="./app.js?v=20261002-1505" defer></script>\n  <script src="./platform-completion.js?v=20261002-1505" defer></script>
+  <script src="./final-features.js?v=20261002-1505" defer></script>
+  <script src="./i18n-en.js?v=20261002-1505" defer></script>
+  <script src="./i18n-errors.js?v=20261002-1505" defer></script>
+  <script src="./remaining-features.js?v=20261002-1505" defer></script>
+  <script src="./requirements-expansion.js?v=20261002-1505" defer></script>
+  <script src="./release-experience.js?v=20261002-1505" defer></script>
+  <script src="./privacy-purge.js?v=20261002-1505" defer></script>
+  <script src="./launch-readiness.js?v=20261002-1505" defer></script>
+  <script src="./distribution-completion.js?v=20261002-1505" defer></script>
+  <script src="./navigation-admin.js?v=20261002-1505" defer></script>
+  <script src="./privacy-availability.js?v=20261002-1505" defer></script>
+  <script src="./admin-control-center.js?v=20261002-1505" defer></script>
+  <script src="./user-content-translation.js?v=20261002-1505" defer></script>
+  <script src="./motion.js?v=20261002-1505" defer></script>
 
 
 
@@ -658,6 +658,6 @@
 
 
 
-  <script src="./release-shell.js?v=20261002-1435" defer></script>
+  <script src="./release-shell.js?v=20261002-1505" defer></script>
 </body>
 </html>
