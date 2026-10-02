@@ -1,40 +1,27 @@
-sha=9febde1346576cfdd2fef826811ac9a39b5251d1
+sha=c5987badd6e0a39c023875764355e82a90a01100
 install=success
 syntax=success
-tests=success
-smoke=success
-live=success
-        at async getPublicOrganization (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:1612:56)
-        at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:366:26)
-  }
-}
-Public organization section unavailable {
-  organizationId: 'synthetic-org-0',
-  section: 'reviews',
-  error: Error: D1_ERROR: no such column: r.item_rating at offset 21: SQLITE_ERROR
-      at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:146:19)
-      at async cloudflare-internal:d1-api:374:41
-      ... 2 lines matching cause stack trace ...
-      at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:366:26) {
-    [cause]: Error: no such column: r.item_rating at offset 21: SQLITE_ERROR
-        at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:147:24)
-        at async cloudflare-internal:d1-api:374:41
-        at async Promise.allSettled (index 1)
-        at async getPublicOrganization (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:1612:56)
-        at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:366:26)
-  }
-}
+tests=cancelled
+smoke=skipped
+live=skipped
+Privacy availability static release gate passed.
+Release hardening static gate passed.
+Release experience static release gate passed.
+Admin control center static release gate passed.
+Privacy purge static release gate passed.
 Community chat retention static release gate passed.
 QR scanning, structured SEO and accessibility shell gate passed.
 Excel export and QR image scanner gate passed.
 Voice message recording gate passed.
 Excel export, accessible admin status and QR image scanning gate passed.
 Full requirements regression extensions passed.
+Static English interface coverage 100.0% (459/459)
 remaining-features Error: Backup checksum mismatch
     at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
     at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:336:91)
     at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:875:37)
     at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:366:26)
 Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T09:45:41.177Z"}
+{"users":250,"organizations":50,"items":500,"concurrency":10,"requests":50,"success":50,"durationMs":372}
+{"users":250,"organizations":50,"items":500,"concurrency":25,"requests":125,"success":125,"durationMs":786}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
