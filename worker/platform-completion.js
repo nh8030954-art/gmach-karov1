@@ -1,4 +1,4 @@
-import qrcode from "qrcode-generator";
+import qrcode from "./vendor/qrcode-generator.mjs";
 const SESSION_COOKIE="gmach_session";
 
 class HttpError extends Error{constructor(status,message){super(message);this.status=status;}}
