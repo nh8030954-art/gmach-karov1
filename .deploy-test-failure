@@ -1,4 +1,4 @@
-deploy_sha=20dd0a84ed8e3755a01efccd7e18efb6b93c3d3c
+deploy_sha=86c0124ecfd3ffb5f8584b45723a69cb9dd44075
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -20,22 +20,26 @@ Excel export and QR image scanner gate passed.
 Voice message recording gate passed.
 Excel export, accessible admin status and QR image scanning gate passed.
 Full requirements regression extensions passed.
+Static English interface coverage 100.0% (459/459)
+remaining-features Error: Backup checksum mismatch
+    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
+    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:336:91)
+    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:746:37)
+    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:237:26)
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: English static UI is missing translations: — אין שעות פעילות קבועות.
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
 
-1 !== 0
+400 !== 200
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/i18n-static.mjs:33:8
-    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
-    at async node:internal/modules/esm/loader:647:26
-    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
-  generatedMessage: false,
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:374:10
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: true,
   code: 'ERR_ASSERTION',
-  actual: 1,
-  expected: 0,
+  actual: 400,
+  expected: 200,
   operator: 'strictEqual',
   diff: 'simple'
 }
