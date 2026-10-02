@@ -485,20 +485,47 @@ function osmEmbed(lat,lon){
  const span=.018,bbox=[lon-span,lat-span,lon+span,lat+span].join("%2C");
  return "https://www.openstreetmap.org/export/embed.html?bbox="+bbox+"&layer=mapnik&marker="+encodeURIComponent(lat+","+lon);
 }
-let leafletPromise=null;
-function ensureLeaflet(){
- if(window.L)return Promise.resolve(window.L);
- if(leafletPromise)return leafletPromise;
- leafletPromise=new Promise((resolve,reject)=>{
-   if(!document.querySelector('link[data-gmach-leaflet]')){
-     const css=document.createElement("link");css.rel="stylesheet";css.href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";css.dataset.gmachLeaflet="1";document.head.append(css);
-   }
-   const existing=document.querySelector('script[data-gmach-leaflet]');
-   if(existing){existing.addEventListener("load",()=>resolve(window.L),{once:true});existing.addEventListener("error",()=>reject(new Error("טעינת המפה נכשלה")),{once:true});return}
-   const script=document.createElement("script");script.src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";script.async=true;script.dataset.gmachLeaflet="1";
-   script.onload=()=>resolve(window.L);script.onerror=()=>reject(new Error("טעינת המפה נכשלה"));document.head.append(script);
- });
- return leafletPromise;
+function createLocalOsmMap(canvas){
+  const state={center:{lat:31.8,lon:34.9},zoom:8,points:[],focus:null,popup:null,drag:null};
+  canvas.innerHTML='<div class="gmach-osm-map" style="position:relative;width:100%;height:100%;overflow:hidden;background:#e9efed;touch-action:none;user-select:none"><div data-osm-tiles style="position:absolute;inset:0"></div><div data-osm-pins style="position:absolute;inset:0;pointer-events:none"></div><div data-osm-controls style="position:absolute;top:12px;left:12px;z-index:4;display:grid;gap:6px"><button type="button" class="button button-secondary button-small" data-osm-zoom="in" aria-label="התקרבות">+</button><button type="button" class="button button-secondary button-small" data-osm-zoom="out" aria-label="התרחקות">−</button></div></div>';
+  const root=canvas.firstElementChild,tiles=root.querySelector("[data-osm-tiles]"),pins=root.querySelector("[data-osm-pins]");
+  const clampLat=lat=>Math.max(-85.05112878,Math.min(85.05112878,Number(lat)||0));
+  const world=(lat,lon,z)=>{const n=2**z,x=(Number(lon)+180)/360*n,y=(1-Math.log(Math.tan(clampLat(lat)*Math.PI/180)+1/Math.cos(clampLat(lat)*Math.PI/180))/Math.PI)/2*n;return{x:x*256,y:y*256}};
+  const inv=(x,y,z)=>{const n=2**z,lon=x/256/n*360-180,yy=Math.PI*(1-2*y/256/n),lat=180/Math.PI*Math.atan(Math.sinh(yy));return{lat,lon}};
+  const removePopup=()=>{state.popup?.remove();state.popup=null};
+  const render=()=>{
+    const w=root.clientWidth||800,h=root.clientHeight||500,z=state.zoom,cw=world(state.center.lat,state.center.lon,z),left=cw.x-w/2,top=cw.y-h/2;
+    tiles.innerHTML="";
+    const minX=Math.floor(left/256),maxX=Math.floor((left+w)/256),minY=Math.floor(top/256),maxY=Math.floor((top+h)/256),n=2**z;
+    for(let ty=minY;ty<=maxY;ty++)for(let tx=minX;tx<=maxX;tx++){
+      if(ty<0||ty>=n)continue;const wrap=((tx%n)+n)%n,img=document.createElement("img");
+      img.src="https://"+(["a","b","c"][(wrap+ty)%3])+".tile.openstreetmap.org/"+z+"/"+wrap+"/"+ty+".png";img.alt="";img.draggable=false;img.decoding="async";img.loading="eager";
+      img.style.cssText="position:absolute;width:256px;height:256px;left:"+(tx*256-left)+"px;top:"+(ty*256-top)+"px";tiles.append(img);
+    }
+    pins.innerHTML="";
+    for(const p of state.points){
+      const wp=world(p.lat,p.lon,z),x=wp.x-left,y=wp.y-top;
+      if(x<-30||y<-30||x>w+30||y>h+30)continue;
+      const btn=document.createElement("button");btn.type="button";btn.dataset.mapOrg=p.id||"";btn.title=p.name||"גמ״ח";
+      btn.style.cssText="pointer-events:auto;position:absolute;left:"+(x-13)+"px;top:"+(y-13)+"px;width:26px;height:26px;border-radius:50%;border:4px solid white;background:#0f766e;box-shadow:0 2px 10px #0005;cursor:pointer;padding:0";
+      btn.onclick=e=>{e.stopPropagation();removePopup();const pop=document.createElement("div");pop.dir=lang==="en"?"ltr":"rtl";pop.style.cssText="position:absolute;z-index:6;min-width:230px;max-width:320px;background:white;border:1px solid #ccd7d3;border-radius:14px;box-shadow:0 12px 35px #0003;padding:12px;left:"+Math.max(8,Math.min(w-250,x-115))+"px;top:"+Math.max(8,Math.min(h-210,y+18))+"px";pop.innerHTML=p.popupHtml||"<strong>"+esc(p.name||"גמ״ח")+"</strong>";root.append(pop);state.popup=pop};
+      pins.append(btn);
+    }
+    if(state.focus){
+      const wp=world(state.focus.lat,state.focus.lon,z),x=wp.x-left,y=wp.y-top,b=document.createElement("div");b.style.cssText="position:absolute;left:"+(x-10)+"px;top:"+(y-10)+"px;width:20px;height:20px;border-radius:50%;background:#b45309;border:4px solid white;box-shadow:0 2px 10px #0005;pointer-events:none";pins.append(b);
+    }
+  };
+  const setView=(lat,lon,zoom=state.zoom)=>{state.center={lat:Number(lat),lon:Number(lon)};state.zoom=Math.max(3,Math.min(18,Math.round(zoom)));removePopup();render()};
+  const fitPoints=points=>{if(!points.length)return render();let minLat=90,maxLat=-90,minLon=180,maxLon=-180;points.forEach(p=>{minLat=Math.min(minLat,p.lat);maxLat=Math.max(maxLat,p.lat);minLon=Math.min(minLon,p.lon);maxLon=Math.max(maxLon,p.lon)});state.center={lat:(minLat+maxLat)/2,lon:(minLon+maxLon)/2};for(let z=14;z>=3;z--){const a=world(maxLat,minLon,z),b=world(minLat,maxLon,z);if(Math.abs(b.x-a.x)<(root.clientWidth||800)-100&&Math.abs(b.y-a.y)<(root.clientHeight||500)-100){state.zoom=z;break}}render()};
+  root.querySelector('[data-osm-zoom="in"]').onclick=e=>{e.stopPropagation();state.zoom=Math.min(18,state.zoom+1);render()};
+  root.querySelector('[data-osm-zoom="out"]').onclick=e=>{e.stopPropagation();state.zoom=Math.max(3,state.zoom-1);render()};
+  root.onpointerdown=e=>{if(e.target.closest("button"))return;state.drag={x:e.clientX,y:e.clientY,center:world(state.center.lat,state.center.lon,state.zoom)};root.setPointerCapture?.(e.pointerId)};
+  root.onpointermove=e=>{if(!state.drag)return;const dx=e.clientX-state.drag.x,dy=e.clientY-state.drag.y,p=inv(state.drag.center.x-dx,state.drag.center.y-dy,state.zoom);state.center=p;render()};
+  root.onpointerup=root.onpointercancel=()=>{state.drag=null};
+  root.onwheel=e=>{e.preventDefault();state.zoom=Math.max(3,Math.min(18,state.zoom+(e.deltaY<0?1:-1)));render()};
+  root.onclick=e=>{if(!e.target.closest("button"))removePopup()};
+  const ro=new ResizeObserver(()=>render());ro.observe(root);
+  return {setPoints(points){state.points=points;render()},fitPoints,setView,setFocus(lat,lon){state.focus={lat:Number(lat),lon:Number(lon)};setView(lat,lon,15)},destroy(){ro.disconnect();removePopup();canvas.innerHTML=""}};
 }
 async function geocodeGmachOrganizations(rows){
  const cache=new Map(),resolved=new Array(rows.length),queue=rows.map((row,index)=>({row,index}));
@@ -529,33 +556,23 @@ async function showAddressMap(){
  const form=$("#map-search",d),results=$("#map-results",d),status=$("#gmach-map-status",d),canvas=$("#gmach-map-canvas",d);
  $("#map-nav-pref",d).onchange=async e=>{navPref=e.target.value;localStorage.setItem("gmach-navigation-app",navPref);try{await api("/api/me/navigation-preferences",{method:"PUT",body:{preferredApp:navPref}})}catch{};toast(lang==="en"?"Navigation preference saved":"העדפת הניווט נשמרה")};
  d.addEventListener("click",async e=>{const button=e.target.closest?.("[data-copy-map-address]");if(!button)return;try{await navigator.clipboard.writeText(button.dataset.copyMapAddress||"");toast(lang==="en"?"Address copied":"הכתובת הועתקה")}catch{toast(lang==="en"?"Could not copy address":"לא הצלחנו להעתיק את הכתובת",true)}});
- let map,L,focusMarker;
+ let map;
  const navigationLinks=(lat,lon,label)=>`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"><a class="button button-secondary button-small" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lat+","+lon)}">Google</a><a class="button button-secondary button-small" target="_blank" rel="noopener" href="https://waze.com/ul?ll=${encodeURIComponent(lat+","+lon)}&navigate=yes">Waze</a><a class="button button-secondary button-small" target="_blank" rel="noopener" href="https://maps.apple.com/?ll=${encodeURIComponent(lat+","+lon)}&q=${encodeURIComponent(label||"יעד")}">Apple</a><button class="button button-secondary button-small" type="button" data-copy-map-address="${esc(label||String(lat)+","+String(lon))}">${lang==="en"?"Copy address":"העתקת כתובת"}</button></div>`;
- const focusPoint=(lat,lon,label)=>{if(!map||!L)return;if(focusMarker)focusMarker.remove();focusMarker=L.marker([lat,lon],{zIndexOffset:1000}).addTo(map).bindPopup(`<strong>${esc(label||"יעד")}</strong>${navigationLinks(lat,lon,label)}`).openPopup();map.setView([lat,lon],15)};
+ const focusPoint=(lat,lon,label)=>{if(!map)return;map.setFocus(lat,lon);results.insertAdjacentHTML("beforeend",`<div class="platform-note"><strong>${esc(label||"יעד")}</strong>${navigationLinks(lat,lon,label)}</div>`)};
  try{
-   L=await ensureLeaflet();
-   map=L.map(canvas,{zoomControl:true,scrollWheelZoom:true}).setView([31.8,34.9],8);
-   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap contributors"}).addTo(map);
+   map=createLocalOsmMap(canvas);
    const discovery=await api("/api/discovery"),organizations=discovery.organizations||[];
    const points=await geocodeGmachOrganizations(organizations);
-   const bounds=[];
    points.forEach(org=>{
-     const marker=L.circleMarker([org.lat,org.lon],{radius:11,weight:3,fillOpacity:.9}).addTo(map);
-     bounds.push([org.lat,org.lon]);
-     const details=`<div dir="${lang==="en"?"ltr":"rtl"}" style="min-width:190px"><strong style="font-size:16px">${esc(org.name)}</strong><div style="margin-top:5px">📍 ${esc([org.city,org.neighborhood].filter(Boolean).join(" · "))}</div><div>📦 ${Number(org.item_count||0)} ${lang==="en"?"items":"פריטים"} · ✅ ${Number(org.available_items||0)} ${lang==="en"?"available":"זמינים"}</div>${org.description?`<p style="margin:7px 0">${esc(org.description)}</p>`:""}<button type="button" class="button button-primary button-small" data-map-open-org="${esc(org.id)}">${lang==="en"?"View gmach":"לפרטי הגמ״ח"}</button>${navigationLinks(org.lat,org.lon,org.name)}</div>`;
-     marker.bindPopup(details,{maxWidth:320});
-     marker.on("popupopen",()=>{
-       const popup=marker.getPopup()?.getElement(),button=popup?.querySelector("[data-map-open-org]");
-       if(button)button.onclick=()=>{const target=document.querySelector('[data-open-organization="'+CSS.escape(button.dataset.mapOpenOrg)+'"],[data-advanced-org="'+CSS.escape(button.dataset.mapOpenOrg)+'"]');if(target){d.close();target.click()}else toast(lang==="en"?"Open the gmach card from the list below the map.":"פרטי הגמ״ח מוצגים בנקודה; ניתן לפתוח אותו גם מרשימת הגמ״חים.")}
-     });
+     org.popupHtml=`<div dir="${lang==="en"?"ltr":"rtl"}"><strong style="font-size:16px">${esc(org.name)}</strong><div style="margin-top:5px">📍 ${esc([org.city,org.neighborhood].filter(Boolean).join(" · "))}</div><div>📦 ${Number(org.item_count||0)} ${lang==="en"?"items":"פריטים"} · ✅ ${Number(org.available_items||0)} ${lang==="en"?"available":"זמינים"}</div>${org.description?`<p style="margin:7px 0">${esc(org.description)}</p>`:""}<button type="button" class="button button-primary button-small" data-map-open-org="${esc(org.id)}">${lang==="en"?"View gmach":"לפרטי הגמ״ח"}</button>${navigationLinks(org.lat,org.lon,org.name)}</div>`;
    });
-   if(bounds.length)map.fitBounds(bounds,{padding:[34,34],maxZoom:13});
+   map.setPoints(points);map.fitPoints(points);
+   canvas.addEventListener("click",e=>{const button=e.target.closest?.("[data-map-open-org]");if(!button)return;const target=document.querySelector('[data-open-organization="'+CSS.escape(button.dataset.mapOpenOrg)+'"],[data-advanced-org="'+CSS.escape(button.dataset.mapOpenOrg)+'"]');if(target){d.close();target.click()}else toast(lang==="en"?"Open the gmach from the list.":"ניתן לפתוח את הגמ״ח גם מרשימת הגמ״חים.")});
    status.textContent=points.length?(lang==="en"?`${points.length} gmachs are shown. Click any marker for details.`:`${points.length} גמ״חים מוצגים על המפה. לחצו על נקודה לפרטים.`):(lang==="en"?"No gmach locations could be placed yet.":"עדיין לא נמצאו כתובות גמ״חים שניתן למקם על המפה.");
-   setTimeout(()=>map.invalidateSize(),80);
  }catch(e){status.textContent=e.message||"טעינת המפה נכשלה";canvas.innerHTML=`<div class="dashboard-empty"><strong>${esc(status.textContent)}</strong></div>`}
  form.onsubmit=async e=>{e.preventDefault();results.innerHTML="<p>מחפשים…</p>";try{const x=await api("/api/maps/geocode?q="+encodeURIComponent(form.q.value));results.innerHTML=x.results.length?x.results.map((r,i)=>`<button type="button" class="button button-secondary" data-map-i="${i}" style="text-align:start">${esc(r.displayName)}</button>`).join(""):"<p>לא נמצאה כתובת.</p>";$$("[data-map-i]",results).forEach(btn=>btn.onclick=()=>{const r=x.results[Number(btn.dataset.mapI)];focusPoint(Number(r.lat),Number(r.lon),r.displayName)})}catch(e){results.innerHTML="<p role=alert>"+esc(e.message)+"</p>"}};
  $("#map-current",d).onclick=()=>navigator.geolocation?.getCurrentPosition(pos=>focusPoint(pos.coords.latitude,pos.coords.longitude,lang==="en"?"My current location":"המיקום הנוכחי"),()=>toast(lang==="en"?"Location permission was not granted":"לא התקבלה הרשאת מיקום",true),{enableHighAccuracy:false,timeout:8000,maximumAge:60000});
- d.addEventListener("close",()=>{try{map?.remove()}catch{}},{once:true});
+ d.addEventListener("close",()=>{try{map?.destroy()}catch{}},{once:true});
 }
 function installMapEntry(){
  if($("#map-entry"))return;const host=$(".header-actions");if(!host)return;const b=document.createElement("button");b.id="map-entry";b.type="button";b.className="button button-secondary";b.textContent=lang==="en"?"Map":"מפה";b.onclick=showAddressMap;host.append(b);const bell=$("#notifications-button"),account=$("#dashboard-button");if(bell&&account&&bell.parentElement===host){account.after(bell);bell.after(b)}
