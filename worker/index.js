@@ -2408,6 +2408,9 @@ async function updateRequestStatus(request, env, id) {
   ];
   if(target==="approved") statusStatements.push(env.DB.prepare("UPDATE inventory_holds SET status='converted' WHERE request_id=? AND status='active'").bind(id));
   if(["declined","cancelled","returned","no_show"].includes(target)) statusStatements.push(env.DB.prepare("UPDATE inventory_holds SET status='released' WHERE request_id=? AND status IN ('active','converted')").bind(id));
+  if(target==="collected"){
+    statusStatements.push(env.DB.prepare("UPDATE item_units SET status='loaned',updated_at=? WHERE id IN (SELECT unit_id FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL)").bind(now,id));
+  }
   if(target==="returned"){
     statusStatements.push(env.DB.prepare("UPDATE loan_unit_assignments SET returned_at=? WHERE request_id=? AND returned_at IS NULL").bind(now,id));
     statusStatements.push(env.DB.prepare("UPDATE item_units SET status='available',updated_at=? WHERE id IN (SELECT unit_id FROM loan_unit_assignments WHERE request_id=?)").bind(now,id));
@@ -3103,16 +3106,17 @@ async function manageLoanUnits(request,env,requestId,write=false){
   const required=Math.max(1,Number(loan.quantity||1));
   if(unitIds.length!==required)throw new HttpError(400,"יש לבחור בדיוק "+required+" יחידות לאיסוף");
   const placeholders=unitIds.map(()=>"?").join(",");
-  const valid=await env.DB.prepare("SELECT id FROM item_units WHERE item_id=? AND id IN ("+placeholders+") AND status IN ('available','loaned')").bind(loan.item_id,...unitIds).all();
+  const valid=await env.DB.prepare("SELECT id FROM item_units WHERE item_id=? AND id IN ("+placeholders+") AND status IN ('available','held','loaned')").bind(loan.item_id,...unitIds).all();
   if((valid.results||[]).length!==unitIds.length)throw new HttpError(409,"אחת היחידות שנבחרו אינה זמינה");
   const conflict=await env.DB.prepare("SELECT COUNT(*) AS count FROM loan_unit_assignments WHERE unit_id IN ("+placeholders+") AND request_id<>? AND returned_at IS NULL").bind(...unitIds,requestId).first();
   if(Number(conflict?.count||0)>0)throw new HttpError(409,"אחת היחידות כבר מוקצית להשאלה אחרת");
   const previous=await env.DB.prepare("SELECT unit_id FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL").bind(requestId).all();
   const now=new Date().toISOString(),statements=[env.DB.prepare("DELETE FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL").bind(requestId)];
-  for(const row of previous.results||[])if(!unitIds.includes(String(row.unit_id)))statements.push(env.DB.prepare("UPDATE item_units SET status='available',updated_at=? WHERE id=? AND status='loaned'").bind(now,row.unit_id));
+  for(const row of previous.results||[])if(!unitIds.includes(String(row.unit_id)))statements.push(env.DB.prepare("UPDATE item_units SET status='available',updated_at=? WHERE id=? AND status IN ('held','loaned')").bind(now,row.unit_id));
+  const selectedStatus=loan.status==="collected"?"loaned":"held";
   for(const unitId of unitIds){
     statements.push(env.DB.prepare("INSERT INTO loan_unit_assignments(request_id,unit_id,assigned_at) VALUES(?,?,?)").bind(requestId,unitId,now));
-    statements.push(env.DB.prepare("UPDATE item_units SET status='loaned',updated_at=? WHERE id=?").bind(now,unitId));
+    statements.push(env.DB.prepare("UPDATE item_units SET status=?,updated_at=? WHERE id=?").bind(selectedStatus,now,unitId));
   }
   await env.DB.batch(statements);
   await auditStatement(env,user.id,"loan.units.assign","loan_request",requestId,{unitIds}).run().catch(()=>{});
