@@ -566,10 +566,15 @@ html.a11y-high-contrast :focus-visible { outline-color: #ffdf00 !important; }
 .footer-links a, .footer-links button { padding: 0; color: var(--ink-soft); font-size: .84rem; font-weight: 500; text-align: right; }
 .footer-bottom { width: var(--shell); margin: 0 auto; padding: 17px 0; border-top: 1px solid var(--line); display: flex; justify-content: space-between; color: #708288; font-size: .75rem; }
 
-.toast-region { position: fixed; z-index: 250; top: auto; right: auto; left: 20px; bottom: 20px; margin: 0; padding: 0; border: 0; background: transparent; overflow: visible; display: grid; gap: 10px; }
-.toast { width: min(380px, calc(100vw - 40px)); padding: 14px 16px; border: 1px solid var(--line); border-right: 5px solid var(--teal); border-radius: 14px; background: #fff; box-shadow: var(--shadow-md); animation: toast-in .22s ease-out; font-size: .88rem; font-weight: 650; }
+.toast-region { position: fixed; z-index: 10050; top: 14px; right: auto; left: 50%; bottom: auto; transform: translateX(-50%); width: min(560px, calc(100vw - 28px)); margin: 0; padding: 0; border: 0; background: transparent; overflow: visible; display: grid; gap: 10px; pointer-events: none; }
+.toast { width: 100%; padding: 14px 16px; border: 1px solid var(--line); border-right: 5px solid var(--teal); border-radius: 14px; background: #fff; box-shadow: var(--shadow-md); animation: toast-in .22s ease-out; font-size: .88rem; font-weight: 650; pointer-events: auto; text-align: start; }
 .toast.error { border-right-color: var(--danger); }
-@keyframes toast-in { from { opacity: 0; transform: translateY(10px); } }
+body.toast-visible dialog[open] { max-height: calc(100dvh - 112px) !important; margin-top: 88px !important; margin-bottom: auto !important; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-10px); } }
+@media (max-width: 640px) {
+  .toast-region { top: 8px; width: calc(100vw - 18px); }
+  body.toast-visible dialog[open] { max-height: calc(100dvh - 92px) !important; margin-top: 74px !important; }
+}
 
 .modal {
   width: min(920px, calc(100% - 28px));
