@@ -1,31 +1,16 @@
-deploy_sha=cb1f6cd0a9232bfef0ef3bff367ad8930a9d2b20
+deploy_sha=d790337be481d447029293b95c08682ec378728d
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
 > node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
 
 Final completion static release gate passed.
-Requirements expansion static release gate passed.
-Launch readiness static release gate passed.
-Distribution completion static release gate passed.
-Navigation admin static release gate passed.
-Privacy availability static release gate passed.
-Release hardening static gate passed.
-Release experience static release gate passed.
-Admin control center static release gate passed.
-Privacy purge static release gate passed.
-Community chat retention static release gate passed.
-QR scanning, structured SEO and accessibility shell gate passed.
-Excel export and QR image scanner gate passed.
-Voice message recording gate passed.
-Excel export, accessible admin status and QR image scanning gate passed.
-Full requirements regression extensions passed.
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: serial units must never exceed item quantity
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:506:8 {
+AssertionError [ERR_ASSERTION]: data-copy-map-address missing from completed map/navigation UI
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:126:114 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
