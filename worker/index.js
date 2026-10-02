@@ -1925,6 +1925,7 @@ async function createItem(request, env) {
   if(publishStatus!=="active") await env.DB.prepare("UPDATE items SET status='pending' WHERE id=?").bind(id).run();
   else await env.DB.prepare("UPDATE organizations SET is_hidden=0,updated_at=? WHERE id=?").bind(new Date().toISOString(),organizationId).run();
   await env.DB.prepare("INSERT INTO organization_onboarding(organization_id,first_item_added) VALUES(?,1) ON CONFLICT(organization_id) DO UPDATE SET first_item_added=1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')").bind(organizationId).run().catch(()=>{});
+  await syncItemUnitsToQuantity(env,id,quantity);
   if(publishStatus==="active"){await notifyMatchingSavedSearches(env,{id,title,description:body.description,organizationName:organization.name,city:organization.city,category,condition});await notifySavedFollowers(env,{itemId:id,organizationId,category,title,event:"created"});}
   return json({ item: { id, status: publishStatus,publishAt } }, 201);
 }
@@ -1955,8 +1956,6 @@ async function updateItem(request, env, id) {
   if (!categoryRow && !CATEGORIES.has(category)) throw new HttpError(400, "נא לבחור קטגוריה תקינה");
   const quantity = Number(body.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw new HttpError(400, "כמות הפריטים אינה תקינה");
-  const trackedUnits=await env.DB.prepare("SELECT COUNT(*) AS count FROM item_units WHERE item_id=? AND status!='retired'").bind(id).first();
-  if(Number(trackedUnits?.count||0)>quantity)throw new HttpError(409,`אי אפשר להקטין את הכמות ל־${quantity} כאשר קיימים ${trackedUnits.count} מספרים סידוריים פעילים. יש להוציא יחידות מהמלאי תחילה.`);
   const values = {
     title: cleanText(body.title, 2, 120, "שם הפריט"),
     description: cleanText(body.description, 10, 1200, "תיאור"),
@@ -1998,6 +1997,7 @@ async function updateItem(request, env, id) {
     positiveInt(body.bookingHorizonDays,Number(existing.booking_horizon_days||365),1,1095,"טווח הזמנה"),
     body.approvalMode==="automatic"?"automatic":"manual",body.depositRequired?1:0,body.depositRequired?moneyAgorot(body.depositAmount):0,publishAt,maxPerUser,preparationMinutes,maxLoanDays,serviceRadiusKm,nextStatus,id).run();
   if(body.bookingHorizonMinutes!==undefined)await env.DB.prepare("UPDATE items SET booking_horizon_minutes=? WHERE id=?").bind(positiveInt(body.bookingHorizonMinutes,Number(existing.booking_horizon_minutes||existing.booking_horizon_days*1440),1,1576800,"טווח הזמנה"),id).run();
+  await syncItemUnitsToQuantity(env,id,quantity);
   return json({ item: { id, status:nextStatus,publishAt,maxPerUser,preparationMinutes,maxLoanDays,serviceRadiusKm } });
 }
 
