@@ -1,21 +1,46 @@
-deploy_sha=6340e437c8037bd580adec02d7652329c5ea9a4b
+deploy_sha=efb42437a258500e6582936134b8ac556acf38d0
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
 > node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
 
 Final completion static release gate passed.
+Requirements expansion static release gate passed.
+Launch readiness static release gate passed.
+Distribution completion static release gate passed.
+Navigation admin static release gate passed.
+Privacy availability static release gate passed.
+Release hardening static gate passed.
+Release experience static release gate passed.
+Admin control center static release gate passed.
+Privacy purge static release gate passed.
+Community chat retention static release gate passed.
+QR scanning, structured SEO and accessibility shell gate passed.
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+Full requirements regression extensions passed.
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:146:83 {
+AssertionError [ERR_ASSERTION]: Every literal server error shown to English users requires an English translation
++ actual - expected
+
++ [
++   'הסניף שנבחר אינו שייך לגמ״ח או שאינו פעיל'
++ ]
+- []
+
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/i18n-static.mjs:29:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
+  actual: [ 'הסניף שנבחר אינו שייך לגמ״ח או שאינו פעיל' ],
+  expected: [],
+  operator: 'deepStrictEqual',
   diff: 'simple'
 }
 
