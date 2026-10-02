@@ -1,3 +1,3 @@
-deploy_sha=be77615d08b9faa0837f80e18bc535e7e4dc3ae9
+deploy_sha=40e3e788ce3c91b15c33fdf6696c4e788eb94f9f
 capabilities=failure
 {"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
