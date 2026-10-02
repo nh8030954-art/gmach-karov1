@@ -1,4 +1,4 @@
-deploy_sha=6fe60b664754e2730e758f09fa50733070e6abe3
+deploy_sha=4562e4ca9545e7daed2c8875cade0d42752b225e
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -24,8 +24,8 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: pickup unit endpoint implementation missing
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:503:8 {
+AssertionError [ERR_ASSERTION]: serial units must never exceed item quantity
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:506:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
