@@ -908,8 +908,8 @@
     maybeShowAccountTour(isNewAccount);
     $$("[data-recent-org]").forEach(button=>button.addEventListener("click",()=>openOrganization(button.dataset.recentOrg)));
     $$('[data-request-action]').forEach(button => button.addEventListener("click", () => updateRequestStatus(button.dataset.requestId, button.dataset.requestAction)));
-    $('[data-pickup-request]').forEach(button=>button.addEventListener("click",()=>openPickupScreen(button.dataset.pickupRequest)));
-    $('[data-confirm-collected]').forEach(button=>button.addEventListener("click",async()=>{
+    $$('[data-pickup-request]').forEach(button=>button.addEventListener("click",()=>openPickupScreen(button.dataset.pickupRequest)));
+    $$('[data-confirm-collected]').forEach(button=>button.addEventListener("click",async()=>{
       if(!translatedConfirm("לאשר שהמשתמש אסף את הפריט?"))return;
       try{
         await api("/api/loan-requests/"+encodeURIComponent(button.dataset.confirmCollected),{method:"PATCH",body:{status:"collected"}});
