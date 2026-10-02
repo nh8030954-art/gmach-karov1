@@ -1,4 +1,4 @@
-deploy_sha=28bf3f08c1b22f205026e55f7aee35d070390749
+deploy_sha=27337a39971c633f50c296d1efef92f26a4fc57e
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -9,8 +9,8 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: community board should have a direct route
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:210:8 {
+AssertionError [ERR_ASSERTION]: single-element selector used as collection
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:142:83 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
