@@ -331,9 +331,11 @@ try {
 
   result = await request("/api/me/dashboard", { cookie: adminCookie });
   assert.equal(result.data.requests[0].direction, "incoming");
-  assert.equal(result.data.requests[0].borrower_phone, "052-7654321");
+  assert.equal(result.data.requests[0].borrower_phone, undefined, "Borrower phone must remain hidden before approval");
   result = await request(`/api/loan-requests/${requestId}/status`, { method: "PATCH", cookie: adminCookie, body: { status: "approved", managerNote: "איסוף מהכניסה בשעה 19:00" } });
   assert.equal(result.response.status, 200);
+  result = await request("/api/me/dashboard", { cookie: adminCookie });
+  assert.equal(result.data.requests[0].borrower_phone, "052-7654321", "Borrower phone must be revealed after approval");
   result = await request(`/api/loan-requests/${requestId}/units`, { cookie: adminCookie });
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(Array.isArray(result.data.units), true);
