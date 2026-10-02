@@ -2411,6 +2411,10 @@ async function updateRequestStatus(request, env, id) {
   if(target==="collected"){
     statusStatements.push(env.DB.prepare("UPDATE item_units SET status='loaned',updated_at=? WHERE id IN (SELECT unit_id FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL)").bind(now,id));
   }
+  if(["declined","cancelled","no_show"].includes(target)){
+    statusStatements.push(env.DB.prepare("UPDATE item_units SET status='available',updated_at=? WHERE id IN (SELECT unit_id FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL) AND status IN ('held','loaned')").bind(now,id));
+    statusStatements.push(env.DB.prepare("UPDATE loan_unit_assignments SET returned_at=? WHERE request_id=? AND returned_at IS NULL").bind(now,id));
+  }
   if(target==="returned"){
     statusStatements.push(env.DB.prepare("UPDATE loan_unit_assignments SET returned_at=? WHERE request_id=? AND returned_at IS NULL").bind(now,id));
     statusStatements.push(env.DB.prepare("UPDATE item_units SET status='available',updated_at=? WHERE id IN (SELECT unit_id FROM loan_unit_assignments WHERE request_id=?)").bind(now,id));
