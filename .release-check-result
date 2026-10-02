@@ -1,4 +1,4 @@
-sha=a69a71845de264d192ad03b0ff59736e0501c7b8
+sha=4c43bc240c02ffb4b0cc082c5dd558f38612f26e
 install=success
 syntax=success
 tests=failure
@@ -13,7 +13,7 @@ AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
 
 2 !== 1
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:412:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:473:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: true,
   code: 'ERR_ASSERTION',
@@ -25,7 +25,7 @@ AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
 
 Node.js v24.21.0
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790942372702:412:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790942407716:473:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: true,
   code: 'ERR_ASSERTION',
@@ -36,5 +36,5 @@ Node.js v24.21.0
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T11:59:37.164Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T12:00:12.224Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
