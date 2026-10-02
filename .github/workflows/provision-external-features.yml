@@ -45,6 +45,10 @@ jobs:
       - run: npm ci
         if: steps.cf.outputs.enabled == 'true'
 
+      - name: Configure verified Resend sender
+        if: steps.cf.outputs.enabled == 'true'
+        run: printf '%s' 'גמ״ח ברגע <no-reply@gmach-berega.co.il>' | npx wrangler secret put RESEND_FROM_EMAIL --config wrangler.jsonc
+
       - name: Provision dedicated backup bucket
         if: steps.cf.outputs.enabled == 'true'
         run: |
@@ -64,7 +68,7 @@ jobs:
       - name: Read live feature state
         if: steps.cf.outputs.enabled == 'true'
         run: |
-          curl -fsS https://gmach-karov1.nh8030954.workers.dev/api/platform/features > "$RUNNER_TEMP/features.json" || echo '{}' > "$RUNNER_TEMP/features.json"
+          curl -fsS https://gmach-berega.co.il/api/platform/features > "$RUNNER_TEMP/features.json" || echo '{}' > "$RUNNER_TEMP/features.json"
 
       - name: Provision VAPID keys when missing
         if: steps.cf.outputs.enabled == 'true'
@@ -86,7 +90,7 @@ jobs:
           NODE
           cat "$RUNNER_TEMP/vapid-private" | npx wrangler secret put VAPID_PRIVATE_KEY --config wrangler.jsonc
           cat "$RUNNER_TEMP/vapid-public" | npx wrangler secret put VAPID_PUBLIC_KEY --config wrangler.jsonc
-          printf '%s' 'mailto:support@gmach-berega.local' | npx wrangler secret put VAPID_SUBJECT --config wrangler.jsonc
+          printf '%s' 'mailto:no-reply@gmach-berega.co.il' | npx wrangler secret put VAPID_SUBJECT --config wrangler.jsonc
           rm -f "$RUNNER_TEMP/vapid-private" "$RUNNER_TEMP/vapid-public"
           echo "VAPID keys provisioned."
 
@@ -107,7 +111,7 @@ jobs:
               -X POST \
               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
               -H "Content-Type: application/json" \
-              --data '{"domains":["gmach-karov1.nh8030954.workers.dev"],"mode":"managed","name":"gmach-karov1-production"}')"
+              --data '{"domains":["gmach-berega.co.il","www.gmach-berega.co.il"],"mode":"managed","name":"gmach-karov1-production"}')"
             printf '%s' "$CREATE" > "$RUNNER_TEMP/turnstile.json"
           else
             curl -fsS "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/challenges/widgets/$SITEKEY/rotate_secret" \
@@ -134,7 +138,7 @@ jobs:
         continue-on-error: true
         run: |
           sleep 10
-          FEATURES="$(curl -fsS --max-time 30 https://gmach-karov1.nh8030954.workers.dev/api/platform/features)"
+          FEATURES="$(curl -fsS --max-time 30 https://gmach-berega.co.il/api/platform/features)"
           echo "$FEATURES" | tee "$RUNNER_TEMP/features-after.json"
           printf '%s' "$FEATURES" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s);if(!x.turnstileEnabled||!x.turnstileSiteKey)throw new Error('Turnstile provisioning did not become active');if(!x.pushConfigured||!x.vapidPublicKey)throw new Error('VAPID provisioning did not become active')})"
       - name: Persist feature verification state

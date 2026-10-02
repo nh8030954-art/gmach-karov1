@@ -7,7 +7,10 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/media/*"]
+    "run_worker_first": [
+      "/api/*",
+      "/media/*"
+    ]
   },
   "d1_databases": [
     {
@@ -27,11 +30,26 @@
       "bucket_name": "gmach-karov-backups"
     }
   ],
-  "ai": {"binding":"AI"},
+  "ai": {
+    "binding": "AI"
+  },
   "observability": {
     "enabled": true
   },
   "triggers": {
-    "crons": ["*/15 * * * *", "17 2 * * *"]
-  }
+    "crons": [
+      "*/15 * * * *",
+      "17 2 * * *"
+    ]
+  },
+  "routes": [
+    {
+      "pattern": "gmach-berega.co.il",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.gmach-berega.co.il",
+      "custom_domain": true
+    }
+  ]
 }

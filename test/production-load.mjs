@@ -1,5 +1,5 @@
-const base=process.env.PRODUCTION_URL||"https://gmach-karov1.nh8030954.workers.dev";
-if(!/^https:\/\/gmach-karov1\.nh8030954\.workers\.dev\/?$/.test(base))throw new Error("Refusing to load-test a non-production target");
+const base=process.env.PRODUCTION_URL||"https://gmach-berega.co.il";
+if(!/^https:\/\/gmach-berega\.co\.il\/?$/.test(base))throw new Error("Refusing to load-test a non-production target");
 const levels=[10,25,50],routes=["/api/health","/api/categories","/api/items?limit=12","/api/discovery?q=chair"];
 for(const concurrency of levels){
   const results=[];

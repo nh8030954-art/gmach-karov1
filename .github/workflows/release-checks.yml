@@ -33,7 +33,7 @@ jobs:
         continue-on-error: true
         run: |
           for i in {1..6}; do
-            body="$(curl -fsS --max-time 10 'https://gmach-karov1.nh8030954.workers.dev/api/health?deep=1' || true)"
+            body="$(curl -fsS --max-time 10 'https://gmach-berega.co.il/api/health?deep=1' || true)"
             echo "$body" > live.log
             if echo "$body" | grep -q '"ok":true' && echo "$body" | grep -q '"catalog":true' && echo "$body" | grep -q '"categories":true'; then exit 0; fi
             sleep 5
@@ -42,7 +42,7 @@ jobs:
       - name: Inspect live platform configuration
         if: always()
         run: |
-          curl -fsS https://gmach-karov1.nh8030954.workers.dev/api/platform/features > platform-features.log || echo '{}' > platform-features.log
+          curl -fsS https://gmach-berega.co.il/api/platform/features > platform-features.log || echo '{}' > platform-features.log
 
       - name: Record verification result
         if: always()

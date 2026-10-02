@@ -50,6 +50,8 @@ jobs:
             echo "No database migration changed in this deployment; D1 snapshot/migration steps will be skipped."
           fi
       - run: npm ci
+      - name: Configure verified Resend sender
+        run: printf '%s' 'גמ״ח ברגע <no-reply@gmach-berega.co.il>' | npx wrangler secret put RESEND_FROM_EMAIL --config wrangler.jsonc
       - run: npm run check
       - name: Run production test suite
         id: tests
@@ -122,22 +124,22 @@ jobs:
           fi
       - name: Publish production Worker
         run: npx wrangler deploy
-      - name: Verify live health
+      - name: Verify live health on custom domain
         run: |
-          for i in {1..6}; do
-            body="$(curl --fail --silent --show-error --max-time 10 'https://gmach-karov1.nh8030954.workers.dev/api/health?deep=1' || true)"
+          for i in {1..18}; do
+            body="$(curl --fail --silent --show-error --max-time 10 'https://gmach-berega.co.il/api/health?deep=1' || true)"
             echo "$body"
             if echo "$body" | grep -q '"ok":true' &&
                echo "$body" | grep -q '"catalog":true' &&
                echo "$body" | grep -q '"categories":true'; then
               exit 0
             fi
-            sleep 5
+            sleep 10
           done
           exit 1
       - name: Verify public gmach data is complete
         run: |
-          origin='https://gmach-karov1.nh8030954.workers.dev'
+          origin='https://gmach-berega.co.il'
           org_id="$(curl --fail --silent --show-error --max-time 20 "$origin/api/discovery" | jq -r '.organizations[0].id // empty')"
           if [ -z "$org_id" ]; then
             echo "No listed gmach to verify."
@@ -156,14 +158,14 @@ jobs:
       - name: Read-only production load gate
         if: github.event_name == 'workflow_dispatch'
         env:
-          PRODUCTION_URL: https://gmach-karov1.nh8030954.workers.dev
+          PRODUCTION_URL: https://gmach-berega.co.il
         run: node test/production-load.mjs
 
       - name: Verify external security and notification configuration
         id: capabilities
         continue-on-error: true
         run: |
-          FEATURES="$(curl --fail --silent --show-error --max-time 30 https://gmach-karov1.nh8030954.workers.dev/api/platform/features)"
+          FEATURES="$(curl --fail --silent --show-error --max-time 30 https://gmach-berega.co.il/api/platform/features)"
           echo "$FEATURES" | tee production-features.json
           printf '%s' "$FEATURES" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const x=JSON.parse(s);if(!x.turnstileEnabled||!x.turnstileSiteKey)throw new Error('Turnstile is not active in production');if(!x.pushConfigured||!x.vapidPublicKey)throw new Error('Web Push VAPID is not active in production');if(!x.backups||!x.calendar||!x.chatMedia||!x.geocoding)throw new Error('One or more required platform capabilities are inactive')})"
       - name: Persist production capability failure

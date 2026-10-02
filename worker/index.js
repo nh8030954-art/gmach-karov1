@@ -141,6 +141,11 @@ async function invalidatePublicSnapshotRoots(origin) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.hostname === "www.gmach-berega.co.il") {
+      const target = new URL(request.url);
+      target.hostname = "gmach-berega.co.il";
+      return new Response(null, { status: 308, headers: { Location: target.toString(), "Cache-Control": "public, max-age=3600" } });
+    }
     try {
       if (url.pathname !== "/api/health") {
         const shabbat = israelShabbatState(new Date());
@@ -2896,13 +2901,13 @@ function icsUtc(v){const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toI
 async function myCalendarFeed(request,env){
   const user=await requireUser(request,env);let token=user.calendar_feed_token;
   if(!token){token=toBase64Url(crypto.getRandomValues(new Uint8Array(24)));await env.DB.prepare("UPDATE users SET calendar_feed_token=?,updated_at=? WHERE id=?").bind(token,new Date().toISOString(),user.id).run()}
-  return json({url:"https://gmach-karov1.nh8030954.workers.dev/calendar/"+token+".ics"});
+  return json({url:"https://gmach-berega.co.il/calendar/"+token+".ics"});
 }
 async function publicCalendarFeed(env,token){
   const user=await env.DB.prepare("SELECT id FROM users WHERE calendar_feed_token=? AND deleted_at IS NULL").bind(token).first();if(!user)return new Response("Not found",{status:404});
   const pref=await env.DB.prepare("SELECT reminder_minutes FROM calendar_preferences WHERE user_id=?").bind(user.id).first().catch(()=>null),reminder=Math.max(0,Number(pref?.reminder_minutes??1440));
   const rows=await env.DB.prepare(`SELECT lr.id,lr.requested_from,lr.requested_until,lr.status,i.title,o.name organization_name FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE (lr.borrower_id=? OR o.owner_id=?) AND lr.status IN ('pending','approved','collected') ORDER BY lr.requested_from LIMIT 300`).bind(user.id,user.id).all();
-  const events=[];for(const x of rows.results||[]){for(const [kind,when,label] of [["pickup",x.requested_from,"איסוף"],["return",x.requested_until,"החזרה"]]){const dt=icsUtc(when);if(!dt)continue;events.push(["BEGIN:VEVENT","UID:"+x.id+"-"+kind+"@gmach-berega","DTSTAMP:"+icsUtc(new Date()),"DTSTART:"+dt,"SUMMARY:"+icsEscape(label+" · "+x.title),"DESCRIPTION:"+icsEscape(x.organization_name+" · "+x.status),"URL:https://gmach-karov1.nh8030954.workers.dev/#/account",...(reminder?["BEGIN:VALARM","TRIGGER:-PT"+reminder+"M","ACTION:DISPLAY","DESCRIPTION:"+icsEscape(label+" · "+x.title),"END:VALARM"]:[]),"END:VEVENT"].join("\r\n"))}}
+  const events=[];for(const x of rows.results||[]){for(const [kind,when,label] of [["pickup",x.requested_from,"איסוף"],["return",x.requested_until,"החזרה"]]){const dt=icsUtc(when);if(!dt)continue;events.push(["BEGIN:VEVENT","UID:"+x.id+"-"+kind+"@gmach-berega","DTSTAMP:"+icsUtc(new Date()),"DTSTART:"+dt,"SUMMARY:"+icsEscape(label+" · "+x.title),"DESCRIPTION:"+icsEscape(x.organization_name+" · "+x.status),"URL:https://gmach-berega.co.il/#/account",...(reminder?["BEGIN:VALARM","TRIGGER:-PT"+reminder+"M","ACTION:DISPLAY","DESCRIPTION:"+icsEscape(label+" · "+x.title),"END:VALARM"]:[]),"END:VEVENT"].join("\r\n"))}}
   const body=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Gmach Berega//Calendar Feed//HE","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:גמ״ח ברגע",...events,"END:VCALENDAR",""].join("\r\n");
   return new Response(body,{headers:{"Content-Type":"text/calendar; charset=utf-8","Cache-Control":"private, max-age=300","Content-Disposition":'inline; filename="gmach-berega.ics"'}});
 }
@@ -2927,12 +2932,12 @@ function israelClock(){
 function inQuietHours(now,start,end){if(!start||!end||start===end)return false;return start<end?now>=start&&now<end:now>=start||now<end}
 async function sendOperationalNotificationEmail(env,user,notification){
   if(!env.RESEND_API_KEY||!user.email)return false;
-  const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-karov1.nh8030954.workers.dev/#/account";
+  const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/#/account";
   const template=await env.DB.prepare("SELECT subject,body_text,enabled FROM email_templates WHERE template_key='notification' AND language=?").bind(lang).first().catch(()=>null);
   if(template&&Number(template.enabled)===0)return false;
   const render=s=>String(s||"").replaceAll("{{title}}",notification.title||"").replaceAll("{{body}}",notification.body||"").replaceAll("{{account_url}}",accountUrl);
   const subject=template?.subject?render(template.subject):(en?"Gmach Berega update":notification.title),plain=template?.body_text?render(template.body_text):(en?`You have a new update in Gmach Berega. Open your account for details.\n\n${notification.title}\n${notification.body}`:`${notification.title}\n\n${notification.body}`);
-  const unsubToken=Number(user.community_emails_accepted)?await communityUnsubscribeToken(env,user.user_id||user.id):null,unsubUrl=unsubToken?"https://gmach-karov1.nh8030954.workers.dev/api/unsubscribe/community?token="+encodeURIComponent(unsubToken):null,finalPlain=plain+(unsubUrl?(en?"\n\nUnsubscribe from community updates: ":"\n\nהסרה מעדכוני קהילה: ")+unsubUrl:"");
+  const unsubToken=Number(user.community_emails_accepted)?await communityUnsubscribeToken(env,user.user_id||user.id):null,unsubUrl=unsubToken?"https://gmach-berega.co.il/api/unsubscribe/community?token="+encodeURIComponent(unsubToken):null,finalPlain=plain+(unsubUrl?(en?"\n\nUnsubscribe from community updates: ":"\n\nהסרה מעדכוני קהילה: ")+unsubUrl:"");
   const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],subject,text:finalPlain,html:`<div dir="${en?"ltr":"rtl"}" style="font-family:Arial,sans-serif;max-width:560px;margin:auto"><h2>${escapeHtmlEmail(subject)}</h2><p style="white-space:pre-line">${escapeHtmlEmail(plain)}</p><p><a href="${accountUrl}">${en?"Open account":"פתיחת האזור האישי"}</a></p></div>`})});
   if(!response.ok)throw new Error("Email provider returned "+response.status);return true;
 }
@@ -2966,7 +2971,7 @@ async function deliverDailyDigests(env){
     const done=await env.DB.prepare("SELECT id FROM notification_digests WHERE user_id=? AND digest_date=? AND status='sent'").bind(user.id,today).first();if(done)continue;
     const items=await env.DB.prepare(`SELECT n.id,n.title,n.body,n.created_at FROM notifications n WHERE n.user_id=? AND n.created_at>=datetime('now','-1 day') AND NOT EXISTS(SELECT 1 FROM notification_delivery_log l WHERE l.notification_id=n.id AND l.channel='email' AND l.status='sent') ORDER BY n.created_at DESC LIMIT 30`).bind(user.id).all();
     if(!(items.results||[]).length)continue;
-    const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-karov1.nh8030954.workers.dev/#/account",template=await env.DB.prepare("SELECT subject,body_text,enabled FROM email_templates WHERE template_key=\'daily_digest\' AND language=?").bind(lang).first().catch(()=>null);if(template&&Number(template.enabled)===0)continue;
+    const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/#/account",template=await env.DB.prepare("SELECT subject,body_text,enabled FROM email_templates WHERE template_key=\'daily_digest\' AND language=?").bind(lang).first().catch(()=>null);if(template&&Number(template.enabled)===0)continue;
     const digestBody=(en?"Updates from the last day:":"עדכונים מהיממה האחרונה:")+"\n\n"+items.results.map(x=>"• "+x.title+" — "+x.body).join("\n"),subject=template?.subject||(en?"Your daily Gmach Berega summary":"הסיכום היומי שלך מגמ״ח ברגע"),text=template?.body_text?String(template.body_text).replaceAll("{{body}}",digestBody).replaceAll("{{account_url}}",accountUrl):digestBody;
     const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],subject,text})});
     const id=crypto.randomUUID(),now=new Date().toISOString();
