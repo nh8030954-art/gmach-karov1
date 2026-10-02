@@ -1,16 +1,23 @@
-deploy_sha=5b0398f181d2e13b8e952a500bc9106952fcfc67
+deploy_sha=90371243db9c4cc38191635f01af9ed802676e4a
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
 > node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
 
 Final completion static release gate passed.
+Requirements expansion static release gate passed.
+Launch readiness static release gate passed.
+Distribution completion static release gate passed.
+Navigation admin static release gate passed.
+Privacy availability static release gate passed.
+Release hardening static gate passed.
+Release experience static release gate passed.
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: invalid triple-dollar selector helper must never reach runtime
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:147:8 {
+AssertionError [ERR_ASSERTION]: pickup unit buttons must read all selected units
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:338:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
