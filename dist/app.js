@@ -32,7 +32,7 @@
     visibleCount: 8, activeCategory: "", compareIds: new Set(), pendingAction: null, dashboardTab: "requests", myOrganizations: [], dashboard: null, authMode: "login",
     editingOrganizationId: null, editingItemId: null, chatRequestId: null, chatTimer: null, notifications: [],
     customizations: new Map(), visualEditMode: false, selectedEditable: null, pendingVerificationEmail: "", supportEmail: "",
-    discovery: { categories: [], cities: [], suggestions: [], organizations: [] }, categoryAliases: [], pendingCommunityItem: null, viewMode: "list"
+    discovery: { categories: [], cities: [], suggestions: [], organizations: [] }, categoryAliases: [], categoryCatalog: [], pendingCommunityItem: null, viewMode: "list"
   };
 
   const ITEM_SUBCATEGORIES = Object.freeze({
@@ -44,11 +44,25 @@
     "בית ואירוח":["מכשירי חשמל","ריהוט מתקפל","מטבח ואפייה","אירוח ולינה","מעבר דירה"],
     "כללי":["ספרים ולימוד","תשמישי קדושה","נגישות","ביגוד ותחפושות","ספורט ופנאי","אחר"]
   });
+  function itemSubcategoriesFor(category){
+    const rows=Array.isArray(state.categoryCatalog)?state.categoryCatalog:[],parent=rows.find(row=>!row.parent_id&&(row.name_he===category||row.id===category));
+    const dynamic=parent?rows.filter(row=>row.parent_id===parent.id).map(row=>row.name_he).filter(Boolean):[];
+    return dynamic.length?dynamic:(ITEM_SUBCATEGORIES[category]||[]);
+  }
+  function populateItemCategorySelector(){
+    const select=$("#item-category");if(!select)return;
+    const parents=(state.categoryCatalog||[]).filter(row=>!row.parent_id&&row.name_he);
+    if(!parents.length)return;
+    const current=select.value;
+    select.innerHTML='<option value="">בחירה</option>'+parents.map(row=>'<option value="'+escapeHTML(row.name_he)+'">'+escapeHTML(row.name_he)+'</option>').join("");
+    if(current&&parents.some(row=>row.name_he===current))select.value=current;
+    updateItemSubcategories();
+  }
   function updateItemSubcategories(selected=""){
     const select=$("#item-subcategory");if(!select)return;
-    const category=$("#item-category")?.value||"",options=ITEM_SUBCATEGORIES[category]||[];
+    const category=$("#item-category")?.value||"",options=itemSubcategoriesFor(category);
     select.disabled=!category||!options.length;
-    select.innerHTML='<option value="">'+(category?"ללא קטגוריית משנה":"בחרו קודם קטגוריה")+'</option>'+options.map(value=>'<option value="'+escapeHTML(value)+'">'+escapeHTML(value)+'</option>').join("");
+    select.innerHTML='<option value="">'+(category?(options.length?"ללא קטגוריית משנה":"אין קטגוריות משנה זמינות"):"בחרו קודם קטגוריה")+'</option>'+options.map(value=>'<option value="'+escapeHTML(value)+'">'+escapeHTML(value)+'</option>').join("");
     if(selected&&options.includes(selected))select.value=selected;
   }
   function setGmachHoursMode(byAppointment){
@@ -74,6 +88,7 @@
     return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
   }
   function normalize(value) { return String(value || "").trim().toLocaleLowerCase("he"); }
+  function displayCondition(value) { const text=String(value||"").trim(); return text==="טוב"?"מצב טוב":text==="מצוין"?"כמו חדש":text||"לא צוין"; }
   function formatDateTime(value) { try { return new Intl.DateTimeFormat(document.documentElement.lang==="en"?"en-GB":"he-IL", { dateStyle: "short", timeStyle: "short",timeZone:"Asia/Jerusalem" }).format(new Date(value)); } catch { return String(value || ""); } }
   function safeColor(value) { return /^#[0-9a-f]{6}$/i.test(String(value || "")) ? value : "#e6f2ef"; }
   function safeImageUrl(value) {
@@ -210,7 +225,9 @@
   async function loadCategoryAliases(){
     try{
       const data=await api("/api/categories");
-      state.categoryAliases=(data.categories||[]).map(row=>({nameHe:row.name_he||"",nameEn:row.name_en||"",synonyms:Array.isArray(row.synonyms)?row.synonyms:[]}));
+      state.categoryCatalog=Array.isArray(data.categories)?data.categories:[];
+      state.categoryAliases=state.categoryCatalog.map(row=>({nameHe:row.name_he||"",nameEn:row.name_en||"",synonyms:Array.isArray(row.synonyms)?row.synonyms:[]}));
+      populateItemCategorySelector();
       renderDiscovery();
     }catch(error){console.warn("Category aliases unavailable",error)}
   }
@@ -347,7 +364,7 @@
     const dynamicAliases=state.categoryAliases.flatMap(row=>{const values=[row.nameHe,row.nameEn,...row.synonyms].filter(Boolean);return values.some(value=>query.includes(normalize(value))||normalize(value).includes(query))?values:[];});
     const translatedAliases=(window.GmachSearchAliases?.()||[]).filter(([he,en])=>{const value=normalize(en);return query.length>=3&&(value.includes(query)||query.includes(value))}).map(([he])=>he);
     const queryTerms = [query,...translatedAliases, ...Object.entries(SEARCH_ALIASES).flatMap(([key, values]) => query.includes(normalize(key)) || normalize(key).includes(query) || values.some(value => query.includes(normalize(value)) || normalize(value).includes(query)) ? [key, ...values] : []),...dynamicAliases].map(normalize).filter(Boolean);
-    const baseMatch=item=>(!city || item.city === city) && (!category || item.category === category) && (!condition || item.condition === condition) && (!type || item.item_type === type) && (!pickup || item.pickup_method === pickup) && (!availableOnly || item.availability_status === "available");
+    const baseMatch=item=>(!city || item.city === city) && (!category || item.category === category) && (!condition || displayCondition(item.condition) === condition) && (!type || item.item_type === type) && (!pickup || item.pickup_method === pickup) && (!availableOnly || item.availability_status === "available");
     state.filteredItems = state.items.filter(item => { const haystack = normalize([item.title, item.description, item.category, item.subcategory, ...(item.tags || []), item.city, item.neighborhood, item.organizations?.name].join(" ")); return baseMatch(item) && (!query || queryTerms.some(term => haystack.includes(term))); });
     if(query&&state.filteredItems.length===0) state.filteredItems=state.items.filter(item=>baseMatch(item)&&fuzzyQueryMatch(item,query));
     const sort = $("#sort-select").value;
@@ -356,7 +373,7 @@
   }
   function itemCardMarkup(item) {
     const image = safeImageUrl(item.image_urls?.[0]), favorite = state.favorites.has(item.id), available = item.availability_status === "available", count = Number(item.available_count ?? item.quantity), updated = item.inventory_updated_at ? formatRelative(item.inventory_updated_at) : "";
-    return `<article class="item-card" data-item-id="${escapeHTML(item.id)}"><div class="item-card-media" style="--media-bg:${safeColor(item.cover_color)}">${image ? `<img src="${escapeHTML(image)}" alt="${escapeHTML(item.title)}" loading="lazy">` : `<span class="item-symbol">${iconSvg(item.icon)}</span>`}<span class="availability-badge ${available ? "" : "is-busy"}">${available ? count > 0 ? `${count} זמינים` : "זמין עכשיו" : "בתיאום"}</span><button class="favorite-button ${favorite ? "is-favorite" : ""}" type="button" data-favorite-id="${escapeHTML(item.id)}" aria-label="${favorite ? "הסרה מהמועדפים" : "הוספה למועדפים"}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS.heart}</svg></button></div><div class="item-card-body"><div class="item-card-topline"><span class="item-category-label">${escapeHTML(item.category)}</span><span>${escapeHTML(item.condition)}</span></div><h3>${escapeHTML(item.title)}</h3><p>${escapeHTML(item.description)}</p><div class="trust-line"><button type="button" data-open-organization="${escapeHTML(item.organizations?.id)}">${escapeHTML(item.organizations?.name || "גמ״ח")}</button>${item.organizations?.rating ? `<span title="דירוג הגמ״ח">גמ״ח ⭐ ${escapeHTML(item.organizations.rating)}</span>` : ""}${item.rating ? `<span title="דירוג הפריט">פריט ⭐ ${escapeHTML(item.rating)}</span>` : ""}<small>${updated ? `עודכן ${escapeHTML(updated)}` : ""}</small></div><div class="item-card-footer"><span class="item-location">📍 ${escapeHTML([item.city, item.neighborhood].filter(Boolean).join(", "))}</span><span class="item-card-controls"><button class="compare-toggle" type="button" data-compare-item="${escapeHTML(item.id)}" aria-pressed="${state.compareIds.has(String(item.id))}">${state.compareIds.has(String(item.id)) ? "✓ להשוואה" : "+ להשוואה"}</button><button class="item-card-open" type="button" data-open-item="${escapeHTML(item.id)}">לפרטים ←</button></span></div></div></article>`;
+    return `<article class="item-card" data-item-id="${escapeHTML(item.id)}"><div class="item-card-media" style="--media-bg:${safeColor(item.cover_color)}">${image ? `<img src="${escapeHTML(image)}" alt="${escapeHTML(item.title)}" loading="lazy">` : `<span class="item-symbol">${iconSvg(item.icon)}</span>`}<span class="availability-badge ${available ? "" : "is-busy"}">${available ? count > 0 ? `${count} זמינים` : "זמין עכשיו" : "בתיאום"}</span><button class="favorite-button ${favorite ? "is-favorite" : ""}" type="button" data-favorite-id="${escapeHTML(item.id)}" aria-label="${favorite ? "הסרה מהמועדפים" : "הוספה למועדפים"}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS.heart}</svg></button></div><div class="item-card-body"><div class="item-card-topline"><span class="item-category-label">${escapeHTML(item.category)}</span><span>${escapeHTML(displayCondition(item.condition))}</span></div><h3>${escapeHTML(item.title)}</h3><p>${escapeHTML(item.description)}</p><div class="trust-line"><button type="button" data-open-organization="${escapeHTML(item.organizations?.id)}">${escapeHTML(item.organizations?.name || "גמ״ח")}</button>${item.organizations?.rating ? `<span title="דירוג הגמ״ח">גמ״ח ⭐ ${escapeHTML(item.organizations.rating)}</span>` : ""}${item.rating ? `<span title="דירוג הפריט">פריט ⭐ ${escapeHTML(item.rating)}</span>` : ""}<small>${updated ? `עודכן ${escapeHTML(updated)}` : ""}</small></div><div class="item-card-footer"><span class="item-location">📍 ${escapeHTML([item.city, item.neighborhood].filter(Boolean).join(", "))}</span><span class="item-card-controls"><button class="compare-toggle" type="button" data-compare-item="${escapeHTML(item.id)}" aria-pressed="${state.compareIds.has(String(item.id))}">${state.compareIds.has(String(item.id)) ? "✓ להשוואה" : "+ להשוואה"}</button><button class="item-card-open" type="button" data-open-item="${escapeHTML(item.id)}">לפרטים ←</button></span></div></div></article>`;
   }
   function formatRelative(value) { const days = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86400000)); if(document.documentElement.lang==="en")return days===0?"today":days===1?"yesterday":`${days} days ago`; return days === 0 ? "היום" : days === 1 ? "אתמול" : `לפני ${days} ימים`; }
   function renderItems() {
@@ -469,12 +486,20 @@
     const item = findItem(id); if (!item) return; state.selectedItem = item;
     $("#item-dialog-content").dataset.itemId = String(item.id);
     const images=(item.image_urls||[]).map(safeImageUrl).filter(Boolean), image = images[0], favorite = state.favorites.has(item.id), available = item.availability_status === "available";
-    $("#item-dialog-content").innerHTML = `<article class="item-detail ${image ? "has-item-image" : "item-detail-no-image"}"><div class="item-detail-media" style="--media-bg:${safeColor(item.cover_color)}">${image ? `<img src="${escapeHTML(image)}" alt="${escapeHTML(item.title)}">` : `<span class="item-symbol">${iconSvg(item.icon)}</span>`}<span class="availability-badge ${available ? "" : "is-busy"}">${available ? "זמין עכשיו" : "זמין בתיאום"}</span></div><div class="item-detail-copy"><div class="detail-meta"><span>${escapeHTML(item.category)}</span><span class="dot"></span><span>${escapeHTML(item.condition)}</span></div><h2 id="item-dialog-title">${escapeHTML(item.title)}</h2><p class="item-detail-description">${escapeHTML(item.description)}</p><ul class="detail-facts"><li><span>מיקום איסוף</span><strong>${escapeHTML([item.city, item.neighborhood].filter(Boolean).join(", "))}</strong></li><li><span>כמות זמינה</span><strong>${escapeHTML(item.quantity || 1)}</strong></li><li><span>דירוג הפריט</span><strong>${item.rating ? `⭐ ${escapeHTML(item.rating)} (${Number(item.reviewCount || 0)})` : "טרם דורג"}</strong></li><li><span>זמינות</span><strong>${available ? "זמין לבקשה" : "יש לתאם תאריך"}</strong></li></ul>${itemPolicyHTML(item)}<div class="gmach-owner"><span class="owner-mark" aria-hidden="true">ג</span><span><strong>${escapeHTML(item.organizations?.name || "גמ״ח קהילתי")}</strong><small>${item.organizations?.rating ? `דירוג גמ״ח ⭐ ${escapeHTML(item.organizations.rating)} (${Number(item.organizations.reviewCount || 0)})` : "גמ״ח חדש ללא דירוגים"} · כתובת הגמ״ח מוצגת בעמוד הגמ״ח · טלפון נמסר רק לאחר אישור הבקשה</small></span></div><div class="detail-actions"><button class="button button-primary" type="button" id="detail-request-button">בקשת השאלה חינמית</button><button class="favorite-button ${favorite ? "is-favorite" : ""}" type="button" id="detail-favorite-button" aria-label="${favorite ? "הסרה מהמועדפים" : "הוספה למועדפים"}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS.heart}</svg></button></div><button class="report-link" type="button" id="detail-report-button">דיווח על פריט או מידע לא נכון</button></div></article>`;
+    const gallery=image?`<div class="item-gallery-stage"><img id="item-gallery-main" src="${escapeHTML(image)}" alt="${escapeHTML(item.title)}"></div>${images.length>1?`<button class="item-gallery-nav item-gallery-prev" type="button" aria-label="תמונה קודמת">‹</button><button class="item-gallery-nav item-gallery-next" type="button" aria-label="תמונה הבאה">›</button><span class="item-gallery-count" aria-live="polite">1 / ${images.length}</span><div class="item-gallery-thumbs">${images.map((src,index)=>`<button type="button" data-gallery-index="${index}" class="${index===0?"is-active":""}" aria-label="הצגת תמונה ${index+1}"><img src="${escapeHTML(src)}" alt=""></button>`).join("")}</div>`:""}`:`<span class="item-symbol">${iconSvg(item.icon)}</span>`;
+    $("#item-dialog-content").innerHTML = `<article class="item-detail ${image ? "has-item-image" : "item-detail-no-image"}"><div class="item-detail-media" style="--media-bg:${safeColor(item.cover_color)}">${gallery}<span class="availability-badge ${available ? "" : "is-busy"}">${available ? "זמין עכשיו" : "זמין בתיאום"}</span></div><div class="item-detail-copy"><div class="detail-meta"><span>${escapeHTML(item.category)}</span><span class="dot"></span><span>${escapeHTML(displayCondition(item.condition))}</span></div><h2 id="item-dialog-title">${escapeHTML(item.title)}</h2><p class="item-detail-description">${escapeHTML(item.description)}</p><ul class="detail-facts"><li><span>מיקום איסוף</span><strong>${escapeHTML([item.city, item.neighborhood].filter(Boolean).join(", "))}</strong></li><li><span>כמות זמינה</span><strong>${escapeHTML(item.quantity || 1)}</strong></li><li><span>דירוג הפריט</span><strong>${item.rating ? `⭐ ${escapeHTML(item.rating)} (${Number(item.reviewCount || 0)})` : "טרם דורג"}</strong></li><li><span>זמינות</span><strong>${available ? "זמין לבקשה" : "יש לתאם תאריך"}</strong></li></ul>${itemPolicyHTML(item)}<div class="gmach-owner"><span class="owner-mark" aria-hidden="true">ג</span><span><strong>${escapeHTML(item.organizations?.name || "גמ״ח קהילתי")}</strong><small>${item.organizations?.rating ? `דירוג גמ״ח ⭐ ${escapeHTML(item.organizations.rating)} (${Number(item.organizations.reviewCount || 0)})` : "גמ״ח חדש ללא דירוגים"} · כתובת הגמ״ח מוצגת בעמוד הגמ״ח · טלפון נמסר רק לאחר אישור הבקשה</small></span></div><div class="detail-actions"><button class="button button-primary" type="button" id="detail-request-button">בקשת השאלה חינמית</button><button class="favorite-button ${favorite ? "is-favorite" : ""}" type="button" id="detail-favorite-button" aria-label="${favorite ? "הסרה מהמועדפים" : "הוספה למועדפים"}"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONS.heart}</svg></button></div><button class="report-link" type="button" id="detail-report-button">דיווח על פריט או מידע לא נכון</button></div></article>`;
     if(images.length>1){
       const media=$(".item-detail-media",$("#item-dialog-content")),main=media?.querySelector("img");
       const strip=document.createElement("div");strip.className="item-detail-thumbnails";strip.style.cssText="display:flex;gap:8px;overflow:auto;margin-top:10px;padding:2px";
       images.forEach((src,index)=>{const b=document.createElement("button");b.type="button";b.style.cssText="border:1px solid #d9e0e5;border-radius:10px;padding:2px;background:#fff;flex:0 0 auto";b.setAttribute("aria-label","תמונה "+(index+1));b.innerHTML='<img src="'+escapeHTML(src)+'" alt="" style="width:64px;height:52px;object-fit:cover;border-radius:7px">';b.addEventListener("click",()=>{if(main)main.src=src});strip.appendChild(b)});
       media?.appendChild(strip);
+    }
+    if(images.length>1){
+      let galleryIndex=0;const root=$("#item-dialog-content"),main=$("#item-gallery-main",root),count=$(".item-gallery-count",root),thumbs=$("[data-gallery-index]",root);
+      const showGallery=index=>{galleryIndex=(index+images.length)%images.length;main.src=images[galleryIndex];count.textContent=`${galleryIndex+1} / ${images.length}`;thumbs.forEach((button,n)=>button.classList.toggle("is-active",n===galleryIndex));};
+      $(".item-gallery-prev",root)?.addEventListener("click",()=>showGallery(galleryIndex-1));
+      $(".item-gallery-next",root)?.addEventListener("click",()=>showGallery(galleryIndex+1));
+      thumbs.forEach(button=>button.addEventListener("click",()=>showGallery(Number(button.dataset.galleryIndex))));
     }
     const orgButton = document.createElement("button"); orgButton.type="button"; orgButton.className="button button-secondary"; orgButton.textContent="עמוד הגמ״ח"; orgButton.addEventListener("click", () => { closeDialog($("#item-dialog")); openOrganization(item.organizations?.id); });
     const shareButton = document.createElement("button"); shareButton.type="button"; shareButton.className="button button-secondary"; shareButton.textContent="שיתוף"; shareButton.addEventListener("click", () => shareItem(item));
