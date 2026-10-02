@@ -1290,9 +1290,11 @@
       else if(seoRoute.startsWith("organization:")) await openOrganization(seoRoute.slice(13));
       else if(seoRoute.startsWith("category:")){const id=seoRoute.slice(9),cat=(state.discovery?.categories||[]).find(x=>x.id===id),label=cat?.name_he||id;$("#category-filter").value=label;state.activeCategory=label;applyFilters();window.setTimeout(()=>$("#catalog").scrollIntoView(),0)}
       else if(seoRoute.startsWith("area:")){const city=seoRoute.slice(5);$("#city-filter").value=city;applyFilters();window.setTimeout(()=>$("#catalog").scrollIntoView(),0)}
-      if(hash==="#/catalog")window.setTimeout(()=>$("#catalog").scrollIntoView(),0);
-      else if(hash==="#/community")window.setTimeout(()=>openCommunityBoard(1),0);
-      const sharedHelp=new URLSearchParams(location.search).get("help");if(sharedHelp)await openCommunityBoard(1,sharedHelp);
+      if(path==="/catalog")window.setTimeout(()=>$("#catalog").scrollIntoView(),0);
+      else if(path==="/community")window.setTimeout(()=>openCommunityBoard(1,new URLSearchParams(location.search).get("help")||undefined),0);
+      else if(path==="/how-it-works")window.setTimeout(()=>$("#how-it-works")?.scrollIntoView(),0);
+      else if(path==="/gmachim")window.setTimeout(()=>$("#gmachim")?.scrollIntoView(),0);
+      const sharedHelp=new URLSearchParams(location.search).get("help");if(sharedHelp&&path!=="/community")await openCommunityBoard(1,sharedHelp);
     }).catch(error=>console.warn("Background page hydration failed",error));
 
     window.setInterval(async()=>{if(state.serverAvailable||document.visibilityState!=="visible")return;await detectServer();if(state.serverAvailable)await Promise.allSettled([loadPublicConfig(),loadDiscovery(),loadCategoryAliases(),loadItems(),refreshUser()])},30000);
