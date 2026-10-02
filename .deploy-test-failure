@@ -1,4 +1,4 @@
-deploy_sha=d218c1f1bc28bddac60443f9374540f4c2aadafe
+deploy_sha=403bd1bfd5145cad37588d565b5a5c2478f9d55f
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -30,16 +30,16 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: manual serial creation must be rejected when item quantity is already fully represented
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
 
-201 !== 409
+2 !== 1
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:260:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:342:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
-  generatedMessage: false,
+  generatedMessage: true,
   code: 'ERR_ASSERTION',
-  actual: 201,
-  expected: 409,
+  actual: 2,
+  expected: 1,
   operator: 'strictEqual',
   diff: 'simple'
 }
