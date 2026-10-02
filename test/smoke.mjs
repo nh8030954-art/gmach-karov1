@@ -339,7 +339,7 @@ try {
   result = await request(`/api/loan-requests/${requestId}/units`, { cookie: adminCookie });
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(Array.isArray(result.data.units), true);
-  assert.equal(result.data.units.length, 1);
+  assert.equal(result.data.units.length, 2,"loan unit listing must reflect the extra serialized unit added earlier");
   result = await request(`/api/loan-requests/${requestId}/calendar.ics`, { cookie: borrowerCookie });
   assert.equal(result.response.status, 200, String(result.data));
   assert.match(result.response.headers.get("content-type")||"", /text\/calendar/);
