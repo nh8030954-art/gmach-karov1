@@ -801,7 +801,7 @@ async function routeApi(request, env, ctx, url) {
   const imageUpload = path.match(/^\/api\/items\/([^/]+)\/images$/);
   if (method === "POST" && imageUpload) return uploadImages(request, env, decodeURIComponent(imageUpload[1]));
   if (method === "POST" && path === "/api/loan-requests") return createLoanRequest(request, env);
-  const loanUnits = path.match(/^\/api\/loan-requests\/([^/]+)\/units$/);
+  const loanCalendar = path.match(/^\/api\/loan-requests\/([^/]+)\/calendar\.ics$/);\n  if (method === "GET" && loanCalendar) return loanRequestCalendar(request,env,decodeURIComponent(loanCalendar[1]));\n  const loanUnits = path.match(/^\/api\/loan-requests\/([^/]+)\/units$/);
   if (method === "GET" && loanUnits) return manageLoanUnits(request, env, decodeURIComponent(loanUnits[1]), false);
   if (method === "POST" && loanUnits) return manageLoanUnits(request, env, decodeURIComponent(loanUnits[1]), true);
   const loanTimeline = path.match(/^\/api\/loan-requests\/([^/]+)\/timeline$/);
@@ -2197,8 +2197,8 @@ async function createLoanRequest(request, env) {
   assertAllowedPickupReturnTime(until, "ההחזרה");
   const duration = loanMinutes(from, until);
   if (duration <= 0) throw new HttpError(400, "מועד ההחזרה חייב להיות אחרי מועד האיסוף");
-  if (duration < Number(item.min_loan_minutes)) throw new HttpError(400, `משך ההשאלה המינימלי הוא ${item.min_loan_minutes} דקות`);
-  if (duration > Number(item.max_loan_minutes)) throw new HttpError(400, `משך ההשאלה המקסימלי הוא ${item.max_loan_minutes} דקות`);
+  if (duration < Number(item.min_loan_minutes)) throw new HttpError(400, `משך ההשאלה המינימלי הוא ${loanDurationLabel(item.min_loan_minutes)}`);
+  if (duration > Number(item.max_loan_minutes)) throw new HttpError(400, `משך ההשאלה המקסימלי הוא ${loanDurationLabel(item.max_loan_minutes)}`);
   if(Number(item.max_loan_days||0)>0&&duration>Number(item.max_loan_days)*1440) throw new HttpError(400,`משך ההשאלה המרבי הוא ${item.max_loan_days} ימים`);
   const now = Date.now();
   const fromMs = Date.parse(from);
@@ -3062,6 +3062,12 @@ async function unsubscribeCommunity(env,token){
 }
 function icsEscape(v){return String(v||"").replaceAll("\\","\\\\").replaceAll(";","\\;").replaceAll(",","\\,").replace(/\r?\n/g,"\\n")}
 function icsUtc(v){const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z")}
+function loanDurationLabel(minutes){
+  const total=Math.max(0,Number(minutes||0)),days=Math.floor(total/1440),hours=(total%1440)/60,parts=[];
+  if(days)parts.push(days+" "+(days===1?"יום":"ימים"));
+  if(hours)parts.push((Number.isInteger(hours)?hours:Number(hours.toFixed(1)))+" שעות");
+  return parts.join(" ו־")||"פחות משעה";
+}
 async function ensureCalendarFeedSchema(env){
   const info=await env.DB.prepare("PRAGMA table_info(users)").all(),cols=new Set((info.results||[]).map(row=>row.name));
   if(!cols.has("calendar_feed_token"))await env.DB.prepare("ALTER TABLE users ADD COLUMN calendar_feed_token TEXT").run().catch(error=>{if(!String(error).toLowerCase().includes("duplicate"))throw error});
@@ -3073,11 +3079,29 @@ async function myCalendarFeed(request,env){
   if(!token){token=toBase64Url(crypto.getRandomValues(new Uint8Array(24)));await env.DB.prepare("UPDATE users SET calendar_feed_token=?,updated_at=? WHERE id=?").bind(token,new Date().toISOString(),user.id).run()}
   return json({url:"https://gmach-berega.co.il/calendar/"+token+".ics"});
 }
+async function loanRequestCalendar(request,env,requestId){
+  const user=await requireUser(request,env);
+  const row=await env.DB.prepare(`SELECT lr.id,lr.borrower_id,lr.requested_from,lr.requested_until,lr.status,i.title,o.id organization_id,o.name organization_name,o.owner_id,
+    EXISTS(SELECT 1 FROM organization_members m WHERE m.organization_id=o.id AND m.user_id=? AND m.status='active') AS is_member
+    FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.id=?`).bind(user.id,requestId).first();
+  if(!row)throw new HttpError(404,"ההשאלה לא נמצאה");
+  if(row.borrower_id!==user.id&&row.owner_id!==user.id&&!row.is_member&&user.role!=="admin")throw new HttpError(403,"אין הרשאה להוסיף את ההשאלה הזו ליומן");
+  const pref=await env.DB.prepare("SELECT reminder_minutes FROM calendar_preferences WHERE user_id=?").bind(user.id).first().catch(()=>null),reminder=Math.max(0,Number(pref?.reminder_minutes??1440));
+  const events=[];
+  for(const [kind,when,label] of [["pickup",row.requested_from,"איסוף"],["return",row.requested_until,"החזרה"]]){
+    const start=icsUtc(when);if(!start)continue;
+    const end=icsUtc(new Date(new Date(when).getTime()+30*60000));
+    events.push(["BEGIN:VEVENT","UID:"+row.id+"-"+kind+"@gmach-berega","DTSTAMP:"+icsUtc(new Date()),"DTSTART:"+start,"DTEND:"+end,"SUMMARY:"+icsEscape(label+" · "+row.title),"DESCRIPTION:"+icsEscape(row.organization_name+" · "+row.status),"URL:https://gmach-berega.co.il/dashboard",...(reminder?["BEGIN:VALARM","TRIGGER:-PT"+reminder+"M","ACTION:DISPLAY","DESCRIPTION:"+icsEscape(label+" · "+row.title),"END:VALARM"]:[]),"END:VEVENT"].join("\r\n"));
+  }
+  if(!events.length)throw new HttpError(400,"להשאלה הזו עדיין אין מועדי איסוף והחזרה תקינים");
+  const body=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Gmach Berega//Loan Calendar//HE","CALSCALE:GREGORIAN","METHOD:PUBLISH",...events,"END:VCALENDAR",""].join("\r\n");
+  return new Response(body,{headers:{"Content-Type":"text/calendar; charset=utf-8","Cache-Control":"private, no-store","Content-Disposition":'attachment; filename="gmach-berega-loan.ics"'}});
+}
 async function publicCalendarFeed(env,token){
   const user=await env.DB.prepare("SELECT id FROM users WHERE calendar_feed_token=? AND deleted_at IS NULL").bind(token).first();if(!user)return new Response("Not found",{status:404});
   const pref=await env.DB.prepare("SELECT reminder_minutes FROM calendar_preferences WHERE user_id=?").bind(user.id).first().catch(()=>null),reminder=Math.max(0,Number(pref?.reminder_minutes??1440));
   const rows=await env.DB.prepare(`SELECT lr.id,lr.requested_from,lr.requested_until,lr.status,i.title,o.name organization_name FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE (lr.borrower_id=? OR o.owner_id=?) AND lr.status IN ('pending','approved','collected') ORDER BY lr.requested_from LIMIT 300`).bind(user.id,user.id).all();
-  const events=[];for(const x of rows.results||[]){for(const [kind,when,label] of [["pickup",x.requested_from,"איסוף"],["return",x.requested_until,"החזרה"]]){const dt=icsUtc(when);if(!dt)continue;events.push(["BEGIN:VEVENT","UID:"+x.id+"-"+kind+"@gmach-berega","DTSTAMP:"+icsUtc(new Date()),"DTSTART:"+dt,"SUMMARY:"+icsEscape(label+" · "+x.title),"DESCRIPTION:"+icsEscape(x.organization_name+" · "+x.status),"URL:https://gmach-berega.co.il/#/account",...(reminder?["BEGIN:VALARM","TRIGGER:-PT"+reminder+"M","ACTION:DISPLAY","DESCRIPTION:"+icsEscape(label+" · "+x.title),"END:VALARM"]:[]),"END:VEVENT"].join("\r\n"))}}
+  const events=[];for(const x of rows.results||[]){for(const [kind,when,label] of [["pickup",x.requested_from,"איסוף"],["return",x.requested_until,"החזרה"]]){const dt=icsUtc(when);if(!dt)continue;events.push(["BEGIN:VEVENT","UID:"+x.id+"-"+kind+"@gmach-berega","DTSTAMP:"+icsUtc(new Date()),"DTSTART:"+dt,"SUMMARY:"+icsEscape(label+" · "+x.title),"DESCRIPTION:"+icsEscape(x.organization_name+" · "+x.status),"URL:https://gmach-berega.co.il/dashboard",...(reminder?["BEGIN:VALARM","TRIGGER:-PT"+reminder+"M","ACTION:DISPLAY","DESCRIPTION:"+icsEscape(label+" · "+x.title),"END:VALARM"]:[]),"END:VEVENT"].join("\r\n"))}}
   const body=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Gmach Berega//Calendar Feed//HE","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:גמ״ח ברגע",...events,"END:VCALENDAR",""].join("\r\n");
   return new Response(body,{headers:{"Content-Type":"text/calendar; charset=utf-8","Cache-Control":"private, max-age=300","Content-Disposition":'inline; filename="gmach-berega.ics"'}});
 }
@@ -3102,7 +3126,7 @@ function israelClock(){
 function inQuietHours(now,start,end){if(!start||!end||start===end)return false;return start<end?now>=start&&now<end:now>=start||now<end}
 async function sendOperationalNotificationEmail(env,user,notification){
   if(!env.RESEND_API_KEY||!user.email)return false;
-  const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/#/account";
+  const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/dashboard";
   const specific=new Set(["new_device","pickup_confirmed","loan_cancelled","extension","waitlist","support"]).has(String(notification.type||""))?String(notification.type):"notification";
   let mail=await managedEmailTemplate(env,specific,lang,{subject:en?"Gmach Berega update":"עדכון חדש בגמ״ח ברגע",text:"{{title}}\n\n{{body}}"},{title:notification.title||"",body:notification.body||"",account_url:accountUrl},accountUrl);
   if(!mail&&specific!=="notification")mail=await managedEmailTemplate(env,"notification",lang,{subject:en?"Gmach Berega update":"עדכון חדש בגמ״ח ברגע",text:"{{title}}\n\n{{body}}"},{title:notification.title||"",body:notification.body||"",account_url:accountUrl},accountUrl);
@@ -3142,7 +3166,7 @@ async function deliverDailyDigests(env){
     const done=await env.DB.prepare("SELECT id FROM notification_digests WHERE user_id=? AND digest_date=? AND status='sent'").bind(user.id,today).first();if(done)continue;
     const items=await env.DB.prepare(`SELECT n.id,n.title,n.body,n.created_at FROM notifications n WHERE n.user_id=? AND n.created_at>=datetime('now','-1 day') AND NOT EXISTS(SELECT 1 FROM notification_delivery_log l WHERE l.notification_id=n.id AND l.channel='email' AND l.status='sent') ORDER BY n.created_at DESC LIMIT 30`).bind(user.id).all();
     if(!(items.results||[]).length)continue;
-    const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/#/account",digestBody=(en?"Updates from the last day:":"עדכונים מהיממה האחרונה:")+"\n\n"+items.results.map(x=>"• "+x.title+" — "+x.body).join("\n");
+    const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/dashboard",digestBody=(en?"Updates from the last day:":"עדכונים מהיממה האחרונה:")+"\n\n"+items.results.map(x=>"• "+x.title+" — "+x.body).join("\n");
     const mail=await managedEmailTemplate(env,"daily_digest",lang,{subject:en?"Your daily Gmach Berega summary":"הסיכום היומי שלך מגמ״ח ברגע",text:"{{body}}"},{body:digestBody,account_url:accountUrl},accountUrl);if(!mail)continue;
     const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],...mail})});
     const id=crypto.randomUUID(),now=new Date().toISOString();
