@@ -1,4 +1,4 @@
-deploy_sha=b1e0107474698ed8a3b4a27654eb44ec294a3478
+deploy_sha=5b0398f181d2e13b8e952a500bc9106952fcfc67
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -9,8 +9,8 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:146:83 {
+AssertionError [ERR_ASSERTION]: invalid triple-dollar selector helper must never reach runtime
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:147:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
