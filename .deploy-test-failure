@@ -1,4 +1,4 @@
-deploy_sha=9d6485991421bc5b391d07389c97ebfd0eab7217
+deploy_sha=6672e418110075301b0956b5afe7cab23aa5422e
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -20,27 +20,27 @@ Excel export and QR image scanner gate passed.
 Voice message recording gate passed.
 Excel export, accessible admin status and QR image scanning gate passed.
 Full requirements regression extensions passed.
-Static English interface coverage 100.0% (462/462)
-remaining-features Error: Backup checksum mismatch
-    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
-    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:352:91)
-    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:902:37)
-    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:377:26)
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+AssertionError [ERR_ASSERTION]: Every literal server error shown to English users requires an English translation
++ actual - expected
 
-1 !== 0
++ [
++   'הסניף שנבחר אינו שייך לגמ״ח או שאינו פעיל'
++ ]
+- []
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:352:10
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
-  generatedMessage: true,
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/i18n-static.mjs:29:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 1,
-  expected: 0,
-  operator: 'strictEqual',
+  actual: [ 'הסניף שנבחר אינו שייך לגמ״ח או שאינו פעיל' ],
+  expected: [],
+  operator: 'deepStrictEqual',
   diff: 'simple'
 }
 
