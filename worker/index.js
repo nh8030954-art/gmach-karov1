@@ -1335,7 +1335,13 @@ async function adminCategories(request,env){
 async function createAdminCategory(request,env){
   const user=await requireAdmin(request,env),body=await readJson(request);
   const id=cleanOptional(body.id,80)||("cat-"+crypto.randomUUID().slice(0,8)),nameHe=cleanText(body.nameHe,2,80,"שם הקטגוריה"),nameEn=cleanOptional(body.nameEn,80),parentId=cleanOptional(body.parentId,80);
-  if(parentId){const parent=await env.DB.prepare("SELECT id FROM categories WHERE id=?").bind(parentId).first();if(!parent)throw new HttpError(400,"קטגוריית האב אינה קיימת");}
+  if(parentId){
+    const parent=await env.DB.prepare("SELECT id,parent_id FROM categories WHERE id=?").bind(parentId).first();
+    if(!parent)throw new HttpError(400,"קטגוריית האב אינה קיימת");
+    if(parent.parent_id)throw new HttpError(400,"ניתן להוסיף קטגוריית משנה רק תחת קטגוריה ראשית");
+  }
+  const duplicate=await env.DB.prepare("SELECT id FROM categories WHERE COALESCE(parent_id,'')=COALESCE(?,'') AND lower(trim(name_he))=lower(trim(?)) LIMIT 1").bind(parentId,nameHe).first();
+  if(duplicate)throw new HttpError(409,"כבר קיימת קטגוריה בשם הזה באותה רמה");
   await env.DB.batch([
     env.DB.prepare("INSERT INTO categories(id,parent_id,name_he,name_en,icon,image_url,synonyms_json,status,sort_order) VALUES(?,?,?,?,?,?,?,?,?)")
       .bind(id,parentId,nameHe,nameEn,cleanOptional(body.icon,50),validateAssetUrl(body.imageUrl),JSON.stringify(Array.isArray(body.synonyms)?body.synonyms.slice(0,50):[]),"active",Math.max(0,Math.min(9999,Number(body.sortOrder)||0))),
