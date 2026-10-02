@@ -1,4 +1,4 @@
--- Rebase all gmach human serial identifiers to a high, sequential range starting at 100001.
+-- Rebase all gmach human serial identifiers to a high, sequential range starting at 150.
 CREATE TABLE IF NOT EXISTS organization_serial_codes (
   code INTEGER PRIMARY KEY AUTOINCREMENT,
   organization_id TEXT NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE,
@@ -13,7 +13,7 @@ CREATE TABLE _gmach_code_rebase (
 );
 
 INSERT INTO _gmach_code_rebase(organization_id,old_code,new_code)
-SELECT organization_id,code,100000 + ROW_NUMBER() OVER (ORDER BY code,created_at,organization_id)
+SELECT organization_id,code,149 + ROW_NUMBER() OVER (ORDER BY code,created_at,organization_id)
 FROM organization_serial_codes;
 
 DROP TABLE IF EXISTS _unit_serial_rebase;
