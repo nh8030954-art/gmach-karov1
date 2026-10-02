@@ -1346,7 +1346,14 @@
   const show=d=>{if(d&&!d.open&&typeof d.showModal==='function')d.showModal()};
   document.querySelectorAll('[data-close-dialog]').forEach(b=>b.addEventListener('click',()=>b.closest('dialog')?.close()));
   const supportButton=document.getElementById('support-form-button'),supportDialog=document.getElementById('support-dialog'),supportForm=document.getElementById('support-form');
-  supportButton?.addEventListener('click',()=>show(supportDialog));
+  supportButton?.addEventListener('click',()=>{
+    const incident=String(window.GmachLastIncidentNumber||'').trim();
+    if(incident&&supportForm&&!supportForm.elements.message.value.trim()){
+      supportForm.elements.subject.value='דיווח על תקלה';
+      supportForm.elements.message.value='מספר תקלה: '+incident+'\nעמוד: '+location.pathname+location.search;
+    }
+    show(supportDialog);
+  });
   supportForm?.addEventListener('submit',async e=>{
    e.preventDefault();if(!supportForm.reportValidity())return;
    const submit=document.getElementById('support-submit'),status=document.getElementById('support-form-status');
