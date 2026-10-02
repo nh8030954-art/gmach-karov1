@@ -1359,7 +1359,10 @@
    const submit=document.getElementById('support-submit'),status=document.getElementById('support-form-status');
    submit.disabled=true;status.textContent='שולחים את הפנייה…';
    try{
-    const res=await fetch('/api/support',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:supportForm.elements.name.value,email:supportForm.elements.email.value,subject:supportForm.elements.subject.value,message:supportForm.elements.message.value,turnstileToken:window.GmachTurnstile?.token("support")||null})});
+    let supportMessage=supportForm.elements.message.value;
+    const incident=String(window.GmachLastIncidentNumber||'').trim();
+    if(incident&&!supportMessage.includes(incident))supportMessage=(supportMessage+'\n\nמספר תקלה: '+incident).trim();
+    const res=await fetch('/api/support',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:supportForm.elements.name.value,email:supportForm.elements.email.value,subject:supportForm.elements.subject.value,message:supportMessage,turnstileToken:window.GmachTurnstile?.token("support")||null})});
     const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||'השליחה לא הושלמה');
     supportForm.reset();status.textContent='הפנייה נשלחה בהצלחה.';
    }catch(err){status.textContent=err.message||'לא הצלחנו לשלוח כרגע. נסו שוב בעוד רגע.'}finally{submit.disabled=false}
