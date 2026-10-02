@@ -327,6 +327,10 @@ try {
   assert.equal(result.data.requests[0].borrower_phone, "052-7654321");
   result = await request(`/api/loan-requests/${requestId}/status`, { method: "PATCH", cookie: adminCookie, body: { status: "approved", managerNote: "איסוף מהכניסה בשעה 19:00" } });
   assert.equal(result.response.status, 200);
+  result = await request(`/api/loan-requests/${requestId}/units`, { cookie: adminCookie });
+  assert.equal(result.response.status, 200, JSON.stringify(result.data));
+  assert.equal(Array.isArray(result.data.units), true);
+  assert.equal(result.data.units.length, 2);
   result = await request(`/api/loan-requests/${requestId}/calendar.ics`, { cookie: borrowerCookie });
   assert.equal(result.response.status, 200, String(result.data));
   assert.match(result.response.headers.get("content-type")||"", /text\/calendar/);
@@ -351,6 +355,21 @@ try {
   assert.equal(result.response.status, 200);
   result = await request("/api/notifications", { cookie: borrowerCookie });
   assert.equal(result.data.unread, 0);
+
+  result = await request("/api/items", { method: "POST", cookie: adminCookie, body: { organizationId, title: "פריט בדיקת אי הגעה", category: "אירועים", condition: "מצב טוב", quantity: 1, description: "פריט ייעודי לבדיקת זרימת אי הגעה במערכת.", loanConditions: "איסוף עצמי", freeConfirmed: true } });
+  assert.equal(result.response.status, 201, JSON.stringify(result.data));
+  const noShowItemId=result.data.item.id;
+  result = await request("/api/loan-requests", { method:"POST",cookie:borrowerCookie,body:{itemId:noShowItemId,requestedFrom:"2026-11-12T10:00",requestedUntil:"2026-11-13T10:00",quantity:1,depositAccepted:true,phone:"052-7654321",note:"בדיקת אי הגעה"} });
+  assert.equal(result.response.status,201,JSON.stringify(result.data));
+  const noShowRequestId=result.data.request.id;
+  result = await request(`/api/loan-requests/${noShowRequestId}/status`,{method:"PATCH",cookie:adminCookie,body:{status:"approved"}});
+  assert.equal(result.response.status,200,JSON.stringify(result.data));
+  result = await request(`/api/loan-requests/${noShowRequestId}/status`,{method:"PATCH",cookie:adminCookie,body:{status:"no_show"}});
+  assert.equal(result.response.status,200,JSON.stringify(result.data));
+  result = await request("/api/me/dashboard",{cookie:adminCookie});
+  const noShowRow=result.data.requests.find(x=>x.id===noShowRequestId);
+  assert.equal(noShowRow.status,"cancelled");
+  assert.equal(noShowRow.workflow_status,"no_show");
 
   result = await request("/api/auth/register", { method: "POST", body: { fullName: "שואל נוסף", phone:"054-1112233", city:"ירושלים", address:"רחוב הבדיקה 2, ירושלים", email: "second@example.com", password: "ThirdPass!789", termsAccepted: true, operationalEmailsAccepted:true } });
   assert.equal(result.response.status, 201);
