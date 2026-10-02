@@ -506,4 +506,4 @@ assert.ok(worker.includes('storedStatus=target==="no_show"?"cancelled":target'),
 assert.ok(worker.includes("if(active.length<desired)")&&worker.includes("else if(active.length>desired)"),"serial units must stay synchronized with item quantity");
 assert.ok(worker.includes("reconcileSerializedQuantity"),"legacy serialized inventory must reconcile to canonical quantity");
 assert.ok(worker.includes("tracked_count")&&worker.includes("usable_tracked"),"availability must account for fully serialized units that are inactive or under repair");
-assert.ok(worker.includes("Number(trackedUnits?.count||0)>quantity"),"item quantity cannot be reduced below active serial-unit count");
+assert.ok(worker.includes("Number(existingUnits?.count||0)>quantity")&&worker.includes("Number(existingUnits.count)-quantity>Number(removable?.count||0)"),"item quantity reduction must protect assigned or unavailable serial units");
