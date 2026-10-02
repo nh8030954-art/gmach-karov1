@@ -681,6 +681,15 @@ html.a11y-high-contrast :focus-visible { outline-color: #ffdf00 !important; }
 }
 .item-detail-media::before { content: ""; position: absolute; width: 310px; height: 310px; border-radius: 50%; border: 65px solid rgba(255,255,255,.36); }
 .item-detail-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.item-gallery-stage{position:absolute;inset:0;overflow:hidden}
+.item-gallery-stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.item-gallery-nav{position:absolute;z-index:4;top:50%;transform:translateY(-50%);width:44px;height:44px;border:1px solid rgba(255,255,255,.75);border-radius:50%;background:rgba(255,255,255,.9);color:var(--navy);font-size:2rem;line-height:1;display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow-sm)}
+.item-gallery-prev{inset-inline-start:16px}.item-gallery-next{inset-inline-end:16px}
+.item-gallery-count{position:absolute;z-index:4;inset-inline-start:16px;bottom:76px;padding:6px 10px;border-radius:999px;background:rgba(5,28,37,.72);color:#fff;font-size:.76rem;font-weight:800}
+.item-gallery-thumbs{position:absolute;z-index:4;inset-inline:16px;bottom:14px;display:flex;gap:8px;overflow-x:auto;padding:2px}
+.item-gallery-thumbs button{position:relative;flex:0 0 52px;width:52px;height:52px;border:2px solid rgba(255,255,255,.72);border-radius:10px;overflow:hidden;padding:0;background:#fff;cursor:pointer;opacity:.78}
+.item-gallery-thumbs button.is-active{border-color:var(--accent);opacity:1;box-shadow:0 0 0 2px rgba(0,0,0,.12)}
+.item-gallery-thumbs img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .item-detail-media .item-symbol { position:relative;z-index:1;width: 132px; height: 132px; border-radius: 40px 14px 40px 40px; }
 .item-detail-media .item-symbol svg { width: 70px; height: 70px; }
 .item-detail-no-image { grid-template-columns: minmax(260px,.62fr) minmax(0,1.38fr); min-height: 0; }
@@ -1155,10 +1164,17 @@ html, body { max-width: 100%; overflow-x: clip; }
 }
 
 /* Registration intent and gmach hours */
-.auth-intent-fieldset{border:1px solid var(--line);border-radius:16px;padding:12px;background:color-mix(in srgb,var(--canvas) 55%,#fff)}
-.auth-intent-fieldset legend{padding-inline:6px;font-weight:800;color:var(--navy)}
-.auth-intent-option{display:flex!important;align-items:flex-start;gap:10px;padding:10px;border-radius:12px;cursor:pointer}
-.auth-intent-option:has(input:checked){background:#fff;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--navy) 22%,var(--line))}
-.auth-intent-option span{display:grid;gap:2px}.auth-intent-option small{color:var(--ink-soft);font-weight:500;line-height:1.45}
+.auth-intent-fieldset{border:0;border-radius:18px;padding:0;background:transparent;display:grid;gap:10px}
+.auth-intent-fieldset legend{padding:0 2px 8px;font-weight:850;color:var(--navy);font-size:1rem}
+.auth-intent-option{display:grid!important;grid-template-columns:26px minmax(0,1fr);align-items:center;gap:13px;padding:14px 16px;border:1px solid var(--line);border-radius:16px;background:#fff;cursor:pointer;transition:border-color .18s ease,box-shadow .18s ease,background .18s ease}
+.auth-intent-option:hover{border-color:color-mix(in srgb,var(--navy) 35%,var(--line));box-shadow:var(--shadow-sm)}
+.auth-intent-option:has(input:checked){border-color:var(--navy);background:color-mix(in srgb,var(--navy) 5%,#fff);box-shadow:0 0 0 2px color-mix(in srgb,var(--navy) 9%,transparent)}
+.auth-intent-option input[type=radio]{appearance:none;-webkit-appearance:none;width:22px!important;height:22px!important;min-width:22px!important;max-width:22px!important;margin:0;border:2px solid #8a9aa3;border-radius:50%;background:#fff;display:grid;place-items:center}
+.auth-intent-option input[type=radio]::before{content:"";width:10px;height:10px;border-radius:50%;transform:scale(0);transition:transform .14s ease;background:var(--navy)}
+.auth-intent-option input[type=radio]:checked{border-color:var(--navy)}
+.auth-intent-option input[type=radio]:checked::before{transform:scale(1)}
+.auth-intent-option span{display:grid;gap:3px;min-width:0}
+.auth-intent-option strong{color:var(--navy);font-size:.98rem}
+.auth-intent-option small{color:var(--ink-soft);font-weight:500;line-height:1.5}
 .hours-coordination-choice{margin-bottom:4px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--canvas) 62%,#fff)}
 #gmach-hours-grid[hidden]{display:none!important}
