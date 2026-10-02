@@ -1,4 +1,4 @@
-sha=d9642eea905d8d725c32177c872b63a966594cb5
+sha=3d6acc5b077fa02848757c057082dcbc9988bf70
 install=success
 syntax=success
 tests=failure
@@ -9,32 +9,32 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+AssertionError [ERR_ASSERTION]: {"error":"אפשר להוסיף עד 1 מספרים סידוריים בלבד, בהתאם לכמות המלאי של הפריט","requestId":"179093897124565861"}
 
-2 !== 1
+409 !== 201
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:406:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:255:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
-  generatedMessage: true,
+  generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 2,
-  expected: 1,
+  actual: 409,
+  expected: 201,
   operator: 'strictEqual',
   diff: 'simple'
 }
 
 Node.js v24.21.0
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790938621137:406:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790938971459:255:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
-  generatedMessage: true,
+  generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 2,
-  expected: 1,
+  actual: 409,
+  expected: 201,
   operator: 'strictEqual',
   diff: 'simple'
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T10:57:06.031Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T11:02:55.251Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
