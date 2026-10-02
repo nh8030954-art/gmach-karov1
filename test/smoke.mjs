@@ -251,9 +251,11 @@ try {
 
   result = await request(`/api/organizations/${organizationId}/branches`, { method:"POST", cookie:adminCookie, body:{ name:"סניף מרכזי",address:"רחוב הבדיקה 1",city:"ירושלים",phone:"050-1234567",inventoryMode:"separate",hours:{sun:"09:00-17:00"} } });
   assert.equal(result.response.status,201,JSON.stringify(result.data));
-  result = await request(`/api/items/${itemId}/units`, { method:"POST",cookie:adminCookie,body:{count:2,condition:"חדש"} });
+  result = await request(`/api/items/${itemId}/units`, { method:"POST",cookie:adminCookie,body:{count:1,condition:"חדש"} });
   assert.equal(result.response.status,201,JSON.stringify(result.data));
-  assert.equal(result.data.units.length,2);
+  assert.equal(result.data.units.length,1);
+  result = await request(`/api/items/${itemId}/units`, { method:"POST",cookie:adminCookie,body:{count:1,condition:"חדש"} });
+  assert.equal(result.response.status,409,"second serial must be rejected when item quantity is one");
 
   const form = new WorkerFormData();
   form.append("images", new Blob([new Uint8Array([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82])], { type: "image/png" }), "sample.png");
@@ -330,7 +332,7 @@ try {
   result = await request(`/api/loan-requests/${requestId}/units`, { cookie: adminCookie });
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(Array.isArray(result.data.units), true);
-  assert.equal(result.data.units.length, 2);
+  assert.equal(result.data.units.length, 1);
   result = await request(`/api/loan-requests/${requestId}/calendar.ics`, { cookie: borrowerCookie });
   assert.equal(result.response.status, 200, String(result.data));
   assert.match(result.response.headers.get("content-type")||"", /text\/calendar/);
