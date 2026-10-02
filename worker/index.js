@@ -801,7 +801,9 @@ async function routeApi(request, env, ctx, url) {
   const imageUpload = path.match(/^\/api\/items\/([^/]+)\/images$/);
   if (method === "POST" && imageUpload) return uploadImages(request, env, decodeURIComponent(imageUpload[1]));
   if (method === "POST" && path === "/api/loan-requests") return createLoanRequest(request, env);
-  const loanCalendar = path.match(/^\/api\/loan-requests\/([^/]+)\/calendar\.ics$/);\n  if (method === "GET" && loanCalendar) return loanRequestCalendar(request,env,decodeURIComponent(loanCalendar[1]));\n  const loanUnits = path.match(/^\/api\/loan-requests\/([^/]+)\/units$/);
+  const loanCalendar = path.match(/^\/api\/loan-requests\/([^/]+)\/calendar\.ics$/);
+  if (method === "GET" && loanCalendar) return loanRequestCalendar(request,env,decodeURIComponent(loanCalendar[1]));
+  const loanUnits = path.match(/^\/api\/loan-requests\/([^/]+)\/units$/);
   if (method === "GET" && loanUnits) return manageLoanUnits(request, env, decodeURIComponent(loanUnits[1]), false);
   if (method === "POST" && loanUnits) return manageLoanUnits(request, env, decodeURIComponent(loanUnits[1]), true);
   const loanTimeline = path.match(/^\/api\/loan-requests\/([^/]+)\/timeline$/);
