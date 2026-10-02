@@ -1606,7 +1606,7 @@ async function discovery(env, url) {
     env.DB.prepare(`SELECT category,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY category ORDER BY count DESC`),
     env.DB.prepare(`SELECT city,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY city ORDER BY count DESC LIMIT 80`),
     env.DB.prepare(`SELECT DISTINCT title FROM items WHERE status='active' AND (?='' OR title LIKE ?) ORDER BY updated_at DESC LIMIT 8`).bind(query || "", like),
-    env.DB.prepare(`SELECT o.id,o.name,o.city,o.description,o.last_active_at,
+    env.DB.prepare(`SELECT o.id,o.name,o.city,o.neighborhood,o.address,o.description,o.last_active_at,
       COUNT(DISTINCT i.id) AS item_count,
       ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count,
       SUM(CASE WHEN i.availability_status='available' THEN 1 ELSE 0 END) AS available_items
@@ -2335,7 +2335,7 @@ async function dashboard(request, env) {
     cancellation_undo_until: row.cancellation_undo_until || null,
     direction: row.direction,
     borrower_name: row.direction === "incoming" ? row.borrower_name : undefined,
-    borrower_phone: row.direction === "incoming" ? row.phone : undefined,
+    borrower_phone: row.direction === "incoming" && ["approved","collected","returned"].includes(row.status) ? row.phone : undefined,
     contact_phone: row.contact_phone,
     items: { title: row.item_title, organizations: { name: row.org_name } }
   }));
@@ -3747,7 +3747,7 @@ function withSecurityHeaders(response) {
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("Permissions-Policy", "camera=(self), microphone=(self), geolocation=(self), payment=()");
   headers.set("X-Frame-Options", "DENY");
-  headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com https://www.openstreetmap.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+  headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://challenges.cloudflare.com https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https://*.tile.openstreetmap.org; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com https://www.openstreetmap.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
   headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   headers.set("Cross-Origin-Opener-Policy", "same-origin");
   headers.set("Cross-Origin-Resource-Policy", "same-origin");
