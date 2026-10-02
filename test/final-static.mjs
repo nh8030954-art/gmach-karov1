@@ -496,3 +496,9 @@ assert.ok(appClient.includes("GmachLastIncidentNumber")&&appClient.includes("/ap
 assert.ok(appClient.includes("מספר תקלה:")&&worker.includes("incidentNumber()"),"system errors must expose traceable incident numbers");
 assert.ok(appClient.includes("window.GmachToast=toast"),"global toast channel missing");
 assert.ok(indexHtml.includes("toast-region"),"toast region missing");
+
+assert.equal((appClient.match(/data-no-show=/g)||[]).length,1,"approved request should render exactly one no-show action");
+assert.ok(appClient.includes("openPickupScreen(button.dataset.pickupRequest)"),"pickup screen button must be wired");
+assert.ok(appClient.includes('updateRequestStatus(button.dataset.noShow,"no_show")'),"no-show button must be wired");
+assert.ok(worker.includes("async function manageLoanUnits("),"pickup unit endpoint implementation missing");
+assert.ok(worker.includes('storedStatus=target==="no_show"?"cancelled":target'),"no-show must respect loan_requests status constraint");
