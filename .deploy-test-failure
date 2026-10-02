@@ -1,4 +1,4 @@
-deploy_sha=f77bbb58a081e3a471813e32096af5fd0a27a5c2
+deploy_sha=4de5af343d3cc9ab05337b97c2d37659bcdb7490
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -30,16 +30,16 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: second serial must be rejected when item quantity is one
+AssertionError [ERR_ASSERTION]: {"error":"מספר היחידות הסידוריות לא יכול לעלות על כמות הפריט. יש לעדכן קודם את כמות הפריט","requestId":"179094166700633098"}
 
-201 !== 409
+409 !== 201
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:263:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:260:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 201,
-  expected: 409,
+  actual: 409,
+  expected: 201,
   operator: 'strictEqual',
   diff: 'simple'
 }
