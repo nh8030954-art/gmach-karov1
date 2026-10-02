@@ -27,13 +27,136 @@ const IMAGE_TYPES = new Map([
 ]);
 const CATEGORIES = new Set(["אירועים", "כלי עבודה", "תינוקות", "רפואה", "טיולים", "בית ואירוח", "כללי"]);
 const ITEM_SUBCATEGORIES = Object.freeze({
-  "אירועים":["עיצוב וקישוט","שולחנות וכיסאות","תאורה והגברה","כלי הגשה","חופות וסוכות","מפות וטקסטיל"],
-  "כלי עבודה":["כלי עבודה חשמליים","כלי עבודה ידניים","כלי גינה","סולמות ופיגומים","ציוד ניקוי"],
-  "תינוקות":["עגלות וטיולונים","מושבי בטיחות","מיטות ולולים","האכלה והנקה","רחצה והחתלה","מנשאים"],
-  "רפואה":["ניידות וכיסאות גלגלים","הליכונים וקביים","ציוד טיפול ביתי","ציוד אורתופדי","ציוד החלמה"],
-  "טיולים":["קמפינג","טיולים והליכה","מזוודות ותיקים","צידניות וציוד אוכל","ים ובריכה"],
-  "בית ואירוח":["מכשירי חשמל","ריהוט מתקפל","מטבח ואפייה","אירוח ולינה","מעבר דירה"],
-  "כללי":["ספרים ולימוד","תשמישי קדושה","נגישות","ביגוד ותחפושות","ספורט ופנאי","אחר"]
+  "אירועים": [
+    "שולחנות וכיסאות",
+    "עיצוב וקישוט",
+    "הגברה ומיקרופונים",
+    "תאורה לאירועים",
+    "כלי הגשה",
+    "חופה ואביזרי חתונה",
+    "בר/בת מצווה",
+    "הפעלות ילדים"
+  ],
+  "כלי עבודה": [
+    "כלי עבודה ידניים",
+    "כלי עבודה חשמליים",
+    "כלי גינה",
+    "סולמות וציוד גובה",
+    "מדידה ובדיקה",
+    "ניקיון ותחזוקה"
+  ],
+  "תינוקות וילדים": [
+    "עגלות ומנשאים",
+    "מיטות ולולים",
+    "האכלה",
+    "כיסאות בטיחות",
+    "צעצועים ומשחקים",
+    "ביגוד ילדים"
+  ],
+  "רפואה ושיקום": [
+    "כיסאות גלגלים והליכונים",
+    "קביים ומקלות",
+    "ציוד רפואי ביתי",
+    "שיקום ופיזיותרפיה",
+    "ציוד לאחר אשפוז"
+  ],
+  "טיולים וקמפינג": [
+    "אוהלים ומחסות",
+    "שקי שינה ומזרנים",
+    "בישול שטח",
+    "תיקים ותרמילים",
+    "מים וצידניות"
+  ],
+  "בית ואירוח": [
+    "ריהוט זמני",
+    "מצעים ושינה",
+    "חימום וקירור",
+    "ניקיון",
+    "אירוח אורחים"
+  ],
+  "חשמל ואלקטרוניקה": [
+    "מחשבים וציוד היקפי",
+    "מקרנים ומסכים",
+    "מטענים וכבלים",
+    "אודיו ואוזניות",
+    "צילום ומצלמות"
+  ],
+  "לימודים ומשרד": [
+    "ספרי לימוד",
+    "ציוד משרדי",
+    "מדפסות וסורקים",
+    "ציוד למצגות"
+  ],
+  "יהדות ותשמישי קדושה": [
+    "ספרי קודש",
+    "תפילין וטלית",
+    "שבת וחג",
+    "סוכה וארבעת המינים",
+    "ציוד לשמחות"
+  ],
+  "ביגוד ואביזרים": [
+    "ביגוד חגיגי",
+    "מעילים וחורף",
+    "נעליים",
+    "תחפושות"
+  ],
+  "ספורט ופנאי": [
+    "כדורים וציוד משחק",
+    "כושר ואימון",
+    "אופניים וקסדות",
+    "ספורט מים"
+  ],
+  "ניידות ותחבורה": [
+    "אביזרי רכב",
+    "אופניים וקורקינטים",
+    "עגלות נשיאה"
+  ],
+  "מטבח ומזון": [
+    "סירים ומחבתות",
+    "מכשירי מטבח",
+    "אירוח והגשה",
+    "פלטות ומיחמים"
+  ],
+  "טיפוח ואירוח אישי": [
+    "טיפוח שיער",
+    "ציוד אורחים"
+  ],
+  "ציוד קהילתי": [
+    "שילוט ומחסומים",
+    "ציוד למפגשים",
+    "ציוד חירום קהילתי"
+  ],
+  "אחר": [],
+  "תינוקות": [
+    "עגלות ומנשאים",
+    "מיטות ולולים",
+    "האכלה",
+    "כיסאות בטיחות",
+    "צעצועים ומשחקים",
+    "ביגוד ילדים"
+  ],
+  "רפואה": [
+    "כיסאות גלגלים והליכונים",
+    "קביים ומקלות",
+    "ציוד רפואי ביתי",
+    "שיקום ופיזיותרפיה",
+    "ציוד לאחר אשפוז"
+  ],
+  "טיולים": [
+    "אוהלים ומחסות",
+    "שקי שינה ומזרנים",
+    "בישול שטח",
+    "תיקים ותרמילים",
+    "מים וצידניות"
+  ],
+  "כללי": [
+    "ספרי לימוד",
+    "ספרי קודש",
+    "תשמישי קדושה",
+    "תחפושות",
+    "ספורט ופנאי",
+    "אחר"
+  ]
 });
 function fixedSubcategory(category,value,legacyValue=null){
   const sub=cleanOptional(value,80);if(!sub)return null;
@@ -44,10 +167,16 @@ function fixedSubcategory(category,value,legacyValue=null){
 const CONDITIONS = new Set(["כמו חדש", "מצוין", "טוב"]);
 const PRODUCT_CONDITIONS = new Set(["חדש","כמו חדש","מצב טוב","מצב סביר","בלאי נראה לעין","מצוין","טוב"]);
 function normalizeProductCondition(value){
-  const detail=String(value||"").trim();
-  if(!PRODUCT_CONDITIONS.has(detail)) throw new HttpError(400,"נא לבחור מצב פריט תקין");
-  const base=detail==="חדש"||detail==="כמו חדש"?"כמו חדש":detail==="מצוין"?"מצוין":"טוב";
+  const incoming=String(value||"").trim();
+  if(!PRODUCT_CONDITIONS.has(incoming)) throw new HttpError(400,"נא לבחור מצב פריט תקין");
+  const detail=incoming==="טוב"?"מצב טוב":incoming==="מצוין"?"כמו חדש":incoming;
+  const base=detail==="חדש"||detail==="כמו חדש"?"כמו חדש":"טוב";
   return {base,detail};
+}
+function publicProductCondition(base,detail){
+  const preferred=String(detail||"").trim();
+  if(["חדש","כמו חדש","מצב טוב","מצב סביר","בלאי נראה לעין"].includes(preferred))return preferred;
+  return String(base||"")==="מצוין"?"כמו חדש":String(base||"")==="טוב"?"מצב טוב":String(base||"")||"מצב טוב";
 }
 
 class HttpError extends Error {
@@ -135,8 +264,8 @@ async function importItems(request,env){
   const rows=Array.isArray(body.items)?body.items.slice(0,500):[];if(!rows.length)throw new HttpError(400,"לא נמצאו שורות לייבוא");
   const created=[],errors=[];
   for(let n=0;n<rows.length;n++){const x=rows[n];try{
-    const title=cleanText(x.title,2,120,"שם הפריט"),category=cleanText(x.category||org.primary_category||"כללי",2,80,"קטגוריה"),description=cleanText(x.description||("פריט "+title+" להשאלה"),10,1200,"תיאור"),condition=normalizeProductCondition(String(x.condition||"טוב")).base,quantity=positiveInt(x.quantity,1,1,999,"כמות"),id=crypto.randomUUID();
-    await env.DB.prepare("INSERT INTO items(id,organization_id,title,category,description,condition,quantity,city,neighborhood,status,availability_status,is_free,icon,cover_color,inventory_updated_at) VALUES(?,?,?,?,?,?,?,?,?,'active','available',1,'box','#e6f2ef',?)").bind(id,organizationId,title,category,description,condition,quantity,cleanOptional(x.city,80)||org.city,cleanOptional(x.neighborhood,80)||org.neighborhood,new Date().toISOString()).run();created.push(id);
+    const title=cleanText(x.title,2,120,"שם הפריט"),category=cleanText(x.category||org.primary_category||"כללי",2,80,"קטגוריה"),description=cleanText(x.description||("פריט "+title+" להשאלה"),10,1200,"תיאור"),conditionInfo=normalizeProductCondition(String(x.condition||"מצב טוב")),quantity=positiveInt(x.quantity,1,1,999,"כמות"),id=crypto.randomUUID();
+    await env.DB.prepare("INSERT INTO items(id,organization_id,title,category,description,condition,condition_detail,quantity,city,neighborhood,status,availability_status,is_free,icon,cover_color,inventory_updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,'active','available',1,'box','#e6f2ef',?)").bind(id,organizationId,title,category,description,conditionInfo.base,conditionInfo.detail,quantity,cleanOptional(x.city,80)||org.city,cleanOptional(x.neighborhood,80)||org.neighborhood,new Date().toISOString()).run();created.push(id);
   }catch(e){errors.push({row:n+2,error:e.message||"שורה לא תקינה"})}}
   if(created.length)await env.DB.prepare("UPDATE organizations SET is_hidden=0,updated_at=? WHERE id=?").bind(new Date().toISOString(),organizationId).run();
   return json({created,errors},created.length?201:400);
@@ -1354,7 +1483,7 @@ async function listItems(env, url) {
   }
   if (category) { where.push("i.category = ?"); params.push(category); }
   if (city) { where.push("i.city = ?"); params.push(city); }
-  if (condition) { where.push("i.condition = ?"); params.push(condition); }
+  if (condition) { where.push("COALESCE(NULLIF(i.condition_detail,''),CASE i.condition WHEN 'טוב' THEN 'מצב טוב' WHEN 'מצוין' THEN 'כמו חדש' ELSE i.condition END) = ?"); params.push(condition); }
   if (subcategory) { where.push("i.subcategory = ?"); params.push(subcategory); }
   if (minimumRating > 0) { where.push("COALESCE((SELECT AVG(r.rating) FROM reviews r WHERE r.organization_id=o.id AND r.status='published'),0) >= ?"); params.push(Math.min(5,minimumRating)); }
   if (minimumQuantity > 0) { where.push("MAX(0,i.quantity-(SELECT COALESCE(SUM(lq.quantity),0) FROM loan_requests lq WHERE lq.item_id=i.id AND lq.status IN ('pending','approved','collected') AND lq.requested_from <= strftime('%Y-%m-%dT%H:%M','now') AND lq.requested_until > strftime('%Y-%m-%dT%H:%M','now'))-(SELECT COALESCE(SUM(ib.quantity),0) FROM inventory_blocks ib WHERE ib.item_id=i.id AND ib.starts_at <= strftime('%Y-%m-%dT%H:%M','now') AND ib.ends_at > strftime('%Y-%m-%dT%H:%M','now'))) >= ?"); params.push(Math.min(999,minimumQuantity)); }
@@ -1394,7 +1523,7 @@ async function listItems(env, url) {
     }
     if (category) { fallbackWhere.push("i.category = ?"); fallbackParams.push(category); }
     if (city) { fallbackWhere.push("i.city = ?"); fallbackParams.push(city); }
-    if (condition) { fallbackWhere.push("i.condition = ?"); fallbackParams.push(condition); }
+    if (condition) { fallbackWhere.push("COALESCE(NULLIF(i.condition_detail,''),CASE i.condition WHEN 'טוב' THEN 'מצב טוב' WHEN 'מצוין' THEN 'כמו חדש' ELSE i.condition END) = ?"); fallbackParams.push(condition); }
     if (availableOnly) fallbackWhere.push("i.availability_status = 'available'");
     result = await env.DB.prepare(`
       SELECT i.*, o.id AS org_id, o.name AS org_name,
@@ -3098,7 +3227,7 @@ function mapItem(row) {
     title: row.title,
     category: row.category,
     description: row.description,
-    condition: row.condition,
+    condition: publicProductCondition(row.condition,row.condition_detail),
     quantity: row.quantity,
     available_count: row.available_count === null || row.available_count === undefined ? row.quantity : Number(row.available_count),
     loan_conditions: row.loan_conditions,
