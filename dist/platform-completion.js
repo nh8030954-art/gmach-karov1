@@ -196,13 +196,13 @@
     if(!data.saved?.length){list.innerHTML='<p class="pt-muted">עדיין אין תוכן שמור.</p>';return}
     const openSaved=entry=>{
       if(entry.type==="item"){dialog.close();window.dispatchEvent(new CustomEvent("gmach:open-item",{detail:{id:String(entry.id)}}));return}
-      if(entry.type==="organization"){dialog.close();location.hash="#/gmach/"+encodeURIComponent(entry.id);return}
+      if(entry.type==="organization"){dialog.close();history.pushState({route:"gmach",id:String(entry.id)},"","/gmach/"+encodeURIComponent(entry.id));window.dispatchEvent(new CustomEvent("gmach:open-organization",{detail:{id:String(entry.id)}}));return}
       if(entry.type==="category"){
         const category=document.getElementById("category-filter"),form=document.getElementById("search-form");
         if(category){category.value=entry.label||"";category.dispatchEvent(new Event("change",{bubbles:true}));}
-        dialog.close();if(form)form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));location.hash="#/catalog";return;
+        dialog.close();if(form)form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));history.pushState({route:"catalog"},"","/catalog");window.dispatchEvent(new CustomEvent("gmach:route",{detail:{path:"/catalog"}}));return;
       }
-      if(entry.type==="help_request"){dialog.close();location.assign(location.origin+location.pathname+"?help="+encodeURIComponent(entry.id)+"#/community");return}
+      if(entry.type==="help_request"){dialog.close();location.assign(location.origin+"/community?help="+encodeURIComponent(entry.id));return}
       if(entry.type==="search"){render("searches");}
     };
     for(const entry of data.saved){
