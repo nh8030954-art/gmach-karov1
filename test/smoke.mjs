@@ -349,8 +349,8 @@ try {
   result = await request(`/api/items/${itemId}/availability-calendar?from=2026-10-08&days=7`);
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(result.data.days.length, 7);
-  assert.equal(result.data.days[0].available, 0);
-  assert.equal(result.data.days[2].available, 1);
+  assert.equal(result.data.days[0].available, 1,"one of two units remains available during the approved quantity-1 loan");
+  assert.equal(result.data.days[2].available, 2,"both units are available after the loan window");
 
   result = await request("/api/me/dashboard", { cookie: borrowerCookie });
   assert.equal(result.data.requests[0].status, "approved");
