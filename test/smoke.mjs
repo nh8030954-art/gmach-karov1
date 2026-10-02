@@ -253,7 +253,7 @@ try {
   assert.equal(result.response.status,200,JSON.stringify(result.data));
   assert.equal(result.data.units.length,1,"A quantity-1 item must receive exactly one automatic serial number");
   assert.ok(String(result.data.units[0].serial_number||"").length>4,"Automatic serial number missing");
-  assert.ok(Number(String(result.data.units[0].serial_number||"").split("-")[1])>=100001,"Gmach serial code must start in the high range");
+  assert.ok(Number(String(result.data.units[0].serial_number||"").split("-")[1])>=150,"Gmach serial code must start at 150 or above");
 
   result = await request(`/api/organizations/${organizationId}/branches`, { method:"POST", cookie:adminCookie, body:{ name:"סניף מרכזי",address:"רחוב הבדיקה 1",city:"ירושלים",phone:"050-1234567",inventoryMode:"separate",hours:{sun:"09:00-17:00"} } });
   assert.equal(result.response.status,201,JSON.stringify(result.data));
