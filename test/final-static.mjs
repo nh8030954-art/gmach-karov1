@@ -335,7 +335,7 @@ for(const token of ["מרכז ניהול־על","/api/admin/site-settings","/api
 assert.ok(!adminControlCenter.includes("data-merge-category"),"destructive category merge must not be exposed in super-admin UI");
 for(const token of ["data-new-subcategory","data-delete-category","gmach:categories-changed","ניהול קטגוריות וקטגוריות משנה"])assert.ok(adminControlCenter.includes(token),token+" missing from hierarchical admin category management");
 for(const token of ["deleteAdminCategory","category.delete","UPDATE items SET category=?","UPDATE items SET subcategory=NULL",'"/api/categories": { fresh:0, stale:86400 }'])assert.ok(worker.includes(token),token+" missing from live category propagation backend");
-for(const token of ["return rows.length?dynamic","bindCategoryRailButtons","gmach:categories-changed","#gmach-category","#help-category"])assert.ok(appClient.includes(token),token+" missing from dynamic live category catalog");
+for(const token of ["state.categoryCatalog","itemSubcategoriesFor","populateItemCategorySelector","bindCategoryRailButtons","gmach:categories-changed","#gmach-category","#help-category"])assert.ok(appClient.includes(token),token+" missing from dynamic live category catalog");
 assert.ok(appClient.includes("const selectedUnits=()=>$$('input[name=\"pickup-unit\"]:checked',d).map(x=>x.value);"),"pickup unit buttons must read all selected units");
 
 assert.ok(indexHtml.includes("./admin-control-center.js"),"admin control center client not loaded");
