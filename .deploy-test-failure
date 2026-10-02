@@ -1,4 +1,4 @@
-deploy_sha=0f03b35f9e66996b74ae1e9bd7fc7439b1f6e76b
+deploy_sha=f0c03718fa652099c8fa61965a3e0d1a272e0b59
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -9,8 +9,8 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:145:83 {
+AssertionError [ERR_ASSERTION]: interactive full-country gmach map missing
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:127:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
