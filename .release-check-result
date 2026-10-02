@@ -1,4 +1,4 @@
-sha=0b9b9bba7082dd42fb05276b750f91a448afef3f
+sha=4a2be42a8eaff627cb61864c98ba50f3d3742820
 install=success
 syntax=success
 tests=failure
@@ -26,7 +26,7 @@ AssertionError [ERR_ASSERTION]: community board should have a direct route
 Node.js v24.21.0
 
 AssertionError [ERR_ASSERTION]: community board should have a direct route
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790936639275:210:8 {
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790936662641:210:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
@@ -36,5 +36,5 @@ AssertionError [ERR_ASSERTION]: community board should have a direct route
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T10:23:59.942Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T10:24:23.203Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
