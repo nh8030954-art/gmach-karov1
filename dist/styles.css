@@ -1182,3 +1182,12 @@ html, body { max-width: 100%; overflow-x: clip; }
 .auth-intent-option small{color:var(--ink-soft);font-weight:500;line-height:1.5}
 .hours-coordination-choice{margin-bottom:4px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--canvas) 62%,#fff)}
 #gmach-hours-grid[hidden]{display:none!important}
+
+.loan-progress{margin-top:12px;min-width:220px;max-width:420px}
+.loan-progress-track{height:8px;border-radius:999px;background:color-mix(in srgb,var(--navy) 12%,transparent);overflow:hidden}
+.loan-progress-track>span{display:block;height:100%;background:var(--accent);border-radius:inherit;transition:width .2s ease}
+.loan-progress-stages{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:7px;font-size:.78rem}
+.loan-progress-stages span{opacity:.55;text-align:center}
+.loan-progress-stages span.is-done{opacity:1;font-weight:700}
+.loan-progress small{display:block;margin-top:6px;font-weight:700}
+.loan-progress-stopped{padding:8px 10px;border:1px solid color-mix(in srgb,#b42318 28%,transparent);border-radius:12px;background:color-mix(in srgb,#b42318 6%,transparent)}
