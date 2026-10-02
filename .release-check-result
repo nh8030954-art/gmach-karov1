@@ -1,4 +1,4 @@
-sha=1eb7d03418941d9dab4535c1381b4ce1eb3e9d64
+sha=94fa6586e50fbac38e4d3b56099640926a17f70f
 install=success
 syntax=success
 tests=failure
@@ -26,7 +26,7 @@ AssertionError [ERR_ASSERTION]: single-element selector used as collection
 Node.js v24.21.0
 
 AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790938428883:144:83 {
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790938473751:144:83 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
@@ -36,5 +36,5 @@ AssertionError [ERR_ASSERTION]: single-element selector used as collection
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T10:53:49.879Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T10:54:34.269Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
