@@ -3084,7 +3084,7 @@ async function myCalendarFeed(request,env){
 async function loanRequestCalendar(request,env,requestId){
   const user=await requireUser(request,env);
   const row=await env.DB.prepare(`SELECT lr.id,lr.borrower_id,lr.requested_from,lr.requested_until,lr.status,i.title,o.id organization_id,o.name organization_name,o.owner_id,
-    EXISTS(SELECT 1 FROM organization_members m WHERE m.organization_id=o.id AND m.user_id=? AND m.status='active') AS is_member
+    EXISTS(SELECT 1 FROM organization_members m WHERE m.organization_id=o.id AND m.user_id=?) AS is_member
     FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.id=?`).bind(user.id,requestId).first();
   if(!row)throw new HttpError(404,"ההשאלה לא נמצאה");
   if(row.borrower_id!==user.id&&row.owner_id!==user.id&&!row.is_member&&user.role!=="admin")throw new HttpError(403,"אין הרשאה להוסיף את ההשאלה הזו ליומן");
@@ -3102,7 +3102,7 @@ async function loanRequestCalendar(request,env,requestId){
 async function publicCalendarFeed(env,token){
   const user=await env.DB.prepare("SELECT id FROM users WHERE calendar_feed_token=? AND deleted_at IS NULL").bind(token).first();if(!user)return new Response("Not found",{status:404});
   const pref=await env.DB.prepare("SELECT reminder_minutes FROM calendar_preferences WHERE user_id=?").bind(user.id).first().catch(()=>null),reminder=Math.max(0,Number(pref?.reminder_minutes??1440));
-  const rows=await env.DB.prepare(`SELECT lr.id,lr.requested_from,lr.requested_until,lr.status,i.title,o.name organization_name FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE (lr.borrower_id=? OR o.owner_id=?) AND lr.status IN ('pending','approved','collected') ORDER BY lr.requested_from LIMIT 300`).bind(user.id,user.id).all();
+  const rows=await env.DB.prepare(`SELECT lr.id,lr.requested_from,lr.requested_until,lr.status,i.title,o.name organization_name FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE (lr.borrower_id=? OR o.owner_id=? OR EXISTS(SELECT 1 FROM organization_members m WHERE m.organization_id=o.id AND m.user_id=?)) AND lr.status IN ('pending','approved','collected') ORDER BY lr.requested_from LIMIT 300`).bind(user.id,user.id,user.id).all();
   const events=[];for(const x of rows.results||[]){for(const [kind,when,label] of [["pickup",x.requested_from,"איסוף"],["return",x.requested_until,"החזרה"]]){const dt=icsUtc(when);if(!dt)continue;events.push(["BEGIN:VEVENT","UID:"+x.id+"-"+kind+"@gmach-berega","DTSTAMP:"+icsUtc(new Date()),"DTSTART:"+dt,"SUMMARY:"+icsEscape(label+" · "+x.title),"DESCRIPTION:"+icsEscape(x.organization_name+" · "+x.status),"URL:https://gmach-berega.co.il/dashboard",...(reminder?["BEGIN:VALARM","TRIGGER:-PT"+reminder+"M","ACTION:DISPLAY","DESCRIPTION:"+icsEscape(label+" · "+x.title),"END:VALARM"]:[]),"END:VEVENT"].join("\r\n"))}}
   const body=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Gmach Berega//Calendar Feed//HE","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:גמ״ח ברגע",...events,"END:VCALENDAR",""].join("\r\n");
   return new Response(body,{headers:{"Content-Type":"text/calendar; charset=utf-8","Cache-Control":"private, max-age=300","Content-Disposition":'inline; filename="gmach-berega.ics"'}});
