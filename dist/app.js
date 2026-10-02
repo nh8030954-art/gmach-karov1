@@ -808,7 +808,7 @@
   function requestActions(row) {
     let actions = `<button class="button button-secondary button-small" data-open-chat="${escapeHTML(row.id)}">שיחה</button><button class="button button-secondary button-small" data-calendar-request="${escapeHTML(row.id)}">הוספה ליומן</button>`;
     if (row.direction === "incoming" && row.status === "pending") actions += `<button class="button button-primary button-small" data-request-decision="approved" data-request-id="${escapeHTML(row.id)}">אישור</button><button class="button button-secondary button-small" data-request-decision="declined" data-request-id="${escapeHTML(row.id)}">דחייה</button>`;
-    if (row.direction === "incoming" && row.status === "approved") actions += `<button class="button button-primary button-small" data-pickup-request="${escapeHTML(row.id)}">מסך איסוף</button><button class="button button-secondary button-small" data-request-action="no_show" data-request-id="${escapeHTML(row.id)}">אי-הגעה</button><button class="button button-secondary button-small" data-no-show="${escapeHTML(row.id)}">אי-הגעה</button>`;
+    if (row.direction === "incoming" && row.status === "approved") actions += `<button class="button button-primary button-small" data-pickup-request="${escapeHTML(row.id)}">מסך איסוף</button><button class="button button-secondary button-small" data-no-show="${escapeHTML(row.id)}">אי-הגעה</button>`;
     if (row.direction === "incoming" && row.status === "approved") actions += `<button class="button button-secondary button-small" data-manager-cancel="${escapeHTML(row.id)}">ביטול מצד הגמ״ח</button>`;
     if (row.direction === "incoming" && row.status === "collected") actions += `<button class="button button-primary button-small" data-return-request="${escapeHTML(row.id)}">מסך החזרה</button>`;
     if (["pending","approved"].includes(row.status)) actions += `<button class="button button-secondary button-small" data-loan-flow="${escapeHTML(row.id)}" data-direction="${escapeHTML(row.direction)}">תיאום וציר זמן</button><button class="button button-secondary button-small" data-branch-proposal="${escapeHTML(row.id)}">סניף איסוף חלופי</button>`
@@ -857,8 +857,11 @@
     $("#account-start-tour")?.addEventListener("click",openAccountTour);
     maybeShowAccountTour(isNewAccount);
     $$("[data-recent-org]").forEach(button=>button.addEventListener("click",()=>openOrganization(button.dataset.recentOrg)));
-    $$('[data-request-action]').forEach(button => button.addEventListener("click", () => updateRequestStatus(button.dataset.requestId, button.dataset.requestAction)));
-    $$('[data-manager-cancel]').forEach(button=>button.addEventListener("click",async()=>{const reason=translatedPrompt("סיבת הביטול שתישלח לשואל/ת:");if(!reason)return;await updateRequestStatus(button.dataset.managerCancel,"cancelled",reason)}));
+    $('[data-request-action]').forEach(button => button.addEventListener("click", () => updateRequestStatus(button.dataset.requestId, button.dataset.requestAction)));
+    $('[data-pickup-request]').forEach(button=>button.addEventListener("click",()=>openPickupScreen(button.dataset.pickupRequest)));
+    $('[data-return-request]').forEach(button=>button.addEventListener("click",()=>openReturnScreen(button.dataset.returnRequest)));
+    $('[data-no-show]').forEach(button=>button.addEventListener("click",async()=>{if(!translatedConfirm("לסמן את השואל/ת כאי-הגעה? הפעולה תשחרר את המלאי ותעדכן את רשימת ההמתנה."))return;await updateRequestStatus(button.dataset.noShow,"no_show")}));
+    $('[data-manager-cancel]').forEach(button=>button.addEventListener("click",async()=>{const reason=translatedPrompt("סיבת הביטול שתישלח לשואל/ת:");if(!reason)return;await updateRequestStatus(button.dataset.managerCancel,"cancelled",reason)}));
     $$('[data-request-decision]').forEach(button => button.addEventListener("click", () => openDecision(button.dataset.requestId, button.dataset.requestDecision)));
     $$('[data-change-request]').forEach(button=>button.addEventListener("click",()=>openLoanChange(button.dataset.changeRequest)));
     $$('[data-undo-cancel]').forEach(button=>button.addEventListener("click",async()=>{try{await api("/api/loan-requests/"+encodeURIComponent(button.dataset.undoCancel)+"/undo-cancel",{method:"POST",body:{}});toast("הבקשה שוחזרה");await refreshAccountSnapshot();showDashboard("requests")}catch(e){toast(e.message,"error")}}));
