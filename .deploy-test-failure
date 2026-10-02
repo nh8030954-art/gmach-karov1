@@ -1,4 +1,4 @@
-deploy_sha=90371243db9c4cc38191635f01af9ed802676e4a
+deploy_sha=494dd2cf56625fadd840a714c463f4630a735491
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -16,8 +16,8 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: pickup unit buttons must read all selected units
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:338:8 {
+AssertionError [ERR_ASSERTION]: return rows.length?dynamic missing from dynamic live category catalog
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:337:146 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
