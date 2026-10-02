@@ -653,3 +653,12 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
   "הצגת תמונה":"Show image",
   "פתיחה ←":"Open ←"
 });
+window.GmachEnglish = Object.freeze({...window.GmachEnglish,
+  "לא מצאת קטגוריית משנה? - אפשר להציע חדשה":"Can't find a subcategory? Suggest a new one",
+  "איזו קטגוריית משנה חסרה?":"Which subcategory is missing?",
+  "תיאור קצר שיעזור לנו להבין מה שייך לקטגוריית המשנה, אופציונלי":"Optional short description to help us understand the subcategory",
+  "הצעת קטגוריית המשנה נשלחה להנהלת האתר":"The subcategory suggestion was sent to the site administrator",
+  "בחרו קודם קטגוריה ראשית":"Choose a main category first",
+  "הפריט אינו זמין כרגע":"This item is currently unavailable",
+  "לא הצלחנו לפתוח את הפריט":"We could not open the item"
+});
