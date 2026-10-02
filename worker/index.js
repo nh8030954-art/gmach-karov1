@@ -2994,16 +2994,16 @@ async function reconcileSerializedQuantity(env,itemId){
 async function serialIdentityCodes(env,item){
   await env.DB.batch([
     env.DB.prepare("CREATE TABLE IF NOT EXISTS organization_serial_codes (code INTEGER PRIMARY KEY AUTOINCREMENT, organization_id TEXT NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))"),
-    env.DB.prepare("CREATE TABLE IF NOT EXISTS item_serial_codes (item_id TEXT PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE, organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, code INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), UNIQUE(organization_id,code))"),
-    env.DB.prepare("CREATE INDEX IF NOT EXISTS item_serial_codes_org_idx ON item_serial_codes(organization_id, code)")
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS item_serial_codes_v2 (item_id TEXT PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE, organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, code INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), UNIQUE(organization_id,code))"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS item_serial_codes_v2_org_idx ON item_serial_codes_v2(organization_id, code)")
   ]);
   await env.DB.prepare("INSERT OR IGNORE INTO organization_serial_codes(organization_id) VALUES(?)").bind(item.organization_id).run();
-  let itemRow=await env.DB.prepare("SELECT code FROM item_serial_codes WHERE item_id=?").bind(item.id).first();
+  let itemRow=await env.DB.prepare("SELECT code FROM item_serial_codes_v2 WHERE item_id=?").bind(item.id).first();
   if(!itemRow){
-    const next=await env.DB.prepare("SELECT COALESCE(MAX(code),0)+1 AS code FROM item_serial_codes WHERE organization_id=?").bind(item.organization_id).first();
+    const next=await env.DB.prepare("SELECT COALESCE(MAX(code),0)+1 AS code FROM item_serial_codes_v2 WHERE organization_id=?").bind(item.organization_id).first();
     const proposed=Math.max(1,Number(next?.code||1));
-    await env.DB.prepare("INSERT OR IGNORE INTO item_serial_codes(item_id,organization_id,code) VALUES(?,?,?)").bind(item.id,item.organization_id,proposed).run();
-    itemRow=await env.DB.prepare("SELECT code FROM item_serial_codes WHERE item_id=?").bind(item.id).first();
+    await env.DB.prepare("INSERT OR IGNORE INTO item_serial_codes_v2(item_id,organization_id,code) VALUES(?,?,?)").bind(item.id,item.organization_id,proposed).run();
+    itemRow=await env.DB.prepare("SELECT code FROM item_serial_codes_v2 WHERE item_id=?").bind(item.id).first();
   }
   const orgRow=await env.DB.prepare("SELECT code FROM organization_serial_codes WHERE organization_id=?").bind(item.organization_id).first();
   const org=orgRow?.code,itemNo=itemRow?.code;
