@@ -1,4 +1,4 @@
-sha=d790337be481d447029293b95c08682ec378728d
+sha=34fc049bd03bc2bc523ee439eb2c1a4a4433c087
 install=success
 syntax=success
 tests=failure
@@ -26,7 +26,7 @@ AssertionError [ERR_ASSERTION]: data-copy-map-address missing from completed map
 Node.js v24.21.0
 
 AssertionError [ERR_ASSERTION]: data-copy-map-address missing from completed map/navigation UI
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790940105008:126:114 {
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790940136825:126:114 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
@@ -36,5 +36,5 @@ AssertionError [ERR_ASSERTION]: data-copy-map-address missing from completed map
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T11:21:45.728Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T11:22:17.629Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
