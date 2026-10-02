@@ -1776,7 +1776,7 @@ async function createHelpRequest(request, env) {
   const category = cleanOptional(body.category, 80);
   if (category) {
     const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
-    if(!categoryRow && !CATEGORIES.has(category)) throw new HttpError(400,"קטגוריה אינה תקינה");
+    if(!categoryRow) throw new HttpError(400,"קטגוריה אינה תקינה");
   }
   const urgency = body.urgency === "urgent" ? "urgent" : "normal"; const id = crypto.randomUUID();
   let requestedFrom=body.requestedFrom?validateDateTime(body.requestedFrom,"מועד התחלה"):null,requestedUntil=body.requestedUntil?validateDateTime(body.requestedUntil,"מועד סיום"):null;
@@ -1859,7 +1859,7 @@ async function createOrganization(request, env) {
   const id = crypto.randomUUID();
   const category = cleanText(body.primaryCategory, 2, 40, "תחום");
   const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
-  if (!categoryRow && !CATEGORIES.has(category)) throw new HttpError(400, "נא לבחור תחום תקין");
+  if (!categoryRow) throw new HttpError(400, "נא לבחור תחום תקין");
   const values = {
     name: cleanText(body.name, 2, 90, "שם הגמ״ח"),
     city: cleanText(body.city, 2, 80, "עיר"),
@@ -1895,7 +1895,7 @@ async function updateOrganization(request, env, id) {
 
   const category = cleanText(body.primaryCategory, 2, 40, "תחום");
   const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
-  if (!categoryRow && !CATEGORIES.has(category)) throw new HttpError(400, "נא לבחור תחום תקין");
+  if (!categoryRow) throw new HttpError(400, "נא לבחור תחום תקין");
   const values = {
     name: cleanText(body.name, 2, 90, "שם הגמ״ח"),
     city: cleanText(body.city, 2, 80, "עיר"),
@@ -1933,7 +1933,7 @@ async function createItem(request, env) {
   const conditionInfo = normalizeProductCondition(cleanText(body.condition, 2, 30, "מצב הפריט"));
   const condition = conditionInfo.base;
   const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
-  if (!categoryRow && !CATEGORIES.has(category)) throw new HttpError(400, "נא לבחור קטגוריה תקינה");
+  if (!categoryRow) throw new HttpError(400, "נא לבחור קטגוריה תקינה");
   const quantity = Number(body.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw new HttpError(400, "כמות הפריטים אינה תקינה");
   const title = cleanText(body.title, 2, 120, "שם הפריט");
@@ -2004,7 +2004,7 @@ async function updateItem(request, env, id) {
   const conditionInfo = normalizeProductCondition(cleanText(body.condition, 2, 30, "מצב הפריט"));
   const condition = conditionInfo.base;
   const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
-  if (!categoryRow && !CATEGORIES.has(category)) throw new HttpError(400, "נא לבחור קטגוריה תקינה");
+  if (!categoryRow) throw new HttpError(400, "נא לבחור קטגוריה תקינה");
   const quantity = Number(body.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw new HttpError(400, "כמות הפריטים אינה תקינה");
   const existingUnits=await env.DB.prepare("SELECT COUNT(*) AS count FROM item_units WHERE item_id=? AND status!='retired'").bind(id).first();
