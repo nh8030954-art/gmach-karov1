@@ -2377,9 +2377,9 @@ async function updateRequestStatus(request, env, id) {
   let result;
   if(target==="collected"){
     const serialized=await env.DB.prepare("SELECT COUNT(*) AS count FROM item_units WHERE item_id=? AND status!='retired'").bind(row.item_id).first();
-    if(Number(serialized?.count||0)===Number(row.quantity||0)&&Number(row.quantity||0)>0){
+    if(Number(serialized?.count||0)>0){
       const assigned=await env.DB.prepare("SELECT COUNT(*) AS count FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL").bind(id).first();
-      if(Number(assigned?.count||0)!==Number(row.requested_quantity||1)) throw new HttpError(409,"יש להקצות בדיוק את היחידות הסידוריות שנמסרות בזמן האיסוף");
+      if(Number(assigned?.count||0)!==Number(row.requested_quantity||1)) throw new HttpError(409,"יש להקצות בדיוק את היחידות הסידוריות שנמסרות לפני אישור האיסוף");
     }
   }
   if (target === "approved") {
@@ -3001,7 +3001,7 @@ async function serialIdentityCodes(env,item){
   const existingOrgCode=await env.DB.prepare("SELECT code FROM organization_serial_codes WHERE organization_id=?").bind(item.organization_id).first();
   if(!existingOrgCode){
     const nextOrgCode=await env.DB.prepare("SELECT MAX(code) AS max_code FROM organization_serial_codes").first();
-    const proposedOrgCode=Math.max(100001,Number(nextOrgCode?.max_code||100000)+1);
+    const proposedOrgCode=Math.max(150,Number(nextOrgCode?.max_code||149)+1);
     await env.DB.prepare("INSERT OR IGNORE INTO organization_serial_codes(code,organization_id) VALUES(?,?)").bind(proposedOrgCode,item.organization_id).run();
   }
   let itemRow=await env.DB.prepare("SELECT code FROM item_serial_codes_v2 WHERE item_id=?").bind(item.id).first();
