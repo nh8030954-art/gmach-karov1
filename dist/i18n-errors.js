@@ -212,4 +212,8 @@ window.GmachEnglish = Object.freeze({
 }});
 window.GmachEnglish = Object.freeze({
   "יש להפעיל אימות דו שלבי לפני כניסה להנהלת האתר":"Enable two-factor authentication before accessing site administration",
-  "יש להפעיל אימות דו שלבי באפליקציית Authenticator לפני כניסה להנהלת האתר":"Enable Authenticator two-factor authentication before accessing site administration",...window.GmachEnglish,"שירות התרגום אינו זמין כרגע":"Translation service is currently unavailable","יש לשלוח עד 12 קטעי טקסט, באורך כולל של עד 4,500 תווים":"Send up to 12 text excerpts with a combined length of 4,500 characters","התרגום אינו זמין כרגע. אפשר לנסות שוב מאוחר יותר":"Translation is currently unavailable. Try again later"});
+  "יש להפעיל אימות דו שלבי באפליקציית Authenticator לפני כניסה להנהלת האתר":"Enable Authenticator two-factor authentication before accessing site administration",...window.GmachEnglish,"שירות התרגום אינו זמין כרגע":"Translation service is currently unavailable","יש לשלוח עד 12 קטעי טקסט, באורך כולל של עד 4,500 תווים":"Send up to 12 text excerpts with a combined length of 4,500 characters","התרגום אינו זמין כרגע. אפשר לנסות שוב מאוחר יותר":"Translation is currently unavailable. Try again later",
+  "אפשר להקצות יחידות רק לאחר אישור הבקשה": "Units can only be assigned after the request is approved"
+,
+  "יחידה כבר מוקצית להשאלה אחרת": "This unit is already assigned to another loan"
+});
