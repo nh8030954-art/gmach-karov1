@@ -182,6 +182,7 @@ window.GmachEnglish = Object.freeze({
   "סיום חלון האיסוף חייב להיות אחרי תחילתו": "Pickup window end must be after its start",
   "סכום הפיקדון אינו תקין": "Invalid deposit amount",
   "סניף היעד לא נמצא": "Destination branch not found",
+  "הסניף שנבחר אינו שייך לגמ״ח או שאינו פעיל": "The selected branch does not belong to this gmach or is inactive",
   "פעולה לא תקינה": "Invalid action",
   "פעולת גמ״ח אינה תקינה": "Invalid gmach action",
   "צבע חייב להיות בפורמט HEX תקין": "Color must be a valid hexadecimal value",
