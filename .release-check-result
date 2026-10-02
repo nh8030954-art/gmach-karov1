@@ -1,4 +1,4 @@
-sha=4c2b3069e047945815f1c98d4d88b1cb56ee97c9
+sha=baedab260f8cac7d04cd63656db0e338cb161c50
 install=success
 syntax=success
 tests=failure
@@ -25,7 +25,7 @@ AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
 
 Node.js v24.21.0
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790942077726:412:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790942298197:412:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: true,
   code: 'ERR_ASSERTION',
@@ -36,5 +36,5 @@ Node.js v24.21.0
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T11:54:43.242Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T11:58:23.574Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
