@@ -655,6 +655,7 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
 });
 window.GmachEnglish = Object.freeze({...window.GmachEnglish,
   "לא מצאת קטגוריית משנה? - אפשר להציע חדשה":"Can't find a subcategory? Suggest a new one",
+  "לא מצאת קטגוריית משנה? הציעו קטגוריה חדשה":"Can't find a subcategory? Suggest a new one",
   "איזו קטגוריית משנה חסרה?":"Which subcategory is missing?",
   "תיאור קצר שיעזור לנו להבין מה שייך לקטגוריית המשנה, אופציונלי":"Optional short description to help us understand the subcategory",
   "הצעת קטגוריית המשנה נשלחה להנהלת האתר":"The subcategory suggestion was sent to the site administrator",
