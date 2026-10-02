@@ -469,3 +469,12 @@ const emailWorkerSource=await readFile("worker/index.js","utf8");
 assert.ok(emailWorkerSource.includes('גמ״ח ברגע <no-reply@gmach-berega.co.il>'),"verified no-reply sender fallback missing");
 assert.ok(!/reply_to\s*:/.test(emailWorkerSource),"personal support email must never be exposed as Reply-To");
 assert.ok(!emailWorkerSource.includes("netanelhirsh@gmail.com"),"personal email must not be hardcoded in the worker");
+
+const emailDesignerMigration=await readFile("migrations/0031_email_template_designer.sql","utf8");
+assert.ok(emailDesignerMigration.includes("design_json"),"email designer migration missing");
+assert.ok(emailDesignerMigration.includes("verification")&&emailDesignerMigration.includes("password_reset")&&emailDesignerMigration.includes("manager_invite"),"core managed email templates missing");
+assert.ok(adminControlCenter.includes("עורך ועיצוב מיילים"),"email designer UI missing");
+assert.ok(adminControlCenter.includes("email-preview"),"email live preview missing");
+assert.ok(adminControlCenter.includes("primaryColor")&&adminControlCenter.includes("buttonColor")&&adminControlCenter.includes("logoUrl"),"email design controls missing");
+assert.ok(worker.includes("managedEmailTemplate"),"managed email renderer missing");
+assert.ok(worker.includes('"verification"')&&worker.includes('"password_reset"')&&worker.includes('"manager_invite"'),"auth and invitation emails are not template-managed");

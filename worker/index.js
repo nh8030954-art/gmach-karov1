@@ -2749,16 +2749,10 @@ async function createOrganizationInvitation(request,env,organizationId,url){
   if(invitedEmail&&env.RESEND_API_KEY){
     try{
       const org=await env.DB.prepare("SELECT name FROM organizations WHERE id=?").bind(organizationId).first();
-      const recipient=await env.DB.prepare("SELECT preferred_language FROM users WHERE email=? COLLATE NOCASE LIMIT 1").bind(invitedEmail).first();
-      const name=String(org?.name||"Gmach"),safeName=escapeHtmlEmail(name),language=recipient?.preferred_language||"both";
-      const englishText=`You were invited to manage ${name}. This invitation expires in seven days: ${inviteUrl}`;
-      const hebrewText=`הוזמנת להצטרף כמנהל/ת של ${name}. הקישור בתוקף לשבעה ימים: ${inviteUrl}`;
-      const subject=language==="he"?`הזמנה לניהול ${name}`:language==="en"?`Invitation to manage ${name}`:`Invitation to manage a gmach | הזמנה לניהול גמ״ח`;
-      const text=language==="he"?hebrewText:language==="en"?englishText:`${englishText}\n\n${hebrewText}`;
-      const englishHtml=`<section dir="ltr" lang="en"><h2>Invitation to manage a gmach</h2><p>You were invited to manage ${safeName}.</p><p><a href="${inviteUrl}">Open invitation</a></p><p>The invitation expires in seven days.</p></section>`;
-      const hebrewHtml=`<section dir="rtl" lang="he"><h2>הזמנה לניהול</h2><p>הוזמנת להצטרף כמנהל/ת של ${safeName}.</p><p><a href="${inviteUrl}">פתיחת ההזמנה</a></p><p>הקישור בתוקף לשבעה ימים.</p></section>`;
-      const deliver=env.RESEND_SERVICE?.fetch?env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE):fetch;
-      const res=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[invitedEmail],subject,text,html:`<div style="font-family:Arial,sans-serif">${language==="he"?hebrewHtml:language==="en"?englishHtml:englishHtml+hebrewHtml}</div>`})});emailSent=res.ok;
+      const recipient=await env.DB.prepare("SELECT preferred_language,full_name FROM users WHERE email=? COLLATE NOCASE LIMIT 1").bind(invitedEmail).first();
+      const name=String(org?.name||"Gmach"),language=recipient?.preferred_language==="en"?"en":"he",en=language==="en";
+      const mail=await managedEmailTemplate(env,"manager_invite",language,{subject:en?"Invitation to manage {{organization_name}}":"הזמנה לניהול {{organization_name}}",text:en?"You were invited to manage {{organization_name}}. This invitation expires in seven days.":"הוזמנת להצטרף כמנהל/ת של {{organization_name}}. הקישור בתוקף לשבעה ימים."},{organization_name:name,invite_url:inviteUrl,full_name:recipient?.full_name||""},inviteUrl);
+      if(mail){const deliver=env.RESEND_SERVICE?.fetch?env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE):fetch;const res=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[invitedEmail],...mail})});emailSent=res.ok;}
     }catch(error){console.error("manager invitation email failed",{organizationId,invitedEmail,error});}
   }
   return json({invitation:{id,role,expiresAt,url:inviteUrl,invitedEmail,emailSent}},201);
@@ -2933,12 +2927,13 @@ function inQuietHours(now,start,end){if(!start||!end||start===end)return false;r
 async function sendOperationalNotificationEmail(env,user,notification){
   if(!env.RESEND_API_KEY||!user.email)return false;
   const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/#/account";
-  const template=await env.DB.prepare("SELECT subject,body_text,enabled FROM email_templates WHERE template_key='notification' AND language=?").bind(lang).first().catch(()=>null);
-  if(template&&Number(template.enabled)===0)return false;
-  const render=s=>String(s||"").replaceAll("{{title}}",notification.title||"").replaceAll("{{body}}",notification.body||"").replaceAll("{{account_url}}",accountUrl);
-  const subject=template?.subject?render(template.subject):(en?"Gmach Berega update":notification.title),plain=template?.body_text?render(template.body_text):(en?`You have a new update in Gmach Berega. Open your account for details.\n\n${notification.title}\n${notification.body}`:`${notification.title}\n\n${notification.body}`);
-  const unsubToken=Number(user.community_emails_accepted)?await communityUnsubscribeToken(env,user.user_id||user.id):null,unsubUrl=unsubToken?"https://gmach-berega.co.il/api/unsubscribe/community?token="+encodeURIComponent(unsubToken):null,finalPlain=plain+(unsubUrl?(en?"\n\nUnsubscribe from community updates: ":"\n\nהסרה מעדכוני קהילה: ")+unsubUrl:"");
-  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],subject,text:finalPlain,html:`<div dir="${en?"ltr":"rtl"}" style="font-family:Arial,sans-serif;max-width:560px;margin:auto"><h2>${escapeHtmlEmail(subject)}</h2><p style="white-space:pre-line">${escapeHtmlEmail(plain)}</p><p><a href="${accountUrl}">${en?"Open account":"פתיחת האזור האישי"}</a></p></div>`})});
+  const specific=new Set(["new_device","pickup_confirmed","loan_cancelled","extension","waitlist","support"]).has(String(notification.type||""))?String(notification.type):"notification";
+  let mail=await managedEmailTemplate(env,specific,lang,{subject:en?"Gmach Berega update":"עדכון חדש בגמ״ח ברגע",text:"{{title}}\n\n{{body}}"},{title:notification.title||"",body:notification.body||"",account_url:accountUrl},accountUrl);
+  if(!mail&&specific!=="notification")mail=await managedEmailTemplate(env,"notification",lang,{subject:en?"Gmach Berega update":"עדכון חדש בגמ״ח ברגע",text:"{{title}}\n\n{{body}}"},{title:notification.title||"",body:notification.body||"",account_url:accountUrl},accountUrl);
+  if(!mail)return false;
+  const unsubToken=Number(user.community_emails_accepted)?await communityUnsubscribeToken(env,user.user_id||user.id):null,unsubUrl=unsubToken?"https://gmach-berega.co.il/api/unsubscribe/community?token="+encodeURIComponent(unsubToken):null;
+  if(unsubUrl)mail.text+=(en?"\n\nUnsubscribe from community updates: ":"\n\nהסרה מעדכוני קהילה: ")+unsubUrl;
+  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],...mail})});
   if(!response.ok)throw new Error("Email provider returned "+response.status);return true;
 }
 async function deliverNotificationChannels(env){
@@ -2971,9 +2966,9 @@ async function deliverDailyDigests(env){
     const done=await env.DB.prepare("SELECT id FROM notification_digests WHERE user_id=? AND digest_date=? AND status='sent'").bind(user.id,today).first();if(done)continue;
     const items=await env.DB.prepare(`SELECT n.id,n.title,n.body,n.created_at FROM notifications n WHERE n.user_id=? AND n.created_at>=datetime('now','-1 day') AND NOT EXISTS(SELECT 1 FROM notification_delivery_log l WHERE l.notification_id=n.id AND l.channel='email' AND l.status='sent') ORDER BY n.created_at DESC LIMIT 30`).bind(user.id).all();
     if(!(items.results||[]).length)continue;
-    const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/#/account",template=await env.DB.prepare("SELECT subject,body_text,enabled FROM email_templates WHERE template_key=\'daily_digest\' AND language=?").bind(lang).first().catch(()=>null);if(template&&Number(template.enabled)===0)continue;
-    const digestBody=(en?"Updates from the last day:":"עדכונים מהיממה האחרונה:")+"\n\n"+items.results.map(x=>"• "+x.title+" — "+x.body).join("\n"),subject=template?.subject||(en?"Your daily Gmach Berega summary":"הסיכום היומי שלך מגמ״ח ברגע"),text=template?.body_text?String(template.body_text).replaceAll("{{body}}",digestBody).replaceAll("{{account_url}}",accountUrl):digestBody;
-    const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],subject,text})});
+    const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/#/account",digestBody=(en?"Updates from the last day:":"עדכונים מהיממה האחרונה:")+"\n\n"+items.results.map(x=>"• "+x.title+" — "+x.body).join("\n");
+    const mail=await managedEmailTemplate(env,"daily_digest",lang,{subject:en?"Your daily Gmach Berega summary":"הסיכום היומי שלך מגמ״ח ברגע",text:"{{body}}"},{body:digestBody,account_url:accountUrl},accountUrl);if(!mail)continue;
+    const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],...mail})});
     const id=crypto.randomUUID(),now=new Date().toISOString();
     if(response.ok){await env.DB.batch([env.DB.prepare("INSERT OR REPLACE INTO notification_digests(id,user_id,digest_date,payload_json,status,sent_at) VALUES(?,?,?,?, 'sent',?)").bind(id,user.id,today,JSON.stringify({count:items.results.length}),now),...items.results.map(x=>env.DB.prepare("INSERT OR REPLACE INTO notification_delivery_log(notification_id,channel,status,attempted_at,error) VALUES(?, 'email','sent',?,NULL)").bind(x.id,now))]);}
     else await env.DB.prepare("INSERT OR REPLACE INTO notification_digests(id,user_id,digest_date,payload_json,status) VALUES(?,?,?,?, 'failed')").bind(id,user.id,today,JSON.stringify({status:response.status})).run();
@@ -3161,36 +3156,42 @@ function verificationCode() {
   return String(100000 + (bytes[0] % 900000));
 }
 
-async function sendVerificationEmail(env, email, fullName, code, language="he") {
-  assertEmailDeliveryConfigured(env);
-  const deliver = env.RESEND_SERVICE?.fetch ? env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE) : fetch;
-  const response = await deliver("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${env.RESEND_API_KEY}` },
-    body: JSON.stringify({
-      from: String(env.RESEND_FROM_EMAIL || DEFAULT_FROM_EMAIL),
-      to: [email],
-      subject: language==="en"?"Your Gmach Berega verification code":"קוד האימות שלך לגמ״ח ברגע",
-      text: language==="en"?`Hello ${fullName}, your verification code is ${code}. It expires in 10 minutes. If you did not sign up, you can ignore this email. Do not reply to this email.`:`שלום ${fullName}, קוד האימות שלך הוא ${code}. הקוד תקף ל-10 דקות. אם לא ביקשת להירשם, אפשר להתעלם מהמייל. אין להשיב למייל זה.`,
-      html: language==="en"?`<div dir="ltr" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#15313a"><h1 style="color:#243f75">Gmach Berega</h1><p>Hello ${escapeHtmlEmail(fullName)},</p><p>Your verification code:</p><p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#243f75">${code}</p><p>The code expires in 10 minutes. If you did not sign up, you can ignore this email.</p><p style="color:#6b7280;font-size:12px">Do not reply to this email.</p></div>`:`<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#15313a"><h1 style="color:#243f75">גמ״ח ברגע</h1><p>שלום ${escapeHtmlEmail(fullName)},</p><p>קוד האימות שלך:</p><p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#243f75" dir="ltr">${code}</p><p>הקוד תקף ל־10 דקות. אם לא ביקשת להירשם, אפשר להתעלם מהמייל.</p><p style="color:#6b7280;font-size:12px">אין להשיב למייל זה.</p></div>`
-    })
-  });
-  if (!response.ok) throw new Error(`Resend returned ${response.status}`);
+const EMAIL_DESIGN_DEFAULT={primaryColor:"#243f75",backgroundColor:"#f5f7f8",cardColor:"#ffffff",textColor:"#15313a",buttonColor:"#ad7b35",fontFamily:"Arial, sans-serif",borderRadius:20,showLogo:true,logoUrl:"https://gmach-berega.co.il/gmach-berega-logo.jpg",buttonText:"",footerText:""};
+function parseEmailDesign(value){try{return {...EMAIL_DESIGN_DEFAULT,...(JSON.parse(value||"{}")||{})}}catch{return {...EMAIL_DESIGN_DEFAULT}}}
+function renderEmailVars(value,vars){let out=String(value||"");for(const [k,v] of Object.entries(vars||{}))out=out.replaceAll("{{"+k+"}}",String(v??""));return out}
+async function managedEmailTemplate(env,key,language,defaults,vars={},actionUrl=""){
+  const lang=language==="en"?"en":"he";
+  const row=await env.DB.prepare("SELECT subject,body_text,design_json,enabled FROM email_templates WHERE template_key=? AND language=?").bind(key,lang).first().catch(()=>null);
+  if(row&&Number(row.enabled)===0)return null;
+  const subject=renderEmailVars(row?.subject||defaults.subject,vars),text=renderEmailVars(row?.body_text||defaults.text,vars),d=parseEmailDesign(row?.design_json);
+  const dir=lang==="en"?"ltr":"rtl",logo=d.showLogo&&d.logoUrl?'<img src="'+escapeHtmlEmail(d.logoUrl)+'" alt="Gmach Berega" style="display:block;max-width:150px;max-height:76px;margin:0 auto 18px;object-fit:contain">':"";
+  const button=actionUrl?'<p style="margin:28px 0;text-align:center"><a href="'+escapeHtmlEmail(actionUrl)+'" style="display:inline-block;background:'+escapeHtmlEmail(d.buttonColor)+';color:#fff;text-decoration:none;padding:12px 24px;border-radius:12px;font-weight:700">'+escapeHtmlEmail(d.buttonText||(lang==="en"?"Open":"פתיחה"))+'</a></p>':"";
+  const footer=d.footerText?'<p style="margin:24px 0 0;color:#7a8790;font-size:12px;text-align:center">'+escapeHtmlEmail(renderEmailVars(d.footerText,vars))+'</p>':"";
+  const bodyHtml=escapeHtmlEmail(text).replaceAll("\n","<br>");
+  const html='<div dir="'+dir+'" style="margin:0;padding:30px 14px;background:'+escapeHtmlEmail(d.backgroundColor)+';font-family:'+escapeHtmlEmail(d.fontFamily)+';color:'+escapeHtmlEmail(d.textColor)+'"><div style="max-width:600px;margin:auto;background:'+escapeHtmlEmail(d.cardColor)+';border-radius:'+Number(d.borderRadius||20)+'px;padding:32px;box-shadow:0 10px 30px rgba(20,45,55,.08)">'+logo+'<h1 style="margin:0 0 20px;color:'+escapeHtmlEmail(d.primaryColor)+';font-size:25px">'+escapeHtmlEmail(subject)+'</h1><div style="font-size:16px;line-height:1.75">'+bodyHtml+'</div>'+button+footer+'</div></div>';
+  return {subject,text,html};
 }
-
-async function sendPasswordResetEmail(env, email, fullName, code, language="he") {
+async function sendVerificationEmail(env,email,fullName,code,language="he"){
   assertEmailDeliveryConfigured(env);
-  const deliver = env.RESEND_SERVICE?.fetch ? env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE) : fetch;
-  const response = await deliver("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${env.RESEND_API_KEY}` },
-    body: JSON.stringify({
-      from: String(env.RESEND_FROM_EMAIL || DEFAULT_FROM_EMAIL), to: [email], subject: language==="en"?"Reset your Gmach Berega password":"איפוס סיסמה בגמ״ח ברגע",
-      text: language==="en"?`Hello ${fullName}, your password reset code is ${code}. It expires in 10 minutes. If you did not request this, you can ignore this email. Do not reply to this email.`:`שלום ${fullName}, קוד איפוס הסיסמה שלך הוא ${code}. הקוד תקף ל-10 דקות. אם לא ביקשת זאת, אפשר להתעלם מהמייל. אין להשיב למייל זה.`,
-      html: language==="en"?`<div dir="ltr" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#15313a"><h1 style="color:#243f75">Gmach Berega</h1><p>Hello ${escapeHtmlEmail(fullName)},</p><p>Your password reset code:</p><p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#243f75">${code}</p><p>The code expires in 10 minutes. If you did not request this, you can ignore this email.</p><p style="color:#6b7280;font-size:12px">Do not reply to this email.</p></div>`:`<div dir="rtl" style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#15313a"><h1 style="color:#243f75">גמ״ח ברגע</h1><p>שלום ${escapeHtmlEmail(fullName)},</p><p>קוד איפוס הסיסמה שלך:</p><p style="font-size:32px;font-weight:800;letter-spacing:8px;color:#243f75" dir="ltr">${code}</p><p>הקוד תקף ל־10 דקות. אם לא ביקשת זאת, אפשר להתעלם מהמייל.</p><p style="color:#6b7280;font-size:12px">אין להשיב למייל זה.</p></div>`
-    })
-  });
-  if (!response.ok) throw new Error(`Resend returned ${response.status}`);
+  const en=language==="en",mail=await managedEmailTemplate(env,"verification",language,{
+    subject:en?"Your Gmach Berega verification code":"קוד האימות שלך לגמ״ח ברגע",
+    text:en?"Hello {{full_name}}, your verification code is {{code}}. It expires in 10 minutes.":"שלום {{full_name}}, קוד האימות שלך הוא {{code}}. הקוד תקף ל־10 דקות."
+  },{full_name:fullName,code});
+  if(!mail)return;
+  const deliver=env.RESEND_SERVICE?.fetch?env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE):fetch;
+  const response=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[email],...mail})});
+  if(!response.ok)throw new Error(`Resend returned ${response.status}`);
+}
+async function sendPasswordResetEmail(env,email,fullName,code,language="he"){
+  assertEmailDeliveryConfigured(env);
+  const en=language==="en",mail=await managedEmailTemplate(env,"password_reset",language,{
+    subject:en?"Reset your Gmach Berega password":"איפוס סיסמה בגמ״ח ברגע",
+    text:en?"Hello {{full_name}}, your password reset code is {{code}}. It expires in 10 minutes.":"שלום {{full_name}}, קוד איפוס הסיסמה שלך הוא {{code}}. הקוד תקף ל־10 דקות."
+  },{full_name:fullName,code});
+  if(!mail)return;
+  const deliver=env.RESEND_SERVICE?.fetch?env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE):fetch;
+  const response=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[email],...mail})});
+  if(!response.ok)throw new Error(`Resend returned ${response.status}`);
 }
 
 function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[char]);}
