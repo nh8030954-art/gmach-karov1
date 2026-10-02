@@ -2989,6 +2989,48 @@ async function reconcileSerializedQuantity(env,itemId){
   }
   return {quantity,tracked,reconciled:false};
 }
+
+function itemUnitPrefix(item){
+  const raw=String(item?.serial_prefix||item?.title||"GMH").replace(/[^A-Za-z0-9א-ת]/g,"").slice(0,8).toUpperCase();
+  return raw||"GMH";
+}
+async function createAutomaticItemUnit(env,item,condition){
+  const prefix=itemUnitPrefix(item);
+  let serial="";
+  for(let attempt=0;attempt<20;attempt++){
+    serial=prefix+"-"+crypto.randomUUID().replaceAll("-","").slice(0,8).toUpperCase();
+    const exists=await env.DB.prepare("SELECT 1 FROM item_units WHERE serial_number=? UNION SELECT 1 FROM retired_serials WHERE serial_number=?").bind(serial,serial).first();
+    if(!exists)break;
+    serial="";
+  }
+  if(!serial)throw new Error("לא ניתן ליצור מספר סידורי ייחודי");
+  const id=crypto.randomUUID();
+  await env.DB.prepare("INSERT INTO item_units(id,item_id,branch_id,serial_number,status,condition) VALUES(?,?,NULL,?,'available',?)").bind(id,item.id,serial,condition||publicProductCondition(item.condition,item.condition_detail)||"מצב טוב").run();
+  return {id,serialNumber:serial};
+}
+async function syncItemUnitsToQuantity(env,itemId,desiredQuantity){
+  const item=await env.DB.prepare("SELECT id,title,serial_prefix,condition,condition_detail,quantity FROM items WHERE id=?").bind(itemId).first();
+  if(!item)throw new HttpError(404,"הפריט לא נמצא");
+  const desired=Math.max(1,Number(desiredQuantity||item.quantity||1));
+  const rows=await env.DB.prepare("SELECT id,serial_number,status FROM item_units WHERE item_id=? AND status!='retired' ORDER BY created_at,id").bind(itemId).all();
+  const active=rows.results||[],created=[],retired=[];
+  if(active.length<desired){
+    for(let i=active.length;i<desired;i++)created.push(await createAutomaticItemUnit(env,item,publicProductCondition(item.condition,item.condition_detail)));
+  }else if(active.length>desired){
+    const removable=await env.DB.prepare("SELECT u.id,u.serial_number FROM item_units u WHERE u.item_id=? AND u.status='available' AND NOT EXISTS(SELECT 1 FROM loan_unit_assignments a WHERE a.unit_id=u.id AND a.returned_at IS NULL) ORDER BY u.created_at DESC,u.id DESC").bind(itemId).all();
+    const need=active.length-desired;
+    if((removable.results||[]).length<need)throw new HttpError(409,"אי אפשר להקטין את הכמות כרגע כי חלק מהיחידות מושאלות או מוקצות לבקשה פעילה");
+    const now=new Date().toISOString(),statements=[];
+    for(const unit of (removable.results||[]).slice(0,need)){
+      statements.push(env.DB.prepare("INSERT OR IGNORE INTO retired_serials(serial_number,item_unit_id,retired_at) VALUES(?,?,?)").bind(unit.serial_number,unit.id,now));
+      statements.push(env.DB.prepare("UPDATE item_units SET status='retired',retired_at=?,updated_at=? WHERE id=?").bind(now,now,unit.id));
+      retired.push({id:unit.id,serialNumber:unit.serial_number});
+    }
+    if(statements.length)await env.DB.batch(statements);
+  }
+  return {created,retired,quantity:desired};
+}
+
 async function listItemUnits(request,env,itemId){const item=await itemOrganization(env,itemId);if(!item)throw new HttpError(404,"הפריט לא נמצא");const inventory=await reconcileSerializedQuantity(env,itemId);if(inventory?.reconciled)item.quantity=inventory.quantity;await requireOrganizationRole(request,env,item.organization_id,["owner","inventory"]);const rows=await env.DB.prepare("SELECT id,branch_id,serial_number,status,condition,created_at,updated_at FROM item_units WHERE item_id=? ORDER BY created_at").bind(itemId).all();const active=(rows.results||[]).filter(row=>row.status!=="retired");return json({units:rows.results,totalQuantity:Number(item.quantity||0),serialTrackedCount:active.length,trackingComplete:active.length===Number(item.quantity||0)});}
 async function createItemUnit(request,env,itemId){const item=await itemOrganization(env,itemId);if(!item)throw new HttpError(404,"הפריט לא נמצא");const {user}=await requireOrganizationRole(request,env,item.organization_id,["owner","inventory"]),body=await readJson(request);const count=positiveInt(body.count,1,1,100,"כמות יחידות"),existing=await env.DB.prepare("SELECT COUNT(*) AS count FROM item_units WHERE item_id=? AND status!='retired'").bind(itemId).first(),remaining=Math.max(0,Number(item.quantity||0)-Number(existing?.count||0));if(count>remaining)throw new HttpError(409,remaining>0?`אפשר להוסיף עד ${remaining} מספרים סידוריים בלבד, בהתאם לכמות המלאי של הפריט`:"לכל יחידות המלאי של הפריט כבר יש מספר סידורי");const prefix=String(item.serial_prefix||item.title||"GMH").replace(/[^A-Za-z0-9א-ת]/g,"").slice(0,8).toUpperCase()||"GMH",created=[];for(let i=0;i<count;i++){let serial;for(let attempt=0;attempt<10;attempt++){serial=`${prefix}-${crypto.randomUUID().replaceAll("-","").slice(0,8).toUpperCase()}`;const exists=await env.DB.prepare("SELECT 1 FROM item_units WHERE serial_number=? UNION SELECT 1 FROM retired_serials WHERE serial_number=?").bind(serial,serial).first();if(!exists)break;}const id=crypto.randomUUID();await env.DB.prepare("INSERT INTO item_units(id,item_id,branch_id,serial_number,condition) VALUES(?,?,?,?,?)").bind(id,itemId,cleanOptional(body.branchId,100),serial,cleanText(body.condition,2,30,"מצב היחידה")).run();created.push({id,serialNumber:serial});}await auditStatement(env,user.id,"item.units.create","item",itemId,{count}).run();return json({units:created},201);}
 async function manageLoanUnits(request,env,requestId,write=false){
