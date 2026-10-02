@@ -70,7 +70,7 @@
     .pt-card{border:1px solid #e4e9ee;border-radius:14px;padding:14px;background:#fff}.pt-card h3{margin-top:0}
     .pt-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pt-form{display:grid;gap:10px}.pt-form[hidden]{display:none}.pt-form input:not([type="checkbox"]),.pt-form select,.pt-form textarea{width:100%;padding:10px;border:1px solid #ccd5dc;border-radius:10px}.pt-form input[type="checkbox"]{width:19px;height:19px;min-width:19px;margin:0;accent-color:#173a4d}.pt-form label:has(>input[type="checkbox"]){display:flex;gap:10px;align-items:center}.pt-form label:has(>input[type="checkbox"]) input{flex:none}
     .pt-btn{border:0;border-radius:10px;padding:9px 13px;cursor:pointer;background:#e9eef2}.pt-btn.primary{background:#173a4d;color:#fff}.pt-btn.danger{background:#fff0f0;color:#9f1d1d}
-    .pt-muted{color:#667681;font-size:.92rem}.pt-status{min-height:1.4em;margin-top:8px}.pt-list{display:grid;gap:10px}.pt-list[hidden],.pt-list .pt-row[hidden]{display:none}
+    .pt-muted{color:#667681;font-size:.92rem}.pt-status{min-height:1.4em;margin-top:8px}.pt-list{display:grid;gap:10px}.pt-list[hidden],.pt-list .pt-row[hidden]{display:none}.pt-favorite-row{display:grid!important;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center}.pt-favorite-main{min-width:0;border:0;background:transparent;padding:4px;text-align:start;display:flex;align-items:center;justify-content:space-between;gap:16px;cursor:pointer;color:inherit;font:inherit}.pt-favorite-main span{min-width:0;display:grid;gap:4px}.pt-favorite-main strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#173a4d}.pt-favorite-main small{display:block}.pt-favorite-main b{flex:0 0 auto;color:#173a4d}.pt-favorite-main:hover strong,.pt-favorite-main:focus-visible strong{text-decoration:underline}@media(max-width:560px){.pt-favorite-row{grid-template-columns:1fr}.pt-favorite-row>.pt-btn{width:100%}}
     @media(max-width:820px){.pt-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}}
     @media(max-width:700px){.platform-tools{width:100vw;max-width:100vw;border-radius:18px 18px 0 0;margin:auto 0 0}.pt-tabs{grid-template-columns:1fr 1fr;padding:10px}.pt-nav-group{padding:8px}.pt-tabs button{padding:8px}.pt-body{max-height:64vh;padding:16px}}
     @media(max-width:420px){.pt-tabs{grid-template-columns:1fr}.pt-nav-buttons{grid-template-columns:1fr 1fr}.pt-nav-group>strong{margin-bottom:6px}}
@@ -194,18 +194,32 @@
     body.innerHTML='<h3>המועדפים שלי</h3><p class="pt-muted">מוצרים, גמ״חים, קטגוריות, בקשות קהילה וחיפושים שמורים במקום אחד.</p><div class="pt-list" id="pt-favorites-list"></div><div class="pt-status" role="status"></div>';
     const list=$("#pt-favorites-list",body);
     if(!data.saved?.length){list.innerHTML='<p class="pt-muted">עדיין אין תוכן שמור.</p>';return}
+    const openSaved=entry=>{
+      if(entry.type==="item"){dialog.close();location.assign("/item/"+encodeURIComponent(entry.id));return}
+      if(entry.type==="organization"){dialog.close();location.hash="#/gmach/"+encodeURIComponent(entry.id);return}
+      if(entry.type==="category"){
+        const category=document.getElementById("category-filter"),form=document.getElementById("search-form");
+        if(category){category.value=entry.label||"";category.dispatchEvent(new Event("change",{bubbles:true}));}
+        dialog.close();if(form)form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));location.hash="#/catalog";return;
+      }
+      if(entry.type==="help_request"){dialog.close();location.assign(location.origin+location.pathname+"?help="+encodeURIComponent(entry.id)+"#/community");return}
+      if(entry.type==="search"){render("searches");}
+    };
     for(const entry of data.saved){
-      const row=document.createElement("div");row.className="pt-card pt-row";
-      const label=document.createElement("span"),localizedLabel=document.documentElement.lang==="en"&&entry.type==="category"?entry.labelEn||entry.label:entry.label;label.innerHTML=`<strong>${esc(localizedLabel)}</strong> <small class="pt-muted">${esc(names[entry.type]||entry.type)}</small>`;
+      const row=document.createElement("div");row.className="pt-card pt-row pt-favorite-row";
+      const main=document.createElement("button");main.type="button";main.className="pt-favorite-main";
+      const localizedLabel=document.documentElement.lang==="en"&&entry.type==="category"?entry.labelEn||entry.label:entry.label;
+      main.innerHTML=`<span><strong>${esc(localizedLabel)}</strong><small class="pt-muted">${esc(names[entry.type]||entry.type)}${entry.detail&&typeof entry.detail==="string"&&!entry.detail.startsWith("{")?" · "+esc(entry.detail):""}</small></span><b>פתיחה ←</b>`;
+      main.onclick=()=>openSaved(entry);
       const remove=document.createElement("button");remove.type="button";remove.className="pt-btn danger";remove.textContent="הסרה מהמועדפים";remove.setAttribute("aria-label",`הסרה מהמועדפים: ${entry.label}`);
       remove.onclick=async()=>{remove.disabled=true;try{await api("/api/me/favorites-overview/"+encodeURIComponent(entry.type)+"/"+encodeURIComponent(entry.id),{method:"DELETE"});row.remove();if(!list.children.length)list.innerHTML='<p class="pt-muted">עדיין אין תוכן שמור.</p>';setStatus("הפריט הוסר מהמועדפים.")}catch(error){setStatus(error.message,true);remove.disabled=false}};
-      row.append(label,remove);list.append(row);
+      row.append(main,remove);list.append(row);
     }
   }
 
 
   async function renderSearches(){
-    const data=await api("/api/me/saved-searches");body.innerHTML=`<div class="pt-grid"><section class="pt-card"><h3>חיפושים שמורים</h3><div class="pt-list" id="pt-search-list"></div></section><section class="pt-card"><h3>שמירת חיפוש</h3><form class="pt-form" id="pt-search-form"><input name="name" placeholder="שם לחיפוש" required><input name="q" placeholder="מילות חיפוש"><input name="city" placeholder="עיר"><input name="category" placeholder="קטגוריה"><label>מצב הפריט<select name="condition"><option value="">כל המצבים</option><option>כמו חדש</option><option>מצוין</option><option>טוב</option></select></label><label><input type="checkbox" name="availableOnly"> רק פריטים זמינים</label><label><input type="checkbox" name="notify" checked> להודיע על תוצאות חדשות</label><button class="pt-btn primary">שמירה</button></form></section></div><div class="pt-status"></div>`;const list=$("#pt-search-list",body);
+    const data=await api("/api/me/saved-searches");body.innerHTML=`<div class="pt-grid"><section class="pt-card"><h3>חיפושים שמורים</h3><div class="pt-list" id="pt-search-list"></div></section><section class="pt-card"><h3>שמירת חיפוש</h3><form class="pt-form" id="pt-search-form"><input name="name" placeholder="שם לחיפוש" required><input name="q" placeholder="מילות חיפוש"><input name="city" placeholder="עיר"><input name="category" placeholder="קטגוריה"><label>מצב הפריט<select name="condition"><option value="">כל המצבים</option><option>חדש</option><option>כמו חדש</option><option>מצב טוב</option><option>מצב סביר</option><option>בלאי נראה לעין</option></select></label><label><input type="checkbox" name="availableOnly"> רק פריטים זמינים</label><label><input type="checkbox" name="notify" checked> להודיע על תוצאות חדשות</label><button class="pt-btn primary">שמירה</button></form></section></div><div class="pt-status"></div>`;const list=$("#pt-search-list",body);
     if(!data.searches.length)list.innerHTML='<p class="pt-muted">אין חיפושים שמורים.</p>';
     const form=$("#pt-search-form",body),status=$(".pt-status",body);let editingId=null;
     for(const s of data.searches){const d=document.createElement("div");d.className="pt-card";const summary=[["חיפוש",s.filters?.q||s.filters?.query],["עיר",s.filters?.city],["קטגוריה",s.filters?.category],["מצב",s.filters?.condition]].filter(([,value])=>value).map(([label,value])=>`${label}: ${value}`).join(" · ")+(s.filters?.availableOnly?" · רק זמינים":"")||"כל הפריטים";d.innerHTML=`<strong>${esc(s.name)}</strong><div class="pt-muted">${esc(summary)}</div><button class="pt-btn primary" type="button" data-open>הצגת תוצאות</button> <button class="pt-btn" type="button" data-edit>עריכה</button> <button class="pt-btn danger" type="button" data-del>מחיקה</button>`;
