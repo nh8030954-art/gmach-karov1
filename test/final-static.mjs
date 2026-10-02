@@ -499,7 +499,7 @@ assert.ok(worker.includes("Math.max(150,Number(nextOrgCode?.max_code||149)+1)"),
 assert.ok(worker.includes("יש להקצות בדיוק את היחידות הסידוריות שנמסרות לפני אישור האיסוף"),"serialized pickup must require exact unit allocation");
 assert.ok(worker.includes('["declined","cancelled","no_show"].includes(target)')&&worker.includes("UPDATE loan_unit_assignments SET returned_at=? WHERE request_id=? AND returned_at IS NULL"),"approved loans ending without pickup must release allocated units");
 assert.ok(appClient.includes("function requestProgress")&&appClient.includes("אישור שהמשתמש אסף")&&appClient.includes("אישור שהמשתמש החזיר"),"loan lifecycle progress and explicit manager confirmations missing");
-assert.ok(appClient.includes("const selectedUnits=()=>$("),"pickup unit selection must use collection selector");
+assert.ok(appClient.includes("const selectedUnits=()=>$$("),"pickup unit selection must use collection selector");
 assert.ok(!/const selectedUnits=\(\)=>\$\((?!\$)/.test(appClient),"pickup unit selection must not use single-element selector");
 assert.ok(worker.includes("item_serial_codes_v2"),"item serial codes must be scoped per gmach");
 
