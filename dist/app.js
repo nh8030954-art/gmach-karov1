@@ -54,8 +54,8 @@
   function setGmachHoursMode(byAppointment){
     const toggle=$("#gmach-hours-by-appointment"),grid=$("#gmach-hours-grid");if(!toggle||!grid)return;
     toggle.checked=Boolean(byAppointment);grid.hidden=Boolean(byAppointment);
-    $("[data-hours-day]",grid).forEach(day=>{day.disabled=Boolean(byAppointment)});
-    $("[data-hours-start],[data-hours-end]",grid).forEach(input=>{input.disabled=Boolean(byAppointment);input.setCustomValidity("")});
+    $$("[data-hours-day]",grid).forEach(day=>{day.disabled=Boolean(byAppointment)});
+    $$("[data-hours-start],[data-hours-end]",grid).forEach(input=>{input.disabled=Boolean(byAppointment);input.setCustomValidity("")});
   }
 
   const SEARCH_ALIASES = Object.freeze({
@@ -689,7 +689,7 @@
     };
     const preview=list=>list.slice(0,3).map(x=>escapeHTML(x.label||"שמירה")).join(" · ");
     $("#dashboard-content").innerHTML=`<section class="dashboard-subsection"><div class="section-heading"><div><h2>השמורים שלי</h2><p>כל מה שסימנת כדי לחזור אליו במהירות.</p></div></div><div class="dashboard-saved-grid"><article class="dashboard-saved-card"><span class="saved-count">${groups.favorites.length}</span><h3>מועדפים</h3><p>${groups.favorites.length?preview(groups.favorites):"עוד לא שמרת פריטים או גמ״חים."}</p><button class="button button-secondary button-small" type="button" data-open-account-tab="favorites">פתיחת המועדפים</button></article><article class="dashboard-saved-card"><span class="saved-count">${groups.searches.length}</span><h3>חיפושים שמורים</h3><p>${groups.searches.length?preview(groups.searches):"שמרו חיפוש כדי לחזור לאותם סינונים."}</p><button class="button button-secondary button-small" type="button" data-open-account-tab="searches">פתיחת החיפושים</button></article><article class="dashboard-saved-card"><span class="saved-count">${groups.categories.length}</span><h3>קטגוריות שמורות</h3><p>${groups.categories.length?preview(groups.categories):"קטגוריות שתשמרו יופיעו כאן."}</p><button class="button button-secondary button-small" type="button" data-open-account-tab="categories">פתיחת הקטגוריות</button></article><article class="dashboard-saved-card"><span class="saved-count">${groups.help.length}</span><h3>בקשות קהילה שמורות</h3><p>${groups.help.length?preview(groups.help):"אין כרגע בקשות קהילה שמורות."}</p><button class="button button-secondary button-small" type="button" id="saved-open-community">לוח הבקשות</button></article></div></section>`;
-    $("[data-open-account-tab]",$("#dashboard-content")).forEach(button=>button.addEventListener("click",()=>window.GmachAccountCenter?.open(button.dataset.openAccountTab)));
+    $$("[data-open-account-tab]",$("#dashboard-content")).forEach(button=>button.addEventListener("click",()=>window.GmachAccountCenter?.open(button.dataset.openAccountTab)));
     $("#saved-open-community")?.addEventListener("click",()=>openCommunityBoard(1));
   }
 
