@@ -327,6 +327,12 @@ try {
   assert.equal(result.data.requests[0].borrower_phone, "052-7654321");
   result = await request(`/api/loan-requests/${requestId}/status`, { method: "PATCH", cookie: adminCookie, body: { status: "approved", managerNote: "איסוף מהכניסה בשעה 19:00" } });
   assert.equal(result.response.status, 200);
+  result = await request(`/api/loan-requests/${requestId}/calendar.ics`, { cookie: borrowerCookie });
+  assert.equal(result.response.status, 200, String(result.data));
+  assert.match(result.response.headers.get("content-type")||"", /text\/calendar/);
+  assert.match(String(result.data), /BEGIN:VCALENDAR/);
+  assert.match(String(result.data), /איסוף/);
+  assert.match(String(result.data), /החזרה/);
   result = await request(`/api/items/${itemId}/availability-calendar?from=2026-10-08&days=7`);
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(result.data.days.length, 7);
