@@ -18,6 +18,12 @@ SELECT id, organization_id,
        ROW_NUMBER() OVER (PARTITION BY organization_id ORDER BY created_at, id)
 FROM items;
 
+-- Move active unit serials to guaranteed-unique temporary values first so
+-- canonical renumbering cannot collide while two items exchange/gap-fill codes.
+UPDATE item_units
+SET serial_number='TMP-' || id
+WHERE status!='retired';
+
 WITH canonical AS (
   SELECT
     u.id,
