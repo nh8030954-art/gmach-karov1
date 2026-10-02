@@ -1,4 +1,4 @@
-deploy_sha=d62c3f6354f674e08222343f21a902ba1e77aa4a
+deploy_sha=7e7f1b4fe51bfabee5a129009ba80ab33eaf88a9
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -20,18 +20,18 @@ Excel export and QR image scanner gate passed.
 Voice message recording gate passed.
 Excel export, accessible admin status and QR image scanning gate passed.
 Full requirements regression extensions passed.
-Static English interface coverage 100.0% (462/462)
-remaining-features Error: Backup checksum mismatch
-    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
-    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:352:91)
-    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:902:37)
-    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:377:26)
-file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:263
-  assert.equal(result.data.branch.name,"סניף מרכזי מעודכן");
-                                  ^
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
 
-TypeError: Cannot read properties of undefined (reading 'name')
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:263:35
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+AssertionError [ERR_ASSERTION]: pickup unit selection must not use single-element selector
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:503:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
 
 Node.js v24.21.0
