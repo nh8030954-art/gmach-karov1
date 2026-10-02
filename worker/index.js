@@ -1887,7 +1887,9 @@ async function createItem(request, env) {
   const minLoanMinutes=positiveInt(body.minLoanMinutes,60,1,525600,"משך מינימלי");
   const maxLoanMinutes=positiveInt(body.maxLoanMinutes,10080,1,525600,"משך מקסימלי");
   if(maxLoanMinutes<minLoanMinutes) throw new HttpError(400,"משך ההשאלה המקסימלי חייב להיות גדול או שווה למינימלי");
-  const subcategory=fixedSubcategory(body.subcategory);\n  const id = crypto.randomUUID();\n  await env.DB.prepare(`
+  const subcategory=fixedSubcategory(body.subcategory);
+  const id = crypto.randomUUID();
+  await env.DB.prepare(`
     INSERT INTO items (id,organization_id,title,category,description,condition,condition_detail,quantity,loan_conditions,city,neighborhood,item_type,subcategory,tags_json,pickup_method,inventory_updated_at,
       min_loan_minutes,max_loan_minutes,booking_notice_minutes,turnaround_minutes,booking_horizon_days,approval_mode,deposit_required,deposit_amount_agorot,
       publish_at,max_per_user,preparation_minutes,max_loan_days,service_radius_km,status,availability_status,is_free,icon,cover_color)
@@ -1957,7 +1959,9 @@ async function updateItem(request, env, id) {
     const removable=await env.DB.prepare("SELECT COUNT(*) AS count FROM item_units u WHERE u.item_id=? AND u.status='available' AND NOT EXISTS(SELECT 1 FROM loan_unit_assignments a WHERE a.unit_id=u.id AND a.returned_at IS NULL)").bind(id).first();
     if(Number(existingUnits.count)-quantity>Number(removable?.count||0))throw new HttpError(409,"אי אפשר להקטין את הכמות כרגע כי חלק מהיחידות מושאלות או מוקצות לבקשה פעילה");
   }
-  const subcategory=fixedSubcategory(body.subcategory);\n  const values = {\n    title: cleanText(body.title, 2, 120, "שם הפריט"),
+  const subcategory=fixedSubcategory(body.subcategory);
+  const values = {
+    title: cleanText(body.title, 2, 120, "שם הפריט"),
     description: cleanText(body.description, 10, 1200, "תיאור"),
     loanConditions: cleanOptional(body.loanConditions, 300), itemType: sanitizeItemType(body.itemType), pickupMethod: sanitizePickupMethod(body.pickupMethod),
     subcategory, tagsJson: JSON.stringify(sanitizeTags(body.tags))
