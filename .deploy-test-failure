@@ -1,4 +1,4 @@
-deploy_sha=ef871a9809344a4cfb05591428d2f6f7881b2e94
+deploy_sha=d7e2cbe6f7a8b258132fc1515f55e2ceb912a3b6
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -20,12 +20,19 @@ Excel export and QR image scanner gate passed.
 Voice message recording gate passed.
 Excel export, accessible admin status and QR image scanning gate passed.
 Full requirements regression extensions passed.
+Static English interface coverage 100.0% (451/451)
+remaining-features Error: Backup checksum mismatch
+    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
+    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:336:91)
+    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:731:37)
+    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:222:26)
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: backup download route missing from UI
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:465:8 {
+AssertionError [ERR_ASSERTION]: Invites to unregistered recipients include both languages
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:284:10
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
