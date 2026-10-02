@@ -26,6 +26,21 @@ const IMAGE_TYPES = new Map([
   ["image/webp", "webp"]
 ]);
 const CATEGORIES = new Set(["אירועים", "כלי עבודה", "תינוקות", "רפואה", "טיולים", "בית ואירוח", "כללי"]);
+const ITEM_SUBCATEGORIES = Object.freeze({
+  "אירועים":["עיצוב וקישוט","שולחנות וכיסאות","תאורה והגברה","כלי הגשה","חופות וסוכות","מפות וטקסטיל"],
+  "כלי עבודה":["כלי עבודה חשמליים","כלי עבודה ידניים","כלי גינה","סולמות ופיגומים","ציוד ניקוי"],
+  "תינוקות":["עגלות וטיולונים","מושבי בטיחות","מיטות ולולים","האכלה והנקה","רחצה והחתלה","מנשאים"],
+  "רפואה":["ניידות וכיסאות גלגלים","הליכונים וקביים","ציוד טיפול ביתי","ציוד אורתופדי","ציוד החלמה"],
+  "טיולים":["קמפינג","טיולים והליכה","מזוודות ותיקים","צידניות וציוד אוכל","ים ובריכה"],
+  "בית ואירוח":["מכשירי חשמל","ריהוט מתקפל","מטבח ואפייה","אירוח ולינה","מעבר דירה"],
+  "כללי":["ספרים ולימוד","תשמישי קדושה","נגישות","ביגוד ותחפושות","ספורט ופנאי","אחר"]
+});
+function fixedSubcategory(category,value,legacyValue=null){
+  const sub=cleanOptional(value,80);if(!sub)return null;
+  const allowed=ITEM_SUBCATEGORIES[category]||[];
+  if(allowed.includes(sub)||sub===legacyValue)return sub;
+  throw new HttpError(400,"יש לבחור קטגוריית משנה מתוך הרשימה המתאימה לקטגוריה הראשית");
+}
 const CONDITIONS = new Set(["כמו חדש", "מצוין", "טוב"]);
 const PRODUCT_CONDITIONS = new Set(["חדש","כמו חדש","מצב טוב","מצב סביר","בלאי נראה לעין","מצוין","טוב"]);
 function normalizeProductCondition(value){
@@ -1689,6 +1704,7 @@ async function notifyMatchingSavedSearches(env,item){const rows=await env.DB.pre
 async function createItem(request, env) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
+  if(body.freeConfirmed!==true)throw new HttpError(400,"יש לאשר שהפריט מוצע להשאלה חינמית בלבד");
   const organizationId = cleanText(body.organizationId, 1, 100, "גמ״ח");
   const organization = await env.DB.prepare("SELECT * FROM organizations WHERE id = ? AND owner_id = ? AND status IN ('pending','approved')")
     .bind(organizationId, user.id).first();
@@ -1725,7 +1741,7 @@ async function createItem(request, env) {
     cleanOptional(body.loanConditions, 300),
     organization.city,
     organization.neighborhood,
-    sanitizeItemType(body.itemType), cleanOptional(body.subcategory, 80), JSON.stringify(sanitizeTags(body.tags)), sanitizePickupMethod(body.pickupMethod), new Date().toISOString(),
+    sanitizeItemType(body.itemType), fixedSubcategory(category,body.subcategory), JSON.stringify(sanitizeTags(body.tags)), sanitizePickupMethod(body.pickupMethod), new Date().toISOString(),
     minLoanMinutes, maxLoanMinutes,
     positiveInt(body.bookingNoticeMinutes,0,0,525600,"זמן התראה"), positiveInt(body.turnaroundMinutes,0,0,10080,"זמן התארגנות"),
     positiveInt(body.bookingHorizonDays,365,1,1095,"טווח הזמנה"), body.approvalMode==="automatic"?"automatic":"manual",
@@ -1764,6 +1780,7 @@ async function updateItem(request, env, id) {
     return json({ id, status });
   }
 
+  if(body.freeConfirmed!==true)throw new HttpError(400,"יש לאשר שהפריט מוצע להשאלה חינמית בלבד");
   const category = cleanText(body.category, 2, 40, "קטגוריה");
   const conditionInfo = normalizeProductCondition(cleanText(body.condition, 2, 30, "מצב הפריט"));
   const condition = conditionInfo.base;
@@ -1775,7 +1792,7 @@ async function updateItem(request, env, id) {
     title: cleanText(body.title, 2, 120, "שם הפריט"),
     description: cleanText(body.description, 10, 1200, "תיאור"),
     loanConditions: cleanOptional(body.loanConditions, 300), itemType: sanitizeItemType(body.itemType), pickupMethod: sanitizePickupMethod(body.pickupMethod),
-    subcategory: cleanOptional(body.subcategory,80), tagsJson: JSON.stringify(sanitizeTags(body.tags))
+    subcategory: fixedSubcategory(category,body.subcategory,existing.subcategory||null), tagsJson: JSON.stringify(sanitizeTags(body.tags))
   };
   const changed = values.title !== existing.title || category !== existing.category || values.description !== existing.description ||
     condition !== existing.condition || quantity !== Number(existing.quantity) || (values.loanConditions || null) !== (existing.loan_conditions || null) || values.itemType !== (existing.item_type||"loan") || values.pickupMethod !== (existing.pickup_method||"pickup") || values.subcategory !== (existing.subcategory||null) || values.tagsJson !== (existing.tags_json||"[]");
@@ -2027,7 +2044,7 @@ async function createLoanRequest(request, env) {
     WHERE i.id=? AND i.status='active' AND i.is_free=1 AND o.status='approved'
   `).bind(itemId).first();
   if (!item) throw new HttpError(404, "הפריט לא נמצא");
-  if (item.owner_id === user.id) throw new HttpError(400, "אי אפשר להזמין פריט מהגמ״ח שלכם");
+  if (item.owner_id === user.id) throw new HttpError(400, "אי אפשר להזמין פריט מהגמ״ח שבבעלותכם. אפשר לשאול פריטים מגמ״חים אחרים.");
   if (item.availability_status === "unavailable") throw new HttpError(409, "הפריט אינו זמין כרגע");
 
   const from = validateLoanDateTime(body.requestedFrom, "מועד האיסוף");
@@ -2903,7 +2920,13 @@ async function unsubscribeCommunity(env,token){
 }
 function icsEscape(v){return String(v||"").replaceAll("\\","\\\\").replaceAll(";","\\;").replaceAll(",","\\,").replace(/\r?\n/g,"\\n")}
 function icsUtc(v){const d=new Date(v);return Number.isNaN(d.getTime())?"":d.toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z")}
+async function ensureCalendarFeedSchema(env){
+  const info=await env.DB.prepare("PRAGMA table_info(users)").all(),cols=new Set((info.results||[]).map(row=>row.name));
+  if(!cols.has("calendar_feed_token"))await env.DB.prepare("ALTER TABLE users ADD COLUMN calendar_feed_token TEXT").run().catch(error=>{if(!String(error).toLowerCase().includes("duplicate"))throw error});
+  await env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS users_calendar_feed_token_idx ON users(calendar_feed_token) WHERE calendar_feed_token IS NOT NULL").run();
+}
 async function myCalendarFeed(request,env){
+  await ensureCalendarFeedSchema(env);
   const user=await requireUser(request,env);let token=user.calendar_feed_token;
   if(!token){token=toBase64Url(crypto.getRandomValues(new Uint8Array(24)));await env.DB.prepare("UPDATE users SET calendar_feed_token=?,updated_at=? WHERE id=?").bind(token,new Date().toISOString(),user.id).run()}
   return json({url:"https://gmach-berega.co.il/calendar/"+token+".ics"});
@@ -3242,7 +3265,7 @@ function sanitizeHours(value) {
 }
 function requiredHours(value){
   const hours=sanitizeHours(value),parsed=JSON.parse(hours);
-  if(!Object.values(parsed).some(entry=>String(entry||"").trim().length>=3))throw new HttpError(400,"יש להזין שעות פעילות");
+  if(!Object.values(parsed).some(entry=>String(entry||"").trim().length>=3))return "{}";
   for(const [day,range] of Object.entries(parsed)){
     if(!["ראשון","שני","שלישי","רביעי","חמישי","שישי","שבת"].includes(day))throw new HttpError(400,"יש לבחור יום פעילות מהרשימה");
     const match=range.match(/^(\d{2}:\d{2})[–-](\d{2}:\d{2})$/);

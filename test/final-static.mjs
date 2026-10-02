@@ -478,3 +478,14 @@ assert.ok(adminControlCenter.includes("email-preview"),"email live preview missi
 assert.ok(adminControlCenter.includes("primaryColor")&&adminControlCenter.includes("buttonColor")&&adminControlCenter.includes("logoUrl"),"email design controls missing");
 assert.ok(worker.includes("managedEmailTemplate"),"managed email renderer missing");
 assert.ok(worker.includes('"verification"')&&worker.includes('"password_reset"')&&worker.includes('"manager_invite"'),"auth and invitation emails are not template-managed");
+
+assert.ok(indexHtml.includes('id="gmach-hours-by-appointment"'),"gmach by-appointment hours option missing");
+assert.ok(indexHtml.includes('id="gmach-suggest-category-button"'),"gmach category suggestion missing");
+assert.ok(indexHtml.includes('id="item-subcategory" disabled'),"fixed item subcategory selector missing");
+assert.ok(indexHtml.includes('id="item-free" type="checkbox" required')&&!indexHtml.includes('id="item-free" type="checkbox" checked required'),"free-loan confirmation must start unchecked");
+assert.ok(appClient.includes("updateItemSubcategories"),"subcategory dependency logic missing");
+assert.ok(appClient.includes('$$("[data-open-account-tab]",$("#dashboard-content")).forEach'),"saved dashboard selector regression");
+assert.ok(worker.includes("fixedSubcategory(category,body.subcategory)"),"server-side fixed subcategory validation missing");
+assert.ok(worker.includes('body.freeConfirmed!==true'),"server-side free confirmation missing");
+assert.ok(worker.includes('if(!Object.values(parsed).some(entry=>String(entry||"").trim().length>=3))return "{}"'),"empty gmach hours must be allowed");
+assert.ok(indexHtml.includes('name="auth-account-intent" value="owner"'),"owner registration intent missing");
