@@ -195,7 +195,7 @@
     const list=$("#pt-favorites-list",body);
     if(!data.saved?.length){list.innerHTML='<p class="pt-muted">עדיין אין תוכן שמור.</p>';return}
     const openSaved=entry=>{
-      if(entry.type==="item"){dialog.close();location.assign("/item/"+encodeURIComponent(entry.id));return}
+      if(entry.type==="item"){dialog.close();window.dispatchEvent(new CustomEvent("gmach:open-item",{detail:{id:String(entry.id)}}));return}
       if(entry.type==="organization"){dialog.close();location.hash="#/gmach/"+encodeURIComponent(entry.id);return}
       if(entry.type==="category"){
         const category=document.getElementById("category-filter"),form=document.getElementById("search-form");
