@@ -47,16 +47,30 @@
   function itemSubcategoriesFor(category){
     const rows=Array.isArray(state.categoryCatalog)?state.categoryCatalog:[],parent=rows.find(row=>!row.parent_id&&(row.name_he===category||row.id===category));
     const dynamic=parent?rows.filter(row=>row.parent_id===parent.id).map(row=>row.name_he).filter(Boolean):[];
-    return dynamic.length?dynamic:(ITEM_SUBCATEGORIES[category]||[]);
+    return rows.length?dynamic:(ITEM_SUBCATEGORIES[category]||[]);
   }
   function populateItemCategorySelector(){
-    const select=$("#item-category");if(!select)return;
     const parents=(state.categoryCatalog||[]).filter(row=>!row.parent_id&&row.name_he);
     if(!parents.length)return;
-    const current=select.value;
-    select.innerHTML='<option value="">בחירה</option>'+parents.map(row=>'<option value="'+escapeHTML(row.name_he)+'">'+escapeHTML(row.name_he)+'</option>').join("");
-    if(current&&parents.some(row=>row.name_he===current))select.value=current;
+    const populate=(selector,emptyLabel)=>{
+      const select=$(selector);if(!select)return;
+      const current=select.value;
+      select.innerHTML='<option value="">'+emptyLabel+'</option>'+parents.map(row=>'<option value="'+escapeHTML(row.name_he)+'">'+escapeHTML(row.name_he)+'</option>').join("");
+      if(current&&parents.some(row=>row.name_he===current))select.value=current;
+    };
+    populate("#item-category","בחירה");
+    populate("#gmach-category","בחירה");
+    populate("#category-filter","כל הקטגוריות");
+    populate("#hero-category-filter","כל הקטגוריות");
+    populate("#help-category","לא בטוח/ה");
+    const rail=$("#category-rail");
+    if(rail){
+      const active=state.activeCategory;
+      rail.innerHTML='<button class="category-card '+(!active?'is-active':'')+'" type="button" data-category="" role="listitem"><span class="category-icon category-all" aria-hidden="true">◫</span><strong>הכול</strong><small>כל מה שזמין</small></button>'+parents.map(row=>'<button class="category-card '+(active===row.name_he?'is-active':'')+'" type="button" data-category="'+escapeHTML(row.name_he)+'" role="listitem"><span class="category-icon" aria-hidden="true">◇</span><strong>'+escapeHTML(row.name_he)+'</strong><small>'+escapeHTML((row.name_en||"").trim())+'</small></button>').join("");
+      bindCategoryRailButtons();
+    }
     updateItemSubcategories();
+    updateCatalogSubcategories();
   }
   function updateItemSubcategories(selected=""){
     const select=$("#item-subcategory");if(!select)return;
@@ -72,7 +86,18 @@
     select.innerHTML='<option value="">'+(category?(options.length?"כל קטגוריות המשנה":"אין קטגוריות משנה זמינות"):"בחרו קודם קטגוריה")+'</option>'+options.map(value=>'<option value="'+escapeHTML(value)+'">'+escapeHTML(value)+'</option>').join("");
     if(selected&&options.includes(selected))select.value=selected;
   }
-  function setGmachHoursMode(byAppointment){
+  function bindCategoryRailButtons(){
+    $("[data-category]").forEach(button=>button.onclick=()=>{
+      state.activeCategory=button.dataset.category||"";
+      $("#category-filter").value=state.activeCategory;
+      $("#hero-category-filter").value=state.activeCategory;
+      updateCatalogSubcategories();
+      $("[data-category]").forEach(other=>other.classList.toggle("is-active",other===button));
+      applyFilters();
+      $("#catalog")?.scrollIntoView({behavior:"smooth",block:"start"});
+    });
+  }
+    function setGmachHoursMode(byAppointment){
     const toggle=$("#gmach-hours-by-appointment"),grid=$("#gmach-hours-grid");if(!toggle||!grid)return;
     toggle.checked=Boolean(byAppointment);grid.hidden=Boolean(byAppointment);
     $$("[data-hours-day]",grid).forEach(day=>{day.disabled=Boolean(byAppointment)});
@@ -266,6 +291,7 @@
       renderDiscovery();
     }catch(error){console.warn("Category aliases unavailable",error)}
   }
+  window.addEventListener("gmach:categories-changed",()=>loadCategoryAliases());
   function installAdvancedGmachSearch(){
     const section=$("#gmachim"),heading=section?.querySelector(".section-heading");
     if(!heading||$("#advanced-gmach-search"))return;
