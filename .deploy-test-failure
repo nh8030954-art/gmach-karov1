@@ -1,38 +1,16 @@
-deploy_sha=d7e2cbe6f7a8b258132fc1515f55e2ceb912a3b6
+deploy_sha=333ba0af5a51b2236bd4cdf70f90b2f2f11c4de1
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
 > node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
 
 Final completion static release gate passed.
-Requirements expansion static release gate passed.
-Launch readiness static release gate passed.
-Distribution completion static release gate passed.
-Navigation admin static release gate passed.
-Privacy availability static release gate passed.
-Release hardening static gate passed.
-Release experience static release gate passed.
-Admin control center static release gate passed.
-Privacy purge static release gate passed.
-Community chat retention static release gate passed.
-QR scanning, structured SEO and accessibility shell gate passed.
-Excel export and QR image scanner gate passed.
-Voice message recording gate passed.
-Excel export, accessible admin status and QR image scanning gate passed.
-Full requirements regression extensions passed.
-Static English interface coverage 100.0% (451/451)
-remaining-features Error: Backup checksum mismatch
-    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
-    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:336:91)
-    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:731:37)
-    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:222:26)
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: Invites to unregistered recipients include both languages
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:284:10
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+AssertionError [ERR_ASSERTION]: single-element selector used as collection
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:142:83 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
