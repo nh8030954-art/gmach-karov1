@@ -454,14 +454,22 @@
     if(v%60===0)return (v/60)+" "+(en?"hours":"שעות");
     return v+" "+(en?"minutes":"דקות");
   }
+  function itemPolicyLoanDuration(v) {
+    const en=document.documentElement.lang==="en";v=Math.max(0,Number(v||0));
+    if(!v)return en?"None":"ללא";
+    const days=Math.floor(v/1440),hours=(v%1440)/60,parts=[];
+    if(days)parts.push(days+" "+(en?(days===1?"day":"days"):"ימים"));
+    if(hours)parts.push((Number.isInteger(hours)?hours:Number(hours.toFixed(1)))+" "+(en?"hours":"שעות"));
+    return parts.join(" + ") || (en?"less than an hour":"פחות משעה");
+  }
   function itemPolicyMoney(v) {
     return (Number(v||0)/100).toLocaleString(document.documentElement.lang==="en"?"en-IL":"he-IL",{style:"currency",currency:"ILS"});
   }
   function itemPolicyHTML(item) {
     const en=document.documentElement.lang==="en",t=(he,enText)=>en?enText:he;
     const timingRows=[
-      [t("משך מינימלי","Minimum duration"),itemPolicyMinutes(item.minLoanMinutes)],
-      [t("משך מרבי","Maximum duration"),itemPolicyMinutes(item.maxLoanMinutes)],
+      [t("משך מינימלי","Minimum duration"),itemPolicyLoanDuration(item.minLoanMinutes)],
+      [t("משך מרבי","Maximum duration"),itemPolicyLoanDuration(item.maxLoanMinutes)],
       [t("הזמנה מראש","Advance notice"),itemPolicyMinutes(item.bookingNoticeMinutes)],
       [t("זמן הכנה","Preparation time"),itemPolicyMinutes(item.preparationMinutes)],
       [t("זמן בין השאלות","Turnaround time"),itemPolicyMinutes(item.turnaroundMinutes)],
@@ -477,7 +485,7 @@
     const emptyValues=new Set([t("ללא","None"),t("ללא מגבלה נוספת","No additional limit"),t("לא הוגדר","Not set")]);
     const renderRows=rows=>rows.map(([label,value])=>'<div class="loan-policy-row"><span>'+escapeHTML(label)+'</span><strong class="'+(emptyValues.has(String(value))?'is-muted':'')+'">'+escapeHTML(value)+'</strong></div>').join("");
     const horizon=Number(item.bookingHorizonDays||0)+" "+t("ימים","days");
-    const summary=[[t("עד","Up to"),itemPolicyMinutes(item.maxLoanMinutes)],[t("אישור","Approval"),approval],[t("הזמנה עד","Book up to"),horizon]];
+    const summary=[[t("עד","Up to"),itemPolicyLoanDuration(item.maxLoanMinutes)],[t("אישור","Approval"),approval],[t("הזמנה עד","Book up to"),horizon]];
     if(item.depositRequired)summary.push([t("פיקדון","Deposit"),itemPolicyMoney(item.depositAmountAgorot)]);
     return '<section class="organization-facts" data-release-policy="1"><section class="loan-policy-panel" style="grid-column:1/-1"><div class="loan-policy-heading"><div><span class="loan-policy-kicker">'+t("מידע חשוב לפני שמבקשים","Important before requesting")+'</span><h3>'+t("תנאי השאלה וזמינות","Loan terms and availability")+'</h3></div></div><div class="loan-policy-summary">'+summary.map(([label,value])=>'<span class="loan-policy-chip"><small>'+escapeHTML(label)+'</small><strong>'+escapeHTML(value)+'</strong></span>').join("")+'</div><div class="loan-policy-groups"><section class="loan-policy-group"><h4>'+t("זמנים","Timing")+'</h4>'+renderRows(timingRows)+'</section><section class="loan-policy-group"><h4>'+t("כללי בקשה","Request rules")+'</h4>'+renderRows(ruleRows)+'</section></div>'+(item.depositRequired?'<div class="loan-policy-deposit"><span>'+t("פיקדון","Deposit")+'</span><strong>'+escapeHTML(itemPolicyMoney(item.depositAmountAgorot))+'</strong><small>'+t("הפיקדון אינו תשלום עבור ההשאלה.","The deposit is not a fee for the loan.")+'</small></div>':'')+(item.loan_conditions?'<div class="loan-policy-notes"><strong>'+t("תנאים נוספים","Additional terms")+'</strong><p>'+escapeHTML(item.loan_conditions)+'</p></div>':'')+'</section></section>';
   }
@@ -661,10 +669,11 @@
     });
   }
   function setLoanDuration(field, minutes) {
-    const value = Math.max(1, Number(minutes) || 1);
+    const value = Math.max(30, Number(minutes) || 60);
     const unit = $("#" + field + "-unit");
-    unit.value = value % 1440 === 0 ? "1440" : value % 60 === 0 ? "60" : "1";
-    $("#" + field).value = value / Number(unit.value);
+    const useDays=value>=1440 && value%1440===0;
+    unit.value = useDays ? "1440" : "60";
+    $("#" + field).value = Number((value / Number(unit.value)).toFixed(2));
   }
   function loanDurationMinutes(field) {
     return Number($("#" + field).value) * Number($("#" + field + "-unit").value);
@@ -767,7 +776,7 @@
     $("#notification-preferences-form").addEventListener("submit", async event => { event.preventDefault(); const form = event.currentTarget; const rows = types.map(t => ({type:t.key,inApp:Boolean(form.querySelector(`[data-pref="${t.key}"][data-channel="inApp"]`)?.checked),email:Boolean(form.querySelector(`[data-pref="${t.key}"][data-channel="email"]`)?.checked),push:Boolean(form.querySelector(`[data-pref="${t.key}"][data-channel="push"]`)?.checked),digest:form.querySelector(`[data-pref="${t.key}"][data-channel="digest"]`)?.value||"immediate",quietStart:form.querySelector(`[data-pref="${t.key}"][data-channel="quietStart"]`)?.value||null,quietEnd:form.querySelector(`[data-pref="${t.key}"][data-channel="quietEnd"]`)?.value||null})); try { await api("/api/me/notification-preferences", {method:"PUT",body:{preferences:rows}}); toast("ההעדפות נשמרו"); } catch(e){toast(e.message,"error");} });
   }
   function calendarUrl(provider,title,start,end,details){const s=new Date(start).toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z"),e=new Date(end).toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z");if(provider==="google")return "https://calendar.google.com/calendar/render?action=TEMPLATE&text="+encodeURIComponent(title)+"&dates="+s+"/"+e+"&details="+encodeURIComponent(details||"");if(provider==="outlook")return "https://outlook.live.com/calendar/0/deeplink/compose?subject="+encodeURIComponent(title)+"&startdt="+encodeURIComponent(new Date(start).toISOString())+"&enddt="+encodeURIComponent(new Date(end).toISOString())+"&body="+encodeURIComponent(details||"");return null}
-  async function openCalendarMenu(requestId){const row=(state.dashboard?.requests||[]).find(x=>String(x.id)===String(requestId));if(!row)return;let d=$("#calendar-action-dialog");if(!d){d=document.createElement("dialog");d.id="calendar-action-dialog";d.className="modal";document.body.append(d)}const title=(row.items?.title||"השאלה")+" - גמ״ח ברגע",pickupEnd=new Date(new Date(row.requested_from).getTime()+30*60000).toISOString(),returnEnd=new Date(new Date(row.requested_until).getTime()+30*60000).toISOString(),gp=calendarUrl("google","איסוף: "+title,row.requested_from,pickupEnd,row.items?.organizations?.name||""),gr=calendarUrl("google","החזרה: "+title,row.requested_until,returnEnd,row.items?.organizations?.name||""),op=calendarUrl("outlook","איסוף: "+title,row.requested_from,pickupEnd,row.items?.organizations?.name||""),or=calendarUrl("outlook","החזרה: "+title,row.requested_until,returnEnd,row.items?.organizations?.name||"");d.innerHTML=`<button class="dialog-close" aria-label="סגירה">×</button><h2>הוספה ליומן</h2><p>בחרו יומן. אירועי האיסוף וההחזרה נשמרים בנפרד.</p><div class="dashboard-row-actions"><a class="button button-primary" target="_blank" rel="noopener" href="${escapeHTML(gp)}">Google - איסוף</a><a class="button button-primary" target="_blank" rel="noopener" href="${escapeHTML(gr)}">Google - החזרה</a><a class="button button-secondary" target="_blank" rel="noopener" href="${escapeHTML(op)}">Outlook - איסוף</a><a class="button button-secondary" target="_blank" rel="noopener" href="${escapeHTML(or)}">Outlook - החזרה</a><a class="button button-secondary" href="/api/loan-requests/${encodeURIComponent(requestId)}/calendar.ics" download>Apple / ICS - שני האירועים</a></div>`;$(".dialog-close",d).onclick=()=>closeDialog(d);openDialog(d)}
+  async function openCalendarMenu(requestId){const row=(state.dashboard?.requests||[]).find(x=>String(x.id)===String(requestId));if(!row){toast("לא הצלחנו למצוא את ההשאלה","error");return}if(!row.requested_from||!row.requested_until||Number.isNaN(Date.parse(row.requested_from))||Number.isNaN(Date.parse(row.requested_until))){toast("להשאלה הזו עדיין אין מועדי איסוף והחזרה תקינים","error");return}let d=$("#calendar-action-dialog");if(!d){d=document.createElement("dialog");d.id="calendar-action-dialog";d.className="modal";document.body.append(d)}const title=(row.items?.title||"השאלה")+" - גמ״ח ברגע",pickupEnd=new Date(new Date(row.requested_from).getTime()+30*60000).toISOString(),returnEnd=new Date(new Date(row.requested_until).getTime()+30*60000).toISOString(),gp=calendarUrl("google","איסוף: "+title,row.requested_from,pickupEnd,row.items?.organizations?.name||""),gr=calendarUrl("google","החזרה: "+title,row.requested_until,returnEnd,row.items?.organizations?.name||""),op=calendarUrl("outlook","איסוף: "+title,row.requested_from,pickupEnd,row.items?.organizations?.name||""),or=calendarUrl("outlook","החזרה: "+title,row.requested_until,returnEnd,row.items?.organizations?.name||"");d.innerHTML=`<button class="dialog-close" aria-label="סגירה">×</button><h2>הוספה ליומן</h2><p>בחרו יומן. אירועי האיסוף וההחזרה נשמרים בנפרד.</p><div class="dashboard-row-actions"><a class="button button-primary" target="_blank" rel="noopener" href="${escapeHTML(gp)}">Google - איסוף</a><a class="button button-primary" target="_blank" rel="noopener" href="${escapeHTML(gr)}">Google - החזרה</a><a class="button button-secondary" target="_blank" rel="noopener" href="${escapeHTML(op)}">Outlook - איסוף</a><a class="button button-secondary" target="_blank" rel="noopener" href="${escapeHTML(or)}">Outlook - החזרה</a><a class="button button-secondary" href="/api/loan-requests/${encodeURIComponent(requestId)}/calendar.ics" download>Apple / ICS - שני האירועים</a></div>`;$(".dialog-close",d).onclick=()=>closeDialog(d);openDialog(d)}
   function requestActions(row) {
     let actions = `<button class="button button-secondary button-small" data-open-chat="${escapeHTML(row.id)}">שיחה</button><button class="button button-secondary button-small" data-calendar-request="${escapeHTML(row.id)}">הוספה ליומן</button>`;
     if (row.direction === "incoming" && row.status === "pending") actions += `<button class="button button-primary button-small" data-request-decision="approved" data-request-id="${escapeHTML(row.id)}">אישור</button><button class="button button-secondary button-small" data-request-decision="declined" data-request-id="${escapeHTML(row.id)}">דחייה</button>`;
@@ -829,7 +838,7 @@
     $$("[data-pickup-expiry]").forEach(b=>b.onclick=async()=>{try{await api("/api/loan-requests/"+encodeURIComponent(b.dataset.requestId)+"/pickup-expiry/respond",{method:"POST",body:{action:b.dataset.pickupExpiry}});toast(b.dataset.pickupExpiry==="wait"?"נשלחה בקשה לתיאום איסוף חדש":"הבקשה בוטלה");await refreshAccountSnapshot();showDashboard("requests")}catch(e){toast(e.message,"error")}}); $$("[data-branch-proposal]").forEach(b=>b.addEventListener("click",()=>openBranchProposal(b.dataset.branchProposal)));
     $$('[data-extension-decision]').forEach(button=>button.addEventListener("click",async()=>{try{await api("/api/loan-requests/"+encodeURIComponent(button.dataset.requestId)+"/extension/respond",{method:"POST",body:{accept:button.dataset.extensionDecision==="approved"}});toast(button.dataset.extensionDecision==="approved"?"ההארכה אושרה":"ההארכה נדחתה");await refreshAccountSnapshot();showDashboard("requests")}catch(e){toast(e.message,"error")}}));
     $$('[data-extension-alternative]').forEach(button=>button.addEventListener("click",async()=>{const value=translatedPrompt("מועד החזרה חלופי, לדוגמה 2026-10-01T18:00");if(!value)return;try{await api("/api/loan-requests/"+encodeURIComponent(button.dataset.extensionAlternative)+"/extension/respond",{method:"POST",body:{accept:false,alternativeUntil:new Date(value).toISOString()}});toast("המועד החלופי נשלח");await refreshAccountSnapshot();showDashboard("requests")}catch(e){toast(e.message,"error")}}));
-    $$('[data-open-chat]').forEach(button => button.addEventListener("click", () => openChat(button.dataset.openChat))); $$('[data-loan-flow]').forEach(button=>button.addEventListener("click",()=>openLoanFlow(button.dataset.loanFlow,button.dataset.direction))); $$('[data-extension-request]').forEach(button=>button.addEventListener("click",()=>openExtensionRequest(button.dataset.extensionRequest)));
+    $('[data-open-chat]').forEach(button => button.addEventListener("click", () => openChat(button.dataset.openChat))); $('[data-calendar-request]').forEach(button=>button.addEventListener("click",()=>openCalendarMenu(button.dataset.calendarRequest))); $('[data-loan-flow]').forEach(button=>button.addEventListener("click",()=>openLoanFlow(button.dataset.loanFlow,button.dataset.direction))); $('[data-extension-request]').forEach(button=>button.addEventListener("click",()=>openExtensionRequest(button.dataset.extensionRequest)));
     $$('[data-review-request]').forEach(button => button.addEventListener("click", () => openReview(button.dataset.reviewRequest))); $("#dashboard-help-request")?.addEventListener("click",openHelpRequest); $$("[data-help-offers]").forEach(b=>b.addEventListener("click",()=>openHelpOffers(b.dataset.helpOffers))); $$("[data-help-matches]").forEach(b=>b.addEventListener("click",()=>openHelpMatches(b.dataset.helpMatches)));
   }
   async function openNearbyGmachs(){
