@@ -2995,15 +2995,24 @@ async function reconcileSerializedQuantity(env,itemId){
   return {quantity,tracked,reconciled:false};
 }
 
-function itemUnitPrefix(item){
-  const raw=String(item?.serial_prefix||item?.title||"GMH").replace(/[^A-Za-z0-9א-ת]/g,"").slice(0,8).toUpperCase();
-  return raw||"GMH";
+async function serialIdentityCodes(env,item){
+  await env.DB.prepare("INSERT OR IGNORE INTO organization_serial_codes(organization_id) VALUES(?)").bind(item.organization_id).run();
+  await env.DB.prepare("INSERT OR IGNORE INTO item_serial_codes(item_id,organization_id) VALUES(?,?)").bind(item.id,item.organization_id).run();
+  const [orgCode,itemCode]=await env.DB.batch([
+    env.DB.prepare("SELECT code FROM organization_serial_codes WHERE organization_id=?").bind(item.organization_id),
+    env.DB.prepare("SELECT code FROM item_serial_codes WHERE item_id=?").bind(item.id)
+  ]);
+  const org=orgCode.results?.[0]?.code,itemNo=itemCode.results?.[0]?.code;
+  if(!org||!itemNo)throw new Error("לא ניתן להקצות מזהה סידורי");
+  return {orgCode:Number(org),itemCode:Number(itemNo)};
 }
 async function createAutomaticItemUnit(env,item,condition){
-  const prefix=itemUnitPrefix(item);
+  const {orgCode,itemCode}=await serialIdentityCodes(env,item);
   let serial="";
   for(let attempt=0;attempt<20;attempt++){
-    serial=prefix+"-"+crypto.randomUUID().replaceAll("-","").slice(0,8).toUpperCase();
+    const existing=await env.DB.prepare("SELECT COUNT(*) AS count FROM item_units WHERE item_id=?").bind(item.id).first();
+    const unitNo=Number(existing?.count||0)+1+attempt;
+    serial=`GB-${orgCode}-${itemCode}-${unitNo}`;
     const exists=await env.DB.prepare("SELECT 1 FROM item_units WHERE serial_number=? UNION SELECT 1 FROM retired_serials WHERE serial_number=?").bind(serial,serial).first();
     if(!exists)break;
     serial="";
@@ -3014,7 +3023,7 @@ async function createAutomaticItemUnit(env,item,condition){
   return {id,serialNumber:serial};
 }
 async function syncItemUnitsToQuantity(env,itemId,desiredQuantity){
-  const item=await env.DB.prepare("SELECT id,title,serial_prefix,condition,condition_detail,quantity FROM items WHERE id=?").bind(itemId).first();
+  const item=await env.DB.prepare("SELECT id,organization_id,title,serial_prefix,condition,condition_detail,quantity FROM items WHERE id=?").bind(itemId).first();
   if(!item)throw new HttpError(404,"הפריט לא נמצא");
   const desired=Math.max(1,Number(desiredQuantity||item.quantity||1));
   const rows=await env.DB.prepare("SELECT id,serial_number,status FROM item_units WHERE item_id=? AND status!='retired' ORDER BY created_at,id").bind(itemId).all();
