@@ -1,4 +1,4 @@
-deploy_sha=d9642eea905d8d725c32177c872b63a966594cb5
+deploy_sha=3d6acc5b077fa02848757c057082dcbc9988bf70
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -30,16 +30,16 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+AssertionError [ERR_ASSERTION]: {"error":"אפשר להוסיף עד 1 מספרים סידוריים בלבד, בהתאם לכמות המלאי של הפריט","requestId":"179093897672034989"}
 
-2 !== 1
+409 !== 201
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:406:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:255:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
-  generatedMessage: true,
+  generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 2,
-  expected: 1,
+  actual: 409,
+  expected: 201,
   operator: 'strictEqual',
   diff: 'simple'
 }
