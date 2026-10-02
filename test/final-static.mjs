@@ -464,3 +464,8 @@ assert.ok(adminControlClient.includes("CURRENT — "),"CURRENT backup slot missi
 assert.ok(adminControlClient.includes("PREVIOUS — "),"PREVIOUS backup slot missing");
 assert.ok(adminControlClient.includes("/api/admin/backups/archive/"),"backup download route missing from UI");
 assert.ok(appClient.includes("refreshUser(hydrate=true)"),"lightweight auth bootstrap missing");
+
+const emailWorkerSource=await readFile("worker/index.js","utf8");
+assert.ok(emailWorkerSource.includes('גמ״ח ברגע <no-reply@gmach-berega.co.il>'),"verified no-reply sender fallback missing");
+assert.ok(!/reply_to\s*:/.test(emailWorkerSource),"personal support email must never be exposed as Reply-To");
+assert.ok(!emailWorkerSource.includes("netanelhirsh@gmail.com"),"personal email must not be hardcoded in the worker");
