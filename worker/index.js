@@ -331,7 +331,7 @@ export default {
         }
         const publicSnapshotPolicy = request.method === "GET" ? ({
           "/api/items": { fresh:30, stale:86400 },
-          "/api/categories": { fresh:1800, stale:86400 },
+          "/api/categories": { fresh:0, stale:86400 },
           "/api/discovery": { fresh:60, stale:86400 }
         })[url.pathname] : null;
         if (publicSnapshotPolicy && typeof caches !== "undefined") {
@@ -875,6 +875,7 @@ async function routeApi(request, env, ctx, url) {
   if (method === "POST" && path === "/api/admin/categories") return createAdminCategory(request, env);
   const adminCategory = path.match(/^\/api\/admin\/categories\/([^/]+)$/);
   if (method === "PATCH" && adminCategory) return updateAdminCategory(request, env, decodeURIComponent(adminCategory[1]));
+  if (method === "DELETE" && adminCategory) return deleteAdminCategory(request, env, decodeURIComponent(adminCategory[1]), url);
   if (method === "GET" && path === "/api/admin/closures") return adminClosures(request, env);
   if (method === "POST" && path === "/api/admin/closures") return createAdminClosure(request, env);
   const adminClosure = path.match(/^\/api\/admin\/closures\/([^/]+)$/);
@@ -1347,9 +1348,16 @@ async function updateAdminCategory(request,env,id){
   const user=await requireAdmin(request,env),body=await readJson(request);
   const current=await env.DB.prepare("SELECT * FROM categories WHERE id=?").bind(id).first();
   if(!current)throw new HttpError(404,"הקטגוריה לא נמצאה");
+  const oldParent=current.parent_id?await env.DB.prepare("SELECT id,name_he FROM categories WHERE id=?").bind(current.parent_id).first():null;
   const parentId=body.parentId===undefined?current.parent_id:cleanOptional(body.parentId,80);
   if(parentId===id)throw new HttpError(400,"קטגוריה לא יכולה להיות קטגוריית אב של עצמה");
-  if(parentId){const parent=await env.DB.prepare("SELECT id FROM categories WHERE id=?").bind(parentId).first();if(!parent)throw new HttpError(400,"קטגוריית האב אינה קיימת");}
+  const newParent=parentId?await env.DB.prepare("SELECT id,parent_id,name_he FROM categories WHERE id=?").bind(parentId).first():null;
+  if(parentId&&!newParent)throw new HttpError(400,"קטגוריית האב אינה קיימת");
+  if(newParent?.parent_id)throw new HttpError(400,"ניתן לשייך קטגוריית משנה רק לקטגוריה ראשית");
+  if(!current.parent_id&&parentId){
+    const children=await env.DB.prepare("SELECT COUNT(*) AS count FROM categories WHERE parent_id=?").bind(id).first();
+    if(Number(children?.count||0)>0)throw new HttpError(409,"לא ניתן להפוך קטגוריה ראשית עם קטגוריות משנה לקטגוריית משנה");
+  }
   const status=["active","hidden"].includes(body.status)?body.status:current.status;
   const nameHe=body.nameHe===undefined?current.name_he:cleanText(body.nameHe,2,80,"שם הקטגוריה");
   const nameEn=body.nameEn===undefined?current.name_en:cleanOptional(body.nameEn,80);
@@ -1357,11 +1365,45 @@ async function updateAdminCategory(request,env,id){
   const imageUrl=body.imageUrl===undefined?current.image_url:validateAssetUrl(body.imageUrl);
   const synonyms=Array.isArray(body.synonyms)?body.synonyms.slice(0,50).map(x=>String(x).trim()).filter(Boolean):parseJsonArray(current.synonyms_json);
   const sortOrder=body.sortOrder===undefined?current.sort_order:Math.max(0,Math.min(9999,Number(body.sortOrder)||0));
-  await env.DB.batch([
-    env.DB.prepare("UPDATE categories SET parent_id=?,name_he=?,name_en=?,icon=?,image_url=?,synonyms_json=?,status=?,sort_order=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(parentId,nameHe,nameEn,icon,imageUrl,JSON.stringify(synonyms),status,sortOrder,id),
-    auditStatement(env,user.id,"category.update","category",id,{nameHe,parentId,status,sortOrder})
-  ]);
+  const statements=[
+    env.DB.prepare("UPDATE categories SET parent_id=?,name_he=?,name_en=?,icon=?,image_url=?,synonyms_json=?,status=?,sort_order=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(parentId,nameHe,nameEn,icon,imageUrl,JSON.stringify(synonyms),status,sortOrder,id)
+  ];
+  if(current.parent_id){
+    const oldParentName=oldParent?.name_he||"",newParentName=newParent?.name_he||oldParentName;
+    statements.push(env.DB.prepare("UPDATE items SET category=?,subcategory=?,updated_at=CURRENT_TIMESTAMP WHERE category=? AND subcategory=?").bind(newParentName,nameHe,oldParentName,current.name_he));
+  }else if(nameHe!==current.name_he){
+    statements.push(env.DB.prepare("UPDATE items SET category=?,updated_at=CURRENT_TIMESTAMP WHERE category=?").bind(nameHe,current.name_he));
+  }
+  statements.push(auditStatement(env,user.id,"category.update","category",id,{oldNameHe:current.name_he,nameHe,oldParentId:current.parent_id,parentId,status,sortOrder}));
+  await env.DB.batch(statements);
   return json({category:{id,nameHe,nameEn,parentId,status,sortOrder}});
+}
+
+async function deleteAdminCategory(request,env,id,url){
+  const user=await requireAdmin(request,env);
+  const current=await env.DB.prepare("SELECT * FROM categories WHERE id=?").bind(id).first();
+  if(!current)throw new HttpError(404,"הקטגוריה לא נמצאה");
+  const replacementId=cleanOptional(url.searchParams.get("replacementId"),80);
+  const statements=[];
+  if(current.parent_id){
+    const parent=await env.DB.prepare("SELECT name_he FROM categories WHERE id=?").bind(current.parent_id).first();
+    statements.push(env.DB.prepare("UPDATE items SET subcategory=NULL,updated_at=CURRENT_TIMESTAMP WHERE category=? AND subcategory=?").bind(parent?.name_he||"",current.name_he));
+  }else{
+    const children=await env.DB.prepare("SELECT COUNT(*) AS count FROM categories WHERE parent_id=?").bind(id).first();
+    const usage=await env.DB.prepare("SELECT COUNT(*) AS count FROM items WHERE category=? AND status!='archived'").bind(current.name_he).first();
+    if(Number(children?.count||0)>0||Number(usage?.count||0)>0){
+      if(!replacementId)throw new HttpError(409,"הקטגוריה בשימוש. בחרו קטגוריה ראשית חלופית כדי להעביר אליה את הפריטים וקטגוריות המשנה");
+      if(replacementId===id)throw new HttpError(400,"קטגוריה חלופית חייבת להיות שונה");
+      const replacement=await env.DB.prepare("SELECT id,name_he,parent_id,status FROM categories WHERE id=?").bind(replacementId).first();
+      if(!replacement||replacement.parent_id)throw new HttpError(400,"הקטגוריה החלופית חייבת להיות קטגוריה ראשית");
+      statements.push(env.DB.prepare("UPDATE items SET category=?,updated_at=CURRENT_TIMESTAMP WHERE category=?").bind(replacement.name_he,current.name_he));
+      statements.push(env.DB.prepare("UPDATE categories SET parent_id=?,updated_at=CURRENT_TIMESTAMP WHERE parent_id=?").bind(replacement.id,id));
+    }
+  }
+  statements.push(auditStatement(env,user.id,"category.delete","category",id,{nameHe:current.name_he,parentId:current.parent_id,replacementId}));
+  statements.push(env.DB.prepare("DELETE FROM categories WHERE id=?").bind(id));
+  await env.DB.batch(statements);
+  return json({ok:true,id,replacementId});
 }
 
 async function adminClosures(request,env){
