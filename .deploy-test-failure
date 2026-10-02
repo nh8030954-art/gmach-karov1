@@ -1,4 +1,4 @@
-deploy_sha=2029ec4ca1b08043c1fd7c446fce5b9f5a6a7e42
+deploy_sha=37911c1f1e3353329592e6f38bb0375678384fd4
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -10,7 +10,7 @@ node:internal/modules/run_main:107
     ^
 
 AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:146:83 {
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:147:83 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
