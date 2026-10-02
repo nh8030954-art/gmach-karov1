@@ -39,7 +39,8 @@ async function imageEdits(request,env,itemId){
  return json({ok:true,images:ordered});
 }
 async function availabilityCalendar(request,env,itemId,url){
- const item=await env.DB.prepare("SELECT id,quantity,preparation_minutes,turnaround_minutes,booking_horizon_days,max_per_user FROM items WHERE id=? AND deleted_at IS NULL").bind(itemId).first();if(!item)throw new RemainingError(404,"הפריט לא נמצא");
+ const item=await env.DB.prepare("SELECT id,quantity,preparation_minutes,turnaround_minutes,booking_horizon_days,max_per_user,(SELECT COUNT(*) FROM item_units u WHERE u.item_id=items.id AND u.status!='retired') AS active_unit_count FROM items WHERE id=? AND deleted_at IS NULL").bind(itemId).first();if(!item)throw new RemainingError(404,"הפריט לא נמצא");
+ const totalQuantity=Number(item.active_unit_count||0)>0?Number(item.active_unit_count):Number(item.quantity||0);
  const days=Math.max(7,Math.min(120,Number(url.searchParams.get("days"))||45)),start=url.searchParams.get("from")?new Date(url.searchParams.get("from")):new Date();if(Number.isNaN(start.getTime()))throw new RemainingError(400,"תאריך לא תקין");
  const first=new Date(start);first.setUTCHours(0,0,0,0);
  const last=new Date(first.getTime()+days*86400000);
@@ -52,9 +53,9 @@ async function availabilityCalendar(request,env,itemId,url){
    const a=new Date(first.getTime()+i*86400000),z=new Date(a.getTime()+86400000);
    const reserved=requests.results.reduce((sum,r)=>sum+(r.requested_from<z.toISOString()&&r.requested_until>a.toISOString()?Number(r.quantity||0):0),0);
    const unavailable=blocks.results.reduce((sum,b)=>sum+(b.starts_at<z.toISOString()&&b.ends_at>a.toISOString()?Number(b.quantity||0):0),0);
-   const available=Math.max(0,Number(item.quantity||0)-reserved-unavailable);const rec={date:dayKey(a),available,blocked:unavailable>0};out.push(rec);if(!nearest&&available>0)nearest=rec.date;
+   const available=Math.max(0,totalQuantity-reserved-unavailable);const rec={date:dayKey(a),available,blocked:unavailable>0};out.push(rec);if(!nearest&&available>0)nearest=rec.date;
  }
- return json({itemId,days:out,busyIntervals:[...requests.results.map(row=>({from:row.requested_from,until:row.requested_until,quantity:Number(row.quantity||1),type:"loan"})),...blocks.results.map(row=>({from:row.starts_at,until:row.ends_at,quantity:Number(row.quantity||1),type:"block"}))],totalQuantity:Number(item.quantity||0),nearestAvailableDate:nearest,maxPerUser:item.max_per_user||item.quantity,preparationMinutes:item.preparation_minutes||0,turnaroundMinutes:item.turnaround_minutes||0});
+ return json({itemId,days:out,busyIntervals:[...requests.results.map(row=>({from:row.requested_from,until:row.requested_until,quantity:Number(row.quantity||1),type:"loan"})),...blocks.results.map(row=>({from:row.starts_at,until:row.ends_at,quantity:Number(row.quantity||1),type:"block"}))],totalQuantity,nearestAvailableDate:nearest,maxPerUser:item.max_per_user||totalQuantity,preparationMinutes:item.preparation_minutes||0,turnaroundMinutes:item.turnaround_minutes||0});
 }
 async function similarItems(env,itemId,url){
  const item=await env.DB.prepare("SELECT id,category,city,title FROM items WHERE id=?").bind(itemId).first();if(!item)throw new RemainingError(404,"הפריט לא נמצא");
