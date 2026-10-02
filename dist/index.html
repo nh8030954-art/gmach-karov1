@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
   <meta charset="utf-8">
-  <script>try{if("scrollRestoration" in history)history.scrollRestoration="manual";if((location.pathname||"/")==="/"&&!location.hash)scrollTo(0,0)}catch{}</script>
+  <script>try{if("scrollRestoration" in history)history.scrollRestoration="manual";if((location.pathname||"/")==="/"&&!location.hash)scrollTo(0,0);if((location.pathname||"/")==="/dashboard")document.documentElement.classList.add("route-dashboard-boot")}catch{}</script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#243f75">
   <meta name="description" content="גמ״ח ברגע — מוצאים ומשאילים ציוד בחינם, קרוב לבית.">
@@ -51,6 +51,9 @@
   .category-rail.carousel-ready .category-icon{width:54px!important;height:54px!important}
   .category-rail.carousel-ready .category-icon svg{width:28px!important;height:28px!important}
   @media(max-width:760px){.category-rail.carousel-ready{gap:12px;padding-bottom:4px}.category-rail.carousel-ready .category-card{flex-basis:168px!important;width:168px!important;min-width:168px!important}}
+</style>
+<style id="route-boot-stability">
+  .route-dashboard-boot #main-content{visibility:hidden;min-height:78vh}
 </style>
 </head>
 <body>
