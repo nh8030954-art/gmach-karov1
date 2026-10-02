@@ -1,4 +1,4 @@
-deploy_sha=5201ac1b6deff713fd0c07f545e325f2f1976030
+deploy_sha=c2799656ad7680dd15c3891c65723ed8141f10b1
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -20,27 +20,17 @@ Excel export and QR image scanner gate passed.
 Voice message recording gate passed.
 Excel export, accessible admin status and QR image scanning gate passed.
 Full requirements regression extensions passed.
-Static English interface coverage 100.0% (461/461)
-remaining-features Error: Backup checksum mismatch
-    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
-    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:336:91)
-    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:905:37)
-    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:380:26)
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-
-2 !== 1
-
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:408:10
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
-  generatedMessage: true,
+AssertionError [ERR_ASSERTION]: pickup unit endpoint implementation missing
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:503:8 {
+  generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 2,
-  expected: 1,
-  operator: 'strictEqual',
+  actual: false,
+  expected: true,
+  operator: '==',
   diff: 'simple'
 }
 
