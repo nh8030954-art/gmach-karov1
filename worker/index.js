@@ -707,7 +707,8 @@ async function routeApi(request, env, ctx, url) {
     return json({ user: user ? publicUser(user) : null });
   }
   if (method === "GET" && path === "/api/public-config") return json({ supportEmail: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL), pushPublicKey: String(env.VAPID_PUBLIC_KEY || "") });
-  if (method === "POST" && path === "/api/client-errors") return recordClientIncident(request,env);\n  if (method === "GET" && path === "/api/me/calendar-feed") return myCalendarFeed(request,env);
+  if (method === "POST" && path === "/api/client-errors") return recordClientIncident(request,env);
+  if (method === "GET" && path === "/api/me/calendar-feed") return myCalendarFeed(request,env);
   const calendarFeed=path.match(/^\/calendar\/([A-Za-z0-9_-]{20,})\.ics$/); if(method==="GET"&&calendarFeed)return publicCalendarFeed(env,calendarFeed[1]);
   if (method === "GET" && path === "/api/unsubscribe/community") return unsubscribeCommunity(env,url.searchParams.get("token"));
   if (method === "GET" && path === "/api/categories") return listCategories(env, url);
