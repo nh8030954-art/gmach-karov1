@@ -1100,7 +1100,7 @@
     requireAuth(async () => { stopChatPolling(); state.chatRequestId = requestId; $("#chat-form").dataset.requestId=String(requestId); $("#chat-messages").innerHTML = '<div class="skeleton-card" aria-hidden="true"></div>'; openDialog($("#chat-dialog")); await loadChatMessages(); state.chatTimer = window.setInterval(() => loadChatMessages(true), 5000); });
   }
   function openReport(itemId) { requireAuth(() => { closeDialog($("#item-dialog")); $("#report-form").reset(); $("#report-item-id").value = itemId; openDialog($("#report-dialog")); }); }
-  function showHome() { $("#organization-page-view").hidden = true; $("#dashboard-view").hidden = true; $("#home-view").hidden = false; history.replaceState(null, "", "#/"); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  function showHome() { $("#organization-page-view").hidden = true; $("#dashboard-view").hidden = true; $("#home-view").hidden = false; history.replaceState(null, "", location.pathname === "/" ? "/" : location.pathname); window.scrollTo({ top: 0, behavior: "smooth" }); }
   function setResultsView(mode) { state.viewMode=mode === "map" ? "map" : "list"; $("#items-grid").hidden=state.viewMode === "map" || !state.filteredItems.length; $("#map-results").hidden=state.viewMode !== "map" || !state.filteredItems.length; $("#list-view-button").classList.toggle("is-active",state.viewMode==="list"); $("#map-view-button").classList.toggle("is-active",state.viewMode==="map"); }
   function openHelpRequest() { requireAuth(() => { $("#help-request-form").reset(); $("#help-city").value=$("#city-filter").value; $("#help-title").value=$("#search-input").value; openDialog($("#help-request-dialog")); }); }
   async function openCommunityBoard(page=1,focusId=null){
@@ -1246,7 +1246,7 @@
     const publicReady=Promise.allSettled([loadPublicConfig(),loadDiscovery(),loadCategoryAliases(),loadItems()]);
     const connectionReady=detectServer();
     const authReady=refreshUser(false);
-    const hash=location.hash||"#/";
+    const hash=location.hash||"";
     if(hash==="#/dashboard"){
       $("#home-view").hidden=true;$("#organization-page-view").hidden=true;$("#dashboard-view").hidden=false;
       $("#dashboard-content").innerHTML='<div class="skeleton-card" aria-hidden="true"></div>';
