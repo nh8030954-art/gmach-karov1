@@ -1,0 +1,40 @@
+name: Production inventory audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/production-inventory-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Audit production inventory and loan lifecycle
+        run: |
+          echo '=== GMACH CODES ==='
+          npx wrangler d1 execute DB --remote --json --command "SELECT MIN(code) AS min_code,MAX(code) AS max_code,COUNT(*) AS organizations,COUNT(DISTINCT code) AS distinct_codes FROM organization_serial_codes;"
+          npx wrangler d1 execute DB --remote --json --command "SELECT osc.code,o.name FROM organization_serial_codes osc JOIN organizations o ON o.id=osc.organization_id ORDER BY osc.code LIMIT 20;"
+          echo '=== SERIAL INTEGRITY ==='
+          npx wrangler d1 execute DB --remote --json --command "SELECT COUNT(*) AS duplicate_serial_groups FROM (SELECT serial_number FROM item_units GROUP BY serial_number HAVING COUNT(*)>1);"
+          npx wrangler d1 execute DB --remote --json --command "SELECT COUNT(*) AS quantity_mismatches FROM items i WHERE i.status!='archived' AND i.deleted_at IS NULL AND i.quantity!=(SELECT COUNT(*) FROM item_units u WHERE u.item_id=i.id AND u.status!='retired');"
+          echo '=== BRANCH INTEGRITY ==='
+          npx wrangler d1 execute DB --remote --json --command "SELECT COUNT(*) AS invalid_unit_branch_links FROM item_units u JOIN items i ON i.id=u.item_id JOIN organization_branches b ON b.id=u.branch_id WHERE u.branch_id IS NOT NULL AND b.organization_id!=i.organization_id;"
+          npx wrangler d1 execute DB --remote --json --command "SELECT COUNT(*) AS active_branches FROM organization_branches WHERE status='active';"
+          echo '=== LOAN UNIT INTEGRITY ==='
+          npx wrangler d1 execute DB --remote --json --command "SELECT COUNT(*) AS wrong_item_assignments FROM loan_unit_assignments a JOIN loan_requests lr ON lr.id=a.request_id JOIN item_units u ON u.id=a.unit_id WHERE lr.item_id!=u.item_id;"
+          npx wrangler d1 execute DB --remote --json --command "SELECT COUNT(*) AS approved_assignment_status_mismatches FROM loan_unit_assignments a JOIN loan_requests lr ON lr.id=a.request_id JOIN item_units u ON u.id=a.unit_id WHERE a.returned_at IS NULL AND lr.status='approved' AND u.status!='held';"
+          npx wrangler d1 execute DB --remote --json --command "SELECT COUNT(*) AS collected_assignment_status_mismatches FROM loan_unit_assignments a JOIN loan_requests lr ON lr.id=a.request_id JOIN item_units u ON u.id=a.unit_id WHERE a.returned_at IS NULL AND lr.status='collected' AND u.status!='loaned';"
+          npx wrangler d1 execute DB --remote --json --command "SELECT COUNT(*) AS returned_open_assignments FROM loan_unit_assignments a JOIN loan_requests lr ON lr.id=a.request_id WHERE lr.status='returned' AND a.returned_at IS NULL;"
