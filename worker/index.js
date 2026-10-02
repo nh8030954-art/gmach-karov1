@@ -158,10 +158,16 @@ const ITEM_SUBCATEGORIES = Object.freeze({
     "אחר"
   ]
 });
-function fixedSubcategory(category,value,legacyValue=null){
+async function fixedSubcategory(env,category,value,legacyValue=null){
   const sub=cleanOptional(value,80);if(!sub)return null;
+  if(sub===legacyValue)return sub;
+  const parent=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND parent_id IS NULL AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
+  if(parent){
+    const child=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND parent_id=? AND (name_he=? OR id=?) LIMIT 1").bind(parent.id,sub,sub).first();
+    if(child)return sub;
+  }
   const allowed=ITEM_SUBCATEGORIES[category]||[];
-  if(allowed.includes(sub)||sub===legacyValue)return sub;
+  if(allowed.includes(sub))return sub;
   throw new HttpError(400,"יש לבחור קטגוריית משנה מתוך הרשימה המתאימה לקטגוריה הראשית");
 }
 const CONDITIONS = new Set(["כמו חדש", "מצוין", "טוב"]);
@@ -1890,8 +1896,7 @@ async function createItem(request, env) {
   const minLoanMinutes=positiveInt(body.minLoanMinutes,60,1,525600,"משך מינימלי");
   const maxLoanMinutes=positiveInt(body.maxLoanMinutes,10080,1,525600,"משך מקסימלי");
   if(maxLoanMinutes<minLoanMinutes) throw new HttpError(400,"משך ההשאלה המקסימלי חייב להיות גדול או שווה למינימלי");
-  const id = crypto.randomUUID();
-  await env.DB.prepare(`
+  const subcategory=await fixedSubcategory(env,category,body.subcategory);\n  const id = crypto.randomUUID();\n  await env.DB.prepare(`
     INSERT INTO items (id,organization_id,title,category,description,condition,condition_detail,quantity,loan_conditions,city,neighborhood,item_type,subcategory,tags_json,pickup_method,inventory_updated_at,
       min_loan_minutes,max_loan_minutes,booking_notice_minutes,turnaround_minutes,booking_horizon_days,approval_mode,deposit_required,deposit_amount_agorot,
       publish_at,max_per_user,preparation_minutes,max_loan_days,service_radius_km,status,availability_status,is_free,icon,cover_color)
@@ -1908,7 +1913,7 @@ async function createItem(request, env) {
     cleanOptional(body.loanConditions, 300),
     organization.city,
     organization.neighborhood,
-    sanitizeItemType(body.itemType), fixedSubcategory(category,body.subcategory), JSON.stringify(sanitizeTags(body.tags)), sanitizePickupMethod(body.pickupMethod), new Date().toISOString(),
+    sanitizeItemType(body.itemType), subcategory, JSON.stringify(sanitizeTags(body.tags)), sanitizePickupMethod(body.pickupMethod), new Date().toISOString(),
     minLoanMinutes, maxLoanMinutes,
     positiveInt(body.bookingNoticeMinutes,0,0,525600,"זמן התראה"), positiveInt(body.turnaroundMinutes,0,0,10080,"זמן התארגנות"),
     positiveInt(body.bookingHorizonDays,365,1,1095,"טווח הזמנה"), body.approvalMode==="automatic"?"automatic":"manual",
@@ -1961,11 +1966,10 @@ async function updateItem(request, env, id) {
     const removable=await env.DB.prepare("SELECT COUNT(*) AS count FROM item_units u WHERE u.item_id=? AND u.status='available' AND NOT EXISTS(SELECT 1 FROM loan_unit_assignments a WHERE a.unit_id=u.id AND a.returned_at IS NULL)").bind(id).first();
     if(Number(existingUnits.count)-quantity>Number(removable?.count||0))throw new HttpError(409,"אי אפשר להקטין את הכמות כרגע כי חלק מהיחידות מושאלות או מוקצות לבקשה פעילה");
   }
-  const values = {
-    title: cleanText(body.title, 2, 120, "שם הפריט"),
+  const subcategory=await fixedSubcategory(env,category,body.subcategory,existing.subcategory||null);\n  const values = {\n    title: cleanText(body.title, 2, 120, "שם הפריט"),
     description: cleanText(body.description, 10, 1200, "תיאור"),
     loanConditions: cleanOptional(body.loanConditions, 300), itemType: sanitizeItemType(body.itemType), pickupMethod: sanitizePickupMethod(body.pickupMethod),
-    subcategory: fixedSubcategory(category,body.subcategory,existing.subcategory||null), tagsJson: JSON.stringify(sanitizeTags(body.tags))
+    subcategory, tagsJson: JSON.stringify(sanitizeTags(body.tags))
   };
   const changed = values.title !== existing.title || category !== existing.category || values.description !== existing.description ||
     condition !== existing.condition || quantity !== Number(existing.quantity) || (values.loanConditions || null) !== (existing.loan_conditions || null) || values.itemType !== (existing.item_type||"loan") || values.pickupMethod !== (existing.pickup_method||"pickup") || values.subcategory !== (existing.subcategory||null) || values.tagsJson !== (existing.tags_json||"[]");
