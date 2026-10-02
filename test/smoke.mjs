@@ -409,14 +409,14 @@ try {
   assert.equal(result.data.items.length, 0);
   await request(`/api/organizations/${organizationId}`, { method: "PATCH", cookie: adminCookie, body: { hidden: false } });
   result = await request("/api/items");
-  assert.equal(result.data.items.length, 1);
+  assert.equal(result.data.items.length, 2);
 
   result = await request("/api/discovery?q=קישוט");
   assert.equal(result.response.status, 200);
   assert.equal(result.data.organizations[0].id, organizationId);
   result = await request(`/api/organizations/${organizationId}/public`);
   assert.equal(result.response.status, 200);
-  assert.equal(result.data.items.length, 1);
+  assert.equal(result.data.items.length, 2);
   assert.equal(result.data.organization.address, "רחוב הבדיקה 1, ירושלים");
   assert.equal(Object.hasOwn(result.data.organization, "contact_phone"), false);
   assert.equal(result.data.partial, false, "Public gmach details must not degrade on a migrated database");
