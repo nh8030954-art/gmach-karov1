@@ -10,7 +10,7 @@ const remainingWorker=await readFile("worker/remaining-features.js","utf8");
 const remainingClient=await readFile("dist/remaining-features.js","utf8");
 const migration=await readFile("migrations/0014_final_features.sql","utf8");
 
-for(const file of ["dist/sw.js","dist/platform-completion.js","migrations/0013_platform_completion.sql","migrations/0015_notification_delivery.sql"]) await access(file);
+for(const file of ["dist/sw.js","dist/platform-completion.js","migrations/0013_platform_completion.sql","migrations/0015_notification_delivery.sql","migrations/0018_backfill_missing_item_units.sql"]) await access(file);
 
 assert.match(worker,/handleFinalFeatures/);
 assert.match(worker,/runFinalMaintenance/);
