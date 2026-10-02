@@ -536,3 +536,7 @@ assert.ok(worker.includes("tracked_count")&&worker.includes("usable_tracked"),"a
 assert.ok(worker.includes("Number(existingUnits?.count||0)>quantity")&&worker.includes("Number(existingUnits.count)-quantity>Number(removable?.count||0)"),"item quantity reduction must protect assigned or unavailable serial units");
 
 assert.ok(worker.includes("CREATE TABLE IF NOT EXISTS organization_serial_codes")&&worker.includes("CREATE TABLE IF NOT EXISTS item_serial_codes"),"serial identity tables must self-heal at runtime");
+
+assert.ok(indexHtml.includes("route-dashboard-boot")&&appClient.includes('classList.remove("route-dashboard-boot")'),"dashboard boot flash guard missing");
+assert.ok(appClient.includes("window.GmachResetCategoryCarousel=start")&&appClient.includes("Category carousel continuous autoplay v3"),"restored category carousel engine missing");
+assert.ok(appClient.includes('window.scrollTo({ top: 0, behavior: "auto" })'),"dashboard must not smooth-scroll during startup");
