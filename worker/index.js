@@ -2992,6 +2992,11 @@ async function reconcileSerializedQuantity(env,itemId){
 }
 
 async function serialIdentityCodes(env,item){
+  await env.DB.batch([
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS organization_serial_codes (code INTEGER PRIMARY KEY AUTOINCREMENT, organization_id TEXT NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS item_serial_codes (code INTEGER PRIMARY KEY AUTOINCREMENT, item_id TEXT NOT NULL UNIQUE REFERENCES items(id) ON DELETE CASCADE, organization_id TEXT NOT NULL REFERENCES organizations(id) ON DELETE CASCADE, created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))"),
+    env.DB.prepare("CREATE INDEX IF NOT EXISTS item_serial_codes_org_idx ON item_serial_codes(organization_id, code)")
+  ]);
   await env.DB.prepare("INSERT OR IGNORE INTO organization_serial_codes(organization_id) VALUES(?)").bind(item.organization_id).run();
   await env.DB.prepare("INSERT OR IGNORE INTO item_serial_codes(item_id,organization_id) VALUES(?,?)").bind(item.id,item.organization_id).run();
   const [orgCode,itemCode]=await env.DB.batch([
