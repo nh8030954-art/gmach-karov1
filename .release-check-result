@@ -1,40 +1,40 @@
-sha=4de5af343d3cc9ab05337b97c2d37659bcdb7490
+sha=0e17e8be0b7dd613c56b5e65158cb0e6c6b59057
 install=success
 syntax=success
 tests=failure
 smoke=failure
 live=success
-    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:377:26)
+
+> gmach-karov@1.0.0 test
+> node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
+
+Final completion static release gate passed.
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: {"error":"מספר היחידות הסידוריות לא יכול לעלות על כמות הפריט. יש לעדכן קודם את כמות הפריט","requestId":"179094167280915821"}
-
-409 !== 201
-
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:260:10
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+AssertionError [ERR_ASSERTION]: stable embedded map with marker overlay missing
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:127:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 409,
-  expected: 201,
-  operator: 'strictEqual',
+  actual: false,
+  expected: true,
+  operator: '==',
   diff: 'simple'
 }
 
 Node.js v24.21.0
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790941673026:260:10
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+AssertionError [ERR_ASSERTION]: stable embedded map with marker overlay missing
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790942025756:127:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 409,
-  expected: 201,
-  operator: 'strictEqual',
+  actual: false,
+  expected: true,
+  operator: '==',
   diff: 'simple'
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T11:47:57.285Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T11:53:46.379Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
