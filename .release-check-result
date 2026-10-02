@@ -1,8 +1,8 @@
-sha=efb42437a258500e6582936134b8ac556acf38d0
+sha=68693dea78c2f5033723e29e19c347f9d42a38bd
 install=success
 syntax=success
 tests=failure
-smoke=success
+smoke=failure
 live=success
 + actual - expected
 
@@ -24,17 +24,17 @@ live=success
 }
 
 Node.js v24.21.0
-Community chat retention static release gate passed.
-QR scanning, structured SEO and accessibility shell gate passed.
-Excel export and QR image scanner gate passed.
-Voice message recording gate passed.
-Excel export, accessible admin status and QR image scanning gate passed.
-Full requirements regression extensions passed.
-remaining-features Error: Backup checksum mismatch
-    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:167:41)
     at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:352:91)
     at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:902:37)
     at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:377:26)
-Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T13:00:30.996Z"}
+file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790946096058:263
+  assert.equal(result.data.branch.name,"סניף מרכזי מעודכן");
+                                  ^
+
+TypeError: Cannot read properties of undefined (reading 'name')
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790946096058:263:35
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+Node.js v24.21.0
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T13:01:40.100Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
