@@ -588,7 +588,7 @@
   function readGmachHours() {
     if($("#gmach-hours-by-appointment")?.checked)return {};
     const hours = {};
-    $('[data-hours-day]:checked').forEach(day => {
+    $$('[data-hours-day]:checked').forEach(day => {
       const name = day.dataset.hoursDay, start = $(`[data-hours-start="${name}"]`).value, end = $(`[data-hours-end="${name}"]`).value;
       if(!start||!end)throw new Error("יש לבחור שעת פתיחה ושעת סיום לכל יום מסומן.");
       if(!validateGmachHoursRange(name,false)){
@@ -603,7 +603,7 @@
   function populateGmachHours(hours) {
     const source=hours&&typeof hours==="object"?hours:{},hasHours=Object.keys(source).some(key=>String(source[key]||"").trim());
     setGmachHoursMode(!hasHours);
-    $('[data-hours-day]').forEach(day => {
+    $$('[data-hours-day]').forEach(day => {
       const name = day.dataset.hoursDay, value = source[name];
       day.checked = Boolean(value);
       const match = String(value||"").match(/(\d{2}:\d{2})[^\d]+(\d{2}:\d{2})/);
@@ -653,7 +653,7 @@
       $("#item-form-title").textContent = clone ? "שכפול פריט" : item ? "עריכת פריט" : "מה תרצו להשאיל?"; $("#item-submit").textContent = item && !clone ? "שמירת שינויים" : "פרסום הפריט"; select.disabled = Boolean(item && !clone);
       if (item) {
         select.value = item.organization_id; $("#item-name").value = clone ? `עותק של ${item.title || ""}`.slice(0,120) : item.title || ""; $("#item-category").value = item.category || ""; $("#item-condition").value = item.condition || "מצב טוב";
-        $("#item-quantity").value = item.quantity || 1; $("#item-description").value = item.description || ""; $("#item-conditions").value = item.loan_conditions || ""; $("#item-type").value=item.item_type||"loan"; updateItemSubcategories(item.subcategory||""); $("#item-tags").value=(item.tags||[]).join(", "); setLoanDuration("item-min-loan",item.min_loan_minutes||60); setLoanDuration("item-max-loan",item.max_loan_minutes||10080); setOptionalDuration("item-booking-notice",item.booking_notice_minutes||0); setOptionalDuration("item-turnaround",item.turnaround_minutes||0); setLoanDuration("item-booking-horizon",item.booking_horizon_minutes||Number(item.booking_horizon_days||365)*1440); $("#item-approval-mode").value=item.approval_mode||"manual"; $("#item-deposit-required").checked=Boolean(item.deposit_required); $("#item-deposit-amount-row").hidden=!item.deposit_required; $("#item-deposit-amount").value=(Number(item.deposit_amount_agorot||0)/100).toFixed(2); $("#item-publish-at").value=item.publish_at?String(item.publish_at).slice(0,16):""; $("#item-max-per-user").value=item.max_per_user||""; $("#item-preparation").value=item.preparation_minutes||0; $("#item-max-loan-days").value=item.max_loan_days||""; $("#item-service-radius").value=item.service_radius_km||""; $("#item-free").checked = !clone; if(clone)$("#item-free").checked=false;
+        $("#item-quantity").value = item.quantity || 1; $("#item-description").value = item.description || ""; $("#item-conditions").value = item.loan_conditions || ""; $("#item-type").value=item.item_type||"loan"; updateItemSubcategories(item.subcategory||""); $("#item-tags").value=(item.tags||[]).join(", "); setLoanDuration("item-min-loan",item.min_loan_minutes||60); setLoanDuration("item-max-loan",item.max_loan_minutes||10080); setOptionalDuration("item-booking-notice",item.booking_notice_minutes||0); setOptionalDuration("item-turnaround",item.turnaround_minutes||0); setLoanDuration("item-booking-horizon",item.booking_horizon_minutes||Number(item.booking_horizon_days||365)*1440); $("#item-approval-mode").value=item.approval_mode||"manual"; $("#item-deposit-required").checked=Boolean(item.deposit_required); $("#item-deposit-amount-row").hidden=!item.deposit_required; $("#item-deposit-amount").value=(Number(item.deposit_amount_agorot||0)/100).toFixed(2); $("#item-publish-at").value=item.publish_at?String(item.publish_at).slice(0,16):""; $("#item-max-per-user").value=item.max_per_user||""; $("#item-preparation").value=item.preparation_minutes||0; $("#item-max-loan-days").value=item.max_loan_days||""; $("#item-service-radius").value=item.service_radius_km||""; $("#item-free").checked=false;
       } else { $("#item-quantity").value=1; $("#item-condition").value="מצב טוב"; setLoanDuration("item-min-loan",60); setLoanDuration("item-max-loan",10080); setOptionalDuration("item-booking-notice",0); setOptionalDuration("item-turnaround",0); setLoanDuration("item-booking-horizon",365*1440); $("#item-approval-mode").value="manual"; $("#item-deposit-required").checked=false; $("#item-deposit-amount-row").hidden=true; $("#item-deposit-amount").value=0; $("#item-publish-at").value=""; $("#item-max-per-user").value=""; $("#item-preparation").value=0; $("#item-max-loan-days").value=""; $("#item-service-radius").value=""; $("#item-free").checked=false; updateItemSubcategories(); if(state.pendingCommunityItem){$("#item-name").value=state.pendingCommunityItem.title||"";$("#item-description").value=(state.pendingCommunityItem.description||"").slice(0,1200);const category=state.pendingCommunityItem.category||"";if(category&&[...$("#item-category").options].some(option=>option.value===category)){$("#item-category").value=category;updateItemSubcategories();}} }
       if (clone) toast("הפרטים הועתקו לטופס חדש. בדקו כמות וצרפו תמונות לפני הפרסום.");
       openDialog($("#item-form-dialog"));
