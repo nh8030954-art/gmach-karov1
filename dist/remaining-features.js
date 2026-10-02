@@ -499,7 +499,7 @@ function createLocalOsmMap(canvas){
     const minX=Math.floor(left/256),maxX=Math.floor((left+w)/256),minY=Math.floor(top/256),maxY=Math.floor((top+h)/256),n=2**z;
     for(let ty=minY;ty<=maxY;ty++)for(let tx=minX;tx<=maxX;tx++){
       if(ty<0||ty>=n)continue;const wrap=((tx%n)+n)%n,img=document.createElement("img");
-      img.src="https://"+(["a","b","c"][(wrap+ty)%3])+".tile.openstreetmap.org/"+z+"/"+wrap+"/"+ty+".png";img.alt="";img.draggable=false;img.decoding="async";img.loading="eager";
+      img.src="/api/maps/tiles/"+z+"/"+wrap+"/"+ty+".png";img.alt="";img.draggable=false;img.decoding="async";img.loading="eager";
       img.style.cssText="position:absolute;width:256px;height:256px;left:"+(tx*256-left)+"px;top:"+(ty*256-top)+"px";tiles.append(img);
     }
     pins.innerHTML="";
