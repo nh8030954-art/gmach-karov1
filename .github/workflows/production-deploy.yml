@@ -125,6 +125,8 @@ jobs:
         run: npx wrangler d1 execute DB --remote --file migrations/0018_backfill_missing_item_units.sql
       - name: Rebase gmach serial codes to high range
         run: npx wrangler d1 execute DB --remote --file migrations/0019_high_gmach_serial_codes.sql
+      - name: Reconcile serialized unit loan states
+        run: npx wrangler d1 execute DB --remote --file migrations/0022_reconcile_loan_unit_states.sql
       - name: Publish production Worker
         run: |
           for attempt in 1 2 3; do
