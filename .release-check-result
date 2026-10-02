@@ -1,40 +1,40 @@
-sha=db9d936f0227928ba052bb19c0577f5c9c73b4a1
+sha=b61547f1fda777d74092243bb110f3f9f1ae8c7a
 install=success
 syntax=success
 tests=failure
 smoke=failure
 live=success
+
+> gmach-karov@1.0.0 test
+> node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
+
+Final completion static release gate passed.
+node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: English static UI is missing translations: כל קטגוריות המשנה
-
-1 !== 0
-
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/i18n-static.mjs:33:8
-    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
-    at async node:internal/modules/esm/loader:647:26
-    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+AssertionError [ERR_ASSERTION]: single-element selector used as collection
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:145:83 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 1,
-  expected: 0,
-  operator: 'strictEqual',
+  actual: false,
+  expected: true,
+  operator: '==',
   diff: 'simple'
 }
 
 Node.js v24.21.0
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790942556526:473:10
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
-  generatedMessage: true,
+AssertionError [ERR_ASSERTION]: single-element selector used as collection
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790942585393:145:83 {
+  generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 2,
-  expected: 1,
-  operator: 'strictEqual',
+  actual: false,
+  expected: true,
+  operator: '==',
   diff: 'simple'
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T12:02:41.207Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T12:03:05.971Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
