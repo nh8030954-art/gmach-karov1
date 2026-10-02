@@ -3031,45 +3031,22 @@ async function syncItemUnitsToQuantity(env,itemId,desiredQuantity){
   return {created,retired,quantity:desired};
 }
 
-async function listItemUnits(request,env,itemId){const item=await itemOrganization(env,itemId);if(!item)throw new HttpError(404,"הפריט לא נמצא");const inventory=await reconcileSerializedQuantity(env,itemId);if(inventory?.reconciled)item.quantity=inventory.quantity;await requireOrganizationRole(request,env,item.organization_id,["owner","inventory"]);const rows=await env.DB.prepare("SELECT id,branch_id,serial_number,status,condition,created_at,updated_at FROM item_units WHERE item_id=? ORDER BY created_at").bind(itemId).all();const active=(rows.results||[]).filter(row=>row.status!=="retired");return json({units:rows.results,totalQuantity:Number(item.quantity||0),serialTrackedCount:active.length,trackingComplete:active.length===Number(item.quantity||0)});}
-async function createItemUnit(request,env,itemId){const item=await itemOrganization(env,itemId);if(!item)throw new HttpError(404,"הפריט לא נמצא");const {user}=await requireOrganizationRole(request,env,item.organization_id,["owner","inventory"]),body=await readJson(request);const count=positiveInt(body.count,1,1,100,"כמות יחידות"),existing=await env.DB.prepare("SELECT COUNT(*) AS count FROM item_units WHERE item_id=? AND status!='retired'").bind(itemId).first(),remaining=Math.max(0,Number(item.quantity||0)-Number(existing?.count||0));if(count>remaining)throw new HttpError(409,remaining>0?`אפשר להוסיף עד ${remaining} מספרים סידוריים בלבד, בהתאם לכמות המלאי של הפריט`:"לכל יחידות המלאי של הפריט כבר יש מספר סידורי");const prefix=String(item.serial_prefix||item.title||"GMH").replace(/[^A-Za-z0-9א-ת]/g,"").slice(0,8).toUpperCase()||"GMH",created=[];for(let i=0;i<count;i++){let serial;for(let attempt=0;attempt<10;attempt++){serial=`${prefix}-${crypto.randomUUID().replaceAll("-","").slice(0,8).toUpperCase()}`;const exists=await env.DB.prepare("SELECT 1 FROM item_units WHERE serial_number=? UNION SELECT 1 FROM retired_serials WHERE serial_number=?").bind(serial,serial).first();if(!exists)break;}const id=crypto.randomUUID();await env.DB.prepare("INSERT INTO item_units(id,item_id,branch_id,serial_number,condition) VALUES(?,?,?,?,?)").bind(id,itemId,cleanOptional(body.branchId,100),serial,cleanText(body.condition,2,30,"מצב היחידה")).run();created.push({id,serialNumber:serial});}await auditStatement(env,user.id,"item.units.create","item",itemId,{count}).run();return json({units:created},201);}
-async function manageLoanUnits(request,env,requestId,write=false){
-  const {user,loan}=await loanAccess(request,env,requestId);await reconcileSerializedQuantity(env,loan.item_id);
-  if(user.id===loan.borrower_id)throw new HttpError(403,"רק מנהל הגמ״ח יכול להקצות יחידות בזמן האיסוף");
-  const role=await requireOrganizationRole(request,env,loan.organization_id,["owner","inventory","requests"]);
-  if(!["approved","collected"].includes(loan.status))throw new HttpError(409,"אפשר לנהל יחידות רק בבקשה שאושרה או נאספה");
-  if(!write){
-    const rows=await env.DB.prepare(`SELECT u.id,u.serial_number,u.status,u.condition,u.branch_id,
-      EXISTS(SELECT 1 FROM loan_unit_assignments a WHERE a.request_id=? AND a.unit_id=u.id AND a.returned_at IS NULL) AS assigned
-      FROM item_units u WHERE u.item_id=? AND u.status!='retired' ORDER BY u.serial_number`).bind(requestId,loan.item_id).all();
-    return json({units:(rows.results||[]).map(row=>({...row,assigned:Boolean(row.assigned)}))});
-  }
-  const body=await readJson(request),unitIds=Array.isArray(body.unitIds)?[...new Set(body.unitIds.map(x=>String(x)).filter(Boolean))]:[];
-  const requestedQuantity=Math.max(1,Number(loan.quantity||1));
-  const itemStock=await env.DB.prepare("SELECT quantity FROM items WHERE id=?").bind(loan.item_id).first(),serialized=await env.DB.prepare("SELECT COUNT(*) AS count FROM item_units WHERE item_id=? AND status!='retired'").bind(loan.item_id).first(),trackingComplete=Number(serialized?.count||0)===Number(itemStock?.quantity||0)&&Number(itemStock?.quantity||0)>0;
-  if(trackingComplete && unitIds.length!==requestedQuantity)throw new HttpError(400,`יש לבחור בדיוק ${requestedQuantity} יחידות לאיסוף`);
-  if(!trackingComplete && unitIds.length>requestedQuantity)throw new HttpError(400,`אפשר לבחור לכל היותר ${requestedQuantity} יחידות לאיסוף`);
-  if(unitIds.length){
-    const placeholders=unitIds.map(()=>"?").join(",");
-    const valid=await env.DB.prepare(`SELECT id,status FROM item_units WHERE item_id=? AND id IN (${placeholders}) AND status IN ('available','held','loaned')`).bind(loan.item_id,...unitIds).all();
-    if((valid.results||[]).length!==unitIds.length)throw new HttpError(409,"אחת היחידות שנבחרו אינה זמינה להקצאה");
-    const conflicts=await env.DB.prepare(`SELECT COUNT(*) AS count FROM loan_unit_assignments WHERE unit_id IN (${placeholders}) AND request_id<>? AND returned_at IS NULL`).bind(...unitIds,requestId).first();
-    if(Number(conflicts?.count||0)>0)throw new HttpError(409,"אחת היחידות כבר מוקצית להשאלה אחרת");
-  }
-  const previous=await env.DB.prepare("SELECT unit_id FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL").bind(requestId).all();
-  const now=new Date().toISOString(),statements=[
-    env.DB.prepare("DELETE FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL").bind(requestId)
-  ];
-  for(const row of previous.results||[])if(!unitIds.includes(String(row.unit_id)))statements.push(env.DB.prepare("UPDATE item_units SET status='available',updated_at=? WHERE id=? AND status='loaned'").bind(now,row.unit_id));
-  for(const unitId of unitIds){
-    statements.push(env.DB.prepare("INSERT INTO loan_unit_assignments(request_id,unit_id,assigned_at) VALUES(?,?,?)").bind(requestId,unitId,now));
-    statements.push(env.DB.prepare("UPDATE item_units SET status='loaned',updated_at=? WHERE id=?").bind(now,unitId));
-  }
-  await env.DB.batch(statements);
-  await auditStatement(env,user.id,"loan.units.assign","loan_request",requestId,{unitIds}).run().catch(()=>{});
-  return json({ok:true,unitIds});
+async function listItemUnits(request,env,itemId){
+  const item=await itemOrganization(env,itemId);if(!item)throw new HttpError(404,"הפריט לא נמצא");
+  await requireOrganizationRole(request,env,item.organization_id,["owner","inventory"]);
+  await syncItemUnitsToQuantity(env,itemId,item.quantity);
+  const rows=await env.DB.prepare("SELECT id,branch_id,serial_number,status,condition,created_at,updated_at FROM item_units WHERE item_id=? AND status!='retired' ORDER BY created_at").bind(itemId).all();
+  return json({units:rows.results});
 }
-
+async function createItemUnit(request,env,itemId){
+  const item=await itemOrganization(env,itemId);if(!item)throw new HttpError(404,"הפריט לא נמצא");
+  const {user}=await requireOrganizationRole(request,env,item.organization_id,["owner","inventory"]),body=await readJson(request);
+  const count=positiveInt(body.count,1,1,100,"כמות יחידות"),nextQuantity=Number(item.quantity||0)+count;
+  await env.DB.prepare("UPDATE items SET quantity=?,inventory_updated_at=?,updated_at=? WHERE id=?").bind(nextQuantity,new Date().toISOString(),new Date().toISOString(),itemId).run();
+  const synced=await syncItemUnitsToQuantity(env,itemId,nextQuantity);
+  await auditStatement(env,user.id,"item.units.create","item",itemId,{count,nextQuantity}).run();
+  return json({units:synced.created,quantity:nextQuantity},201);
+}
 
 async function markReviewHelpful(request,env,reviewId){const user=await requireUser(request,env);const exists=await env.DB.prepare("SELECT id FROM reviews WHERE id=? AND status='published'").bind(reviewId).first();if(!exists)throw new HttpError(404,"הביקורת לא נמצאה");await env.DB.batch([env.DB.prepare("INSERT OR IGNORE INTO review_helpful_votes(review_id,user_id) VALUES(?,?)").bind(reviewId,user.id),env.DB.prepare("UPDATE reviews SET helpful_count=(SELECT COUNT(*) FROM review_helpful_votes WHERE review_id=?) WHERE id=?").bind(reviewId,reviewId)]);return json({helpful:true});}
 async function reportReviewContent(request,env,reviewId){const user=await requireUser(request,env),body=await readJson(request),id=crypto.randomUUID();try{await env.DB.prepare("INSERT INTO review_reports(id,review_id,reporter_id,reason) VALUES(?,?,?,?)").bind(id,reviewId,user.id,cleanText(body.reason,2,500,"סיבת הדיווח")).run();}catch(error){if(String(error).toLowerCase().includes("unique"))throw new HttpError(409,"כבר דיווחתם על הביקורת");throw error;}return json({report:{id,status:"pending"}},201);}
