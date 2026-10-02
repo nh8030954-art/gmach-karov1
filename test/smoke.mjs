@@ -245,7 +245,7 @@ try {
   assert.equal(result.response.status, 201);
   const organizationId = result.data.organization.id;
 
-  result = await request("/api/items", { method: "POST", cookie: adminCookie, body: { organizationId, title: "ערכת קישוטים לבדיקה", category: "אירועים", condition: "מצוין", quantity: 1, description: "ערכת קישוטים מלאה שנועדה לבדוק את תהליך הפרסום באתר.", loanConditions: "איסוף עצמי", depositRequired: true, depositAmount: "100" } });
+  result = await request("/api/items", { method: "POST", cookie: adminCookie, body: { organizationId, title: "ערכת קישוטים לבדיקה", category: "אירועים", condition: "מצוין", quantity: 1, description: "ערכת קישוטים מלאה שנועדה לבדוק את תהליך הפרסום באתר.", loanConditions: "איסוף עצמי", depositRequired: true, depositAmount: "100", freeConfirmed: true } });
   assert.equal(result.response.status, 201);
   const itemId = result.data.item.id;
 
