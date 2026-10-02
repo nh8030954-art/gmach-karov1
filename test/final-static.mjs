@@ -143,6 +143,8 @@ for(const token of ["editRequestMessage","message_edited","data-edit-message","m
 for(const token of ["scheduledItems","publish_at IS NOT NULL","notifyMatchingSavedSearches"])assert.ok(worker.includes(token),token+" missing from scheduled publication workflow");
 for(const token of ["openHelpMatches","data-help-matches","data-select-offer"])assert.ok(appClient.includes(token),token+" missing from community match/offer workflow");
 for(const source of [appClient,finalClient,platformClient,remainingClient])assert.ok(!/(?<!\$)\$\((?:'[^']*'|"[^"]*")(?:,[^)]*)?\)\.forEach/.test(source),"single-element selector used as collection");
+assert.ok(!appClient.includes("$$$("),"invalid triple-dollar selector helper must never reach runtime");
+assert.ok(!worker.includes("כבר קיים בגמ״ח פריט פעיל בשם הזה ובאותה קטגוריה"),"item creation must not hard-block duplicate names/categories");
 for(const token of ["relationReady","CREATE TABLE IF NOT EXISTS organization_categories","CREATE TABLE IF NOT EXISTS item_categories"])assert.ok(worker.includes(token),token+" missing from production schema repair");
 
 for(const token of ["const inviteMatch=","/accept","הצטרפת לצוות הניהול"])assert.ok(appClient.includes(token),token+" missing from manager invite acceptance UI");
