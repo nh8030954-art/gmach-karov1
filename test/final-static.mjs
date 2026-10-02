@@ -380,6 +380,7 @@ assert.ok((await readFile("worker/launch-readiness.js","utf8")).includes("/api/a
 assert.ok((await readFile("dist/admin-control-center.js","utf8")).includes("ייצוא נתונים"),"admin export UI missing");
 
 for(const token of ["scan-unit-qr","BarcodeDetector","getUserMedia","unit-qr-manual"])assert.ok(appClient.includes(token),token+" missing from camera QR scanner");
+for(const token of ["/dashboard?unit=","/api/item-units/by-serial/","openManagedUnitFromQr","data-unit-serial"])assert.ok((platform+appClient).includes(token),token+" missing from direct QR-to-manager flow");
 for(const token of ['application/ld+json','SearchAction','og:site_name','twitter:card'])assert.ok(indexHtml.includes(token),token+" missing from structured SEO metadata");
 assert.ok(indexHtml.includes('class="skip-link"'),"global skip link missing");
 console.log("QR scanning, structured SEO and accessibility shell gate passed.");
