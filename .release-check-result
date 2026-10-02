@@ -1,4 +1,4 @@
-sha=7aee21ca17f6947fd02a12f296d6e2e3513e02cb
+sha=f50ba9ee29a8e17100c7340fccfdeae7a6f0e257
 install=success
 syntax=success
 tests=failure
@@ -27,14 +27,14 @@ Node.js v24.21.0
     at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:352:91)
     at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:902:37)
     at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:377:26)
-file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790946302923:263
+file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790946336222:263
   assert.equal(result.data.branch.name,"סניף מרכזי מעודכן");
                                   ^
 
 TypeError: Cannot read properties of undefined (reading 'name')
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790946302923:263:35
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790946336222:263:35
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T13:05:06.480Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T13:05:40.054Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
