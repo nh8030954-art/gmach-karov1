@@ -1377,8 +1377,12 @@ async function updateAdminCategory(request,env,id){
   if(current.parent_id){
     const oldParentName=oldParent?.name_he||"",newParentName=newParent?.name_he||oldParentName;
     statements.push(env.DB.prepare("UPDATE items SET category=?,subcategory=?,updated_at=CURRENT_TIMESTAMP WHERE category=? AND subcategory=?").bind(newParentName,nameHe,oldParentName,current.name_he));
+    statements.push(env.DB.prepare("UPDATE saved_searches SET filters_json=json_set(json_set(filters_json,'$.category',?),'$.subcategory',?) WHERE json_extract(filters_json,'$.category')=? AND json_extract(filters_json,'$.subcategory')=?").bind(newParentName,nameHe,oldParentName,current.name_he));
   }else if(nameHe!==current.name_he){
     statements.push(env.DB.prepare("UPDATE items SET category=?,updated_at=CURRENT_TIMESTAMP WHERE category=?").bind(nameHe,current.name_he));
+    statements.push(env.DB.prepare("UPDATE organizations SET primary_category=?,updated_at=CURRENT_TIMESTAMP WHERE primary_category=?").bind(nameHe,current.name_he));
+    statements.push(env.DB.prepare("UPDATE help_requests SET category=? WHERE category=?").bind(nameHe,current.name_he));
+    statements.push(env.DB.prepare("UPDATE saved_searches SET filters_json=json_set(filters_json,'$.category',?) WHERE json_extract(filters_json,'$.category')=?").bind(nameHe,current.name_he));
   }
   statements.push(auditStatement(env,user.id,"category.update","category",id,{oldNameHe:current.name_he,nameHe,oldParentId:current.parent_id,parentId,status,sortOrder}));
   await env.DB.batch(statements);
@@ -1394,6 +1398,7 @@ async function deleteAdminCategory(request,env,id,url){
   if(current.parent_id){
     const parent=await env.DB.prepare("SELECT name_he FROM categories WHERE id=?").bind(current.parent_id).first();
     statements.push(env.DB.prepare("UPDATE items SET subcategory=NULL,updated_at=CURRENT_TIMESTAMP WHERE category=? AND subcategory=?").bind(parent?.name_he||"",current.name_he));
+    statements.push(env.DB.prepare("UPDATE saved_searches SET filters_json=json_remove(filters_json,'$.subcategory') WHERE json_extract(filters_json,'$.category')=? AND json_extract(filters_json,'$.subcategory')=?").bind(parent?.name_he||"",current.name_he));
   }else{
     const children=await env.DB.prepare("SELECT COUNT(*) AS count FROM categories WHERE parent_id=?").bind(id).first();
     const usage=await env.DB.prepare("SELECT COUNT(*) AS count FROM items WHERE category=? AND status!='archived'").bind(current.name_he).first();
@@ -1403,6 +1408,9 @@ async function deleteAdminCategory(request,env,id,url){
       const replacement=await env.DB.prepare("SELECT id,name_he,parent_id,status FROM categories WHERE id=?").bind(replacementId).first();
       if(!replacement||replacement.parent_id)throw new HttpError(400,"הקטגוריה החלופית חייבת להיות קטגוריה ראשית");
       statements.push(env.DB.prepare("UPDATE items SET category=?,updated_at=CURRENT_TIMESTAMP WHERE category=?").bind(replacement.name_he,current.name_he));
+      statements.push(env.DB.prepare("UPDATE organizations SET primary_category=?,updated_at=CURRENT_TIMESTAMP WHERE primary_category=?").bind(replacement.name_he,current.name_he));
+      statements.push(env.DB.prepare("UPDATE help_requests SET category=? WHERE category=?").bind(replacement.name_he,current.name_he));
+      statements.push(env.DB.prepare("UPDATE saved_searches SET filters_json=json_set(filters_json,'$.category',?) WHERE json_extract(filters_json,'$.category')=?").bind(replacement.name_he,current.name_he));
       statements.push(env.DB.prepare("UPDATE categories SET parent_id=?,updated_at=CURRENT_TIMESTAMP WHERE parent_id=?").bind(replacement.id,id));
     }
   }
