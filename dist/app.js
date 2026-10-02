@@ -857,11 +857,11 @@
     $("#account-start-tour")?.addEventListener("click",openAccountTour);
     maybeShowAccountTour(isNewAccount);
     $$("[data-recent-org]").forEach(button=>button.addEventListener("click",()=>openOrganization(button.dataset.recentOrg)));
-    $('[data-request-action]').forEach(button => button.addEventListener("click", () => updateRequestStatus(button.dataset.requestId, button.dataset.requestAction)));
-    $('[data-pickup-request]').forEach(button=>button.addEventListener("click",()=>openPickupScreen(button.dataset.pickupRequest)));
-    $('[data-return-request]').forEach(button=>button.addEventListener("click",()=>openReturnScreen(button.dataset.returnRequest)));
-    $('[data-no-show]').forEach(button=>button.addEventListener("click",async()=>{if(!translatedConfirm("לסמן את השואל/ת כאי-הגעה? הפעולה תשחרר את המלאי ותעדכן את רשימת ההמתנה."))return;await updateRequestStatus(button.dataset.noShow,"no_show")}));
-    $('[data-manager-cancel]').forEach(button=>button.addEventListener("click",async()=>{const reason=translatedPrompt("סיבת הביטול שתישלח לשואל/ת:");if(!reason)return;await updateRequestStatus(button.dataset.managerCancel,"cancelled",reason)}));
+    $$('[data-request-action]').forEach(button => button.addEventListener("click", () => updateRequestStatus(button.dataset.requestId, button.dataset.requestAction)));
+    $$('[data-pickup-request]').forEach(button=>button.addEventListener("click",()=>openPickupScreen(button.dataset.pickupRequest)));
+    $$('[data-return-request]').forEach(button=>button.addEventListener("click",()=>openReturnScreen(button.dataset.returnRequest)));
+    $$('[data-no-show]').forEach(button=>button.addEventListener("click",async()=>{if(!translatedConfirm("לסמן את השואל/ת כאי-הגעה? הפעולה תשחרר את המלאי ותעדכן את רשימת ההמתנה."))return;await updateRequestStatus(button.dataset.noShow,"no_show")}));
+    $$('[data-manager-cancel]').forEach(button=>button.addEventListener("click",async()=>{const reason=translatedPrompt("סיבת הביטול שתישלח לשואל/ת:");if(!reason)return;await updateRequestStatus(button.dataset.managerCancel,"cancelled",reason)}));
     $$('[data-request-decision]').forEach(button => button.addEventListener("click", () => openDecision(button.dataset.requestId, button.dataset.requestDecision)));
     $$('[data-change-request]').forEach(button=>button.addEventListener("click",()=>openLoanChange(button.dataset.changeRequest)));
     $$('[data-undo-cancel]').forEach(button=>button.addEventListener("click",async()=>{try{await api("/api/loan-requests/"+encodeURIComponent(button.dataset.undoCancel)+"/undo-cancel",{method:"POST",body:{}});toast("הבקשה שוחזרה");await refreshAccountSnapshot();showDashboard("requests")}catch(e){toast(e.message,"error")}}));
