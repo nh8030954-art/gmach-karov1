@@ -50,8 +50,6 @@ jobs:
             echo "No database migration changed in this deployment; D1 snapshot/migration steps will be skipped."
           fi
       - run: npm ci
-      - name: Configure verified Resend sender
-        run: printf '%s' 'גמ״ח ברגע <no-reply@gmach-berega.co.il>' | npx wrangler secret put RESEND_FROM_EMAIL --config wrangler.jsonc
       - run: npm run check
       - name: Run production test suite
         id: tests
@@ -107,8 +105,7 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-      - name: Apply production database migrations
-        if: steps.migration_changes.outputs.changed == 'true'
+      - name: Apply pending production database migrations
         run: |
           set +e
           OUTPUT="$(npx wrangler d1 migrations apply DB --remote 2>&1)"
@@ -117,7 +114,7 @@ jobs:
           echo "$OUTPUT"
           if [ "$STATUS" -ne 0 ]; then
             if echo "$OUTPUT" | grep -Eqi "duplicate column name|already exists"; then
-              echo "::warning::The live D1 schema is ahead of the Wrangler migration ledger. Continuing with the runtime idempotent schema reconciliation already built into the Worker."
+              echo "::warning::The live D1 schema is ahead of the Wrangler migration ledger. Continuing with runtime idempotent schema reconciliation."
             else
               exit "$STATUS"
             fi
