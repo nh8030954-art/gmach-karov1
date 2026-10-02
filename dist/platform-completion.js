@@ -47,9 +47,10 @@
     new MutationObserver(sync).observe(document.getElementById("auth-dialog")||document.body,{subtree:true,attributes:true,attributeFilter:["aria-selected"]});sync();
   }
   const api=async(path,opts={})=>{
-    const res=await fetch(path,{credentials:"same-origin",...opts,headers:{"Content-Type":"application/json",...(opts.headers||{})},body:opts.body&&typeof opts.body!=="string"?JSON.stringify(opts.body):opts.body});
+    let res;try{res=await fetch(path,{credentials:"same-origin",...opts,headers:{"Content-Type":"application/json",...(opts.headers||{})},body:opts.body&&typeof opts.body!=="string"?JSON.stringify(opts.body):opts.body})}
+    catch(error){throw new Error(window.GmachDescribeNetworkError?window.GmachDescribeNetworkError(error):"לא ניתן להתחבר לשרת")}
     const data=await res.json().catch(()=>({}));
-    if(!res.ok) throw new Error(data.error||"הפעולה לא הושלמה");
+    if(!res.ok) throw new Error(window.GmachDescribeHttpError?window.GmachDescribeHttpError(res,data):(data.error||"הפעולה לא הושלמה"));
     return data;
   };
   const style=document.createElement("style");
