@@ -184,13 +184,14 @@ async function patchAdminEntity(request,env,type,id){
 
 async function operationalHealth(request,env){
   await requireAdmin(request,env);const now=Date.now();
-  const [backup,drill,failedQueue,failedOutbox,critical,totals]=await env.DB.batch([
+  const [backup,drill,failedQueue,failedOutbox,critical,totals,inventoryMismatch]=await env.DB.batch([
     env.DB.prepare("SELECT * FROM backup_runs ORDER BY COALESCE(finished_at,completed_at,created_at) DESC LIMIT 1"),
     env.DB.prepare("SELECT * FROM restore_drills ORDER BY started_at DESC LIMIT 1"),
     env.DB.prepare("SELECT COUNT(*) AS count FROM notification_queue WHERE failed_at IS NOT NULL AND failed_at>=?").bind(new Date(now-86400000).toISOString()),
     env.DB.prepare("SELECT COUNT(*) AS count FROM notification_outbox WHERE status='failed' AND created_at>=?").bind(new Date(now-86400000).toISOString()),
     env.DB.prepare("SELECT * FROM system_alerts WHERE resolved_at IS NULL ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,created_at DESC LIMIT 100"),
-    env.DB.prepare("SELECT (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL) AS users,(SELECT COUNT(*) FROM organizations WHERE deleted_at IS NULL) AS organizations,(SELECT COUNT(*) FROM items WHERE deleted_at IS NULL) AS items,(SELECT COUNT(*) FROM loan_requests) AS loans")
+    env.DB.prepare("SELECT (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL) AS users,(SELECT COUNT(*) FROM organizations WHERE deleted_at IS NULL) AS organizations,(SELECT COUNT(*) FROM items WHERE deleted_at IS NULL) AS items,(SELECT COUNT(*) FROM loan_requests) AS loans"),
+    env.DB.prepare("SELECT COUNT(*) AS count FROM items i WHERE (SELECT COUNT(*) FROM item_units u WHERE u.item_id=i.id AND u.status!=\'retired\')>i.quantity")
   ]);
   const latest=backup.results?.[0]||null,lastBackupAt=latest?.finished_at||latest?.completed_at||latest?.created_at||null,backupAgeHours=lastBackupAt?(now-Date.parse(lastBackupAt))/3600000:null;
   const services={email:Boolean(env.RESEND_API_KEY),turnstile:Boolean(env.TURNSTILE_SECRET_KEY&&env.TURNSTILE_SITE_KEY),push:Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY),encryption:Boolean(env.DATA_ENCRYPTION_KEY),separateBackupStorage:Boolean(env.BACKUP_STORAGE)};
@@ -199,8 +200,9 @@ async function operationalHealth(request,env){
   if(Number(failedQueue.results?.[0]?.count||0)+Number(failedOutbox.results?.[0]?.count||0)>0)warnings.push("notification_delivery");
   if((critical.results||[]).some(x=>x.severity==="critical"))warnings.push("critical_alert");
   if(!services.encryption)warnings.push("encryption");
+  if(Number(inventoryMismatch.results?.[0]?.count||0)>0)warnings.push("inventory_serial_quantity_mismatch");
   const status=warnings.includes("critical_alert")||warnings.includes("encryption")?"critical":warnings.length?"warning":"healthy";
-  const payload={status,warnings,latestBackup:latest,latestRestoreDrill:drill.results?.[0]||null,failedNotifications24h:Number(failedQueue.results?.[0]?.count||0)+Number(failedOutbox.results?.[0]?.count||0),alerts:critical.results||[],services,totals:totals.results?.[0]||{}};
+  const payload={status,warnings,latestBackup:latest,latestRestoreDrill:drill.results?.[0]||null,failedNotifications24h:Number(failedQueue.results?.[0]?.count||0)+Number(failedOutbox.results?.[0]?.count||0),inventorySerialQuantityMismatch:Number(inventoryMismatch.results?.[0]?.count||0),alerts:critical.results||[],services,totals:totals.results?.[0]||{}};
   await env.DB.prepare("INSERT INTO operational_health_snapshots(id,status,payload_json) VALUES(?,?,?)").bind(crypto.randomUUID(),status,JSON.stringify(payload)).run().catch(()=>{});
   return json(payload);
 }
