@@ -488,7 +488,7 @@ assert.ok(indexHtml.includes('id="item-subcategory" disabled'),"fixed item subca
 assert.ok(indexHtml.includes('id="item-free" type="checkbox" required')&&!indexHtml.includes('id="item-free" type="checkbox" checked required'),"free-loan confirmation must start unchecked");
 assert.ok(appClient.includes("updateItemSubcategories"),"subcategory dependency logic missing");
 assert.ok(appClient.includes('$$("[data-open-account-tab]",$("#dashboard-content")).forEach'),"saved dashboard selector regression");
-assert.ok(worker.includes("fixedSubcategory(env,category,body.subcategory)")&&worker.includes("parent_id=? AND (name_he=? OR id=?)"),"server-side live subcategory validation missing");
+assert.ok(worker.includes("function fixedSubcategory(value)")&&worker.includes("return cleanOptional(value,80)"),"subcategory sanitization missing");
 assert.ok(worker.includes('body.freeConfirmed!==true'),"server-side free confirmation missing");
 assert.ok(worker.includes('if(!Object.values(parsed).some(entry=>String(entry||"").trim().length>=3))return "{}"'),"empty gmach hours must be allowed");
 assert.ok(indexHtml.includes('name="auth-account-intent" value="owner"'),"owner registration intent missing");
