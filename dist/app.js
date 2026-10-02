@@ -57,6 +57,7 @@
       const active=state.activeCategory;
       rail.innerHTML='<button class="category-card '+(!active?'is-active':'')+'" type="button" data-category="" role="listitem"><span class="category-icon category-all" aria-hidden="true">◫</span><strong>הכול</strong><small>כל מה שזמין</small></button>'+parents.map(row=>'<button class="category-card '+(active===row.name_he?'is-active':'')+'" type="button" data-category="'+escapeHTML(row.name_he)+'" role="listitem"><span class="category-icon" aria-hidden="true">◇</span><strong>'+escapeHTML(row.name_he)+'</strong><small>'+escapeHTML((row.name_en||"").trim())+'</small></button>').join("");
       bindCategoryRailButtons();
+      window.setTimeout(()=>window.GmachResetCategoryCarousel?.(),0);
     }
     updateItemSubcategories();
     updateCatalogSubcategories();
@@ -787,9 +788,9 @@
   }
 
   async function showDashboard(tab = state.dashboardTab) {
-    if (!state.user) { requireAuth(() => showDashboard(tab)); return; } if (state.user.role === "admin" && !state.user.twoFactorEnabled) tab = "profile"; else if (tab === "admin" && state.user.role !== "admin") tab = "requests"; state.dashboardTab = tab; $("#home-view").hidden = true; $("#organization-page-view").hidden = true; $("#dashboard-view").hidden = false; window.scrollTo({ top: 0, behavior: "smooth" }); history.replaceState({route:"dashboard"}, "", "/dashboard"); $$('[data-dashboard-tab]').forEach(button => button.setAttribute("aria-selected", String(button.dataset.dashboardTab === tab))); $("#dashboard-content").innerHTML = '<div class="skeleton-card" aria-hidden="true"></div>';
-    try { const data = await refreshAccountSnapshot(); $("#stat-requests").textContent = data.stats.activeRequests; $("#stat-items").textContent = data.stats.items; $("#stat-completed").textContent = data.stats.completed; if (tab === "requests") renderDashboardRequests(data.requests || []); if (tab === "items") renderDashboardItems(data.items || []); if (tab === "gmachim") renderDashboardOrganizations(data.organizations || []); if (tab === "saved") await renderDashboardSaved(); if (tab === "addresses") await renderAddresses(); if (tab === "sessions") await renderSessions(); if (tab === "searches") await renderSavedSearches(); if (tab === "profile") { await renderProfile(); if(state.user.role==="admin"&&!state.user.twoFactorEnabled){const panel=document.createElement("section");panel.className="dashboard-empty";panel.innerHTML=`<h2>אבטחת חשבון הנהלת האתר</h2><p>כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.</p><button class="button button-primary" type="button" id="admin-enable-2fa">הפעלת אימות דו שלבי</button><div id="two-factor-setup"></div>`;$("#dashboard-content").prepend(panel);$("#admin-enable-2fa").addEventListener("click",beginTwoFactorSetup)}}; if (tab === "notifications") await renderNotificationPreferences(); if (tab === "admin") await renderAdmin(); organizeDashboardTools(); }
-    catch (error) { console.error("Dashboard error", error); $("#dashboard-content").innerHTML = `<div class="dashboard-empty"><p>${escapeHTML(error.message || "לא הצלחנו לטעון את האזור האישי")}</p>${error.systemFault&&error.requestId?`<small>מספר תקלה לתמיכה: ${escapeHTML(error.requestId)}</small>`:""}<button class="button button-secondary" type="button" id="dashboard-support-error">פנייה לתמיכה עם פרטי התקלה</button></div>`;$("#dashboard-support-error")?.addEventListener("click",()=>openSupportForError(error,"תקלה בטעינת האזור האישי")); }
+    if (!state.user) { requireAuth(() => showDashboard(tab)); return; } if (state.user.role === "admin" && !state.user.twoFactorEnabled) tab = "profile"; else if (tab === "admin" && state.user.role !== "admin") tab = "requests"; state.dashboardTab = tab; $("#home-view").hidden = true; $("#organization-page-view").hidden = true; $("#dashboard-view").hidden = false; window.scrollTo({ top: 0, behavior: "auto" }); history.replaceState({route:"dashboard"}, "", "/dashboard"); $$('[data-dashboard-tab]').forEach(button => button.setAttribute("aria-selected", String(button.dataset.dashboardTab === tab))); $("#dashboard-content").innerHTML = '<div class="skeleton-card" aria-hidden="true"></div>';
+    try { const data = await refreshAccountSnapshot(); $("#stat-requests").textContent = data.stats.activeRequests; $("#stat-items").textContent = data.stats.items; $("#stat-completed").textContent = data.stats.completed; if (tab === "requests") renderDashboardRequests(data.requests || []); if (tab === "items") renderDashboardItems(data.items || []); if (tab === "gmachim") renderDashboardOrganizations(data.organizations || []); if (tab === "saved") await renderDashboardSaved(); if (tab === "addresses") await renderAddresses(); if (tab === "sessions") await renderSessions(); if (tab === "searches") await renderSavedSearches(); if (tab === "profile") { await renderProfile(); if(state.user.role==="admin"&&!state.user.twoFactorEnabled){const panel=document.createElement("section");panel.className="dashboard-empty";panel.innerHTML=`<h2>אבטחת חשבון הנהלת האתר</h2><p>כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.</p><button class="button button-primary" type="button" id="admin-enable-2fa">הפעלת אימות דו שלבי</button><div id="two-factor-setup"></div>`;$("#dashboard-content").prepend(panel);$("#admin-enable-2fa").addEventListener("click",beginTwoFactorSetup)}}; if (tab === "notifications") await renderNotificationPreferences(); if (tab === "admin") await renderAdmin(); organizeDashboardTools(); document.documentElement.classList.remove("route-dashboard-boot"); }
+    catch (error) { document.documentElement.classList.remove("route-dashboard-boot"); console.error("Dashboard error", error); $("#dashboard-content").innerHTML = `<div class="dashboard-empty"><p>${escapeHTML(error.message || "לא הצלחנו לטעון את האזור האישי")}</p>${error.systemFault&&error.requestId?`<small>מספר תקלה לתמיכה: ${escapeHTML(error.requestId)}</small>`:""}<button class="button button-secondary" type="button" id="dashboard-support-error">פנייה לתמיכה עם פרטי התקלה</button></div>`;$("#dashboard-support-error")?.addEventListener("click",()=>openSupportForError(error,"תקלה בטעינת האזור האישי")); }
   }
   async function renderSessions() {
     const [{sessions = []},{events = []}] = await Promise.all([api("/api/me/sessions"),api("/api/me/security-events")]);
@@ -1486,57 +1487,54 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
 })();
 
-// Seamless category carousel. It deliberately uses one animation engine only;
-// a second timer-based carousel causes visible resets and uneven motion.
+// Category carousel continuous autoplay v3 — restored behavior.
 (()=>{
-  const ready=()=>{
+  let stopCurrent=()=>{};
+  const start=()=>{
     const rail=document.getElementById('category-rail');
-    if(!rail || rail.dataset.continuousCarousel==='1') return;
+    if(!rail) return;
+    stopCurrent();
+    rail.querySelectorAll('[data-carousel-clone]').forEach(node=>node.remove());
+    delete rail.dataset.continuousCarousel;
+    rail.scrollLeft=0;
     if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     rail.dataset.continuousCarousel='1';
     rail.classList.add('carousel-ready','carousel-continuous');
-    const originals=[...rail.children];
+    const originals=[...rail.children].filter(node=>!node.dataset.carouselClone);
     if(originals.length<2) return;
-    const appendSet=()=>originals.forEach((original,index)=>{
-      const clone=original.cloneNode(true);
+    originals.forEach((el,index)=>{
+      const clone=el.cloneNode(true);
       clone.setAttribute('aria-hidden','true');
       clone.tabIndex=-1;
       clone.dataset.carouselClone=String(index);
-      clone.addEventListener('click',()=>original.click());
+      clone.addEventListener('click',()=>el.click());
       rail.appendChild(clone);
     });
-    // Keep at least two full viewport widths in the rail. This guarantees
-    // movement on desktop even when every original category initially fits.
-    const fillRail=()=>{
-      const gap=parseFloat(getComputedStyle(rail).gap)||0;
-      const setWidth=originals.reduce((width,item)=>width+item.getBoundingClientRect().width,0)+gap*(originals.length-1);
-      const requiredSets=Math.max(3,Math.ceil((rail.clientWidth*2+gap)/Math.max(setWidth,1)));
-      while(rail.children.length<originals.length*requiredSets) appendSet();
-      return setWidth+gap;
-    };
-    let cycleWidth=fillRail();
-    let paused=false, last=performance.now(), raf=0;
+    let paused=false,last=performance.now(),raf=0;
+    const speed=window.innerWidth<=760?62:48;
     const rtl=document.documentElement.dir==='rtl';
-    const speed=()=>window.innerWidth<=760 ? 82 : 46;
-    const tick=(now)=>{
-      const dt=Math.min(40,now-last); last=now;
-      if(!paused && !document.hidden && !document.documentElement.classList.contains('a11y-stop-motion')){
-        const delta=speed()*dt/1000;
-        rail.scrollLeft += rtl ? -delta : delta;
-        if(Math.abs(rail.scrollLeft)>=cycleWidth) rail.scrollLeft+=rtl ? cycleWidth : -cycleWidth;
+    const half=()=>rail.scrollWidth/2;
+    const tick=now=>{
+      const dt=Math.min(40,now-last);last=now;
+      if(!paused&&!document.hidden&&!document.documentElement.classList.contains('a11y-stop-motion')){
+        const delta=speed*dt/1000;
+        rail.scrollLeft+=rtl?-delta:delta;
+        const h=half();
+        if(Math.abs(rail.scrollLeft)>=h-2)rail.scrollLeft=0;
       }
       raf=requestAnimationFrame(tick);
     };
     let resume;
-    const pause=()=>{ paused=true; clearTimeout(resume); };
-    const restart=()=>{ clearTimeout(resume); resume=setTimeout(()=>paused=false,450); };
+    const pause=()=>{paused=true;clearTimeout(resume)};
+    const restart=()=>{clearTimeout(resume);resume=setTimeout(()=>paused=false,450)};
     rail.addEventListener('pointerdown',pause,{passive:true});
     rail.addEventListener('pointerup',restart,{passive:true});
     rail.addEventListener('pointercancel',restart,{passive:true});
     rail.addEventListener('touchend',restart,{passive:true});
-    rail.addEventListener('wheel',()=>{pause();restart();},{passive:true});
-    addEventListener('resize',()=>{ cycleWidth=fillRail(); },{passive:true});
+    rail.addEventListener('wheel',()=>{pause();restart()},{passive:true});
     raf=requestAnimationFrame(tick);
+    stopCurrent=()=>{cancelAnimationFrame(raf);clearTimeout(resume)};
   };
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',ready,{once:true}); else ready();
+  window.GmachResetCategoryCarousel=start;
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
