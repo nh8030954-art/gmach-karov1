@@ -280,7 +280,7 @@
       renderDiscovery();
     }catch(error){console.warn("Category aliases unavailable",error)}
   }
-  window.addEventListener("gmach:categories-changed",()=>loadCategoryAliases());
+  window.addEventListener("gmach:categories-changed",()=>Promise.allSettled([loadCategoryAliases(),loadDiscovery(),loadItems()]));
   function installAdvancedGmachSearch(){
     const section=$("#gmachim"),heading=section?.querySelector(".section-heading");
     if(!heading||$("#advanced-gmach-search"))return;
@@ -1216,7 +1216,7 @@
     requireAuth(async () => { stopChatPolling(); state.chatRequestId = requestId; $("#chat-form").dataset.requestId=String(requestId); $("#chat-messages").innerHTML = '<div class="skeleton-card" aria-hidden="true"></div>'; openDialog($("#chat-dialog")); await loadChatMessages(); state.chatTimer = window.setInterval(() => loadChatMessages(true), 5000); });
   }
   function openReport(itemId) { requireAuth(() => { closeDialog($("#item-dialog")); $("#report-form").reset(); $("#report-item-id").value = itemId; openDialog($("#report-dialog")); }); }
-  function showHome() { $("#organization-page-view").hidden = true; $("#dashboard-view").hidden = true; $("#home-view").hidden = false; history.replaceState(null, "", location.pathname === "/" ? "/" : location.pathname); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  function showHome() { $("#organization-page-view").hidden = true; $("#dashboard-view").hidden = true; $("#home-view").hidden = false; history.replaceState(null, "", location.pathname === "/" ? "/" : location.pathname); window.scrollTo({ top: 0, behavior: "auto" }); }
   function setResultsView(mode) { state.viewMode=mode === "map" ? "map" : "list"; $("#items-grid").hidden=state.viewMode === "map" || !state.filteredItems.length; $("#map-results").hidden=state.viewMode !== "map" || !state.filteredItems.length; $("#list-view-button").classList.toggle("is-active",state.viewMode==="list"); $("#map-view-button").classList.toggle("is-active",state.viewMode==="map"); }
   function openHelpRequest() { requireAuth(() => { $("#help-request-form").reset(); $("#help-city").value=$("#city-filter").value; $("#help-title").value=$("#search-input").value; openDialog($("#help-request-dialog")); }); }
   async function openCommunityBoard(page=1,focusId=null){
@@ -1374,6 +1374,8 @@
     },true);
   }
   async function init() {
+    if("scrollRestoration" in history)history.scrollRestoration="manual";
+    if((location.pathname||"/")==="/"&&!location.hash)window.scrollTo({top:0,left:0,behavior:"auto"});
     setupEvents(); installFormErrorFocus(); installDashboardToolOrganizer(); setAuthMode("login"); updateAuthUI(); installAdvancedGmachSearch(); registerWebMCP();
     const siteCopyReady=Promise.allSettled([loadSiteSettings(),loadPageCustomizations()]);
     const publicReady=Promise.allSettled([loadPublicConfig(),loadDiscovery(),loadCategoryAliases(),loadItems()]);
