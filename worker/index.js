@@ -2825,8 +2825,8 @@ async function restorePageCustomizationVersion(request, env, versionId) {
 async function adminContent(request, env) {
   await requireAdmin(request, env);
   const [organizations, items, requests, reports, versions] = await env.DB.batch([
-    env.DB.prepare(`SELECT o.id,o.name,o.city,o.neighborhood,o.status,o.verified,o.is_hidden,o.created_at,u.full_name AS owner_name,u.email AS owner_email,osc.code AS gmach_code FROM organizations o LEFT JOIN users u ON u.id=o.owner_id LEFT JOIN organization_serial_codes osc ON osc.organization_id=o.id ORDER BY o.created_at DESC LIMIT 500`),
-    env.DB.prepare(`SELECT i.id,i.title,i.category,i.condition,i.quantity,i.status,i.availability_status,i.created_at,o.name AS organization_name,(SELECT COUNT(*) FROM item_units iu WHERE iu.item_id=i.id AND iu.status!='retired') AS unit_count FROM items i JOIN organizations o ON o.id=i.organization_id ORDER BY i.created_at DESC LIMIT 1000`),
+    env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,o.verified,o.is_hidden,o.created_at,u.full_name AS owner_name,u.email AS owner_email,osc.code AS gmach_code FROM organizations o LEFT JOIN users u ON u.id=o.owner_id LEFT JOIN organization_serial_codes osc ON osc.organization_id=o.id ORDER BY o.created_at DESC LIMIT 500`),
+    env.DB.prepare(`SELECT i.id,i.title,i.category,i.subcategory,i.description,i.condition,i.quantity,i.status,i.availability_status,i.created_at,o.name AS organization_name,(SELECT COUNT(*) FROM item_units iu WHERE iu.item_id=i.id AND iu.status!='retired') AS unit_count FROM items i JOIN organizations o ON o.id=i.organization_id ORDER BY i.created_at DESC LIMIT 1000`),
     env.DB.prepare(`SELECT lr.id,lr.status,lr.requested_from,lr.requested_until,lr.created_at,i.title AS item_title,b.full_name AS borrower_name,b.email AS borrower_email,o.name AS organization_name FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN users b ON b.id=lr.borrower_id JOIN organizations o ON o.id=i.organization_id ORDER BY lr.created_at DESC LIMIT 1000`),
     env.DB.prepare(`SELECT r.id,r.reason,r.status,r.created_at,i.title AS item_title,u.full_name AS reporter_name FROM reports r JOIN items i ON i.id=r.item_id JOIN users u ON u.id=r.reporter_id ORDER BY r.created_at DESC LIMIT 500`),
     env.DB.prepare(`SELECT v.id,v.created_at,u.full_name AS created_by_name FROM page_customization_versions v LEFT JOIN users u ON u.id=v.created_by ORDER BY v.created_at DESC LIMIT 100`)
@@ -2881,30 +2881,49 @@ function auditStatement(env, actorId, action, entityType, entityId = null, metad
 }
 
 async function moderateOrganization(request, env, id) {
-  await requireAdmin(request, env);
-  const body = await readJson(request);
-  const status = cleanText(body.status, 2, 20, "סטטוס");
-  if (!["approved", "rejected"].includes(status)) throw new HttpError(400, "סטטוס האישור אינו תקין");
-  const result = await env.DB.prepare("UPDATE organizations SET status = ?, verified = 0, updated_at = ? WHERE id = ?")
-    .bind(status, new Date().toISOString(), id).run();
-  if (!result.meta.changes) throw new HttpError(404, "הגמ״ח לא נמצא");
-  return json({ id, status });
+  const admin=await requireAdmin(request, env),body=await readJson(request);
+  const current=await env.DB.prepare("SELECT * FROM organizations WHERE id=?").bind(id).first();
+  if(!current)throw new HttpError(404,"הגמ״ח לא נמצא");
+  const status=body.status===undefined?current.status:String(body.status);
+  if(!["approved","rejected"].includes(status))throw new HttpError(400,"סטטוס האישור אינו תקין");
+  const name=body.name===undefined?current.name:cleanText(body.name,2,100,"שם הגמ״ח");
+  const primaryCategory=body.primaryCategory===undefined?current.primary_category:cleanOptional(body.primaryCategory,80);
+  const city=body.city===undefined?current.city:cleanText(body.city,2,80,"עיר");
+  const neighborhood=body.neighborhood===undefined?current.neighborhood:cleanOptional(body.neighborhood,80);
+  const description=body.description===undefined?current.description:cleanText(body.description,2,1200,"תיאור");
+  const now=new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE organizations SET name=?,primary_category=?,city=?,neighborhood=?,description=?,status=?,verified=0,updated_at=? WHERE id=?").bind(name,primaryCategory,city,neighborhood,description,status,now,id),
+    auditStatement(env,admin.id,"admin.organization.update","organization",id,{name,primaryCategory,city,neighborhood,status})
+  ]);
+  return json({id,name,primaryCategory,city,neighborhood,description,status});
 }
 
 async function moderateItem(request, env, id) {
-  await requireAdmin(request, env);
-  const body = await readJson(request);
-  const status = cleanText(body.status, 2, 20, "סטטוס");
-  if (!["active", "rejected", "archived"].includes(status)) throw new HttpError(400, "סטטוס הפריט אינו תקין");
-  if (status === "active") {
-    const owner = await env.DB.prepare("SELECT o.status FROM items i JOIN organizations o ON o.id = i.organization_id WHERE i.id = ?").bind(id).first();
-    if (!owner) throw new HttpError(404, "הפריט לא נמצא");
-    if (owner.status !== "approved") throw new HttpError(409, "יש לאשר את הגמ״ח לפני פרסום הפריט");
+  const admin=await requireAdmin(request, env),body=await readJson(request);
+  const current=await env.DB.prepare("SELECT * FROM items WHERE id=?").bind(id).first();
+  if(!current)throw new HttpError(404,"הפריט לא נמצא");
+  const status=body.status===undefined?current.status:String(body.status);
+  if(!["active","rejected","archived"].includes(status))throw new HttpError(400,"סטטוס הפריט אינו תקין");
+  if(status==="active"){
+    const owner=await env.DB.prepare("SELECT o.status FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.id=?").bind(id).first();
+    if(owner?.status!=="approved")throw new HttpError(409,"יש לאשר את הגמ״ח לפני פרסום הפריט");
   }
-  const result = await env.DB.prepare("UPDATE items SET status = ?, updated_at = ? WHERE id = ?")
-    .bind(status, new Date().toISOString(), id).run();
-  if (!result.meta.changes) throw new HttpError(404, "הפריט לא נמצא");
-  return json({ id, status });
+  const title=body.title===undefined?current.title:cleanText(body.title,2,120,"שם הפריט");
+  const category=body.category===undefined?current.category:cleanText(body.category,2,80,"קטגוריה");
+  const subcategory=body.subcategory===undefined?current.subcategory:cleanOptional(body.subcategory,80);
+  const description=body.description===undefined?current.description:cleanText(body.description,2,1500,"תיאור");
+  const condition=body.condition===undefined?current.condition:cleanText(body.condition,2,80,"מצב");
+  const availabilityStatus=body.availabilityStatus===undefined?current.availability_status:String(body.availabilityStatus);
+  if(!["available","unavailable","reserved"].includes(availabilityStatus))throw new HttpError(400,"מצב הזמינות אינו תקין");
+  const quantity=body.quantity===undefined?Number(current.quantity||1):Math.max(1,Math.min(999,Number(body.quantity)||1));
+  const now=new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE items SET title=?,category=?,subcategory=?,description=?,condition=?,quantity=?,status=?,availability_status=?,inventory_updated_at=?,updated_at=? WHERE id=?").bind(title,category,subcategory,description,condition,quantity,status,availabilityStatus,now,now,id),
+    auditStatement(env,admin.id,"admin.item.update","item",id,{title,category,subcategory,condition,quantity,status,availabilityStatus})
+  ]);
+  await syncItemUnitsToQuantity(env,id,quantity);
+  return json({id,title,category,subcategory,description,condition,quantity,status,availabilityStatus});
 }
 
 async function moderateReport(request, env, id) {
