@@ -1,4 +1,4 @@
-sha=3d6acc5b077fa02848757c057082dcbc9988bf70
+sha=3d027eb2ae2d6268cbfe39acf7b91f2afd85ffb6
 install=success
 syntax=success
 tests=failure
@@ -9,7 +9,7 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: {"error":"אפשר להוסיף עד 1 מספרים סידוריים בלבד, בהתאם לכמות המלאי של הפריט","requestId":"179093897124565861"}
+AssertionError [ERR_ASSERTION]: {"error":"אפשר להוסיף עד 1 מספרים סידוריים בלבד, בהתאם לכמות המלאי של הפריט","requestId":"179093900621604807"}
 
 409 !== 201
 
@@ -25,7 +25,7 @@ AssertionError [ERR_ASSERTION]: {"error":"אפשר להוסיף עד 1 מספר�
 
 Node.js v24.21.0
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790938971459:255:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1790939006363:255:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
@@ -36,5 +36,5 @@ Node.js v24.21.0
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T11:02:55.251Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T11:03:29.436Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
