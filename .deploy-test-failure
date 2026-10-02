@@ -1,4 +1,4 @@
-deploy_sha=a69a71845de264d192ad03b0ff59736e0501c7b8
+deploy_sha=4c43bc240c02ffb4b0cc082c5dd558f38612f26e
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -34,7 +34,7 @@ AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
 
 2 !== 1
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:412:10
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:473:10
     at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
   generatedMessage: true,
   code: 'ERR_ASSERTION',
