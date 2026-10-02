@@ -1,0 +1,36 @@
+name: Serial audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/serial-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Audit gmach 1 serials
+        run: |
+          echo '=== GMACH 1 INVENTORY ==='
+          npx wrangler d1 execute DB --remote --json --command "SELECT osc.code AS gmach_code,o.name AS gmach_name,isc.code AS item_code,i.title,i.quantity,(SELECT COUNT(*) FROM item_units u WHERE u.item_id=i.id AND u.status!='retired') AS unit_count,(SELECT GROUP_CONCAT(serial_number,'|') FROM (SELECT u2.serial_number FROM item_units u2 WHERE u2.item_id=i.id AND u2.status!='retired' ORDER BY u2.created_at,u2.id)) AS serials FROM items i JOIN organizations o ON o.id=i.organization_id JOIN organization_serial_codes osc ON osc.organization_id=o.id JOIN item_serial_codes_v2 isc ON isc.item_id=i.id WHERE osc.code=1 AND i.status!='archived' ORDER BY isc.code;"
+          echo '=== GMACH 1 ITEM CODE SEQUENCE CHECK ==='
+          npx wrangler d1 execute DB --remote --json --command "WITH x AS (SELECT isc.code,ROW_NUMBER() OVER (ORDER BY isc.code) AS expected FROM item_serial_codes_v2 isc JOIN organization_serial_codes osc ON osc.organization_id=isc.organization_id WHERE osc.code=1) SELECT COUNT(*) AS item_count,COALESCE(SUM(code!=expected),0) AS item_code_mismatches FROM x;"
+          echo '=== GMACH 1 UNIT SERIAL CHECK ==='
+          npx wrangler d1 execute DB --remote --json --command "WITH x AS (SELECT u.serial_number,'GB-'||osc.code||'-'||isc.code||'-'||ROW_NUMBER() OVER (PARTITION BY u.item_id ORDER BY u.created_at,u.id) AS expected FROM item_units u JOIN items i ON i.id=u.item_id JOIN organization_serial_codes osc ON osc.organization_id=i.organization_id JOIN item_serial_codes_v2 isc ON isc.item_id=i.id WHERE osc.code=1 AND u.status!='retired') SELECT COUNT(*) AS unit_count,COALESCE(SUM(serial_number!=expected),0) AS serial_mismatches FROM x;"
+          echo '=== GMACH 1 QUANTITY CHECK ==='
+          npx wrangler d1 execute DB --remote --json --command "SELECT COUNT(*) AS quantity_mismatches FROM items i JOIN organization_serial_codes osc ON osc.organization_id=i.organization_id WHERE osc.code=1 AND i.status!='archived' AND i.quantity!=(SELECT COUNT(*) FROM item_units u WHERE u.item_id=i.id AND u.status!='retired');"
+          echo '=== GLOBAL DUPLICATE SERIAL CHECK ==='
+          npx wrangler d1 execute DB --remote --json --command "SELECT COUNT(*) AS duplicate_serial_groups FROM (SELECT serial_number FROM item_units WHERE status!='retired' GROUP BY serial_number HAVING COUNT(*)>1);"
