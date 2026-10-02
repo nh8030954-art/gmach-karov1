@@ -1,20 +1,20 @@
-sha=37911c1f1e3353329592e6f38bb0375678384fd4
+sha=eafacb0dddbac46ee68a6e7ffc4c059dcbb9a4cf
 install=success
 syntax=success
 tests=failure
 smoke=failure
 live=success
-
-> gmach-karov@1.0.0 test
-> node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
-
-Final completion static release gate passed.
+Distribution completion static release gate passed.
+Navigation admin static release gate passed.
+Privacy availability static release gate passed.
+Release hardening static gate passed.
+Release experience static release gate passed.
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:147:83 {
+AssertionError [ERR_ASSERTION]: return rows.length?dynamic missing from dynamic live category catalog
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:338:146 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
@@ -25,8 +25,8 @@ AssertionError [ERR_ASSERTION]: single-element selector used as collection
 
 Node.js v24.21.0
 
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790949920546:147:83 {
+AssertionError [ERR_ASSERTION]: return rows.length?dynamic missing from dynamic live category catalog
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1790950016764:338:146 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
@@ -36,5 +36,5 @@ AssertionError [ERR_ASSERTION]: single-element selector used as collection
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T14:05:21.062Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-02T14:06:57.689Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
