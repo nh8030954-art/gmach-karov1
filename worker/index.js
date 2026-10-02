@@ -185,6 +185,20 @@ class HttpError extends Error {
     this.status = status;
   }
 }
+function incidentNumber(){
+  const random=crypto.getRandomValues(new Uint32Array(1))[0]%100000;
+  return String(Date.now())+String(random).padStart(5,"0");
+}
+async function recordClientIncident(request,env){
+  await ensureDistributionCompletionSchema(env);
+  const body=await readJson(request),requestId=String(body.incidentNumber||"").replace(/\D/g,"").slice(0,24);
+  if(requestId.length<8)throw new HttpError(400,"מספר התקלה אינו תקין");
+  let userId=null;try{userId=(await currentUser(request,env))?.id||null}catch{}
+  const pagePath=String(body.path||"/").slice(0,500),message=String(body.message||"שגיאת דפדפן").slice(0,1000),stack=String(body.stack||"").slice(0,3000);
+  await env.DB.prepare("INSERT OR IGNORE INTO server_errors(id,request_id,path,method,message,stack_excerpt,user_id) VALUES(?,?,?,?,?,?,?)")
+    .bind(crypto.randomUUID(),requestId,pagePath,"CLIENT",message,stack,userId).run();
+  return json({ok:true,incidentNumber:requestId},201);
+}
 
 
 function escapeMeta(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]))}
@@ -402,7 +416,7 @@ export default {
       return withSecurityHeaders(response);
     } catch (error) {
       const status = error instanceof HttpError ? error.status : 500;
-      const requestId = crypto.randomUUID();
+      const requestId = incidentNumber();
       if (status >= 500) { console.error("Request failed", { requestId, path: url.pathname, error }); try { ctx.waitUntil(recordDistributionError(env,request,error,requestId)); } catch {} }
       return withSecurityHeaders(json({ error: error instanceof HttpError ? error.message : "אירעה תקלה זמנית בשרת", requestId }, status, { "X-Request-Id": requestId }));
     }
@@ -693,7 +707,7 @@ async function routeApi(request, env, ctx, url) {
     return json({ user: user ? publicUser(user) : null });
   }
   if (method === "GET" && path === "/api/public-config") return json({ supportEmail: String(env.SUPPORT_EMAIL || DEFAULT_SUPPORT_EMAIL), pushPublicKey: String(env.VAPID_PUBLIC_KEY || "") });
-  if (method === "GET" && path === "/api/me/calendar-feed") return myCalendarFeed(request,env);
+  if (method === "POST" && path === "/api/client-errors") return recordClientIncident(request,env);\n  if (method === "GET" && path === "/api/me/calendar-feed") return myCalendarFeed(request,env);
   const calendarFeed=path.match(/^\/calendar\/([A-Za-z0-9_-]{20,})\.ics$/); if(method==="GET"&&calendarFeed)return publicCalendarFeed(env,calendarFeed[1]);
   if (method === "GET" && path === "/api/unsubscribe/community") return unsubscribeCommunity(env,url.searchParams.get("token"));
   if (method === "GET" && path === "/api/categories") return listCategories(env, url);
