@@ -491,3 +491,8 @@ assert.ok(worker.includes("fixedSubcategory(category,body.subcategory)"),"server
 assert.ok(worker.includes('body.freeConfirmed!==true'),"server-side free confirmation missing");
 assert.ok(worker.includes('if(!Object.values(parsed).some(entry=>String(entry||"").trim().length>=3))return "{}"'),"empty gmach hours must be allowed");
 assert.ok(indexHtml.includes('name="auth-account-intent" value="owner"'),"owner registration intent missing");
+
+assert.ok(appClient.includes("GmachLastIncidentNumber")&&appClient.includes("/api/client-errors"),"client incident references must be recorded");
+assert.ok(appClient.includes("מספר תקלה:")&&worker.includes("incidentNumber()"),"system errors must expose traceable incident numbers");
+assert.ok(appClient.includes("window.GmachToast=toast"),"global toast channel missing");
+assert.ok(indexHtml.includes("toast-region"),"toast region missing");
