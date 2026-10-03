@@ -249,7 +249,7 @@ for(const token of ["admin_user_controls","admin_loan_holds","multi_range_batch_
 assert.ok(worker.includes("handleRequirementsExpansion"),"requirements expansion handler not wired");
 assert.ok(worker.includes("requirementsExpansionPreflight"),"requirements expansion preflight not wired");
 assert.ok(worker.includes("runRequirementsExpansionMaintenance"),"requirements expansion maintenance not wired");
-assert.ok(indexHtml.includes("./requirements-expansion.js"),"requirements expansion client not loaded");
+assert.ok(indexHtml.includes("/requirements-expansion.js"),"requirements expansion client not loaded");
 console.log("Requirements expansion static release gate passed.");
 
 
@@ -261,7 +261,7 @@ for(const token of ["מרכז ניהול השאלות","מדיניות מלאי 
 for(const token of ["operational_health_snapshots","system_alerts_type_open_idx"]) assert.ok(launchMigration.includes(token),token+" missing from launch readiness migration");
 assert.ok(worker.includes("handleLaunchReadiness"),"launch readiness handler not wired");
 assert.ok(worker.includes("runLaunchReadinessMaintenance"),"launch readiness maintenance not wired");
-assert.ok(indexHtml.includes("./launch-readiness.js"),"launch readiness client not loaded");
+assert.ok(indexHtml.includes("/launch-readiness.js"),"launch readiness client not loaded");
 console.log("Launch readiness static release gate passed.");
 
 for(const token of ["moderateItemImage","@cf/moondream/moondream3.1-9B-A2B","moderationFindings","autoHidden"])assert.ok(worker.includes(token),token+" missing from automatic item image moderation");
@@ -280,7 +280,7 @@ for(const token of ["חיפוש סניפים ונקודות איסוף","מרכ�
 for(const token of ["server_errors","priority","assigned_to","last_staff_reply_at"]) assert.ok(distributionMigration.includes(token),token+" missing from distribution completion migration");
 assert.ok(worker.includes("handleDistributionCompletion"),"distribution completion handler not wired");
 assert.ok(worker.includes("recordDistributionError"),"server error recording not wired");
-assert.ok(indexHtml.includes("./distribution-completion.js"),"distribution completion client not loaded");
+assert.ok(indexHtml.includes("/distribution-completion.js"),"distribution completion client not loaded");
 console.log("Distribution completion static release gate passed.");
 
 for(const token of ["/api/admin/entities","patchAdminEntity","branchManagement"])assert.ok(launchWorker.includes(token),token+" missing from admin entity controls and branch editing");
@@ -295,7 +295,7 @@ for(const token of ["/api/navigation-links","/api/admin/navigation-links","navig
 for(const token of ["ניהול קישורים ותפריטים","applyPublicLinks","data-navigation-admin","#action:support"]) assert.ok(navigationClient.includes(token),token+" missing from navigation admin UI");
 for(const token of ["navigation_links","footer_find","footer_share","footer_info"]) assert.ok(navigationMigration.includes(token),token+" missing from navigation migration");
 assert.ok(worker.includes("handleNavigationAdmin"),"navigation admin handler not wired");
-assert.ok(indexHtml.includes("./navigation-admin.js"),"navigation admin client not loaded");
+assert.ok(indexHtml.includes("/navigation-admin.js"),"navigation admin client not loaded");
 console.log("Navigation admin static release gate passed.");
 
 
@@ -307,7 +307,7 @@ for(const token of ["ניהול זמינות מתקדם","בקשות פרטיו�
 for(const token of ["admin_note","assigned_to","due_at","availability_rules_scope_idx"]) assert.ok(privacyAvailabilityMigration.includes(token),token+" missing from privacy/availability migration");
 assert.ok(worker.includes("handlePrivacyAvailability"),"privacy/availability handler not wired");
 assert.ok(worker.includes("checkAvailabilityRules(env,itemId,from,until"),"availability rules not enforced for loan requests");
-assert.ok(indexHtml.includes("./privacy-availability.js"),"privacy/availability client not loaded");
+assert.ok(indexHtml.includes("/privacy-availability.js"),"privacy/availability client not loaded");
 console.log("Privacy availability static release gate passed.");
 
 
@@ -332,7 +332,7 @@ console.log("Release hardening static gate passed.");
 const releaseExperience=await readFile("dist/release-experience.js","utf8");
 for(const token of ["Loan terms and availability","My support requests","support-faq-suggestions","Branch map","data-branch-visual-map","/api/me/support-tickets","/api/faqs?lang="]) assert.ok(releaseExperience.includes(token),token+" missing from release experience");
 for(const token of ["minLoanMinutes","bookingNoticeMinutes","turnaroundMinutes","depositAmountAgorot","recurringAllowed"]) assert.ok(worker.includes(token),token+" missing from public item policy payload");
-assert.ok(indexHtml.includes("./release-experience.js"),"release experience client not loaded");
+assert.ok(indexHtml.includes("/release-experience.js"),"release experience client not loaded");
 assert.ok(expansionClient.includes("שעות פעילות"),"branch hours missing from public branch UI");
 assert.ok(expansionClient.includes("data-copy-branch"),"branch copy-address action missing");
 console.log("Release experience static release gate passed.");
@@ -345,7 +345,7 @@ for(const token of ["deleteAdminCategory","category.delete","UPDATE items SET ca
 for(const token of ["state.categoryCatalog","itemSubcategoriesFor","populateItemCategorySelector","bindCategoryRailButtons","gmach:categories-changed","#gmach-category","#help-category"])assert.ok(appClient.includes(token),token+" missing from dynamic live category catalog");
 assert.ok(appClient.includes("const selectedUnits=()=>$$('input[name=\"pickup-unit\"]:checked',d).map(x=>x.value);"),"pickup unit buttons must read all selected units");
 
-assert.ok(indexHtml.includes("./admin-control-center.js"),"admin control center client not loaded");
+assert.ok(indexHtml.includes("/admin-control-center.js"),"admin control center client not loaded");
 for(const token of ["optionalReportQuery","sources:{items:items.length","/api/me/reports"]) assert.ok(expansionWorker.includes(token),token+" missing from resilient report tracking");
 console.log("Admin control center static release gate passed.");
 
@@ -361,7 +361,7 @@ assert.ok(worker.includes("handlePrivacyPurge"),"privacy purge handler not wired
 assert.ok(worker.includes("runPrivacyPurgeMaintenance"),"privacy purge maintenance not wired");
 assert.ok(worker.includes("blockedByOwnedOrganizations"),"account deletion ownership guard missing");
 assert.ok(platform.includes("privacy-retention"),"privacy retention admin operations are not step-up protected");
-assert.ok(indexHtml.includes("./privacy-purge.js"),"privacy purge client not loaded");
+assert.ok(indexHtml.includes("/privacy-purge.js"),"privacy purge client not loaded");
 console.log("Privacy purge static release gate passed.");
 
 
@@ -383,7 +383,7 @@ const manifestText=await readFile("dist/manifest.webmanifest","utf8");
 for(const token of ["beforeinstallprompt","serviceWorker.register","connection-status-banner","appinstalled"])assert.ok(releaseShell.includes(token),token+" missing from release shell");
 for(const token of ["CACHE_NAME","caches.open","req.mode===\"navigate\"","notificationclick"])assert.ok(swClient.includes(token),token+" missing from service worker");
 assert.ok(indexHtml.includes('rel="manifest"'),"web app manifest is not linked");
-assert.ok(indexHtml.includes("./release-shell.js"),"release shell is not loaded");
+assert.ok(indexHtml.includes("/release-shell.js"),"release shell is not loaded");
 assert.ok(indexHtml.includes("family=Assistant:wght@400;500;600;700;800&display=block"),"Assistant must be the first painted site font");
 assert.ok(!indexHtml.includes('localStorage.getItem("gmach-site-settings-v1")'),"layout bootstrap must not live in blocked inline script");
 const i18nBoot=await readFile("dist/i18n-boot.js","utf8");
