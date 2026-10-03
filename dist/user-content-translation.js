@@ -1,24 +1,25 @@
 (() => {
   'use strict';
   let started = false;
-  const selector = '.item-detail-description,#item-dialog-title,.item-card h3,.item-card p,.organization-hero>p,.organization-card p,.review-list blockquote p,.chat-message p,.community-board-card>h3,.community-board-card>p';
+  const selector = 'body';
+  const NEVER_TRANSLATE = '.organization-name,[translate="no"],[data-no-translate],#organization-title,[data-open-organization],[data-recent-org] strong,[data-owned-org] h3,.organization-switch button,.gmach-owner strong';
   const cache = new Map(), ignored = new WeakSet();
   let timer = 0, busy = false, requests = 0;
   function candidates() {
     const nodes = [];
-    for (const element of document.querySelectorAll(selector)) {
-      if (!element.getClientRects().length || element.closest('.organization-name,[translate="no"],[data-no-translate]')) continue;
-      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-      let node;
-      while ((node = walker.nextNode())) {
-        const value = node.nodeValue?.trim() || '';
-        if (!ignored.has(node) && /[\u0590-\u05ff]/.test(value) && value.length >= 2 && value.length <= 500) nodes.push({ node, value });
-      }
+    const root=document.body;if(!root)return nodes;
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+    let node;
+    while((node=walker.nextNode())){
+      const parent=node.parentElement,value=node.nodeValue?.trim()||'';
+      if(!parent||!parent.getClientRects().length||parent.closest(NEVER_TRANSLATE)||parent.closest('script,style,noscript,textarea,code,pre'))continue;
+      if(!ignored.has(node)&&/[\u0590-\u05ff]/.test(value)&&value.length>=2&&value.length<=500)nodes.push({node,value});
+      if(nodes.length>=24)break;
     }
-    return nodes.slice(0, 12);
+    return nodes;
   }
   async function translate() {
-    if (busy || requests >= 20) return;
+    if (busy || requests >= 60) return;
     const group = candidates();
     if (!group.length) return;
     busy = true;
@@ -41,10 +42,10 @@
       }
     } catch {
       // Keep the author's original words visible when translation is unavailable.
-      group.forEach(({ node }) => ignored.add(node));
+      if (requests < 60) setTimeout(schedule, 1800);
     } finally {
       busy = false;
-      if (requests < 20 && candidates().length) schedule();
+      if (requests < 60 && candidates().length) schedule();
     }
   }
   function schedule() { if (!timer) timer = setTimeout(() => { timer = 0; translate(); }, 450); }
