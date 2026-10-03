@@ -377,10 +377,14 @@ for(const token of ["beforeinstallprompt","serviceWorker.register","connection-s
 for(const token of ["CACHE_NAME","caches.open","req.mode===\"navigate\"","notificationclick"])assert.ok(swClient.includes(token),token+" missing from service worker");
 assert.ok(indexHtml.includes('rel="manifest"'),"web app manifest is not linked");
 assert.ok(indexHtml.includes("./release-shell.js"),"release shell is not loaded");
-assert.ok(indexHtml.includes("display=optional"),"web fonts must not late-swap during first paint");
+assert.ok(indexHtml.includes("family=Assistant:wght@400;500;600;700;800&display=block"),"Assistant must be the first painted site font");
 assert.ok(!indexHtml.includes('localStorage.getItem("gmach-site-settings-v1")'),"layout bootstrap must not live in blocked inline script");
 const i18nBoot=await readFile("dist/i18n-boot.js","utf8");
 assert.ok(i18nBoot.includes("scrollRestoration")&&i18nBoot.includes('gmach-site-settings-v1'),"early external layout bootstrap missing");
+assert.ok(i18nBoot.includes("cache_version===2")&&i18nBoot.includes('root.style.setProperty("--site-font","Assistant, sans-serif")'),"font boot must ignore stale cached font values");
+assert.ok(appClient.includes("cache_version:2"),"live settings must refresh versioned font cache");
+assert.ok(appClient.includes('לא הצלחנו לאשר את ההחזרה')&&appClient.includes('setButtonBusy(button,true,"מאשרים…")'),"return confirmation must handle errors and double submits");
+assert.ok(worker.includes("post-return follower notification failed")&&worker.includes("post-status waitlist advance failed"),"return completion must survive noncritical side-effect failures");
 
 assert.ok(indexHtml.includes("./app.js?v="),"app cache-busting version missing");
 assert.ok(!indexHtml.includes('id="app-boot-guard"'),"full-page boot loader must stay disabled");
