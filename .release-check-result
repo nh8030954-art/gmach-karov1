@@ -1,7 +1,40 @@
-sha=c37f7a1d7eaf2d65824814cf9815ca32ce8d54b7
-install=cancelled
-syntax=skipped
-tests=skipped
-smoke=skipped
-live=skipped
+sha=c6416771e3102cd4b45b5eb0cb64d643a05df6e1
+install=success
+syntax=success
+tests=failure
+smoke=failure
+live=success
+QR scanning, structured SEO and accessibility shell gate passed.
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+Full requirements regression extensions passed.
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: five-star rating UI missing
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:520:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
+
+AssertionError [ERR_ASSERTION]: five-star rating UI missing
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791051308131:520:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-03T18:15:08.723Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
