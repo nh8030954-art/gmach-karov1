@@ -538,5 +538,7 @@ assert.ok(worker.includes("Number(existingUnits?.count||0)>quantity")&&worker.in
 assert.ok(worker.includes("CREATE TABLE IF NOT EXISTS organization_serial_codes")&&worker.includes("CREATE TABLE IF NOT EXISTS item_serial_codes"),"serial identity tables must self-heal at runtime");
 
 assert.ok(indexHtml.includes("route-dashboard-boot")&&appClient.includes('classList.remove("route-dashboard-boot")'),"dashboard boot flash guard missing");
-assert.ok(appClient.includes("categoryRailPresentation")&&appClient.includes('rail.classList.add("carousel-ready")')&&!appClient.includes("Category carousel continuous autoplay v3"),"original manual category carousel behavior missing");
+assert.ok(appClient.includes("categoryRailPresentation")&&appClient.includes('rail.classList.add("carousel-ready")')&&appClient.includes("window.GmachResetCategoryCarousel=start")&&appClient.includes("Category carousel continuous autoplay v3"),"category carousel visuals and autoplay must both be present");
+assert.ok(!appClient.includes('setAuthMode("login"); updateAuthUI();'),"startup must not flash logged-out auth UI before /auth/me resolves");
+assert.ok(indexHtml.includes('id="notifications-button"')&&indexHtml.includes('style="visibility:hidden"'),"notification slot must be reserved during auth hydration");
 assert.ok(appClient.includes('window.scrollTo({ top: 0, behavior: "auto" })'),"dashboard must not smooth-scroll during startup");
