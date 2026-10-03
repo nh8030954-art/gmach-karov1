@@ -545,5 +545,9 @@ assert.ok(worker.includes("CREATE TABLE IF NOT EXISTS organization_serial_codes"
 assert.ok(indexHtml.includes("route-dashboard-boot")&&appClient.includes('classList.remove("route-dashboard-boot")'),"dashboard boot flash guard missing");
 assert.ok(appClient.includes("categoryRailPresentation")&&appClient.includes('rail.classList.add("carousel-ready")')&&appClient.includes("window.GmachResetCategoryCarousel=start")&&appClient.includes("Category carousel continuous autoplay v3"),"category carousel visuals and autoplay must both be present");
 assert.ok(!appClient.includes('setAuthMode("login"); updateAuthUI();'),"startup must not flash logged-out auth UI before /auth/me resolves");
-assert.ok(indexHtml.includes('id="notifications-button"')&&indexHtml.includes('style="visibility:hidden"'),"notification slot must be reserved during auth hydration");
+assert.ok(indexHtml.includes('id="notifications-button"')&&indexHtml.includes('style="visibility:visible"'),"notification slot must remain reserved during auth hydration without a layout shift");
 assert.ok(appClient.includes('window.scrollTo({ top: 0, behavior: "auto" })'),"dashboard must not smooth-scroll during startup");
+
+assert.ok(appClient.includes("navigateHomeSection")&&appClient.includes('a[href="/catalog"],a[href="/how-it-works"],a[href="/gmachim"]'),"top navigation must route in-place without a page-top jump");
+
+assert.ok(appClient.includes("data-confirm-collected")&&appClient.includes("שמירת הקצאת יחידות"),"pickup confirmation must stay separate from unit assignment");
