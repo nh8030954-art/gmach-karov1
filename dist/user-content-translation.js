@@ -14,7 +14,7 @@
       if(!ignored.has(node)&&/[\u0590-\u05ff]/.test(value)&&value.length>=2&&value.length<=500){nodes.push({node,value});seen.add(node)}
     };
     root.querySelectorAll('[data-user-content-priority]').forEach(el=>{const w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);let n;while((n=w.nextNode())){add(n);if(nodes.length>=12)return}});
-    if(nodes.length<12){const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;while((node=walker.nextNode())){add(node);if(nodes.length>=12)break}}
+    if(nodes.length<12){const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;while((node=walker.nextNode())){add(node);if(nodes.length>=12)break;}}
     return nodes;
   }
   async function translate() {
