@@ -2481,8 +2481,12 @@ async function updateRequestStatus(request, env, id) {
     statusStatements.push(env.DB.prepare("UPDATE item_units SET status='available',updated_at=? WHERE id IN (SELECT unit_id FROM loan_unit_assignments WHERE request_id=?)").bind(now,id));
   }
   await env.DB.batch(statusStatements);
-  if(["declined","returned","no_show"].includes(target)) await advanceWaitlist(env,row.item_id);
-  if(target==="returned") await notifySavedFollowers(env,{itemId:row.item_id,organizationId:row.organization_id,category:row.category,title:row.item_title,event:"available"});
+  if(["declined","returned","no_show"].includes(target)) {
+    try { await advanceWaitlist(env,row.item_id); } catch(error) { console.error("post-status waitlist advance failed",error); }
+  }
+  if(target==="returned") {
+    try { await notifySavedFollowers(env,{itemId:row.item_id,organizationId:row.organization_id,category:row.category,title:row.item_title,event:"available"}); } catch(error) { console.error("post-return follower notification failed",error); }
+  }
   return json({ id, status: target, managerNote });
 }
 
