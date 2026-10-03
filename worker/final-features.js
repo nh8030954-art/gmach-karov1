@@ -478,6 +478,9 @@ export async function runFinalMaintenance(env){
 export async function handleFinalFeatures(request,env,ctx,url){
   const path=url.pathname,method=request.method.toUpperCase();if(!path.startsWith("/api/")&&path!=="/sitemap.xml")return null;
   if(path.startsWith("/api/maps/"))return null;
+  // These routes belong to the launch-readiness layer. Do not run the final-feature schema bootstrap first:
+  // a failure there must never block super-admin loan management.
+  if(path==="/api/admin/loan-requests"||/^\/api\/admin\/loan-requests\//.test(path))return null;
   try{
     await ensureFinalSchema(env);
     let m;
