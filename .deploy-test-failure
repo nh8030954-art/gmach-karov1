@@ -1,4 +1,4 @@
-deploy_sha=224a237003bd7ee2013e9a7a72af08f4b043bf6a
+deploy_sha=c2ec7283e83ec52ce4603b29e0f1dcd58e05b95c
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -9,8 +9,8 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:159:83 {
+AssertionError [ERR_ASSERTION]: map endpoints must not depend on full schema reconciliation
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:133:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
