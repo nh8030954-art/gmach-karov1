@@ -518,6 +518,10 @@ assert.ok(adminControlCenter.includes("ניהול קטגוריות וקטגור�
 for(const token of ["updateCatalogSubcategories","!subcategory || item.subcategory === subcategory","item.subcategory?","subcategory:$(\"#subcategory-filter\")?.value"])assert.ok(appClient.includes(token),token+" missing from category/subcategory separation UI");
 assert.ok(worker.includes("matchesSubcategory=!f.subcategory"),"saved-search subcategory separation missing");
 assert.ok(appClient.includes("function ratingStars(")&&appClient.includes('size:"review-primary"')&&appClient.includes('size:"item-large"')&&appClient.includes("rating-star"),"five-star rating UI missing");
+assert.ok(appClient.includes("item-rating-hero")&&!appClient.includes('<span>דירוג הפריט</span>'),"item detail rating must be prominent and unlabeled");
+assert.ok(appClient.includes('label:"גמ״ח",size:"gmach-hero"'),"gmach hero rating must be prominent");
+assert.ok(appClient.includes("if(!shellReady) toast"),"boot error toast must only appear when the visible shell is unavailable");
+
 assert.ok(worker.includes("nextQuantity=currentQuantity+count"),"unit creation must increase item quantity");
 assert.ok(worker.includes("Math.max(150,Number(nextOrgCode?.max_code||149)+1)"),"gmach serial numbering must start at 150");
 assert.ok(worker.includes("יש להקצות בדיוק את היחידות הסידוריות שנמסרות לפני אישור האיסוף"),"serialized pickup must require exact unit allocation");
