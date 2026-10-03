@@ -1,4 +1,4 @@
-deploy_sha=9cf366560cf72be7fa9d2b5720c1c8fef130c4d3
+deploy_sha=c0771ceac966475e4f0dbc40f5b5c1bb1c013379
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -20,17 +20,27 @@ Excel export and QR image scanner gate passed.
 Voice message recording gate passed.
 Excel export, accessible admin status and QR image scanning gate passed.
 Full requirements regression extensions passed.
+Static English interface coverage 100.0% (462/462)
+remaining-features Error: Backup checksum mismatch
+    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:175:41)
+    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:362:91)
+    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:913:37)
+    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:378:26)
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: English content translation allowance regression
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:617:8 {
-  generatedMessage: false,
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+202 !== 201
+
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:464:10
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: true,
   code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
+  actual: 202,
+  expected: 201,
+  operator: 'strictEqual',
   diff: 'simple'
 }
 
