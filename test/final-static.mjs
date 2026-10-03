@@ -390,7 +390,9 @@ assert.ok(worker.includes('url.pathname === "/gmach-berega-logo.jpg"'),"closure 
 
 assert.ok(worker.includes("post-return follower notification failed")&&worker.includes("post-status waitlist advance failed"),"return completion must survive noncritical side-effect failures");
 
-assert.ok(indexHtml.includes("./app.js?v="),"app cache-busting version missing");
+assert.ok(indexHtml.includes('/app.js?v='),"app cache-busting version missing");
+assert.ok(!/(?:src|href)="\.\//.test(indexHtml),"route pages must use root-relative static assets");
+assert.ok(appClient.includes("$('[data-org-item]'")&&appClient.includes("$('[data-review-item]'")&&appClient.includes("$('[data-review-helpful]'"),"public gmach listeners must use querySelectorAll helper");
 assert.ok(!indexHtml.includes('id="app-boot-guard"'),"full-page boot loader must stay disabled");
 assert.ok(!indexHtml.includes('class="app-booting site-copy-pending"'),"boot-hiding classes must stay disabled");
 const motionCss=await readFile("dist/motion.css","utf8");
