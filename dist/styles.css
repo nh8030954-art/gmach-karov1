@@ -1325,3 +1325,11 @@ html[lang="en"] .header-actions #dashboard-button{
 @media(min-width:1501px){
   html[lang="en"] .desktop-nav{display:flex;gap:24px}
 }
+
+/* Final English header collision guard: use compact menu before any label can overlap. */
+@media(max-width:2200px){
+  html[dir="ltr"] .header-inner{grid-template-columns:minmax(190px,1fr) auto!important;gap:18px!important}
+  html[dir="ltr"] .desktop-nav{display:none!important}
+  html[dir="ltr"] .mobile-menu-button{display:inline-grid!important}
+  html[dir="ltr"] .header-actions{gap:10px!important;padding-inline-start:0!important}
+}

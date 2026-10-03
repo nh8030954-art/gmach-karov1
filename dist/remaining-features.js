@@ -491,31 +491,21 @@ function osmEmbed(lat,lon){
 }
 function createInteractiveOsmMap(canvas){
   const state={center:{lat:31.55,lon:34.85},zoom:7,points:[],focus:null,popup:null,drag:null};
-  canvas.innerHTML='<div class="gmach-osm-map" style="position:relative;width:100%;height:100%;overflow:hidden;background:#e9efed;touch-action:none;user-select:none"><div data-osm-tiles style="position:absolute;inset:0"></div><div data-osm-pins style="position:absolute;inset:0;pointer-events:none"></div><div data-osm-controls style="position:absolute;top:12px;left:12px;z-index:6;display:grid;gap:6px"><button type="button" class="button button-secondary button-small" data-osm-zoom="in" aria-label="התקרבות">+</button><button type="button" class="button button-secondary button-small" data-osm-zoom="out" aria-label="התרחקות">−</button></div></div>';
-  const root=canvas.firstElementChild,tiles=root.querySelector("[data-osm-tiles]"),pins=root.querySelector("[data-osm-pins]");
+  canvas.innerHTML='<div class="gmach-osm-map" style="position:relative;width:100%;height:100%;overflow:hidden;background:#e9efed;touch-action:none;user-select:none"><iframe data-osm-frame title="OpenStreetMap" loading="eager" referrerpolicy="strict-origin-when-cross-origin" style="position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none;background:#e9efed"></iframe><div data-osm-pins style="position:absolute;inset:0;pointer-events:none"></div><div data-osm-controls style="position:absolute;top:12px;left:12px;z-index:6;display:grid;gap:6px"><button type="button" class="button button-secondary button-small" data-osm-zoom="in" aria-label="התקרבות">+</button><button type="button" class="button button-secondary button-small" data-osm-zoom="out" aria-label="התרחקות">−</button></div></div>';
+  const root=canvas.firstElementChild,frame=root.querySelector("[data-osm-frame]"),pins=root.querySelector("[data-osm-pins]");
   const clampLat=lat=>Math.max(-85.05112878,Math.min(85.05112878,Number(lat)||0));
   const world=(lat,lon,z)=>{const n=2**z,x=(Number(lon)+180)/360*n,y=(1-Math.log(Math.tan(clampLat(lat)*Math.PI/180)+1/Math.cos(clampLat(lat)*Math.PI/180))/Math.PI)/2*n;return{x:x*256,y:y*256}};
   const inv=(x,y,z)=>{const n=2**z,lon=x/256/n*360-180,yy=Math.PI*(1-2*y/256/n),lat=180/Math.PI*Math.atan(Math.sinh(yy));return{lat,lon}};
   const removePopup=()=>{state.popup?.remove();state.popup=null};
+  const frameUrl=(left,top,w,h,z)=>{
+    const nw=inv(left,top,z),se=inv(left+w,top+h,z);
+    const bbox=[nw.lon,se.lat,se.lon,nw.lat].map(v=>Number(v).toFixed(6)).join(",");
+    return "https://www.openstreetmap.org/export/embed.html?bbox="+encodeURIComponent(bbox)+"&layer=mapnik";
+  };
   const render=()=>{
     const w=root.clientWidth||800,h=root.clientHeight||500,z=state.zoom,cw=world(state.center.lat,state.center.lon,z),left=cw.x-w/2,top=cw.y-h/2;
-    tiles.innerHTML="";
-    const minX=Math.floor(left/256),maxX=Math.floor((left+w)/256),minY=Math.floor(top/256),maxY=Math.floor((top+h)/256),n=2**z;
-    for(let ty=minY;ty<=maxY;ty++)for(let tx=minX;tx<=maxX;tx++){
-      if(ty<0||ty>=n)continue;
-      const wrap=((tx%n)+n)%n,img=document.createElement("img");
-      const tilePath="/api/maps/tiles/"+z+"/"+wrap+"/"+ty+".png";
-      (async()=>{try{
-        let response=await fetch(tilePath,{credentials:"same-origin",cache:"force-cache"});
-        if(!response.ok)response=await fetch("https://tile.openstreetmap.org/"+z+"/"+wrap+"/"+ty+".png",{mode:"cors",cache:"force-cache"});
-        if(!response.ok)throw new Error("tile");
-        const blob=await response.blob(),reader=new FileReader();
-        reader.onload=()=>{if(img.isConnected)img.src=reader.result};reader.readAsDataURL(blob);
-      }catch{img.removeAttribute("src");img.style.background="#e7eeeb"}})();
-      img.alt="";img.draggable=false;img.decoding="async";img.loading="eager";img.referrerPolicy="origin";
-      img.style.cssText="position:absolute;width:256px;height:256px;left:"+(tx*256-left)+"px;top:"+(ty*256-top)+"px;max-width:none";
-      tiles.append(img);
-    }
+    const src=frameUrl(left,top,w,h,z);
+    if(frame.dataset.src!==src){frame.dataset.src=src;frame.src=src}
     pins.innerHTML="";
     for(const p of state.points){
       const wp=world(p.lat,p.lon,z),x=wp.x-left,y=wp.y-top;
@@ -534,8 +524,9 @@ function createInteractiveOsmMap(canvas){
   root.querySelector('[data-osm-zoom="in"]').onclick=e=>{e.stopPropagation();state.zoom=Math.min(18,state.zoom+1);render()};
   root.querySelector('[data-osm-zoom="out"]').onclick=e=>{e.stopPropagation();state.zoom=Math.max(5,state.zoom-1);render()};
   root.onpointerdown=e=>{if(e.target.closest("button"))return;state.drag={x:e.clientX,y:e.clientY,center:world(state.center.lat,state.center.lon,state.zoom)};root.setPointerCapture?.(e.pointerId)};
-  root.onpointermove=e=>{if(!state.drag)return;const dx=e.clientX-state.drag.x,dy=e.clientY-state.drag.y,p=inv(state.drag.center.x-dx,state.drag.center.y-dy,state.zoom);state.center=p;render()};
-  root.onpointerup=root.onpointercancel=()=>{state.drag=null};
+  root.onpointermove=e=>{if(!state.drag)return;const dx=e.clientX-state.drag.x,dy=e.clientY-state.drag.y,p=inv(state.drag.center.x-dx,state.drag.center.y-dy,state.zoom);state.center=p};
+  root.onpointerup=e=>{if(state.drag){state.drag=null;render()}};
+  root.onpointercancel=()=>{state.drag=null};
   root.onwheel=e=>{e.preventDefault();state.zoom=Math.max(5,Math.min(18,state.zoom+(e.deltaY<0?1:-1)));render()};
   root.onclick=e=>{if(!e.target.closest("button"))removePopup()};
   const ro=new ResizeObserver(()=>render());ro.observe(root);render();

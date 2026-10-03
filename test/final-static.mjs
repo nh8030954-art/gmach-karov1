@@ -125,14 +125,14 @@ for(const token of ["openHelpMatches","data-help-matches","data-offer-match"])as
 assert.ok(appClient.includes("data-counter-pickup"),"pickup counter proposal UI missing");
 
 for(const token of ["maps.apple.com","data-copy-map-address","navigator.geolocation","/api/maps/geocode"])assert.ok(remainingClient.includes(token),token+" missing from completed map/navigation UI");
-assert.ok(remainingClient.includes("createInteractiveOsmMap")&&remainingClient.includes("/api/maps/tiles/")&&remainingClient.includes("showCountry"),"interactive full-country gmach map missing");
+assert.ok(remainingClient.includes("createInteractiveOsmMap")&&remainingClient.includes("openstreetmap.org/export/embed.html")&&remainingClient.includes("showCountry"),"interactive full-country gmach map missing");
 assert.ok(remainingClient.includes("map-nav-pref-label"),"map navigation preference control must use non-overlapping layout");
 assert.ok(remainingWorker.includes("maps\\/tiles\\/")&&remainingWorker.includes("tile.openstreetmap.org"),"same-origin map tile proxy missing");
 assert.ok(remainingClient.includes('data.cached===false')&&remainingClient.includes('gmach:open-organization'),"gmach map geocoding/open flow regression");
 assert.ok(worker.includes("organization_branches b")&&worker.includes("AS latitude")&&worker.includes("AS longitude"),"discovery must expose stored branch coordinates for the map");
 assert.ok(remainingClient.includes("row.latitude")&&remainingClient.includes("tile.openstreetmap.org"),"map must prefer stored coordinates and retain a tile fallback");
 assert.ok(remainingClient.includes("FileReader")&&remainingClient.includes("fetch(tilePath"),"map tiles must be converted to data URLs to avoid blocked image requests");
-assert.ok(worker.includes("connect-src 'self' https://challenges.cloudflare.com https://tile.openstreetmap.org"),"OSM tile fallback must be allowed by CSP");
+
 
 for(const token of ["manageLoanUnits","const loanUnits =","loan_unit_assignments"])assert.ok(worker.includes(token),token+" missing from pickup unit assignment backend");
 
@@ -583,3 +583,5 @@ assert.ok(appClient.includes('confirmCollected)+"/status"'),"separate pickup con
 
 assert.ok(!indexHtml.includes("site-font-loading body{visibility:hidden}"),"body must never be hidden waiting for a font");
 assert.ok(!indexHtml.includes("<script>\n(()=>{const root=document.documentElement,done="),"CSP-blocked inline font boot must not return");
+
+assert.ok(remainingClient.includes("frameUrl")&&remainingClient.includes("data-osm-frame"),"map base must use the embedded OpenStreetMap frame instead of blocked tile images");
