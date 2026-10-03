@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="he" dir="rtl">
+<html lang="he" dir="rtl" class="site-font-loading">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -22,7 +22,14 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=block" rel="stylesheet">
+  <style id="site-font-stability">
+  html.site-font-loading body{visibility:hidden}
+  html.site-font-ready body{visibility:visible}
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=block" rel="stylesheet">
+<script>
+(()=>{const root=document.documentElement,done=()=>{root.classList.remove("site-font-loading");root.classList.add("site-font-ready")};try{Promise.race([document.fonts.load("600 1em Assistant"),new Promise(r=>setTimeout(r,1800))]).then(done,done)}catch{done()}})();
+</script>
   <link rel="icon" type="image/jpeg" href="./gmach-berega-logo.jpg">
   <link rel="stylesheet" href="./styles.css?v=20261002-1610">
   <link rel="stylesheet" href="./motion.css?v=20261002-1610">
