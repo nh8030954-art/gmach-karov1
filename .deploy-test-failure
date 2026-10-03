@@ -1,4 +1,4 @@
-deploy_sha=3251a9f72042862eed02d000e561db1ea19c541b
+deploy_sha=df81f98feef77533abc46c644185847d3e05bf65
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -19,8 +19,8 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: font boot must ignore stale cached font values
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:384:8 {
+AssertionError [ERR_ASSERTION]: live settings must refresh versioned font cache
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:385:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
