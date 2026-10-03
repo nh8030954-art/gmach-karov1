@@ -302,7 +302,8 @@ export default {
       return new Response(null, { status: 308, headers: { Location: target.toString(), "Cache-Control": "public, max-age=3600" } });
     }
     try {
-      if (url.pathname !== "/api/health") {
+      const closureAsset = url.pathname === "/gmach-berega-logo.jpg";
+      if (url.pathname !== "/api/health" && !closureAsset) {
         const shabbat = israelShabbatState(new Date());
         if (shabbat.closed) {
           if (url.pathname.startsWith("/api/")) return withSecurityHeaders(json({ error:"האתר סגור כעת לכבוד השבת. שבת שלום.", shabbat:true },503));
@@ -3388,14 +3389,20 @@ async function sendOperationalNotificationEmail(env,user,notification){
   const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],...mail})});
   if(!response.ok)throw new Error("Email provider returned "+response.status);return true;
 }
+async function outboundNotificationsPaused(env,now=new Date()){
+  if(israelShabbatState(now).closed)return true;
+  if(israelHolidayState(now).closed)return true;
+  return Boolean(await activePlatformClosure(env,now));
+}
 async function deliverNotificationChannels(env){
+  if(await outboundNotificationsPaused(env))return;
   const nowIso=new Date().toISOString(),clock=israelClock();
   const rows=await env.DB.prepare(`SELECT n.id,n.user_id,n.type,n.title,n.body,n.request_id,n.created_at,u.email,u.preferred_language,u.community_emails_accepted,
     COALESCE(p.email,CASE WHEN n.type IN ('request','status') THEN 1 ELSE 0 END) pref_email,
     COALESCE(p.push,0) pref_push,COALESCE(p.digest,'immediate') digest,p.quiet_start,p.quiet_end
     FROM notifications n JOIN users u ON u.id=n.user_id
     LEFT JOIN notification_preferences p ON p.user_id=n.user_id AND p.notification_type=n.type
-    WHERE n.created_at>=datetime(?,'-2 days') AND u.deleted_at IS NULL
+    WHERE n.created_at>=datetime(?,'-4 days') AND u.deleted_at IS NULL
       AND NOT EXISTS(SELECT 1 FROM notification_delivery_log l WHERE l.notification_id=n.id AND l.channel='email' AND l.status='sent')
     ORDER BY n.created_at LIMIT 100`).bind(nowIso).all().catch(()=>({results:[]}));
   for(const n of rows.results||[]){
@@ -3411,12 +3418,13 @@ async function deliverNotificationChannels(env){
   }
 }
 async function deliverDailyDigests(env){
+  if(await outboundNotificationsPaused(env))return;
   const clock=israelClock();if(clock<"19:00"||clock>"20:00"||!env.RESEND_API_KEY)return;
   const today=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Jerusalem",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
   const users=await env.DB.prepare(`SELECT DISTINCT u.id,u.email,u.preferred_language FROM users u JOIN notification_preferences p ON p.user_id=u.id WHERE p.digest='daily' AND p.email=1 AND u.deleted_at IS NULL`).all().catch(()=>({results:[]}));
   for(const user of users.results||[]){
     const done=await env.DB.prepare("SELECT id FROM notification_digests WHERE user_id=? AND digest_date=? AND status='sent'").bind(user.id,today).first();if(done)continue;
-    const items=await env.DB.prepare(`SELECT n.id,n.title,n.body,n.created_at FROM notifications n WHERE n.user_id=? AND n.created_at>=datetime('now','-1 day') AND NOT EXISTS(SELECT 1 FROM notification_delivery_log l WHERE l.notification_id=n.id AND l.channel='email' AND l.status='sent') ORDER BY n.created_at DESC LIMIT 30`).bind(user.id).all();
+    const items=await env.DB.prepare(`SELECT n.id,n.title,n.body,n.created_at FROM notifications n WHERE n.user_id=? AND n.created_at>=datetime('now','-4 days') AND NOT EXISTS(SELECT 1 FROM notification_delivery_log l WHERE l.notification_id=n.id AND l.channel='email' AND l.status='sent') ORDER BY n.created_at DESC LIMIT 30`).bind(user.id).all();
     if(!(items.results||[]).length)continue;
     const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/dashboard",digestBody=(en?"Updates from the last day:":"עדכונים מהיממה האחרונה:")+"\n\n"+items.results.map(x=>"• "+x.title+" — "+x.body).join("\n");
     const mail=await managedEmailTemplate(env,"daily_digest",lang,{subject:en?"Your daily Gmach Berega summary":"הסיכום היומי שלך מגמ״ח ברגע",text:"{{body}}"},{body:digestBody,account_url:accountUrl},accountUrl);if(!mail)continue;
