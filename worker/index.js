@@ -1853,7 +1853,7 @@ async function recordAnalytics(request, env) {
   // D1 Free allows 100k rows written/day. Analytics is non-critical and can be
   // derived in large part from canonical tables, so keep only a small sample.
   const sampleRate=body.eventType==="share"?0.1:0.02;
-  if(crypto.getRandomValues(new Uint32Array(1))[0]/4294967296>=sampleRate)return json({ok:true,sampled:false},202);
+  if(crypto.getRandomValues(new Uint32Array(1))[0]/4294967296>=sampleRate)return json({ok:true,sampled:false},201);
   const user = await currentUser(request, env);
   const source=cleanOptional(body.source,80),referrer=cleanOptional(body.referrer,180),pagePath=cleanOptional(body.pagePath,180);
   await env.DB.prepare("INSERT INTO analytics_events(id,user_id,event_type,query,city,category,entity_id,source,referrer,page_path) VALUES (?,?,?,?,?,?,?,?,?,?)")
