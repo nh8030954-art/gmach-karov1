@@ -1,7 +1,40 @@
-sha=d9807c1a81150f161943a2efb6863cfa24b5461c
-install=cancelled
-syntax=skipped
-tests=skipped
-smoke=skipped
-live=skipped
+sha=d0e1b9484772b263a9a2129e59dac35c6f1b678a
+install=success
+syntax=success
+tests=failure
+smoke=failure
+live=success
+Release hardening static gate passed.
+Release experience static release gate passed.
+Admin control center static release gate passed.
+Privacy purge static release gate passed.
+Community chat retention static release gate passed.
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: web fonts must not late-swap during first paint
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:380:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
+
+AssertionError [ERR_ASSERTION]: web fonts must not late-swap during first paint
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791046516856:380:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-03T16:55:17.527Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
