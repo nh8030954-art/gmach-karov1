@@ -1,4 +1,4 @@
-deploy_sha=df81f98feef77533abc46c644185847d3e05bf65
+deploy_sha=3840b7b007c62c003ec00b39660ce5f6370cb045
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -19,8 +19,8 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: live settings must refresh versioned font cache
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:385:8 {
+AssertionError [ERR_ASSERTION]: Assistant must be the first painted site font
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:380:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
