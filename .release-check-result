@@ -1,4 +1,4 @@
-sha=60b824dca083cb6888c924de2716429ac6dbf988
+sha=74fe46c69b4cc2045dd0e69402823977878d7950
 install=success
 syntax=success
 tests=failure
@@ -33,8 +33,8 @@ Full requirements regression extensions passed.
 remaining-features Error: Backup checksum mismatch
     at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:175:41)
     at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:362:91)
-    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:904:37)
+    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:906:37)
     at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:378:26)
 Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-03T21:54:33.200Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-03T22:00:25.210Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
