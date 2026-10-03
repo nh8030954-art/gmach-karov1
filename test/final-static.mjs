@@ -377,6 +377,11 @@ for(const token of ["beforeinstallprompt","serviceWorker.register","connection-s
 for(const token of ["CACHE_NAME","caches.open","req.mode===\"navigate\"","notificationclick"])assert.ok(swClient.includes(token),token+" missing from service worker");
 assert.ok(indexHtml.includes('rel="manifest"'),"web app manifest is not linked");
 assert.ok(indexHtml.includes("./release-shell.js"),"release shell is not loaded");
+assert.ok(indexHtml.includes("display=optional"),"web fonts must not late-swap during first paint");
+assert.ok(!indexHtml.includes('localStorage.getItem("gmach-site-settings-v1")'),"layout bootstrap must not live in blocked inline script");
+const i18nBoot=await readFile("dist/i18n-boot.js","utf8");
+assert.ok(i18nBoot.includes("scrollRestoration")&&i18nBoot.includes('gmach-site-settings-v1'),"early external layout bootstrap missing");
+
 assert.ok(indexHtml.includes("./app.js?v="),"app cache-busting version missing");
 assert.ok(!indexHtml.includes('id="app-boot-guard"'),"full-page boot loader must stay disabled");
 assert.ok(!indexHtml.includes('class="app-booting site-copy-pending"'),"boot-hiding classes must stay disabled");
