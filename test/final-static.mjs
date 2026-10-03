@@ -561,3 +561,6 @@ assert.ok(appClient.includes("navigateHomeSection")&&appClient.includes('a[href=
 assert.ok(appClient.includes("data-confirm-collected")&&appClient.includes("שמירת הקצאת יחידות"),"pickup confirmation must stay separate from unit assignment");
 
 assert.ok(appClient.includes('confirmCollected)+"/status"'),"separate pickup confirmation must call the status endpoint");
+
+assert.ok(!indexHtml.includes("site-font-loading body{visibility:hidden}"),"body must never be hidden waiting for a font");
+assert.ok(!indexHtml.includes("<script>\n(()=>{const root=document.documentElement,done="),"CSP-blocked inline font boot must not return");
