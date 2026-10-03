@@ -1195,3 +1195,7 @@ html, body { max-width: 100%; overflow-x: clip; }
 .loan-progress-stages span.is-done{opacity:1;font-weight:700}
 .loan-progress small{display:block;margin-top:6px;font-weight:700}
 .loan-progress-stopped{padding:8px 10px;border:1px solid color-mix(in srgb,#b42318 28%,transparent);border-radius:12px;background:color-mix(in srgb,#b42318 6%,transparent)}
+
+/* Keep auth controls dimensionally stable while /api/auth/me resolves. */
+#dashboard-button { min-width: 82px; text-align: center; }
+#notifications-button { width: 40px; height: 40px; flex: 0 0 40px; }
