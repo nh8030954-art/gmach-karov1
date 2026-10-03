@@ -568,7 +568,7 @@ async function geocodeGmachOrganizations(rows){
    if(cache.has(query))return cache.get(query);
    for(let attempt=0;attempt<4;attempt++){
      try{
-       const data=await api("/api/maps/geocode?q="+encodeURIComponent(query));
+       const data=await api("/api/geocode?q="+encodeURIComponent(query));
        const first=data.results?.[0];
        const point=first?{lat:Number(first.lat),lon:Number(first.lon)}:null;
        cache.set(query,point);
@@ -619,7 +619,7 @@ async function showAddressMap(){
    canvas.addEventListener("click",e=>{const button=e.target.closest?.("[data-map-open-org]");if(!button)return;d.close();window.dispatchEvent(new CustomEvent("gmach:open-organization",{detail:{id:button.dataset.mapOpenOrg}}))});
    status.textContent=points.length?(lang==="en"?`${points.length} gmachs are shown. Click any marker for details.`:`${points.length} גמ״חים מוצגים על המפה. לחצו על נקודה לפרטים.`):(lang==="en"?"No gmach locations could be placed yet.":"עדיין לא נמצאו כתובות גמ״חים שניתן למקם על המפה.");
  }catch(e){status.textContent=e.message||"טעינת המפה נכשלה";canvas.innerHTML=`<div class="dashboard-empty"><strong>${esc(status.textContent)}</strong></div>`}
- form.onsubmit=async e=>{e.preventDefault();results.innerHTML="<p>מחפשים…</p>";try{const x=await api("/api/maps/geocode?q="+encodeURIComponent(form.q.value));results.innerHTML=x.results.length?x.results.map((r,i)=>`<button type="button" class="button button-secondary" data-map-i="${i}" style="text-align:start">${esc(r.displayName)}</button>`).join(""):"<p>לא נמצאה כתובת.</p>";$$("[data-map-i]",results).forEach(btn=>btn.onclick=()=>{const r=x.results[Number(btn.dataset.mapI)];focusPoint(Number(r.lat),Number(r.lon),r.displayName)})}catch(e){results.innerHTML="<p role=alert>"+esc(e.message)+"</p>"}};
+ form.onsubmit=async e=>{e.preventDefault();results.innerHTML="<p>מחפשים…</p>";try{const x=await api("/api/geocode?q="+encodeURIComponent(form.q.value));results.innerHTML=x.results.length?x.results.map((r,i)=>`<button type="button" class="button button-secondary" data-map-i="${i}" style="text-align:start">${esc(r.displayName)}</button>`).join(""):"<p>לא נמצאה כתובת.</p>";$$("[data-map-i]",results).forEach(btn=>btn.onclick=()=>{const r=x.results[Number(btn.dataset.mapI)];focusPoint(Number(r.lat),Number(r.lon),r.displayName)})}catch(e){results.innerHTML="<p role=alert>"+esc(e.message)+"</p>"}};
  $("#map-current",d).onclick=()=>navigator.geolocation?.getCurrentPosition(pos=>focusPoint(pos.coords.latitude,pos.coords.longitude,lang==="en"?"My current location":"המיקום הנוכחי"),()=>toast(lang==="en"?"Location permission was not granted":"לא התקבלה הרשאת מיקום",true),{enableHighAccuracy:false,timeout:8000,maximumAge:60000});
  d.addEventListener("close",()=>{try{map?.destroy()}catch{}},{once:true});
 }
