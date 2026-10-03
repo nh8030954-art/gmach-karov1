@@ -482,7 +482,6 @@ export async function handleFinalFeatures(request,env,ctx,url){
   // a failure there must never block super-admin loan management.
   if(path==="/api/admin/loan-requests"||/^\/api\/admin\/loan-requests\//.test(path))return null;
   try{
-    await ensureFinalSchema(env);
     let m;
     if(path==="/sitemap.xml"&&method==="GET")return await sitemap(env,url);
     m=path.match(/^\/api\/me\/tours\/([^/]+)$/);if(m&&(method==="GET"||method==="PATCH"))return await tour(request,env,decodeURIComponent(m[1]));
