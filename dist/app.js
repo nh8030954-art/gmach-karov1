@@ -74,6 +74,7 @@
       rail.classList.add("carousel-ready");
       rail.innerHTML='<button class="category-card '+(!active?'is-active':'')+'" type="button" data-category="" role="listitem"><span class="category-icon category-all" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></span><strong>הכול</strong><small>כל מה שזמין</small></button>'+parents.map(row=>{const meta=categoryRailPresentation(row);return '<button class="category-card '+(active===row.name_he?'is-active ':'')+'" type="button" data-category="'+escapeHTML(row.name_he)+'" role="listitem"><span class="category-icon '+escapeHTML(meta.className)+'" aria-hidden="true"><svg viewBox="0 0 24 24">'+(ICONS[meta.icon]||ICONS.box)+'</svg></span><strong>'+escapeHTML(row.name_he)+'</strong><small>'+escapeHTML(meta.subtitle)+'</small></button>'}).join("");
       bindCategoryRailButtons();
+      window.setTimeout(()=>window.GmachResetCategoryCarousel?.(),0);
     }
     updateItemSubcategories();
     updateCatalogSubcategories();
@@ -663,7 +664,7 @@
     if (!state.user) return null; const data = await api("/api/me/dashboard"); state.dashboard = data; state.myOrganizations = data.organizations || []; state.favorites = new Set(data.favorites || []); renderItems(); return data;
   }
   function updateAuthUI() {
-    const label = state.user ? "האזור שלי" : "כניסה"; $("#dashboard-button").textContent = label; $$('[data-requires-auth]').forEach(button => { if (button !== $("#dashboard-button")) button.textContent = label; }); $("#dashboard-name").textContent = state.user?.fullName || state.user?.email?.split("@")[0] || "חבר/ה"; $("#admin-tab").hidden = state.user?.role !== "admin" || !state.user.twoFactorEnabled; $("#notifications-button").hidden = !state.user; if (state.user?.role !== "admin" || !state.user.twoFactorEnabled) { $$('[data-admin-support-center],[data-release-readiness],[data-server-errors],[data-admin-control-center],[data-launch-admin-loans],[data-launch-health],[data-launch-entities],[data-admin-users-full],[data-privacy-retention],[data-navigation-admin]').forEach(button=>button.remove()); if(state.dashboardTab==="admin")state.dashboardTab="profile"; } if (!state.user) { $("#notification-badge").hidden = true; state.notifications = []; }
+    const label = state.user ? "האזור שלי" : "כניסה"; $("#dashboard-button").textContent = label; $$('[data-requires-auth]').forEach(button => { if (button !== $("#dashboard-button")) button.textContent = label; }); $("#dashboard-name").textContent = state.user?.fullName || state.user?.email?.split("@")[0] || "חבר/ה"; $("#admin-tab").hidden = state.user?.role !== "admin" || !state.user.twoFactorEnabled; const notificationButton=$("#notifications-button"); notificationButton.hidden=false; notificationButton.style.visibility=state.user?"visible":"hidden"; notificationButton.disabled=!state.user; notificationButton.setAttribute("aria-hidden",state.user?"false":"true"); if (state.user?.role !== "admin" || !state.user.twoFactorEnabled) { $$('[data-admin-support-center],[data-release-readiness],[data-server-errors],[data-admin-control-center],[data-launch-admin-loans],[data-launch-health],[data-launch-entities],[data-admin-users-full],[data-privacy-retention],[data-navigation-admin]').forEach(button=>button.remove()); if(state.dashboardTab==="admin")state.dashboardTab="profile"; } if (!state.user) { $("#notification-badge").hidden = true; state.notifications = []; }
   }
   async function refreshNotifications(silent = false) {
     if (!state.user) return;
@@ -1393,7 +1394,7 @@
   async function init() {
     if("scrollRestoration" in history)history.scrollRestoration="manual";
     if((location.pathname||"/")==="/"&&!location.hash)window.scrollTo({top:0,left:0,behavior:"auto"});
-    setupEvents(); installFormErrorFocus(); installDashboardToolOrganizer(); setAuthMode("login"); updateAuthUI(); installAdvancedGmachSearch(); registerWebMCP();
+    setupEvents(); installFormErrorFocus(); installDashboardToolOrganizer(); setAuthMode("login"); installAdvancedGmachSearch(); registerWebMCP();
     const siteCopyReady=Promise.allSettled([loadSiteSettings(),loadPageCustomizations()]);
     const publicReady=Promise.allSettled([loadPublicConfig(),loadDiscovery(),loadCategoryAliases(),loadItems()]);
     const connectionReady=detectServer();
@@ -1503,5 +1504,53 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
 })();
 
-// Category rail uses the original manual horizontal carousel behavior.
+// Category carousel continuous autoplay v3 — movement only; current visuals are preserved.
+(()=>{
+  let stopCurrent=()=>{};
+  const start=()=>{
+    const rail=document.getElementById('category-rail');
+    if(!rail)return;
+    stopCurrent();
+    rail.querySelectorAll('[data-carousel-clone]').forEach(node=>node.remove());
+    delete rail.dataset.continuousCarousel;
+    rail.scrollLeft=0;
+    if(matchMedia('(prefers-reduced-motion: reduce)').matches||document.documentElement.classList.contains('a11y-stop-motion'))return;
+    rail.dataset.continuousCarousel='1';
+    rail.classList.add('carousel-ready','carousel-continuous');
+    const originals=[...rail.children].filter(node=>!node.dataset.carouselClone);
+    if(originals.length<2)return;
+    originals.forEach((el,index)=>{
+      const clone=el.cloneNode(true);
+      clone.setAttribute('aria-hidden','true');
+      clone.tabIndex=-1;
+      clone.dataset.carouselClone=String(index);
+      clone.addEventListener('click',()=>el.click());
+      rail.appendChild(clone);
+    });
+    let paused=false,last=performance.now(),raf=0,resume=0;
+    const speed=window.innerWidth<=760?62:48;
+    const rtl=document.documentElement.dir==='rtl';
+    const half=()=>rail.scrollWidth/2;
+    const tick=now=>{
+      const dt=Math.min(40,now-last);last=now;
+      if(!paused&&!document.hidden&&!document.documentElement.classList.contains('a11y-stop-motion')){
+        rail.scrollLeft+=rtl?-(speed*dt/1000):(speed*dt/1000);
+        const h=half();
+        if(Math.abs(rail.scrollLeft)>=h-2)rail.scrollLeft=0;
+      }
+      raf=requestAnimationFrame(tick);
+    };
+    const pause=()=>{paused=true;clearTimeout(resume)};
+    const restart=()=>{clearTimeout(resume);resume=setTimeout(()=>paused=false,450)};
+    rail.addEventListener('pointerdown',pause,{passive:true});
+    rail.addEventListener('pointerup',restart,{passive:true});
+    rail.addEventListener('pointercancel',restart,{passive:true});
+    rail.addEventListener('touchend',restart,{passive:true});
+    rail.addEventListener('wheel',()=>{pause();restart()},{passive:true});
+    raf=requestAnimationFrame(tick);
+    stopCurrent=()=>{cancelAnimationFrame(raf);clearTimeout(resume)};
+  };
+  window.GmachResetCategoryCarousel=start;
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+})();
 
