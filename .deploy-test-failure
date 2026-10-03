@@ -1,4 +1,4 @@
-deploy_sha=c1873db77bc977fedb8be74297a4b49a46951331
+deploy_sha=513a32a0a8862dc9d8fdb8c767f48c60d9357d8e
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -24,8 +24,8 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: Assistant must be the first-paint default font
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:541:8 {
+AssertionError [ERR_ASSERTION]: five-star rating UI missing
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:516:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
