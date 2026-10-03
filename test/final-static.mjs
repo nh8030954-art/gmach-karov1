@@ -130,7 +130,7 @@ assert.ok(remainingClient.includes("createInteractiveOsmMap")&&remainingClient.i
 assert.ok(remainingClient.includes("map-nav-pref-label"),"map navigation preference control must use non-overlapping layout");
 assert.ok(remainingWorker.includes("maps\\/tiles\\/")&&remainingWorker.includes("tile.openstreetmap.org"),"same-origin map tile proxy missing");
 const remainingHandler=remainingWorker.slice(remainingWorker.indexOf("export async function handleRemainingFeatures"));
-assert.ok(remainingWorker.includes("ensureMapSchema")&&remainingHandler.indexOf("api\\/maps\\/tiles")<remainingHandler.indexOf("await ensureSchema(env)"),"map endpoints must not depend on full schema reconciliation");
+assert.ok(remainingWorker.includes("ensureMapSchema")&&!remainingHandler.includes("await ensureSchema(env)")&&remainingHandler.includes('if(path==="/api/maps/geocode"&&method==="GET"){await ensureMapSchema(env);'),"map endpoints must avoid full request-time schema reconciliation while geocoding keeps its narrow map schema check");
 assert.ok(remainingClient.includes('/api/geocode?q=')&&remainingClient.includes('gmach:open-organization'),"gmach map geocoding/open flow regression");
 assert.ok(remainingClient.includes('org.review_count')&&remainingClient.includes('"★".repeat(filled)+"☆".repeat(5-filled)')&&remainingClient.includes('class="organization-name" translate="no"'),"map gmach rating stars/name preservation missing");
 assert.ok(remainingClient.includes('/api/translate/user-content')&&remainingClient.includes('queueAiTranslation')&&remainingClient.includes('NEVER_TRANSLATE_SELECTOR=".organization-name'),"English dynamic-content translation fallback missing");
