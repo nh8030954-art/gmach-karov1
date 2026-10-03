@@ -1439,6 +1439,9 @@
     if(path==="/dashboard"){
       $("#home-view").hidden=true;$("#organization-page-view").hidden=true;$("#dashboard-view").hidden=false;
       $("#dashboard-content").innerHTML='<div class="skeleton-card" aria-hidden="true"></div>';
+    } else if(path.startsWith("/gmach/")){
+      $("#home-view").hidden=true;$("#dashboard-view").hidden=true;$("#organization-page-view").hidden=false;
+      $("#organization-page-content").innerHTML='<div class="skeleton-card" aria-hidden="true"></div>';
     }
 
     const routeAfterAuth=async()=>{
@@ -1457,6 +1460,7 @@
       const seoRoute=document.body.dataset.seoRoute||"";
       if(seoRoute.startsWith("item:")) await openItem(seoRoute.slice(5));
       else if(seoRoute.startsWith("organization:")) await openOrganization(seoRoute.slice(13));
+      else if(path.startsWith("/gmach/")) await openOrganization(decodeURIComponent(path.slice(7)));
       else if(seoRoute.startsWith("category:")){const id=seoRoute.slice(9),cat=(state.discovery?.categories||[]).find(x=>x.id===id),label=cat?.name_he||id;$("#category-filter").value=label;state.activeCategory=label;applyFilters();window.setTimeout(()=>$("#catalog").scrollIntoView(),0)}
       else if(seoRoute.startsWith("area:")){const city=seoRoute.slice(5);$("#city-filter").value=city;applyFilters();window.setTimeout(()=>$("#catalog").scrollIntoView(),0)}
       if(path==="/catalog")window.setTimeout(()=>$("#catalog").scrollIntoView(),0);
