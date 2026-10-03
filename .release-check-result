@@ -1,7 +1,40 @@
-sha=cb34f09e246fe75e260cd4ad62f88e1e5a9c6776
-install=cancelled
-syntax=skipped
-tests=skipped
-smoke=skipped
-live=skipped
+sha=0f1ed188763d466f3bb2727aa9a99aa714b598a3
+install=success
+syntax=success
+tests=failure
+smoke=failure
+live=success
+
+> gmach-karov@1.0.0 test
+> node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
+
+Final completion static release gate passed.
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: map must prefer stored coordinates and retain a tile fallback
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:135:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
+
+AssertionError [ERR_ASSERTION]: map must prefer stored coordinates and retain a tile fallback
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791058631888:135:8 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
+
+Node.js v24.21.0
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-03T20:17:12.439Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
