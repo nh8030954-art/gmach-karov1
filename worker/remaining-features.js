@@ -14,6 +14,13 @@ const CREATE=[
 "CREATE TABLE IF NOT EXISTS restore_validations (id TEXT PRIMARY KEY,backup_run_id TEXT NOT NULL REFERENCES backup_runs(id) ON DELETE CASCADE,table_count INTEGER NOT NULL DEFAULT 0,row_count INTEGER NOT NULL DEFAULT 0,checksum TEXT,status TEXT NOT NULL CHECK(status IN ('running','success','failed')),details_json TEXT NOT NULL DEFAULT '{}',started_at TEXT NOT NULL,finished_at TEXT)",
 "CREATE TABLE IF NOT EXISTS external_service_status (service_key TEXT PRIMARY KEY,status TEXT NOT NULL CHECK(status IN ('configured','missing','degraded','healthy')),details_json TEXT NOT NULL DEFAULT '{}',checked_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))"
 ];
+async function ensureMapSchema(env){
+  await env.DB.batch([
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS geocode_cache (query_key TEXT PRIMARY KEY,query_text TEXT NOT NULL,result_json TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),expires_at TEXT NOT NULL)"),
+    env.DB.prepare("CREATE TABLE IF NOT EXISTS geocode_throttle (id INTEGER PRIMARY KEY CHECK(id=1),last_request_at TEXT)"),
+    env.DB.prepare("INSERT OR IGNORE INTO geocode_throttle(id,last_request_at) VALUES(1,NULL)")
+  ]);
+}
 async function ensureSchema(env){if(schemaPromise)return schemaPromise;schemaPromise=(async()=>{for(const s of CREATE)await env.DB.prepare(s).run();const bi=await env.DB.prepare("PRAGMA table_info(backup_runs)").all().catch(()=>({results:[]})),bc=new Set((bi.results||[]).map(x=>x.name));for(const [name,def] of [["backup_type","TEXT NOT NULL DEFAULT 'manual'"],["started_at","TEXT"],["finished_at","TEXT"],["manifest_json","TEXT NOT NULL DEFAULT '{}'"]])if(!bc.has(name))await env.DB.prepare("ALTER TABLE backup_runs ADD COLUMN "+name+" "+def).run();await env.DB.prepare("UPDATE backup_runs SET started_at=COALESCE(started_at,created_at),finished_at=COALESCE(finished_at,completed_at)").run();await env.DB.prepare("INSERT OR IGNORE INTO geocode_throttle(id,last_request_at) VALUES(1,NULL)").run();return true})().catch(e=>{schemaPromise=null;throw e});return schemaPromise}
 function cookie(request,name){for(const p of String(request.headers.get("Cookie")||"").split(";")){const [k,...v]=p.trim().split("=");if(k===name)return decodeURIComponent(v.join("="))}return""}
 function b64(bytes){let out="";for(const b of bytes)out+=String.fromCharCode(b);return btoa(out).replaceAll("+","-").replaceAll("/","_").replace(/=+$/g,"")}
@@ -333,9 +340,12 @@ async function unifiedModeration(request,env,url){
 export async function ensureRemainingFeaturesSchema(env){return ensureSchema(env)}
 export async function runRemainingMaintenance(env){await ensureSchema(env);const now=new Date().toISOString();await env.DB.prepare("UPDATE page_content SET status='published',publish_at=NULL,updated_at=? WHERE status='scheduled' AND publish_at IS NOT NULL AND publish_at<=?").bind(now,now).run();await automaticDailyBackup(env)}
 export async function handleRemainingFeatures(request,env,ctx,url){
- await ensureSchema(env);const method=request.method.toUpperCase(),path=url.pathname;
+ const method=request.method.toUpperCase(),path=url.pathname;
  try{
-  let m=path.match(/^\/api\/items\/([^/]+)\/image-edits$/);if(m&&(method==="GET"||method==="PUT"))return await imageEdits(request,env,decodeURIComponent(m[1]));
+  let m=path.match(/^\/api\/maps\/tiles\/(\d+)\/(\d+)\/(\d+)\.png$/);if(m&&method==="GET")return await mapTile(url,m[1],m[2],m[3]);
+  if(path==="/api/maps/geocode"&&method==="GET"){await ensureMapSchema(env);return await explicitGeocode(request,env,url)}
+  await ensureSchema(env);
+  m=path.match(/^\/api\/items\/([^/]+)\/image-edits$/);if(m&&(method==="GET"||method==="PUT"))return await imageEdits(request,env,decodeURIComponent(m[1]));
   m=path.match(/^\/api\/items\/([^/]+)\/availability-calendar$/);if(m&&method==="GET")return await availabilityCalendar(request,env,decodeURIComponent(m[1]),url);
   m=path.match(/^\/api\/items\/([^/]+)\/similar$/);if(m&&method==="GET")return await similarItems(env,decodeURIComponent(m[1]),url);
   m=path.match(/^\/api\/reviews\/([^/]+)$/);if(m&&method==="PATCH")return await updateReview(request,env,decodeURIComponent(m[1]));
@@ -353,8 +363,6 @@ export async function handleRemainingFeatures(request,env,ctx,url){
   m=path.match(/^\/api\/admin\/backups\/([^/]+)\/validate$/);if(m&&method==="POST")return await validateBackup(request,env,decodeURIComponent(m[1]));
   if(path==="/api/admin/external-services"&&method==="GET")return await externalStatus(request,env);
   if(path==="/api/admin/moderation-unified"&&(method==="GET"||method==="PATCH"))return await unifiedModeration(request,env,url);
-  m=path.match(/^\/api\/maps\/tiles\/(\d+)\/(\d+)\/(\d+)\.png$/);if(m&&method==="GET")return await mapTile(url,m[1],m[2],m[3]);
-  if(path==="/api/maps/geocode"&&method==="GET")return await explicitGeocode(request,env,url);
   return null;
  }catch(e){const status=e instanceof RemainingError?e.status:500;if(status>=500)console.error("remaining-features",e);return json({error:e instanceof RemainingError?e.message:"אירעה תקלה בשכבת ההשלמה"},status)}
 }
