@@ -1,0 +1,51 @@
+name: Email control diagnostic
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/email-control-diagnostic.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Read live email template state
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute DB --remote --json --command "SELECT template_key,language,enabled,updated_at FROM email_templates ORDER BY template_key,language" > /tmp/templates.json
+          node <<'NODE'
+          const fs=require('fs');
+          const raw=JSON.parse(fs.readFileSync('/tmp/templates.json','utf8'));
+          const rows=raw.flatMap(x=>x.results||[]);
+          for(const r of rows) console.log(JSON.stringify(r));
+          NODE
+      - name: Read recent admin template audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute DB --remote --json --command "SELECT action,entity_id,created_at,details_json FROM audit_log WHERE action LIKE '%email%' OR action LIKE '%template%' ORDER BY created_at DESC LIMIT 30" > /tmp/audit.json
+          node <<'NODE'
+          const fs=require('fs');
+          const raw=JSON.parse(fs.readFileSync('/tmp/audit.json','utf8'));
+          const rows=raw.flatMap(x=>x.results||[]);
+          for(const r of rows) {
+            let d={}; try{d=JSON.parse(r.details_json||'{}')}catch{}
+            console.log(JSON.stringify({action:r.action,entityId:r.entity_id,createdAt:r.created_at,enabled:d.enabled,language:d.language,templateKey:d.templateKey}));
+          }
+          NODE
