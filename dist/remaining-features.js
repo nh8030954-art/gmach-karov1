@@ -504,7 +504,14 @@ function createInteractiveOsmMap(canvas){
     for(let ty=minY;ty<=maxY;ty++)for(let tx=minX;tx<=maxX;tx++){
       if(ty<0||ty>=n)continue;
       const wrap=((tx%n)+n)%n,img=document.createElement("img");
-      img.src="/api/maps/tiles/"+z+"/"+wrap+"/"+ty+".png";img.onerror=()=>{if(!img.dataset.fallback){img.dataset.fallback="1";img.src="https://tile.openstreetmap.org/"+z+"/"+wrap+"/"+ty+".png"}};
+      const tilePath="/api/maps/tiles/"+z+"/"+wrap+"/"+ty+".png";
+      (async()=>{try{
+        let response=await fetch(tilePath,{credentials:"same-origin",cache:"force-cache"});
+        if(!response.ok)response=await fetch("https://tile.openstreetmap.org/"+z+"/"+wrap+"/"+ty+".png",{mode:"cors",cache:"force-cache"});
+        if(!response.ok)throw new Error("tile");
+        const blob=await response.blob(),reader=new FileReader();
+        reader.onload=()=>{if(img.isConnected)img.src=reader.result};reader.readAsDataURL(blob);
+      }catch{img.removeAttribute("src");img.style.background="#e7eeeb"}})();
       img.alt="";img.draggable=false;img.decoding="async";img.loading="eager";img.referrerPolicy="origin";
       img.style.cssText="position:absolute;width:256px;height:256px;left:"+(tx*256-left)+"px;top:"+(ty*256-top)+"px;max-width:none";
       tiles.append(img);

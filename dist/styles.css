@@ -1314,3 +1314,14 @@ html[lang="en"] .header-actions #dashboard-button{
   html[lang="en"] .desktop-nav .nav-button{font-size:.84rem}
   html[lang="en"] .header-actions{gap:8px;padding-inline-start:12px}
 }
+
+/* English header: switch to compact navigation before labels can collide. */
+@media(max-width:1500px){
+  html[lang="en"] .header-inner{grid-template-columns:minmax(190px,1fr) auto;gap:18px}
+  html[lang="en"] .desktop-nav{display:none!important}
+  html[lang="en"] .mobile-menu-button{display:inline-grid!important}
+  html[lang="en"] .header-actions{padding-inline-start:0;gap:10px}
+}
+@media(min-width:1501px){
+  html[lang="en"] .desktop-nav{display:flex;gap:24px}
+}
