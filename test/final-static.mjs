@@ -590,3 +590,5 @@ assert.ok(css.includes("Keep the English desktop links visible")&&css.includes("
 
 assert.ok(remainingClient.includes('row.latitude!==null')&&remainingClient.includes('(storedLat!==0||storedLon!==0)'),"map must not treat null coordinates as 0,0");
 assert.ok(remainingClient.includes('pointer-events:none;z-index:3'),"gmach marker layer must stay above the map frame");
+
+assert.ok(remainingClient.includes("attempt<4")&&remainingClient.includes("city!==full")&&remainingClient.includes("await sleep(1250)"),"gmach map geocoding must retry throttled requests and fall back to city");

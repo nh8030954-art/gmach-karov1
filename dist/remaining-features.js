@@ -538,26 +538,38 @@ function createInteractiveOsmMap(canvas){
   };
 }
 async function geocodeGmachOrganizations(rows){
- const cache=new Map(),resolved=[];
+ const cache=new Map(),resolved=[],sleep=ms=>new Promise(r=>setTimeout(r,ms));
+ const geocode=async query=>{
+   if(!query)return null;
+   if(cache.has(query))return cache.get(query);
+   for(let attempt=0;attempt<4;attempt++){
+     try{
+       const data=await api("/api/maps/geocode?q="+encodeURIComponent(query));
+       const first=data.results?.[0];
+       const point=first?{lat:Number(first.lat),lon:Number(first.lon)}:null;
+       cache.set(query,point);
+       if(data.cached===false)await sleep(1200);
+       return point;
+     }catch(error){
+       const msg=String(error?.message||"");
+       if((msg.includes("שנייה")||msg.includes("429"))&&attempt<3){await sleep(1250);continue}
+       console.warn("Gmach geocoding failed",query,error);
+       cache.set(query,null);
+       return null;
+     }
+   }
+   return null;
+ };
  for(const row of rows||[]){
    const hasStored=row.latitude!==null&&row.latitude!==undefined&&row.longitude!==null&&row.longitude!==undefined&&String(row.latitude).trim()!==""&&String(row.longitude).trim()!=="";
    const storedLat=hasStored?Number(row.latitude):NaN,storedLon=hasStored?Number(row.longitude):NaN;
-   if(Number.isFinite(storedLat)&&Number.isFinite(storedLon)&&Math.abs(storedLat)<=90&&Math.abs(storedLon)<=180&&(storedLat!==0||storedLon!==0)){resolved.push({...row,lat:storedLat,lon:storedLon});continue}
-   const address=[row.address,row.city].filter(Boolean).join(", ")||row.city;
-   if(!address)continue;
-   try{
-     let point=cache.get(address);
-     if(point===undefined){
-       const data=await api("/api/maps/geocode?q="+encodeURIComponent(address));
-       const first=data.results?.[0];
-       point=first?{lat:Number(first.lat),lon:Number(first.lon)}:null;
-       cache.set(address,point);
-       if(data.cached===false)await new Promise(r=>setTimeout(r,1150));
-     }
-     if(point&&Number.isFinite(point.lat)&&Number.isFinite(point.lon))resolved.push({...row,...point});
-   }catch(error){
-     console.warn("Gmach geocoding failed",address,error);
+   if(Number.isFinite(storedLat)&&Number.isFinite(storedLon)&&Math.abs(storedLat)<=90&&Math.abs(storedLon)<=180&&(storedLat!==0||storedLon!==0)){
+     resolved.push({...row,lat:storedLat,lon:storedLon});continue;
    }
+   const full=[row.address,row.city].filter(Boolean).join(", "),city=String(row.city||"").trim();
+   let point=await geocode(full||city);
+   if(!point&&city&&city!==full)point=await geocode(city);
+   if(point&&Number.isFinite(point.lat)&&Number.isFinite(point.lon))resolved.push({...row,...point});
  }
  return resolved;
 }
