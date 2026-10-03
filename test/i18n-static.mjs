@@ -46,6 +46,7 @@ assert.ok(app.includes('compare-rating-row')&&app.includes('ratingStars(item.rat
 assert.ok(runtime.includes('NEVER_TRANSLATE_SELECTOR=".organization-name')&&runtime.includes('"דירוג פריט":"Item rating"'),'English runtime must preserve gmach names and translate item-rating labels');
 const userContent=readFileSync('dist/user-content-translation.js','utf8');
 assert.ok(!userContent.includes('.organization-hero h2')&&!userContent.includes('.organization-card h3'),'Gmach names must remain in their original language');
+assert.ok(app.includes("subcategoryDisplayName")&&app.includes("categoryDisplayName(item.category)"),"English item views must use catalog English category/subcategory names");
 
 
 assert.ok(html.includes("user-content-translation.js"),"Offer optional translation for user written content");
@@ -54,6 +55,6 @@ for(const phrase of ["Alternative pickup branch","Start here","Recently viewed g
 
 const userTranslator=readFileSync('dist/user-content-translation.js','utf8');
 assert.ok(userTranslator.includes("const selector = 'body'")&&userTranslator.includes("NEVER_TRANSLATE"),"English fallback translation must cover all remaining visible Hebrew while preserving gmach names");
-assert.ok(userTranslator.includes("#organization-title")&&userTranslator.includes("[data-open-organization]"),"gmach names must remain in their original language");
+assert.ok(userTranslator.includes("#organization-title")&&userTranslator.includes(".organization-name")&&!userTranslator.includes("[data-open-organization]"),"only actual gmach-name elements may bypass English translation");
 
 assert.ok(runtime.includes('only organization names stay original')&&runtime.includes('[alt]'),"English mode must translate all visible/dynamic content and attributes except organization names");
