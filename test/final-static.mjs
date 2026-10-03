@@ -125,13 +125,13 @@ for(const token of ["openHelpMatches","data-help-matches","data-offer-match"])as
 
 assert.ok(appClient.includes("data-counter-pickup"),"pickup counter proposal UI missing");
 
-for(const token of ["maps.apple.com","data-copy-map-address","navigator.geolocation","/api/maps/geocode"])assert.ok(remainingClient.includes(token),token+" missing from completed map/navigation UI");
+for(const token of ["maps.apple.com","data-copy-map-address","navigator.geolocation","/api/geocode"])assert.ok(remainingClient.includes(token),token+" missing from completed map/navigation UI");
 assert.ok(remainingClient.includes("createInteractiveOsmMap")&&remainingClient.includes("/api/maps/tiles/")&&remainingClient.includes("showCountry"),"interactive full-country gmach map missing");
 assert.ok(remainingClient.includes("map-nav-pref-label"),"map navigation preference control must use non-overlapping layout");
 assert.ok(remainingWorker.includes("maps\\/tiles\\/")&&remainingWorker.includes("tile.openstreetmap.org"),"same-origin map tile proxy missing");
 const remainingHandler=remainingWorker.slice(remainingWorker.indexOf("export async function handleRemainingFeatures"));
 assert.ok(remainingWorker.includes("ensureMapSchema")&&remainingHandler.indexOf("api\\/maps\\/tiles")<remainingHandler.indexOf("await ensureSchema(env)"),"map endpoints must not depend on full schema reconciliation");
-assert.ok(remainingClient.includes('data.cached===false')&&remainingClient.includes('gmach:open-organization'),"gmach map geocoding/open flow regression");
+assert.ok(remainingClient.includes('/api/geocode?q=')&&remainingClient.includes('gmach:open-organization'),"gmach map geocoding/open flow regression");
 assert.ok(worker.includes("organization_branches b")&&worker.includes("AS latitude")&&worker.includes("AS longitude"),"discovery must expose stored branch coordinates for the map");
 assert.ok(remainingClient.includes("row.latitude")&&remainingClient.includes("/api/maps/tiles/"),"map must prefer stored coordinates and use same-origin tile loading");
 
