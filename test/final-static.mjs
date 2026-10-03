@@ -125,7 +125,7 @@ for(const token of ["openHelpMatches","data-help-matches","data-offer-match"])as
 assert.ok(appClient.includes("data-counter-pickup"),"pickup counter proposal UI missing");
 
 for(const token of ["maps.apple.com","data-copy-map-address","navigator.geolocation","/api/maps/geocode"])assert.ok(remainingClient.includes(token),token+" missing from completed map/navigation UI");
-assert.ok(remainingClient.includes("createInteractiveOsmMap")&&remainingClient.includes("openstreetmap.org/export/embed.html")&&remainingClient.includes("showCountry"),"interactive full-country gmach map missing");
+assert.ok(remainingClient.includes("createInteractiveOsmMap")&&remainingClient.includes("/api/maps/tiles/")&&remainingClient.includes("showCountry"),"interactive full-country gmach map missing");
 assert.ok(remainingClient.includes("map-nav-pref-label"),"map navigation preference control must use non-overlapping layout");
 assert.ok(remainingWorker.includes("maps\\/tiles\\/")&&remainingWorker.includes("tile.openstreetmap.org"),"same-origin map tile proxy missing");
 assert.ok(remainingClient.includes('data.cached===false')&&remainingClient.includes('gmach:open-organization'),"gmach map geocoding/open flow regression");
@@ -584,7 +584,7 @@ assert.ok(appClient.includes('confirmCollected)+"/status"'),"separate pickup con
 assert.ok(!indexHtml.includes("site-font-loading body{visibility:hidden}"),"body must never be hidden waiting for a font");
 assert.ok(!indexHtml.includes("<script>\n(()=>{const root=document.documentElement,done="),"CSP-blocked inline font boot must not return");
 
-assert.ok(remainingClient.includes("frameUrl")&&remainingClient.includes("data-osm-frame"),"map base must use the embedded OpenStreetMap frame instead of blocked tile images");
+assert.ok(remainingClient.includes("data-osm-tiles")&&remainingClient.includes('img.src="/api/maps/tiles/"'),"map base must use same-origin proxied OpenStreetMap tiles");
 
 assert.ok(css.includes("Keep the English desktop links visible")&&css.includes("padding-inline-start:28px"),"English desktop nav must stay visible with spacing before My account");
 
@@ -592,3 +592,5 @@ assert.ok(remainingClient.includes('row.latitude!==null')&&remainingClient.inclu
 assert.ok(remainingClient.includes('pointer-events:none;z-index:3'),"gmach marker layer must stay above the map frame");
 
 assert.ok(remainingClient.includes("attempt<4")&&remainingClient.includes("city!==full")&&remainingClient.includes("await sleep(1250)"),"gmach map geocoding must retry throttled requests and fall back to city");
+
+assert.ok(remainingClient.includes("screenX=wp.x-left")&&remainingClient.includes("screenY=wp.y-top"),"gmach markers must be positioned from Web Mercator coordinates on every render");
