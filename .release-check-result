@@ -1,40 +1,40 @@
-sha=224a237003bd7ee2013e9a7a72af08f4b043bf6a
+sha=003d07ba90bc1b96ec97c6fe56a3b525062f2b78
 install=success
 syntax=success
 tests=failure
 smoke=failure
 live=success
+Navigation admin static release gate passed.
+Privacy availability static release gate passed.
+Release hardening static gate passed.
+Release experience static release gate passed.
+Admin control center static release gate passed.
+Privacy purge static release gate passed.
+Community chat retention static release gate passed.
+QR scanning, structured SEO and accessibility shell gate passed.
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+Full requirements regression extensions passed.
+file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:606
+assert.ok(platformWorker.includes("suppressed: email template disabled")&&platformWorker.includes("suppressed: email preference disabled"),"legacy notification queue must re-check email switches at send time");
+          ^
 
-> gmach-karov@1.0.0 test
-> node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
-
-Final completion static release gate passed.
-node:internal/modules/run_main:107
-    triggerUncaughtException(
-    ^
-
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:159:83 {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
-
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791061272610:159:83 {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
-  diff: 'simple'
-}
+ReferenceError: platformWorker is not defined
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:606:11
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-03T21:01:13.233Z"}
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+Full requirements regression extensions passed.
+file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791061380156:606
+assert.ok(platformWorker.includes("suppressed: email template disabled")&&platformWorker.includes("suppressed: email preference disabled"),"legacy notification queue must re-check email switches at send time");
+          ^
+
+ReferenceError: platformWorker is not defined
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791061380156:606:11
+
+Node.js v24.21.0
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-03T21:03:00.882Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
