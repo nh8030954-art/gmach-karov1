@@ -2419,7 +2419,12 @@ async function updateRequestStatus(request, env, id) {
   if (!row) throw new HttpError(404, "הבקשה לא נמצאה");
   let allowed = false;
   if (row.borrower_id === user.id && ["pending","approved"].includes(row.status) && target === "cancelled") allowed = true;
-  if (row.owner_id === user.id || user.role === "admin") {
+  let managerAllowed=row.owner_id===user.id||user.role==="admin";
+  if(!managerAllowed){
+    const member=await env.DB.prepare("SELECT role FROM organization_members WHERE organization_id=? AND user_id=? LIMIT 1").bind(row.organization_id,user.id).first();
+    managerAllowed=["owner","requests","inventory"].includes(String(member?.role||""));
+  }
+  if (managerAllowed) {
     allowed = allowed || (row.status === "pending" && ["approved", "declined", "cancelled"].includes(target));
     allowed = allowed || (row.status === "approved" && ["collected","cancelled","no_show"].includes(target));
     allowed = allowed || (row.status === "collected" && target === "returned");
@@ -2427,7 +2432,7 @@ async function updateRequestStatus(request, env, id) {
   if (!allowed) throw new HttpError(403, "מעבר הסטטוס הזה אינו מורשה");
   let managerNote = row.manager_note;
   if (target === "declined") managerNote = cleanText(body.managerNote, 3, 500, "סיבת הדחייה");
-  else if (target === "cancelled" && (row.owner_id === user.id || user.role === "admin") && row.status === "approved") managerNote = cleanText(body.managerNote, 3, 500, "סיבת הביטול");
+  else if (target === "cancelled" && managerAllowed && row.status === "approved") managerNote = cleanText(body.managerNote, 3, 500, "סיבת הביטול");
   else if (target === "approved") managerNote = cleanOptional(body.managerNote, 500);
   const now = new Date().toISOString();
   let result;
