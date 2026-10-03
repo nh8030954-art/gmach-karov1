@@ -125,7 +125,7 @@ for(const token of ["openHelpMatches","data-help-matches","data-offer-match"])as
 assert.ok(appClient.includes("data-counter-pickup"),"pickup counter proposal UI missing");
 
 for(const token of ["maps.apple.com","data-copy-map-address","navigator.geolocation","/api/maps/geocode"])assert.ok(remainingClient.includes(token),token+" missing from completed map/navigation UI");
-assert.ok(remainingClient.includes("createInteractiveOsmMap")&&remainingClient.includes("/api/maps/tiles/")&&remainingClient.includes("showCountry"),"interactive full-country gmach map missing");
+assert.ok(remainingClient.includes("createInteractiveOsmMap")&&remainingClient.includes("https://tile.openstreetmap.org/")&&remainingClient.includes("showCountry"),"interactive full-country gmach map missing");
 assert.ok(remainingWorker.includes("maps\\/tiles\\/")&&remainingWorker.includes("tile.openstreetmap.org"),"same-origin map tile proxy missing");
 
 for(const token of ["manageLoanUnits","const loanUnits =","loan_unit_assignments"])assert.ok(worker.includes(token),token+" missing from pickup unit assignment backend");
