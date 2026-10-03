@@ -370,15 +370,58 @@ Object.assign(I18N.en,I18N_FINAL_EN,{
   "📷 תמונה":"📷 Photo","🎤 קול":"🎤 Voice","📍 מיקום":"📍 Location"
 });
 let lang=localStorage.getItem("gmach-language")||document.documentElement.lang||"he";
-function replaceTranslatedPhrase(text,he,en){let out=text,pos=0;const isHeb=c=>!!c&&/[\u0590-\u05FF]/.test(c),starts=isHeb(he[0]),ends=isHeb(he[he.length-1]);while((pos=out.indexOf(he,pos))!==-1){const before=out[pos-1]||"",after=out[pos+he.length]||"";if((starts&&isHeb(before))||(ends&&isHeb(after))){pos+=he.length;continue}out=out.slice(0,pos)+en+out.slice(pos+he.length);pos+=en.length}return out}function translateText(raw){if(!raw)return raw;if(I18N.en[raw])return I18N.en[raw];let out=raw;for(const [he,en] of Object.entries(I18N.en).sort((a,b)=>b[0].length-a[0].length)){if(he.length>2&&out.includes(he))out=replaceTranslatedPhrase(out,he,en)}return out}const USER_CONTENT_SELECTOR=".item-detail-description,#item-dialog-title,.item-card h3,.item-card p,.organization-hero>p,.review-list blockquote p,.chat-message p,.community-board-card>h3,.community-board-card>p";const NEVER_TRANSLATE_SELECTOR=".organization-name,[translate=\"no\"],[data-no-translate]";function isUserContentNode(n){return !!n?.parentElement?.closest?.(USER_CONTENT_SELECTOR+","+NEVER_TRANSLATE_SELECTOR)}window.GmachTranslate=value=>lang==="en"?translateText(value):value;function translateNode(n){if(lang!=="en"||isUserContentNode(n))return;const full=n.nodeValue||"",trim=full.trim();if(!trim)return;const option=n.parentElement?.tagName==="OPTION"?n.parentElement:null;if(option&&!option.hasAttribute("value"))option.setAttribute("value",trim);const translated=translateText(trim);if(translated!==trim)n.nodeValue=full.replace(trim,translated)}Object.assign(I18N.en,{"פרחים":"Flowers","מתאימים":"matching","עודכן":"Updated","פרטי קשר נמסרים רק לאחר אישור הבקשה":"Contact details are shared only after the request is approved","גמ״ח ברגע \u2014 גדולה גמילות חסדים יותר מן הצדקה":"Gmach Berega - Kindness connects communities"});window.GmachSearchAliases=()=>Object.entries(I18N.en).filter(([he,en])=>/[\u0590-\u05ff]/.test(he)&&/^[a-z][a-z\s-]{2,}$/i.test(en));
+function replaceTranslatedPhrase(text,he,en){let out=text,pos=0;const isHeb=c=>!!c&&/[\u0590-\u05FF]/.test(c),starts=isHeb(he[0]),ends=isHeb(he[he.length-1]);while((pos=out.indexOf(he,pos))!==-1){const before=out[pos-1]||"",after=out[pos+he.length]||"";if((starts&&isHeb(before))||(ends&&isHeb(after))){pos+=he.length;continue}out=out.slice(0,pos)+en+out.slice(pos+he.length);pos+=en.length}return out}function translateText(raw){if(!raw)return raw;if(I18N.en[raw])return I18N.en[raw];let out=raw;for(const [he,en] of Object.entries(I18N.en).sort((a,b)=>b[0].length-a[0].length)){if(he.length>2&&out.includes(he))out=replaceTranslatedPhrase(out,he,en)}return out}const NEVER_TRANSLATE_SELECTOR=".organization-name,[translate=\"no\"],[data-no-translate]";
+function isNeverTranslateNode(n){return !!n?.parentElement?.closest?.(NEVER_TRANSLATE_SELECTOR)}
+const aiTranslationCache=new Map(),aiTranslationPending=new Map();let aiTranslationTimer=null,aiTranslationBusy=false;
+try{const saved=JSON.parse(sessionStorage.getItem("gmach-en-ai-cache")||"{}");for(const [k,v] of Object.entries(saved))if(typeof v==="string")aiTranslationCache.set(k,v)}catch{}
+function persistAiTranslationCache(){try{const entries=[...aiTranslationCache.entries()].slice(-300);sessionStorage.setItem("gmach-en-ai-cache",JSON.stringify(Object.fromEntries(entries)))}catch{}}
+function applyTranslatedNode(node,source,value){
+  if(!node?.isConnected||lang!=="en"||isNeverTranslateNode(node))return;
+  const full=node.nodeValue||"",trim=full.trim();
+  if(trim!==source&&trim!==translateText(source))return;
+  node.nodeValue=full.replace(trim,value);
+}
+function queueAiTranslation(node,text){
+  const source=String(text||"").trim();
+  if(lang!=="en"||!source||!/[\u0590-\u05ff]/.test(source)||isNeverTranslateNode(node))return;
+  const cached=aiTranslationCache.get(source);if(cached){applyTranslatedNode(node,source,cached);return}
+  if(!aiTranslationPending.has(source))aiTranslationPending.set(source,new Set());
+  aiTranslationPending.get(source).add(node);
+  if(!aiTranslationTimer)aiTranslationTimer=setTimeout(flushAiTranslations,80);
+}
+async function flushAiTranslations(){
+  aiTranslationTimer=null;if(aiTranslationBusy||lang!=="en"||!aiTranslationPending.size)return;
+  aiTranslationBusy=true;
+  const entries=[...aiTranslationPending.entries()].slice(0,12);
+  for(const [source] of entries)aiTranslationPending.delete(source);
+  try{
+    const data=await api("/api/translate/user-content",{method:"POST",body:{texts:entries.map(([source])=>source)}});
+    const values=Array.isArray(data?.translations)?data.translations:[];
+    entries.forEach(([source,nodes],i)=>{const value=String(values[i]||"").trim();if(!value)return;aiTranslationCache.set(source,value);for(const node of nodes)applyTranslatedNode(node,source,value)});
+    persistAiTranslationCache();
+  }catch(error){console.warn("English content translation unavailable",error)}
+  finally{aiTranslationBusy=false;if(aiTranslationPending.size&&!aiTranslationTimer)aiTranslationTimer=setTimeout(flushAiTranslations,120)}
+}
+window.GmachTranslate=value=>lang==="en"?translateText(value):value;
+function translateNode(n){
+  if(lang!=="en"||isNeverTranslateNode(n))return;
+  const full=n.nodeValue||"",trim=full.trim();if(!trim)return;
+  const option=n.parentElement?.tagName==="OPTION"?n.parentElement:null;
+  if(option&&!option.hasAttribute("value"))option.setAttribute("value",trim);
+  const translated=translateText(trim);
+  if(translated!==trim)n.nodeValue=full.replace(trim,translated);
+  if(/[\u0590-\u05ff]/.test(translated))queueAiTranslation(n,trim);
+}
+Object.assign(I18N.en,{"פרחים":"Flowers","מתאימים":"matching","עודכן":"Updated","פרטי קשר נמסרים רק לאחר אישור הבקשה":"Contact details are shared only after the request is approved","גמ״ח ברגע — גדולה גמילות חסדים יותר מן הצדקה":"Gmach Berega - Kindness connects communities"});
+window.GmachSearchAliases=()=>Object.entries(I18N.en).filter(([he,en])=>/[\u0590-\u05ff]/.test(he)&&/^[a-z][a-z\s-]{2,}$/i.test(en));
 function translate(root=document.body){if(lang!=="en")return;document.documentElement.lang="en";document.documentElement.dir="ltr";const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;while(n=w.nextNode())translateNode(n);$$("input[placeholder],textarea[placeholder],[title],[aria-label],input[type=button][value],input[type=submit][value]",root).forEach(el=>{for(const a of ["placeholder","title","aria-label","value"]){if(a==="value"&&!el.matches("input[type=button],input[type=submit]"))continue;const v=el.getAttribute(a);if(v){const translated=translateText(v);if(translated!==v)el.setAttribute(a,translated)}}})}
 function observeTranslations(){if(lang!=="en")return;const o=new MutationObserver(ms=>{for(const m of ms){if(m.type==="characterData"){translateNode(m.target);continue}if(m.type==="attributes"){const el=m.target,a=m.attributeName,v=el.getAttribute(a);if(v&&(!(["value"].includes(a))||el.matches("input[type=button],input[type=submit]"))){const translated=translateText(v);if(translated!==v)el.setAttribute(a,translated)}continue}for(const n of m.addedNodes){if(n.nodeType===Node.TEXT_NODE)translateNode(n);else if(n.nodeType===Node.ELEMENT_NODE)translate(n)}}});o.observe(document.body,{childList:true,characterData:true,attributes:true,attributeFilter:["placeholder","title","aria-label","value"],subtree:true})}
 function installLanguage(){
  if(lang==="en"){document.title=translateText(document.title);const meta=document.querySelector('meta[name="description"]');if(meta)meta.content=translateText(meta.content)}
  const b=$("#language-switch");if(!b)return;
- b.type="button";b.className="button button-secondary";b.textContent=lang==="en"?"עברית":"English";b.setAttribute("aria-label","החלף שפה");
- b.onclick=()=>{lang=lang==="en"?"he":"en";localStorage.setItem("gmach-language",lang);api("/api/me/profile",{method:"PATCH",body:{preferredLanguage:lang}}).catch(()=>{});if(lang==="he"){location.reload();return}document.documentElement.lang="en";document.documentElement.dir="ltr";b.textContent="עברית";const mobileSwitch=$("#mobile-language-switch");if(mobileSwitch)mobileSwitch.textContent="עברית";document.title=translateText(document.title);const meta=document.querySelector('meta[name="description"]');if(meta)meta.content=translateText(meta.content);translate(document.body);observeTranslations();window.dispatchEvent(new Event("gmach-language-change"))};
- const mobile=$("#mobile-menu");if(mobile&&!$("#mobile-language-switch",mobile)){const m=document.createElement("button");m.id="mobile-language-switch";m.type="button";m.textContent=lang==="en"?"עברית":"English";m.setAttribute("aria-label","החלף שפה");m.onclick=b.onclick;mobile.append(m)};if(lang==="en"){document.title=translateText(document.title);const meta=document.querySelector('meta[name="description"]');if(meta)meta.content=translateText(meta.content);translate(document.body);observeTranslations()}
+ b.type="button";b.className="button button-secondary";b.textContent=lang==="en"?"Hebrew":"English";b.setAttribute("aria-label","החלף שפה");
+ b.onclick=()=>{lang=lang==="en"?"he":"en";localStorage.setItem("gmach-language",lang);api("/api/me/profile",{method:"PATCH",body:{preferredLanguage:lang}}).catch(()=>{});if(lang==="he"){location.reload();return}document.documentElement.lang="en";document.documentElement.dir="ltr";b.textContent="Hebrew";const mobileSwitch=$("#mobile-language-switch");if(mobileSwitch)mobileSwitch.textContent="Hebrew";document.title=translateText(document.title);const meta=document.querySelector('meta[name="description"]');if(meta)meta.content=translateText(meta.content);translate(document.body);observeTranslations();window.dispatchEvent(new Event("gmach-language-change"))};
+ const mobile=$("#mobile-menu");if(mobile&&!$("#mobile-language-switch",mobile)){const m=document.createElement("button");m.id="mobile-language-switch";m.type="button";m.textContent=lang==="en"?"Hebrew":"English";m.setAttribute("aria-label","החלף שפה");m.onclick=b.onclick;mobile.append(m)};if(lang==="en"){document.title=translateText(document.title);const meta=document.querySelector('meta[name="description"]');if(meta)meta.content=translateText(meta.content);translate(document.body);observeTranslations()}
 }
 function dialog(id,title){let d=$("#"+id);if(!d){d=document.createElement("dialog");d.id=id;d.className="modal modal-wide";document.body.append(d)}d.innerHTML='<button class="dialog-close" type="button" aria-label="סגירה">×</button><div class="dialog-heading"><h2>'+esc(title)+'</h2></div><div class="remaining-body"></div>';$(".dialog-close",d).onclick=()=>d.close();return d}
 function fileToCanvas(file){return new Promise((resolve,reject)=>{const img=new Image(),url=URL.createObjectURL(file);img.onload=()=>{const c=document.createElement("canvas");c.width=img.naturalWidth;c.height=img.naturalHeight;c.getContext("2d").drawImage(img,0,0);URL.revokeObjectURL(url);resolve(c)};img.onerror=reject;img.src=url})}
@@ -613,13 +656,13 @@ async function showAddressMap(){
    const discovery=await api("/api/discovery"),organizations=discovery.organizations||[];
    const points=await geocodeGmachOrganizations(organizations);
    points.forEach(org=>{
-     org.popupHtml=`<div dir="${lang==="en"?"ltr":"rtl"}"><strong style="font-size:16px">${esc(org.name)}</strong><div style="margin-top:5px">📍 ${esc([org.city,org.neighborhood].filter(Boolean).join(" · "))}</div><div>📦 ${Number(org.item_count||0)} ${lang==="en"?"items":"פריטים"} · ✅ ${Number(org.available_items||0)} ${lang==="en"?"available":"זמינים"}</div>${org.description?`<p style="margin:7px 0">${esc(org.description)}</p>`:""}<button type="button" class="button button-primary button-small" data-map-open-org="${esc(org.id)}">${lang==="en"?"View gmach":"לפרטי הגמ״ח"}</button>${navigationLinks(org.lat,org.lon,org.name)}</div>`;
+     {const rating=Math.max(0,Math.min(5,Number(org.rating)||0)),filled=Math.max(0,Math.min(5,Math.round(rating))),stars="★".repeat(filled)+"☆".repeat(5-filled),reviewCount=Number(org.review_count||0);org.popupHtml=`<div dir="${lang==="en"?"ltr":"rtl"}"><strong class="organization-name" translate="no" style="font-size:16px">${esc(org.name)}</strong><div style="margin-top:5px">📍 ${esc([org.city,org.neighborhood].filter(Boolean).join(" · "))}</div><div style="margin-top:6px;font-weight:700"><span aria-label="${lang==="en"?"Gmach rating":"דירוג הגמ״ח"} ${rating.toFixed(1)} ${lang==="en"?"out of 5":"מתוך 5"}" style="color:#b07b2f;letter-spacing:1px">${stars}</span> <span>${rating?rating.toFixed(1):"—"}/5</span> <small>(${reviewCount} ${lang==="en"?(reviewCount===1?"review":"reviews"):"דירוגים"})</small></div><div style="margin-top:5px">📦 ${Number(org.item_count||0)} ${lang==="en"?"items":"פריטים"} · ✅ ${Number(org.available_items||0)} ${lang==="en"?"available":"זמינים"}</div>${org.description?`<p style="margin:7px 0">${esc(org.description)}</p>`:""}<button type="button" class="button button-primary button-small" data-map-open-org="${esc(org.id)}">${lang==="en"?"View gmach":"לפרטי הגמ״ח"}</button>${navigationLinks(org.lat,org.lon,org.name)}</div>`;}
    });
    map.setPoints(points);map.showCountry();
    canvas.addEventListener("click",e=>{const button=e.target.closest?.("[data-map-open-org]");if(!button)return;d.close();window.dispatchEvent(new CustomEvent("gmach:open-organization",{detail:{id:button.dataset.mapOpenOrg}}))});
    status.textContent=points.length?(lang==="en"?`${points.length} gmachs are shown. Click any marker for details.`:`${points.length} גמ״חים מוצגים על המפה. לחצו על נקודה לפרטים.`):(lang==="en"?"No gmach locations could be placed yet.":"עדיין לא נמצאו כתובות גמ״חים שניתן למקם על המפה.");
  }catch(e){status.textContent=e.message||"טעינת המפה נכשלה";canvas.innerHTML=`<div class="dashboard-empty"><strong>${esc(status.textContent)}</strong></div>`}
- form.onsubmit=async e=>{e.preventDefault();results.innerHTML="<p>מחפשים…</p>";try{const x=await api("/api/geocode?q="+encodeURIComponent(form.q.value));results.innerHTML=x.results.length?x.results.map((r,i)=>`<button type="button" class="button button-secondary" data-map-i="${i}" style="text-align:start">${esc(r.displayName)}</button>`).join(""):"<p>לא נמצאה כתובת.</p>";$$("[data-map-i]",results).forEach(btn=>btn.onclick=()=>{const r=x.results[Number(btn.dataset.mapI)];focusPoint(Number(r.lat),Number(r.lon),r.displayName)})}catch(e){results.innerHTML="<p role=alert>"+esc(e.message)+"</p>"}};
+ form.onsubmit=async e=>{e.preventDefault();results.innerHTML=lang==="en"?"<p>Searching…</p>":"<p>מחפשים…</p>";try{const x=await api("/api/geocode?q="+encodeURIComponent(form.q.value));results.innerHTML=x.results.length?x.results.map((r,i)=>`<button type="button" class="button button-secondary" data-map-i="${i}" style="text-align:start">${esc(r.displayName)}</button>`).join(""):(lang==="en"?"<p>Address not found.</p>":"<p>לא נמצאה כתובת.</p>");$$("[data-map-i]",results).forEach(btn=>btn.onclick=()=>{const r=x.results[Number(btn.dataset.mapI)];focusPoint(Number(r.lat),Number(r.lon),r.displayName)})}catch(e){results.innerHTML="<p role=alert>"+esc(e.message)+"</p>"}};
  $("#map-current",d).onclick=()=>navigator.geolocation?.getCurrentPosition(pos=>focusPoint(pos.coords.latitude,pos.coords.longitude,lang==="en"?"My current location":"המיקום הנוכחי"),()=>toast(lang==="en"?"Location permission was not granted":"לא התקבלה הרשאת מיקום",true),{enableHighAccuracy:false,timeout:8000,maximumAge:60000});
  d.addEventListener("close",()=>{try{map?.destroy()}catch{}},{once:true});
 }
