@@ -819,6 +819,8 @@ async function routeApi(request, env, ctx, url) {
   const loanUnits = path.match(/^\/api\/loan-requests\/([^/]+)\/units$/);
   if (method === "GET" && loanUnits) return manageLoanUnits(request, env, decodeURIComponent(loanUnits[1]), false);
   if (method === "POST" && loanUnits) return manageLoanUnits(request, env, decodeURIComponent(loanUnits[1]), true);
+  const assignLoanUnits = path.match(/^\/api\/loan-requests\/([^/]+)\/assign-units$/);
+  if (method === "POST" && assignLoanUnits) return manageLoanUnits(request, env, decodeURIComponent(assignLoanUnits[1]), true);
   const loanTimeline = path.match(/^\/api\/loan-requests\/([^/]+)\/timeline$/);
   if (method === "GET" && loanTimeline) return getLoanTimeline(request, env, decodeURIComponent(loanTimeline[1]));
   const loanPickup = path.match(/^\/api\/loan-requests\/([^/]+)\/pickup-proposals$/);
@@ -3250,14 +3252,19 @@ async function manageLoanUnits(request,env,requestId,write=false){
   const conflict=await env.DB.prepare("SELECT COUNT(*) AS count FROM loan_unit_assignments WHERE unit_id IN ("+placeholders+") AND request_id<>? AND returned_at IS NULL").bind(...unitIds,requestId).first();
   if(Number(conflict?.count||0)>0)throw new HttpError(409,"אחת היחידות כבר מוקצית להשאלה אחרת");
   const previous=await env.DB.prepare("SELECT unit_id FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL").bind(requestId).all();
-  const now=new Date().toISOString(),statements=[env.DB.prepare("DELETE FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL").bind(requestId)];
-  for(const row of previous.results||[])if(!unitIds.includes(String(row.unit_id)))statements.push(env.DB.prepare("UPDATE item_units SET status='available',updated_at=? WHERE id=? AND status IN ('held','loaned')").bind(now,row.unit_id));
+  const now=new Date().toISOString(),statements=[];
+  for(const row of previous.results||[]){
+    if(!unitIds.includes(String(row.unit_id))){
+      statements.push(env.DB.prepare("UPDATE loan_unit_assignments SET returned_at=? WHERE request_id=? AND unit_id=? AND returned_at IS NULL").bind(now,requestId,row.unit_id));
+      statements.push(env.DB.prepare("UPDATE item_units SET status='available',updated_at=? WHERE id=? AND status IN ('held','loaned')").bind(now,row.unit_id));
+    }
+  }
   const selectedStatus=loan.status==="collected"?"loaned":"held";
   for(const unitId of unitIds){
-    statements.push(env.DB.prepare("INSERT INTO loan_unit_assignments(request_id,unit_id,assigned_at) VALUES(?,?,?)").bind(requestId,unitId,now));
+    statements.push(env.DB.prepare("INSERT INTO loan_unit_assignments(request_id,unit_id,assigned_at,returned_at) VALUES(?,?,?,NULL) ON CONFLICT(request_id,unit_id) DO UPDATE SET assigned_at=excluded.assigned_at,returned_at=NULL").bind(requestId,unitId,now));
     statements.push(env.DB.prepare("UPDATE item_units SET status=?,updated_at=? WHERE id=?").bind(selectedStatus,now,unitId));
   }
-  await env.DB.batch(statements);
+  if(statements.length)await env.DB.batch(statements);
   await auditStatement(env,user.id,"loan.units.assign","loan_request",requestId,{unitIds}).run().catch(()=>{});
   return json({ok:true,unitIds});
 }
