@@ -1,4 +1,4 @@
-deploy_sha=1138030e65e44b6313c3e923653cf457db165dee
+deploy_sha=d0e1b9484772b263a9a2129e59dac35c6f1b678a
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -15,17 +15,12 @@ Release experience static release gate passed.
 Admin control center static release gate passed.
 Privacy purge static release gate passed.
 Community chat retention static release gate passed.
-QR scanning, structured SEO and accessibility shell gate passed.
-Excel export and QR image scanner gate passed.
-Voice message recording gate passed.
-Excel export, accessible admin status and QR image scanning gate passed.
-Full requirements regression extensions passed.
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: original manual category carousel behavior missing
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:541:8 {
+AssertionError [ERR_ASSERTION]: web fonts must not late-swap during first paint
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:380:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
