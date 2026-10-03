@@ -538,7 +538,7 @@ assert.ok(appClient.includes("openPickupScreen(button.dataset.pickupRequest)"),"
 assert.ok(appClient.includes('updateRequestStatus(button.dataset.noShow,"no_show")'),"no-show button must be wired");
 assert.ok(worker.includes("async function manageLoanUnits("),"pickup unit endpoint implementation missing");
 assert.ok(appClient.includes('encodeURIComponent(requestId)+"/status"')&&appClient.includes('status:"returned"'),"return confirmation must use status endpoint");
-assert.ok(indexHtml.includes('class="site-font-loading"')&&indexHtml.includes('document.fonts.load("600 1em Assistant")'),"Assistant must be the first-paint default font");
+assert.ok(indexHtml.includes("family=Assistant:wght@400;500;600;700;800&display=block")&&!indexHtml.includes('class="site-font-loading"')&&!indexHtml.includes("site-font-loading body{visibility:hidden}"),"Assistant must load first without hiding the whole page");
 assert.ok(appClient.includes("cache_version:3")&&i18nBoot.includes("s.cache_version===3"),"site settings font cache must use current version");
 assert.ok(await access("migrations/0019_normalize_site_font.sql").then(()=>true),"font normalization migration missing");
 assert.ok(worker.includes('storedStatus=target==="no_show"?"cancelled":target'),"no-show must respect loan_requests status constraint");
