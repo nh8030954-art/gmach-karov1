@@ -609,3 +609,6 @@ assert.ok(appClient.includes("subtitleEn")&&appClient.includes("Everything avail
 assert.ok(css.includes("#dashboard-view .admin-control-entry")&&css.includes("color:#fff!important"),"super-admin control-center entry must be visible");
 assert.ok(worker.includes("operationalTemplateKey")&&worker.includes('emailTemplateState(env,specific,lang)'),"operational emails must honor the matching admin template toggle");
 assert.ok(adminControlCenter.includes("read-back verification")||adminControlCenter.includes("אימות הקריאה החוזרת"),"admin email template saves must be verified by read-back");
+
+assert.ok(appClient.includes('formatDateTime(row.requested_from))} — ${escapeHTML(formatDateTime(row.requested_until))'),"user loan cards must display localized date/time instead of raw ISO timestamps");
+assert.ok(finalWorker.includes('path==="/api/admin/loan-requests"')&&finalWorker.includes('launch-readiness layer'),"admin loan routes must bypass unrelated final-schema bootstrap");
