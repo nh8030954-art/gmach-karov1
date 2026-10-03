@@ -2350,14 +2350,41 @@ async function createLoanRequest(request, env) {
 
 async function dashboard(request, env) {
   const user = await requireUser(request, env);
-  const [organizationsResult, itemsResult, requestsResult, favoritesResult, savedOrganizationsResult, helpRequestsResult, recentOrganizationsResult] = await env.DB.batch([
+  const safeAll = async (primary, fallback = null, label = "dashboard") => {
+    try { return await primary.all(); }
+    catch (error) {
+      console.error("Dashboard query degraded:", label, error);
+      if (!fallback) return { results: [] };
+      try { return await fallback.all(); }
+      catch (fallbackError) {
+        console.error("Dashboard fallback failed:", label, fallbackError);
+        return { results: [] };
+      }
+    }
+  };
+
+  const organizationsResult = await safeAll(
     env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,o.verified,o.is_hidden,o.created_at,c.contact_phone,o.address,o.website_url,o.service_area,o.hours_json,o.pickup_options
       FROM organizations o LEFT JOIN organization_contacts c ON c.organization_id = o.id WHERE o.owner_id = ? ORDER BY o.created_at DESC`).bind(user.id),
+    env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,o.verified,o.is_hidden,o.created_at,
+      NULL AS contact_phone,NULL AS address,NULL AS website_url,NULL AS service_area,NULL AS hours_json,NULL AS pickup_options
+      FROM organizations o WHERE o.owner_id = ? ORDER BY o.created_at DESC`).bind(user.id),
+    "organizations"
+  );
+  const itemsResult = await safeAll(
     env.DB.prepare(`SELECT i.id,i.organization_id,i.title,i.category,i.description,i.condition,i.condition_detail,i.quantity,i.loan_conditions,i.image_urls,
       i.status,i.availability_status,i.created_at,o.name AS org_name,i.item_type,i.subcategory,i.tags_json,i.pickup_method,i.inventory_updated_at,
       (SELECT COUNT(*) FROM item_units iu WHERE iu.item_id=i.id AND iu.status!='retired') AS unit_count,
       i.min_loan_minutes,i.max_loan_minutes,i.booking_notice_minutes,i.turnaround_minutes,i.booking_horizon_days,i.approval_mode,i.deposit_required,i.deposit_amount_agorot
       FROM items i JOIN organizations o ON o.id = i.organization_id WHERE o.owner_id = ? ORDER BY i.created_at DESC`).bind(user.id),
+    env.DB.prepare(`SELECT i.id,i.organization_id,i.title,i.category,i.description,i.condition,NULL AS condition_detail,i.quantity,i.loan_conditions,i.image_urls,
+      i.status,i.availability_status,i.created_at,o.name AS org_name,NULL AS item_type,NULL AS subcategory,NULL AS tags_json,NULL AS pickup_method,NULL AS inventory_updated_at,
+      0 AS unit_count,NULL AS min_loan_minutes,NULL AS max_loan_minutes,NULL AS booking_notice_minutes,NULL AS turnaround_minutes,NULL AS booking_horizon_days,
+      'manual' AS approval_mode,0 AS deposit_required,0 AS deposit_amount_agorot
+      FROM items i JOIN organizations o ON o.id = i.organization_id WHERE o.owner_id = ? ORDER BY i.created_at DESC`).bind(user.id),
+    "items"
+  );
+  const requestsResult = await safeAll(
     env.DB.prepare(`SELECT lr.id,lr.item_id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,lr.manager_note,lr.created_at,lr.quantity,lr.deposit_required_snapshot,lr.deposit_amount_agorot_snapshot,lr.workflow_status,lr.extension_status,lr.extension_until,lr.change_pending_json,lr.cancellation_undo_until,
       i.title AS item_title,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,
       CASE WHEN o.owner_id = ? THEN 'incoming' ELSE 'outgoing' END AS direction,
@@ -2365,18 +2392,38 @@ async function dashboard(request, env) {
       FROM loan_requests lr JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id
       JOIN users u ON u.id = lr.borrower_id LEFT JOIN organization_contacts c ON c.organization_id = o.id
       WHERE lr.borrower_id = ? OR o.owner_id = ? ORDER BY lr.created_at DESC`).bind(user.id, user.id, user.id, user.id),
-    env.DB.prepare("SELECT item_id FROM favorites WHERE user_id = ?").bind(user.id),
+    env.DB.prepare(`SELECT lr.id,lr.item_id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,NULL AS manager_note,lr.created_at,
+      COALESCE(lr.quantity,1) AS quantity,0 AS deposit_required_snapshot,0 AS deposit_amount_agorot_snapshot,NULL AS workflow_status,NULL AS extension_status,
+      NULL AS extension_until,NULL AS change_pending_json,NULL AS cancellation_undo_until,
+      i.title AS item_title,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,
+      CASE WHEN o.owner_id = ? THEN 'incoming' ELSE 'outgoing' END AS direction,NULL AS contact_phone
+      FROM loan_requests lr JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id
+      JOIN users u ON u.id = lr.borrower_id
+      WHERE lr.borrower_id = ? OR o.owner_id = ? ORDER BY lr.created_at DESC`).bind(user.id, user.id, user.id),
+    "requests"
+  );
+  const favoritesResult = await safeAll(env.DB.prepare("SELECT item_id FROM favorites WHERE user_id = ?").bind(user.id), null, "favorites");
+  const savedOrganizationsResult = await safeAll(
     env.DB.prepare(`SELECT s.organization_id,o.name,o.city,o.verified FROM saved_organizations s JOIN organizations o ON o.id=s.organization_id WHERE s.user_id=? ORDER BY s.created_at DESC`).bind(user.id),
+    null,"saved organizations"
+  );
+  const helpRequestsResult = await safeAll(
     env.DB.prepare(`SELECT id,title,description,category,city,urgency,status,requested_from,requested_until,distance_km,created_at FROM help_requests WHERE requester_id=? ORDER BY created_at DESC`).bind(user.id),
+    env.DB.prepare(`SELECT id,title,description,category,city,urgency,status,NULL AS requested_from,NULL AS requested_until,NULL AS distance_km,created_at FROM help_requests WHERE requester_id=? ORDER BY created_at DESC`).bind(user.id),
+    "help requests"
+  );
+  const recentOrganizationsResult = await safeAll(
     env.DB.prepare(`SELECT rv.organization_id,o.name,o.city,o.primary_category,rv.viewed_at,
       (SELECT COUNT(*) FROM items i WHERE i.organization_id=o.id AND i.status='active' AND i.deleted_at IS NULL) AS item_count
       FROM recently_viewed_organizations rv JOIN organizations o ON o.id=rv.organization_id
       WHERE rv.user_id=? AND o.status='approved' AND o.is_hidden=0 AND o.deleted_at IS NULL
-      ORDER BY rv.viewed_at DESC LIMIT 8`).bind(user.id)
-  ]);
-  const organizations = organizationsResult.results.map(row => ({ ...row, verified: Boolean(row.verified), is_hidden: Boolean(row.is_hidden), hours: safeJsonObject(row.hours_json), pickupOptions: parseJsonArray(row.pickup_options) }));
-  const items = itemsResult.results.map(row => ({ ...row, condition: publicProductCondition(row.condition,row.condition_detail), image_urls: parseJsonArray(row.image_urls), tags: parseJsonArray(row.tags_json), organizations: { name: row.org_name } }));
-  const requests = requestsResult.results.map(row => ({
+      ORDER BY rv.viewed_at DESC LIMIT 8`).bind(user.id),
+    null,"recent organizations"
+  );
+
+  const organizations = (organizationsResult.results || []).map(row => ({ ...row, verified: Boolean(row.verified), is_hidden: Boolean(row.is_hidden), hours: safeJsonObject(row.hours_json), pickupOptions: parseJsonArray(row.pickup_options) }));
+  const items = (itemsResult.results || []).map(row => ({ ...row, condition: publicProductCondition(row.condition,row.condition_detail), image_urls: parseJsonArray(row.image_urls), tags: parseJsonArray(row.tags_json), organizations: { name: row.org_name } }));
+  const requests = (requestsResult.results || []).map(row => ({
     id: row.id,
     status: row.status,
     requested_from: row.requested_from,
@@ -2402,10 +2449,10 @@ async function dashboard(request, env) {
     organizations,
     items,
     requests,
-    favorites: favoritesResult.results.map(row => row.item_id),
-    savedOrganizations: savedOrganizationsResult.results,
-    recentlyViewedOrganizations: recentOrganizationsResult.results,
-    helpRequests: helpRequestsResult.results,
+    favorites: (favoritesResult.results || []).map(row => row.item_id),
+    savedOrganizations: savedOrganizationsResult.results || [],
+    recentlyViewedOrganizations: recentOrganizationsResult.results || [],
+    helpRequests: helpRequestsResult.results || [],
     stats: {
       activeRequests: requests.filter(row => ["pending", "approved", "collected"].includes(row.status)).length,
       items: items.length,
@@ -2413,7 +2460,6 @@ async function dashboard(request, env) {
     }
   });
 }
-
 async function updateRequestStatus(request, env, id) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
