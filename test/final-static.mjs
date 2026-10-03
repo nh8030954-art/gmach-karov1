@@ -585,3 +585,5 @@ assert.ok(!indexHtml.includes("site-font-loading body{visibility:hidden}"),"body
 assert.ok(!indexHtml.includes("<script>\n(()=>{const root=document.documentElement,done="),"CSP-blocked inline font boot must not return");
 
 assert.ok(remainingClient.includes("frameUrl")&&remainingClient.includes("data-osm-frame"),"map base must use the embedded OpenStreetMap frame instead of blocked tile images");
+
+assert.ok(css.includes("Keep the English desktop links visible")&&css.includes("padding-inline-start:28px"),"English desktop nav must stay visible with spacing before My account");
