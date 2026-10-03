@@ -1,4 +1,4 @@
-sha=4db0651d91e696009166a4505774ea599e924e42
+sha=8ee7a38b248d030f50f223d8a2d2ba15ba560de5
 install=success
 syntax=success
 tests=failure
@@ -26,7 +26,7 @@ AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
 Node.js v24.21.0
   assert.ok(html.includes("./platform-completion.js"))
 
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791053847499:37:8 {
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791054164072:37:8 {
   generatedMessage: true,
   code: 'ERR_ASSERTION',
   actual: false,
@@ -36,5 +36,5 @@ Node.js v24.21.0
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-03T18:57:28.192Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-03T19:02:44.597Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
