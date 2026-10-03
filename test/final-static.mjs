@@ -5,6 +5,7 @@ const worker=await readFile("worker/index.js","utf8");
 const platform=await readFile("worker/platform-completion.js","utf8");
 const finalWorker=await readFile("worker/final-features.js","utf8");
 const html=await readFile("dist/index.html","utf8");
+const css=await readFile("dist/styles.css","utf8");
 const finalClient=await readFile("dist/final-features.js","utf8");
 const remainingWorker=await readFile("worker/remaining-features.js","utf8");
 const remainingClient=await readFile("dist/remaining-features.js","utf8");
