@@ -1,4 +1,4 @@
-deploy_sha=c0771ceac966475e4f0dbc40f5b5c1bb1c013379
+deploy_sha=1c07370bf50916b76d14d627a99132c658578696
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -21,26 +21,20 @@ Voice message recording gate passed.
 Excel export, accessible admin status and QR image scanning gate passed.
 Full requirements regression extensions passed.
 Static English interface coverage 100.0% (462/462)
-remaining-features Error: Backup checksum mismatch
-    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:175:41)
-    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:362:91)
-    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:913:37)
-    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:378:26)
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-
-202 !== 201
-
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:464:10
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
-  generatedMessage: true,
+AssertionError [ERR_ASSERTION]: User-content translation batches must stay within the 12-text API limit
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/i18n-static.mjs:49:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 202,
-  expected: 201,
-  operator: 'strictEqual',
+  actual: false,
+  expected: true,
+  operator: '==',
   diff: 'simple'
 }
 
