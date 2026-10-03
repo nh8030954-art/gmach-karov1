@@ -1262,3 +1262,55 @@ html[lang="en"] .desktop-nav{column-gap:28px}
   html[lang="en"] .header-actions #dashboard-button{margin-inline-start:10px}
   html[lang="en"] .desktop-nav{column-gap:20px}
 }
+
+/* Prevent desktop header and map controls from colliding */
+html[lang="en"] .header-inner{
+  grid-template-columns:190px minmax(0,1fr) auto;
+  gap:24px;
+}
+html[lang="en"] .desktop-nav{
+  min-width:0;
+  justify-content:center;
+  gap:22px;
+  white-space:nowrap;
+}
+html[lang="en"] .desktop-nav a,
+html[lang="en"] .desktop-nav .nav-button{
+  flex:0 0 auto;
+  font-size:.9rem;
+}
+html[lang="en"] .header-actions{
+  position:relative;
+  z-index:2;
+  gap:12px;
+  padding-inline-start:18px;
+  background:#fff;
+  white-space:nowrap;
+}
+html[lang="en"] .header-actions #dashboard-button{
+  margin-inline-start:0;
+}
+#map-dialog .map-nav-pref-label{
+  display:grid!important;
+  grid-template-columns:1fr;
+  gap:6px!important;
+  align-items:stretch!important;
+  line-height:1.35;
+}
+#map-dialog #map-nav-pref{
+  display:block;
+  width:100%;
+  min-height:42px;
+  margin:0!important;
+  padding:8px 10px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff;
+  box-sizing:border-box;
+}
+@media(max-width:1320px){
+  html[lang="en"] .desktop-nav{gap:16px}
+  html[lang="en"] .desktop-nav a,
+  html[lang="en"] .desktop-nav .nav-button{font-size:.84rem}
+  html[lang="en"] .header-actions{gap:8px;padding-inline-start:12px}
+}
