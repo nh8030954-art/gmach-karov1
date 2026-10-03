@@ -1,4 +1,4 @@
-deploy_sha=30416c5d5c049af0745323ec6aaec2b8b2c4da08
+deploy_sha=148e095c339f809b2cec7ffacd1fc28a7ef8aba0
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
