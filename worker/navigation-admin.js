@@ -54,7 +54,7 @@ async function adminLinkDetail(request,env,id){
 }
 export async function handleNavigationAdmin(request,env,ctx,url){
  try{
-  await ensureNavigationAdminSchema(env);const path=url.pathname,method=request.method.toUpperCase();let m;
+  const path=url.pathname,method=request.method.toUpperCase();let m;
   if(method==="GET"&&path==="/api/navigation-links")return publicLinks(env);
   if(path==="/api/admin/navigation-links"&&(method==="GET"||method==="POST"))return adminLinks(request,env);
   if((m=path.match(/^\/api\/admin\/navigation-links\/([^/]+)$/))&&["PATCH","DELETE"].includes(method))return adminLinkDetail(request,env,decodeURIComponent(m[1]));
