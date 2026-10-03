@@ -587,7 +587,8 @@ async function showAddressMap(){
  d.addEventListener("close",()=>{try{map?.destroy()}catch{}},{once:true});
 }
 function installMapEntry(){
- if($("#map-entry"))return;const host=$(".header-actions");if(!host)return;const b=document.createElement("button");b.id="map-entry";b.type="button";b.className="button button-secondary";b.textContent=lang==="en"?"Map":"מפה";b.onclick=showAddressMap;host.append(b);const bell=$("#notifications-button"),account=$("#dashboard-button");if(bell&&account&&bell.parentElement===host){account.after(bell);bell.after(b)}
+ const b=$("#map-entry");if(!b)return;b.type="button";b.className="button button-secondary";b.textContent=lang==="en"?"Map":"מפה";b.onclick=showAddressMap;
+ const host=b.parentElement,bell=$("#notifications-button"),account=$("#dashboard-button");if(host&&bell&&account&&bell.parentElement===host){account.after(bell);bell.after(b)}
 }
 async function openCategoryManager(type,id){
   const d=dialog("category-manager-dialog",lang==="en"?"Categories":"קטגוריות"),b=$(".remaining-body",d);b.innerHTML="<p>טוענים…</p>";d.showModal();
