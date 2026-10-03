@@ -523,6 +523,7 @@ assert.ok(worker.includes("matchesSubcategory=!f.subcategory"),"saved-search sub
 assert.ok(appClient.includes("function ratingStars(")&&appClient.includes('size:"review-primary"')&&appClient.includes('size:"item-large"')&&appClient.includes("rating-star"),"five-star rating UI missing");
 assert.ok(appClient.includes("item-rating-hero")&&!appClient.includes('<span>דירוג הפריט</span>'),"item detail rating must be prominent and unlabeled");
 assert.ok(appClient.includes('label:"גמ״ח",size:"gmach-hero"'),"gmach hero rating must be prominent");
+assert.ok(appClient.includes('organization-card-rating')&&appClient.includes('size:"gmach-card-top"'),"nationwide gmach cards must show prominent star ratings at the top");
 assert.ok(appClient.includes("if(!shellReady) toast"),"boot error toast must only appear when the visible shell is unavailable");
 
 assert.ok(worker.includes("nextQuantity=currentQuantity+count"),"unit creation must increase item quantity");
