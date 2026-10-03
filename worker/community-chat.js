@@ -89,7 +89,6 @@ export async function runCommunityChatMaintenance(env){await ensureCommunityChat
 export async function handleCommunityChat(request,env,ctx,url){
   const method=request.method.toUpperCase(),path=url.pathname;
   try{
-    await ensureCommunityChatSchema(env);
     let m=path.match(/^\/api\/help-offers\/([^/]+)\/messages$/);
     if(m&&method==="GET")return listMessages(request,env,decodeURIComponent(m[1]));
     if(m&&method==="POST")return createMessage(request,env,decodeURIComponent(m[1]));
