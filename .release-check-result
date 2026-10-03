@@ -1,39 +1,27 @@
-sha=df81f98feef77533abc46c644185847d3e05bf65
+sha=6a24b864cb02b9b20291718614b82dfc0f00e75f
 install=success
 syntax=success
-tests=failure
-smoke=failure
-live=cancelled
+tests=cancelled
+smoke=skipped
+live=skipped
+Privacy availability static release gate passed.
 Release hardening static gate passed.
 Release experience static release gate passed.
 Admin control center static release gate passed.
 Privacy purge static release gate passed.
 Community chat retention static release gate passed.
-node:internal/modules/run_main:107
-    triggerUncaughtException(
-    ^
-
-AssertionError [ERR_ASSERTION]: live settings must refresh versioned font cache
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:385:8 {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
-
-AssertionError [ERR_ASSERTION]: live settings must refresh versioned font cache
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791050034056:385:8 {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
+QR scanning, structured SEO and accessibility shell gate passed.
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+Full requirements regression extensions passed.
+Static English interface coverage 100.0% (463/463)
+remaining-features Error: Backup checksum mismatch
+    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:168:41)
+    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:353:91)
+    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:903:37)
+    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:377:26)
+Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
+{"users":250,"organizations":50,"items":500,"concurrency":10,"requests":50,"success":50,"durationMs":826}
+{"users":250,"organizations":50,"items":500,"concurrency":25,"requests":125,"success":125,"durationMs":1673}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
