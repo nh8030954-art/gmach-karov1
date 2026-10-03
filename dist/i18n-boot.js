@@ -8,7 +8,8 @@
     if(color(s.primary_color))root.style.setProperty("--navy",s.primary_color);
     if(color(s.secondary_color))root.style.setProperty("--teal",s.secondary_color);
     if(color(s.accent_color))root.style.setProperty("--accent",s.accent_color);
-    if(typeof s.font_family==="string"&&s.font_family.length<120)root.style.setProperty("--site-font",s.font_family);
+    root.style.setProperty("--site-font","Assistant, sans-serif");
+    if(s.cache_version===2&&typeof s.font_family==="string"&&s.font_family.length<120)root.style.setProperty("--site-font",s.font_family);
     const n=Number(s.base_font_size);if(Number.isFinite(n)&&n>=12&&n<=24)root.style.fontSize=n+"px";
   }
 }catch{}})();
