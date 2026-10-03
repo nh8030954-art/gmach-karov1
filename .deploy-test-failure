@@ -1,16 +1,26 @@
-deploy_sha=52b7d42c84835fedf71ed4f4bab3613dd660b297
+deploy_sha=c314175eeead688d54411e82de36207ba117a6b7
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
 > node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
 
 Final completion static release gate passed.
+Requirements expansion static release gate passed.
+Launch readiness static release gate passed.
+Distribution completion static release gate passed.
+Navigation admin static release gate passed.
+Privacy availability static release gate passed.
+Release hardening static gate passed.
+Release experience static release gate passed.
+Admin control center static release gate passed.
+Privacy purge static release gate passed.
+Community chat retention static release gate passed.
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:147:83 {
+AssertionError [ERR_ASSERTION]: web fonts must not late-swap during first paint
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:380:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
