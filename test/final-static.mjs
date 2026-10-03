@@ -382,7 +382,7 @@ assert.ok(!indexHtml.includes('localStorage.getItem("gmach-site-settings-v1")'),
 const i18nBoot=await readFile("dist/i18n-boot.js","utf8");
 assert.ok(i18nBoot.includes("scrollRestoration")&&i18nBoot.includes('gmach-site-settings-v1'),"early external layout bootstrap missing");
 assert.ok(i18nBoot.includes("cache_version===3")&&i18nBoot.includes('root.style.setProperty("--site-font","Assistant, sans-serif")'),"font boot must ignore stale cached font values");
-assert.ok(appClient.includes("cache_version:2"),"live settings must refresh versioned font cache");
+assert.ok(appClient.includes("cache_version:3"),"live settings must refresh versioned font cache");
 assert.ok(appClient.includes('לא הצלחנו לאשר את ההחזרה')&&appClient.includes('setButtonBusy(button,true,"מאשרים…")'),"return confirmation must handle errors and double submits");
 assert.ok(worker.includes("post-return follower notification failed")&&worker.includes("post-status waitlist advance failed"),"return completion must survive noncritical side-effect failures");
 
