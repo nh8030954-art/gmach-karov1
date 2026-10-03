@@ -614,4 +614,5 @@ assert.ok(appClient.includes('formatDateTime(row.requested_from))} — ${escapeH
 assert.ok(finalWorker.includes('path==="/api/admin/loan-requests"')&&finalWorker.includes('launch-readiness layer'),"admin loan routes must bypass unrelated final-schema bootstrap");
 
 assert.ok(appClient.includes('data-user-content-priority="title"'),"item titles must be prioritized for English translation");
-assert.ok(worker.includes('content_translation",ctx,120'),"English content translation allowance regression");
+assert.ok(worker.includes('enforceEdgeRateLimit(identity,"content_translation",120)'),"English content translation allowance regression");
+assert.ok(!worker.includes('enforcePublicRateLimit(env,identity,"content_translation",ctx,120)'),"content translation rate limiting must not spend a D1 write per batch");
