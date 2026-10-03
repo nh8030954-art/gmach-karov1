@@ -1289,9 +1289,24 @@
   window.addEventListener("gmach:open-item",event=>{const id=event?.detail?.id;if(id)openItem(id);});
   window.addEventListener("gmach:open-organization",event=>{const id=event?.detail?.id;if(id)openOrganization(id);});
   window.addEventListener("gmach:route",event=>{const path=event?.detail?.path;if(path==="/catalog")window.setTimeout(()=>$("#catalog")?.scrollIntoView(),0);});
+  function navigateHomeSection(path,targetId){
+    $("#organization-page-view").hidden=true;
+    $("#dashboard-view").hidden=true;
+    $("#home-view").hidden=false;
+    history.pushState({route:path},"",path);
+    const target=$("#"+targetId);
+    if(target) target.scrollIntoView({behavior:"auto",block:"start"});
+  }
   function setupEvents() {
     $("#current-year").textContent = new Date().getFullYear(); const today = new Date().toISOString().slice(0, 10); $("#date-filter").min = today; const nowLocal=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16); $("#request-start").min=nowLocal; $("#request-end").min=nowLocal; $("#request-start").addEventListener("change",()=>{$("#request-end").min=$("#request-start").value||nowLocal;checkRequestedAvailability();}); $("#request-end").addEventListener("change",checkRequestedAvailability); $("#request-quantity").addEventListener("change",checkRequestedAvailability); $("#item-deposit-required").addEventListener("change",()=>{$("#item-deposit-amount-row").hidden=!$("#item-deposit-required").checked;$("#item-deposit-amount").required=$("#item-deposit-required").checked;});
-    $("#mobile-menu-button").addEventListener("click", () => { const menu = $("#mobile-menu"); menu.hidden = !menu.hidden; $("#mobile-menu-button").setAttribute("aria-expanded", String(!menu.hidden)); }); $$("#mobile-menu a, #mobile-menu button").forEach(el => el.addEventListener("click", () => { $("#mobile-menu").hidden = true; $("#mobile-menu-button").setAttribute("aria-expanded", "false"); }));
+    $("#mobile-menu-button").addEventListener("click", () => { const menu = $("#mobile-menu"); menu.hidden = !menu.hidden; $("#mobile-menu-button").setAttribute("aria-expanded", String(!menu.hidden)); }); $("#mobile-menu a, #mobile-menu button").forEach(el => el.addEventListener("click", () => { $("#mobile-menu").hidden = true; $("#mobile-menu-button").setAttribute("aria-expanded", "false"); }));
+    const cleanSectionRoutes={"/catalog":"catalog","/how-it-works":"how-it-works","/gmachim":"gmachim"};
+    $('a[href="/catalog"],a[href="/how-it-works"],a[href="/gmachim"]').forEach(link=>link.addEventListener("click",event=>{
+      if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
+      const targetId=cleanSectionRoutes[link.getAttribute("href")];if(!targetId)return;
+      event.preventDefault();navigateHomeSection(link.getAttribute("href"),targetId);
+    }));
+
     $("#search-form").addEventListener("submit", async event => { event.preventDefault(); $("#category-filter").value=$("#hero-category-filter").value; if ($("#date-filter").value) await loadItems(); else applyFilters(); const details={query:$("#search-input").value.trim(),city:$("#city-filter").value,category:$("#category-filter").value}; analytics(state.filteredItems.length ? "search" : "no_results",details); $("#catalog").scrollIntoView({ behavior: "smooth", block: "start" }); }); ["#city-filter", "#category-filter", "#subcategory-filter", "#condition-filter", "#type-filter", "#available-only", "#sort-select"].forEach(selector => $(selector).addEventListener("change", () => { if (selector === "#category-filter") { state.activeCategory = $(selector).value; updateCatalogSubcategories(); $$("[data-category]").forEach(button => button.classList.toggle("is-active", button.dataset.category === state.activeCategory)); } applyFilters(); })); $("#date-filter").addEventListener("change", loadItems);
     let suggestTimer; $("#search-input").addEventListener("input", () => { clearTimeout(suggestTimer); suggestTimer=setTimeout(() => loadDiscovery($("#search-input").value.trim()),300); });
     $("#list-view-button").addEventListener("click", () => setResultsView("list")); $("#map-view-button").addEventListener("click", () => setResultsView("map"));
@@ -1352,10 +1367,10 @@
       if(path==="/dashboard"){const unit=new URLSearchParams(location.search).get("unit");if(unit){openManagedUnitFromQr(unit);return}state.user?showDashboard():requireAuth(()=>showDashboard());return}
       if(path.startsWith("/gmach/")){openOrganization(decodeURIComponent(path.slice(7)));return}
       $("#organization-page-view").hidden=true;$("#dashboard-view").hidden=true;$("#home-view").hidden=false;
-      if(path==="/catalog")window.setTimeout(()=>$("#catalog").scrollIntoView(),0);
+      if(path==="/catalog")$("#catalog")?.scrollIntoView({behavior:"auto",block:"start"});
       else if(path==="/community")window.setTimeout(()=>openCommunityBoard(1,new URLSearchParams(location.search).get("help")||undefined),0);
-      else if(path==="/how-it-works")window.setTimeout(()=>$("#how-it-works")?.scrollIntoView(),0);
-      else if(path==="/gmachim")window.setTimeout(()=>$("#gmachim")?.scrollIntoView(),0);
+      else if(path==="/how-it-works")$("#how-it-works")?.scrollIntoView({behavior:"auto",block:"start"});
+      else if(path==="/gmachim")$("#gmachim")?.scrollIntoView({behavior:"auto",block:"start"});
     };
     window.addEventListener("popstate",handleCleanRoute);
     window.addEventListener("hashchange",()=>{const h=location.hash;
