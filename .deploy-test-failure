@@ -1,19 +1,17 @@
-deploy_sha=bf2bb7c1830ddb488400ebb8761df9ccffcb7715
+deploy_sha=6df34f21a91a655c206a9c0958d6b616b186ec08
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
 > node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
 
+Final completion static release gate passed.
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
-
-  assert.ok(html.includes("./platform-completion.js"))
-
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:37:8 {
-  generatedMessage: true,
+AssertionError [ERR_ASSERTION]: map endpoints must not depend on full schema reconciliation
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:131:8 {
+  generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
   expected: true,
