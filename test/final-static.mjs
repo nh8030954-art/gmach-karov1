@@ -612,3 +612,6 @@ assert.ok(adminControlCenter.includes("read-back verification")||adminControlCen
 
 assert.ok(appClient.includes('formatDateTime(row.requested_from))} — ${escapeHTML(formatDateTime(row.requested_until))'),"user loan cards must display localized date/time instead of raw ISO timestamps");
 assert.ok(finalWorker.includes('path==="/api/admin/loan-requests"')&&finalWorker.includes('launch-readiness layer'),"admin loan routes must bypass unrelated final-schema bootstrap");
+
+assert.ok(appClient.includes('data-user-content-priority="title"'),"item titles must be prioritized for English translation");
+assert.ok(worker.includes('content_translation",ctx,120'),"English content translation allowance regression");
