@@ -1,30 +1,22 @@
-deploy_sha=692dadcc1f0c639fc29b516f52fedac56e73af7a
+deploy_sha=cc461224d737f6049cb8c8e825c351b18821270e
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
 > node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
 
 Final completion static release gate passed.
-Requirements expansion static release gate passed.
-Launch readiness static release gate passed.
-Distribution completion static release gate passed.
-Navigation admin static release gate passed.
-Privacy availability static release gate passed.
-Release hardening static gate passed.
-Release experience static release gate passed.
-Admin control center static release gate passed.
-Privacy purge static release gate passed.
-Community chat retention static release gate passed.
-QR scanning, structured SEO and accessibility shell gate passed.
-Excel export and QR image scanner gate passed.
-Voice message recording gate passed.
-Excel export, accessible admin status and QR image scanning gate passed.
-Full requirements regression extensions passed.
-file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:606
-assert.ok(platformWorker.includes("suppressed: email template disabled")&&platformWorker.includes("suppressed: email preference disabled"),"legacy notification queue must re-check email switches at send time");
-          ^
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
 
-ReferenceError: platformWorker is not defined
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:606:11
+AssertionError [ERR_ASSERTION]: single-element selector used as collection
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:159:83 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: '==',
+  diff: 'simple'
+}
 
 Node.js v24.21.0
