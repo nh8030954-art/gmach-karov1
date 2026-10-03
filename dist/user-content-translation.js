@@ -14,7 +14,7 @@
       const parent=node.parentElement,value=node.nodeValue?.trim()||'';
       if(!parent||!parent.getClientRects().length||parent.closest(NEVER_TRANSLATE)||parent.closest('script,style,noscript,textarea,code,pre'))continue;
       if(!ignored.has(node)&&/[\u0590-\u05ff]/.test(value)&&value.length>=2&&value.length<=500)nodes.push({node,value});
-      if(nodes.length>=24)break;
+      if(nodes.length>=12)break;
     }
     return nodes;
   }
@@ -24,7 +24,7 @@
     if (!group.length) return;
     busy = true;
     try {
-      const pending = group.filter(({ value }) => !cache.has(value));
+      const pending = group.filter(({ value }) => !cache.has(value)).slice(0,12);
       if (pending.length) {
         requests++;
         const response = await fetch('/api/translate/user-content', {
