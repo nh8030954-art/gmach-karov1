@@ -189,9 +189,13 @@
   };
 
   const init=()=>{
+    // Calculate the initial scene position before enabling motion styles, so decorative icons
+    // never render at their zero-position and then jump on the first animation frame.
+    setupScenes(); setupCategoryScene();
+    draw();
     // Apply the final hero state in the same frame so already-rendered content never fades out and back in.
     root.classList.add('motion-ready','motion-active','motion-loaded');
-    setupScenes(); setupCategoryScene(); setupReveal(); setupSkeletons(); setupCounts(); setupActions(); setupMobileHeaderFill(); setupOneTimeCta(); syncEmptySections();
+    setupReveal(); setupSkeletons(); setupCounts(); setupActions(); setupMobileHeaderFill(); setupOneTimeCta(); syncEmptySections();
     addEventListener('scroll',requestDraw,{passive:true});
     addEventListener('resize',rebuild,{passive:true});
     reduceQuery.addEventListener?.('change',requestDraw);
