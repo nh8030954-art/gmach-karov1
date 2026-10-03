@@ -422,7 +422,7 @@ export default {
         // write trying to persist the same incident. Console observability remains.
         if(!d1Limit)try { ctx.waitUntil(recordDistributionError(env,request,error,requestId)); } catch {}
       }
-      const publicMessage=d1Limit?"שירות הנתונים הגיע זמנית למגבלת קיבולת. הפעולה לא נשמרה; אפשר לנסות שוב לאחר איפוס השירות.":(error instanceof HttpError ? error.message : "אירעה תקלה זמנית בשרת");
+      const publicMessage=d1Limit?"אירעה תקלה זמנית בשרת":(error instanceof HttpError ? error.message : "אירעה תקלה זמנית בשרת");
       return withSecurityHeaders(json({ error: publicMessage, requestId }, status, { "X-Request-Id": requestId, ...(d1Limit?{"Retry-After":"900"}:{}) }));
     }
   },
