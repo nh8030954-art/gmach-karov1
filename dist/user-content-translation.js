@@ -2,7 +2,7 @@
   'use strict';
   let started = false;
   const selector = 'body';
-  const NEVER_TRANSLATE = '.organization-name,[translate="no"],[data-no-translate],#organization-title,[data-open-organization],[data-recent-org] strong,[data-owned-org] h3,.organization-switch button,.gmach-owner strong';
+  const NEVER_TRANSLATE = '.organization-name,[translate="no"],[data-no-translate],#organization-title,[data-recent-org] strong,[data-owned-org] h3,.organization-switch .organization-name,.gmach-owner .organization-name';
   const cache = new Map(), ignored = new WeakSet();
   let timer = 0, busy = false, requests = 0;
   function candidates() {
