@@ -1,0 +1,57 @@
+name: Incident diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/incident-diagnostic.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Classify recent production server errors
+        shell: bash
+        run: |
+          set -euo pipefail
+          RAW="$(npx wrangler d1 execute DB --remote --json --command "SELECT request_id,path,method,message,created_at FROM server_errors ORDER BY created_at DESC LIMIT 40" 2>/dev/null)"
+          export RAW
+          node <<'NODE'
+          const raw=JSON.parse(process.env.RAW||"[]");
+          const rows=Array.isArray(raw)?(raw.flatMap(x=>x.results||[])):[];
+          const sanitizePath=p=>String(p||"").replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/ig,":id").replace(/\b\d{12,}\b/g,":num");
+          const classify=m=>{
+            const s=String(m||"");
+            let x=s.match(/no such column:\s*([A-Za-z0-9_.]+)/i); if(x)return "MISSING_COLUMN:"+x[1];
+            x=s.match(/no such table:\s*([A-Za-z0-9_.]+)/i); if(x)return "MISSING_TABLE:"+x[1];
+            x=s.match(/UNIQUE constraint failed:\s*([A-Za-z0-9_., ]+)/i); if(x)return "UNIQUE_CONSTRAINT:"+x[1].replace(/\s+/g,"");
+            x=s.match(/CHECK constraint failed:\s*([^\n]+)/i); if(x)return "CHECK_CONSTRAINT";
+            if(/FOREIGN KEY constraint failed/i.test(s))return "FOREIGN_KEY_CONSTRAINT";
+            if(/database is locked|SQLITE_BUSY/i.test(s))return "DB_BUSY";
+            if(/too many SQL variables|too many parameters/i.test(s))return "TOO_MANY_SQL_VARS";
+            if(/D1_ERROR/i.test(s))return "D1_OTHER";
+            if(/TypeError|ReferenceError|is not a function|Cannot read/i.test(s))return "WORKER_RUNTIME";
+            return "OTHER";
+          };
+          for(const r of rows) console.log(JSON.stringify({
+            requestId:r.request_id,
+            path:sanitizePath(r.path),
+            method:r.method,
+            category:classify(r.message),
+            createdAt:r.created_at
+          }));
+          NODE
