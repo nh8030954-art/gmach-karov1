@@ -198,7 +198,6 @@ export async function runRequirementsExpansionMaintenance(env){
 export async function handleRequirementsExpansion(request,env,ctx,url){
   const method=request.method.toUpperCase(),path=url.pathname;
   try{
-    await ensureRequirementsExpansionSchema(env);
     let m;
     if(method==="GET"&&(m=path.match(/^\/api\/organizations\/([^/]+)\/branches-public$/)))return publicBranches(env,decodeURIComponent(m[1]));
     if(method==="POST"&&(m=path.match(/^\/api\/items\/([^/]+)\/multi-range-check$/)))return multiRangeCheck(request,env,decodeURIComponent(m[1]));
