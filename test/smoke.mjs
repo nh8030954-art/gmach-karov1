@@ -473,6 +473,8 @@ try {
   result = await request(`/api/loan-requests/${requestId}/assign-units`, { method: "POST", cookie: adminCookie, body: { unitIds: [allocatedUnitId] } });
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(result.data.status,"approved","allocating units must not itself mark the item as collected");
+  result = await request(`/api/loan-requests/${requestId}/assign-units`, { method: "POST", cookie: adminCookie, body: { unitIds: [allocatedUnitId] } });
+  assert.equal(result.response.status, 200, "saving the same unit assignment twice must be idempotent: "+JSON.stringify(result.data));
   result = await request(`/api/loan-requests/${requestId}/units`, { cookie:adminCookie });
   assert.equal(result.response.status,200,JSON.stringify(result.data));
   const allocated=result.data.units.find(u=>u.id===allocatedUnitId);
