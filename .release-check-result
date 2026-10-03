@@ -1,40 +1,7 @@
-sha=d1f5d38bb0c8b390d4bb8ce9444dec9c30d976ee
-install=success
-syntax=success
-tests=failure
-smoke=failure
-live=success
-> node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
-
-node:internal/modules/run_main:107
-    triggerUncaughtException(
-    ^
-
-AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
-
-  assert.ok(html.includes("./platform-completion.js"))
-
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:37:8 {
-  generatedMessage: true,
-  code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
-  assert.ok(html.includes("./platform-completion.js"))
-
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791054566379:37:8 {
-  generatedMessage: true,
-  code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-03T19:09:27.023Z"}
+sha=4855a1d955ec18b7d21427811bbf81f8ec2c3ff0
+install=skipped
+syntax=skipped
+tests=skipped
+smoke=skipped
+live=skipped
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
