@@ -129,7 +129,6 @@ export async function runPrivacyPurgeMaintenance(env){return runAll(env)}
 export async function handlePrivacyPurge(request,env,ctx,url){
  const method=request.method.toUpperCase(),path=url.pathname;
  try{
-  await ensurePrivacyPurgeSchema(env);
   if(method==="GET"&&path==="/api/admin/privacy-retention")return adminOverview(request,env);
   if(method==="POST"&&path==="/api/admin/privacy-retention/run")return runNow(request,env);
   const m=path.match(/^\/api\/admin\/privacy-retention\/policies\/([^/]+)$/);if(method==="PATCH"&&m)return updatePolicy(request,env,decodeURIComponent(m[1]));
