@@ -39,6 +39,20 @@
     const rows=Array.isArray(state.categoryCatalog)?state.categoryCatalog:[],parent=rows.find(row=>!row.parent_id&&(row.name_he===category||row.id===category));
     return parent?rows.filter(row=>row.parent_id===parent.id).map(row=>row.name_he).filter(Boolean):[];
   }
+  function categoryRailPresentation(row){
+    const name=String(row?.name_he||"").trim();
+    const known={
+      "אירועים":{icon:"decor",className:"category-events",subtitle:"עיצוב, שולחנות וציוד"},
+      "כלי עבודה":{icon:"tools",className:"category-tools",subtitle:"לבית ולתיקונים"},
+      "תינוקות":{icon:"baby",className:"category-baby",subtitle:"עגלות, מיטות וכיסאות"},
+      "רפואה":{icon:"medical",className:"category-medical",subtitle:"שיקום וסיוע"},
+      "רפואה ושיקום":{icon:"medical",className:"category-medical",subtitle:"שיקום וסיוע"},
+      "טיולים":{icon:"tent",className:"category-outdoors",subtitle:"קמפינג ונסיעות"},
+      "בית ואירוח":{icon:"home",className:"category-home",subtitle:"אירוח וציוד לבית"}
+    };
+    const fallbackIcon=ICONS[row?.icon]?row.icon:"box";
+    return known[name]||{icon:fallbackIcon,className:"category-all",subtitle:String(row?.name_en||"").trim()||"ציוד להשאלה"};
+  }
   function populateItemCategorySelector(){
     const parents=(state.categoryCatalog||[]).filter(row=>!row.parent_id&&row.name_he);
     const populate=(selector,emptyLabel)=>{
@@ -55,9 +69,11 @@
     const rail=$("#category-rail");
     if(rail){
       const active=state.activeCategory;
-      rail.innerHTML='<button class="category-card '+(!active?'is-active':'')+'" type="button" data-category="" role="listitem"><span class="category-icon category-all" aria-hidden="true">◫</span><strong>הכול</strong><small>כל מה שזמין</small></button>'+parents.map(row=>'<button class="category-card '+(active===row.name_he?'is-active':'')+'" type="button" data-category="'+escapeHTML(row.name_he)+'" role="listitem"><span class="category-icon" aria-hidden="true">◇</span><strong>'+escapeHTML(row.name_he)+'</strong><small>'+escapeHTML((row.name_en||"").trim())+'</small></button>').join("");
+      rail.querySelectorAll('[data-carousel-clone]').forEach(node=>node.remove());
+      rail.classList.remove("carousel-continuous");
+      rail.classList.add("carousel-ready");
+      rail.innerHTML='<button class="category-card '+(!active?'is-active':'')+'" type="button" data-category="" role="listitem"><span class="category-icon category-all" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></span><strong>הכול</strong><small>כל מה שזמין</small></button>'+parents.map(row=>{const meta=categoryRailPresentation(row);return '<button class="category-card '+(active===row.name_he?'is-active ':'')+'" type="button" data-category="'+escapeHTML(row.name_he)+'" role="listitem"><span class="category-icon '+escapeHTML(meta.className)+'" aria-hidden="true"><svg viewBox="0 0 24 24">'+(ICONS[meta.icon]||ICONS.box)+'</svg></span><strong>'+escapeHTML(row.name_he)+'</strong><small>'+escapeHTML(meta.subtitle)+'</small></button>'}).join("");
       bindCategoryRailButtons();
-      window.setTimeout(()=>window.GmachResetCategoryCarousel?.(),0);
     }
     updateItemSubcategories();
     updateCatalogSubcategories();
@@ -1487,54 +1503,5 @@
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',ready,{once:true});else ready();
 })();
 
-// Category carousel continuous autoplay v3 — restored behavior.
-(()=>{
-  let stopCurrent=()=>{};
-  const start=()=>{
-    const rail=document.getElementById('category-rail');
-    if(!rail) return;
-    stopCurrent();
-    rail.querySelectorAll('[data-carousel-clone]').forEach(node=>node.remove());
-    delete rail.dataset.continuousCarousel;
-    rail.scrollLeft=0;
-    if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    rail.dataset.continuousCarousel='1';
-    rail.classList.add('carousel-ready','carousel-continuous');
-    const originals=[...rail.children].filter(node=>!node.dataset.carouselClone);
-    if(originals.length<2) return;
-    originals.forEach((el,index)=>{
-      const clone=el.cloneNode(true);
-      clone.setAttribute('aria-hidden','true');
-      clone.tabIndex=-1;
-      clone.dataset.carouselClone=String(index);
-      clone.addEventListener('click',()=>el.click());
-      rail.appendChild(clone);
-    });
-    let paused=false,last=performance.now(),raf=0;
-    const speed=window.innerWidth<=760?62:48;
-    const rtl=document.documentElement.dir==='rtl';
-    const half=()=>rail.scrollWidth/2;
-    const tick=now=>{
-      const dt=Math.min(40,now-last);last=now;
-      if(!paused&&!document.hidden&&!document.documentElement.classList.contains('a11y-stop-motion')){
-        const delta=speed*dt/1000;
-        rail.scrollLeft+=rtl?-delta:delta;
-        const h=half();
-        if(Math.abs(rail.scrollLeft)>=h-2)rail.scrollLeft=0;
-      }
-      raf=requestAnimationFrame(tick);
-    };
-    let resume;
-    const pause=()=>{paused=true;clearTimeout(resume)};
-    const restart=()=>{clearTimeout(resume);resume=setTimeout(()=>paused=false,450)};
-    rail.addEventListener('pointerdown',pause,{passive:true});
-    rail.addEventListener('pointerup',restart,{passive:true});
-    rail.addEventListener('pointercancel',restart,{passive:true});
-    rail.addEventListener('touchend',restart,{passive:true});
-    rail.addEventListener('wheel',()=>{pause();restart()},{passive:true});
-    raf=requestAnimationFrame(tick);
-    stopCurrent=()=>{cancelAnimationFrame(raf);clearTimeout(resume)};
-  };
-  window.GmachResetCategoryCarousel=start;
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
-})();
+// Category rail uses the original manual horizontal carousel behavior.
+
