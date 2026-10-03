@@ -1,4 +1,4 @@
-deploy_sha=eafacb0dddbac46ee68a6e7ffc4c059dcbb9a4cf
+deploy_sha=8a7d2f957e7c015083fb5ab88d13dcfdf147faee
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -12,12 +12,20 @@ Navigation admin static release gate passed.
 Privacy availability static release gate passed.
 Release hardening static gate passed.
 Release experience static release gate passed.
+Admin control center static release gate passed.
+Privacy purge static release gate passed.
+Community chat retention static release gate passed.
+QR scanning, structured SEO and accessibility shell gate passed.
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+Full requirements regression extensions passed.
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: return rows.length?dynamic missing from dynamic live category catalog
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:338:146 {
+AssertionError [ERR_ASSERTION]: original manual category carousel behavior missing
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:541:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
