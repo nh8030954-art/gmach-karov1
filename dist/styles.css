@@ -1206,3 +1206,6 @@ html, body { max-width: 100%; overflow-x: clip; }
 /* Keep auth controls dimensionally stable while /api/auth/me resolves. */
 #dashboard-button { min-width: 82px; text-align: center; }
 #notifications-button { width: 40px; height: 40px; flex: 0 0 40px; }
+
+.loan-date-range{white-space:nowrap;direction:rtl;font-variant-numeric:tabular-nums;color:var(--ink-soft)}
+@media(max-width:560px){.loan-date-range{white-space:normal}}
