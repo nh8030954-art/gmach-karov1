@@ -18,7 +18,5 @@ try {
   if (localStorage.getItem('gmach-language') === 'en') {
     document.documentElement.lang = 'en';
     document.documentElement.dir = 'ltr';
-    document.documentElement.classList.add('i18n-en-pending');
-    window.setTimeout(()=>document.documentElement.classList.remove('i18n-en-pending'),2500);
   }
 } catch { /* Storage can be disabled; Hebrew remains the safe default. */ }
