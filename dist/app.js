@@ -930,7 +930,7 @@
     $$('[data-confirm-collected]').forEach(button=>button.addEventListener("click",async()=>{
       if(!translatedConfirm("לאשר שהמשתמש אסף את הפריט?"))return;
       try{
-        await api("/api/loan-requests/"+encodeURIComponent(button.dataset.confirmCollected),{method:"PATCH",body:{status:"collected"}});
+        await api("/api/loan-requests/"+encodeURIComponent(button.dataset.confirmCollected)+"/status",{method:"PATCH",body:{status:"collected"}});
         toast("אושר שהמשתמש אסף את הפריט");
         await refreshAccountSnapshot();
         showDashboard("requests");
