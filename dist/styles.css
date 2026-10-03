@@ -1413,3 +1413,16 @@ html[lang="en"] .header-actions #dashboard-button{
   background:color-mix(in srgb,var(--navy) 88%,#fff)!important;
   color:#fff!important;
 }
+
+/* Super-admin layout: keep clear spacing between labels, values and lower sections. */
+#admin-control-center .launch-body{display:grid;gap:18px}
+#admin-control-center .dashboard-section{display:grid;gap:14px}
+#admin-control-center .section-heading{margin-bottom:2px}
+#admin-control-center .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:2px 0 4px}
+#admin-control-center .stats-grid article{min-height:82px;padding:14px 16px;border:1px solid var(--line);border-radius:15px;background:#fff;display:flex;align-items:center;justify-content:space-between;gap:16px}
+#admin-control-center .stats-grid article span{color:var(--ink-soft);font-weight:700}
+#admin-control-center .stats-grid article strong{flex:0 0 auto;margin-inline-start:10px;color:var(--navy);font-size:1.45rem}
+#admin-control-center .dashboard-row>div:first-child{display:grid;gap:5px}
+#admin-control-center .dashboard-row p,#admin-control-center .dashboard-row small{margin:0}
+@media(max-width:900px){#admin-control-center .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){#admin-control-center .stats-grid{grid-template-columns:1fr}}
