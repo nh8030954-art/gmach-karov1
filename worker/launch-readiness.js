@@ -300,7 +300,7 @@ export async function runLaunchReadinessMaintenance(env){
 
 export async function handleLaunchReadiness(request,env,ctx,url){
   try{
-    await ensureLaunchReadinessSchema(env);const method=request.method.toUpperCase(),path=url.pathname;let m;
+    const method=request.method.toUpperCase(),path=url.pathname;let m;
     if(method==="GET"&&path==="/api/admin/loan-requests")return adminLoans(request,env,url);
     if(method==="GET"&&(m=path.match(/^\/api\/admin\/loan-requests\/([^/]+)\/timeline$/)))return adminLoanTimeline(request,env,decodeURIComponent(m[1]));
     if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/loan-requests\/([^/]+)\/override$/)))return adminLoanOverride(request,env,decodeURIComponent(m[1]));
