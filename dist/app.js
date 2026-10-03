@@ -42,23 +42,28 @@
   function categoryRailPresentation(row){
     const name=String(row?.name_he||"").trim();
     const known={
-      "אירועים":{icon:"decor",className:"category-events",subtitle:"עיצוב, שולחנות וציוד"},
-      "כלי עבודה":{icon:"tools",className:"category-tools",subtitle:"לבית ולתיקונים"},
-      "תינוקות":{icon:"baby",className:"category-baby",subtitle:"עגלות, מיטות וכיסאות"},
-      "רפואה":{icon:"medical",className:"category-medical",subtitle:"שיקום וסיוע"},
-      "רפואה ושיקום":{icon:"medical",className:"category-medical",subtitle:"שיקום וסיוע"},
-      "טיולים":{icon:"tent",className:"category-outdoors",subtitle:"קמפינג ונסיעות"},
-      "בית ואירוח":{icon:"home",className:"category-home",subtitle:"אירוח וציוד לבית"}
+      "אירועים":{icon:"decor",className:"category-events",subtitle:"עיצוב, שולחנות וציוד",subtitleEn:"Decor, tables & event gear"},
+      "כלי עבודה":{icon:"tools",className:"category-tools",subtitle:"לבית ולתיקונים",subtitleEn:"Home & repair tools"},
+      "תינוקות":{icon:"baby",className:"category-baby",subtitle:"עגלות, מיטות וכיסאות",subtitleEn:"Strollers, cribs & seats"},
+      "רפואה":{icon:"medical",className:"category-medical",subtitle:"שיקום וסיוע",subtitleEn:"Rehabilitation & assistance"},
+      "רפואה ושיקום":{icon:"medical",className:"category-medical",subtitle:"שיקום וסיוע",subtitleEn:"Rehabilitation & assistance"},
+      "טיולים":{icon:"tent",className:"category-outdoors",subtitle:"קמפינג ונסיעות",subtitleEn:"Camping & travel"},
+      "בית ואירוח":{icon:"home",className:"category-home",subtitle:"אירוח וציוד לבית",subtitleEn:"Hosting & home equipment"}
     };
     const fallbackIcon=ICONS[row?.icon]?row.icon:"box";
     return known[name]||{icon:fallbackIcon,className:"category-all",subtitle:String(row?.name_en||"").trim()||"ציוד להשאלה"};
+  }
+  function categoryDisplayName(value){
+    const row=(state.categoryCatalog||[]).find(x=>x.name_he===value);
+    return document.documentElement.lang==="en"?(row?.name_en||value):value;
   }
   function populateItemCategorySelector(){
     const parents=(state.categoryCatalog||[]).filter(row=>!row.parent_id&&row.name_he);
     const populate=(selector,emptyLabel)=>{
       const select=$(selector);if(!select)return;
       const current=select.value;
-      select.innerHTML='<option value="">'+emptyLabel+'</option>'+parents.map(row=>'<option value="'+escapeHTML(row.name_he)+'">'+escapeHTML(row.name_he)+'</option>').join("");
+      const visibleEmpty=document.documentElement.lang==="en"?(window.GmachTranslate?.(emptyLabel)||emptyLabel):emptyLabel;
+      select.innerHTML='<option value="">'+escapeHTML(visibleEmpty)+'</option>'+parents.map(row=>'<option value="'+escapeHTML(row.name_he)+'">'+escapeHTML(document.documentElement.lang==="en"?(row.name_en||row.name_he):row.name_he)+'</option>').join("");
       if(current&&parents.some(row=>row.name_he===current))select.value=current;
     };
     populate("#item-category","בחירה");
@@ -72,7 +77,8 @@
       rail.querySelectorAll('[data-carousel-clone]').forEach(node=>node.remove());
       rail.classList.remove("carousel-continuous");
       rail.classList.add("carousel-ready");
-      rail.innerHTML='<button class="category-card '+(!active?'is-active':'')+'" type="button" data-category="" role="listitem"><span class="category-icon category-all" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></span><strong>הכול</strong><small>כל מה שזמין</small></button>'+parents.map(row=>{const meta=categoryRailPresentation(row);return '<button class="category-card '+(active===row.name_he?'is-active ':'')+'" type="button" data-category="'+escapeHTML(row.name_he)+'" role="listitem"><span class="category-icon '+escapeHTML(meta.className)+'" aria-hidden="true"><svg viewBox="0 0 24 24">'+(ICONS[meta.icon]||ICONS.box)+'</svg></span><strong>'+escapeHTML(row.name_he)+'</strong><small>'+escapeHTML(meta.subtitle)+'</small></button>'}).join("");
+      const isEnglish=document.documentElement.lang==="en";
+      rail.innerHTML='<button class="category-card '+(!active?'is-active':'')+'" type="button" data-category="" role="listitem"><span class="category-icon category-all" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg></span><strong>'+(isEnglish?'All':'הכול')+'</strong><small>'+(isEnglish?'Everything available':'כל מה שזמין')+'</small></button>'+parents.map(row=>{const meta=categoryRailPresentation(row),label=isEnglish?(row.name_en||row.name_he):row.name_he,subtitle=isEnglish?(meta.subtitleEn||row.name_en||'Items for loan'):meta.subtitle;return '<button class="category-card '+(active===row.name_he?'is-active ':'')+'" type="button" data-category="'+escapeHTML(row.name_he)+'" role="listitem"><span class="category-icon '+escapeHTML(meta.className)+'" aria-hidden="true"><svg viewBox="0 0 24 24">'+(ICONS[meta.icon]||ICONS.box)+'</svg></span><strong>'+escapeHTML(label)+'</strong><small>'+escapeHTML(subtitle)+'</small></button>'}).join("");
       bindCategoryRailButtons();
       window.setTimeout(()=>window.GmachResetCategoryCarousel?.(),0);
     }
@@ -83,14 +89,14 @@
     const select=$("#item-subcategory");if(!select)return;
     const category=$("#item-category")?.value||"",options=itemSubcategoriesFor(category);
     select.disabled=!category||!options.length;
-    select.innerHTML='<option value="">'+(category?(options.length?"ללא קטגוריית משנה":"אין קטגוריות משנה זמינות"):"בחרו קודם קטגוריה")+'</option>'+options.map(value=>'<option value="'+escapeHTML(value)+'">'+escapeHTML(value)+'</option>').join("");
+    select.innerHTML='<option value="">'+(category?(options.length?"ללא קטגוריית משנה":"אין קטגוריות משנה זמינות"):"בחרו קודם קטגוריה")+'</option>'+options.map(value=>'<option value="'+escapeHTML(value)+'">'+escapeHTML(categoryDisplayName(value))+'</option>').join("");
     if(selected&&options.includes(selected))select.value=selected;
   }
   function updateCatalogSubcategories(selected=""){
     const select=$("#subcategory-filter");if(!select)return;
     const category=$("#category-filter")?.value||"",options=category?itemSubcategoriesFor(category):[];
     select.disabled=!category||!options.length;
-    select.innerHTML='<option value="">'+(category?(options.length?"כל קטגוריות המשנה":"אין קטגוריות משנה זמינות"):"בחרו קודם קטגוריה")+'</option>'+options.map(value=>'<option value="'+escapeHTML(value)+'">'+escapeHTML(value)+'</option>').join("");
+    select.innerHTML='<option value="">'+(category?(options.length?"כל קטגוריות המשנה":"אין קטגוריות משנה זמינות"):"בחרו קודם קטגוריה")+'</option>'+options.map(value=>'<option value="'+escapeHTML(value)+'">'+escapeHTML(categoryDisplayName(value))+'</option>').join("");
     if(selected&&options.includes(selected))select.value=selected;
   }
   function bindCategoryRailButtons(){
