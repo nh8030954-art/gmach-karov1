@@ -1,4 +1,4 @@
-deploy_sha=c6416771e3102cd4b45b5eb0cb64d643a05df6e1
+deploy_sha=b8d799d1a18c1933ee2486b05a07d6e037c55ff8
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -24,13 +24,19 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: five-star rating UI missing
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:520:8 {
+AssertionError [ERR_ASSERTION]: English static UI is missing translations: טוענים את האתר…
+
+1 !== 0
+
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/i18n-static.mjs:33:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
+  actual: 1,
+  expected: 0,
+  operator: 'strictEqual',
   diff: 'simple'
 }
 
