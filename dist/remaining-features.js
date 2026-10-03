@@ -504,7 +504,7 @@ function createInteractiveOsmMap(canvas){
     for(let ty=minY;ty<=maxY;ty++)for(let tx=minX;tx<=maxX;tx++){
       if(ty<0||ty>=n)continue;
       const wrap=((tx%n)+n)%n,img=document.createElement("img");
-      img.src="/api/maps/tiles/"+z+"/"+wrap+"/"+ty+".png";
+      img.src="/api/maps/tiles/"+z+"/"+wrap+"/"+ty+".png";img.onerror=()=>{if(!img.dataset.fallback){img.dataset.fallback="1";img.src="https://tile.openstreetmap.org/"+z+"/"+wrap+"/"+ty+".png"}};
       img.alt="";img.draggable=false;img.decoding="async";img.loading="eager";img.referrerPolicy="origin";
       img.style.cssText="position:absolute;width:256px;height:256px;left:"+(tx*256-left)+"px;top:"+(ty*256-top)+"px;max-width:none";
       tiles.append(img);
@@ -542,6 +542,8 @@ function createInteractiveOsmMap(canvas){
 async function geocodeGmachOrganizations(rows){
  const cache=new Map(),resolved=[];
  for(const row of rows||[]){
+   const storedLat=Number(row.latitude),storedLon=Number(row.longitude);
+   if(Number.isFinite(storedLat)&&Number.isFinite(storedLon)){resolved.push({...row,lat:storedLat,lon:storedLon});continue}
    const address=[row.address,row.city].filter(Boolean).join(", ")||row.city;
    if(!address)continue;
    try{

@@ -1661,6 +1661,8 @@ async function discovery(env, url) {
     env.DB.prepare(`SELECT city,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY city ORDER BY count DESC LIMIT 80`),
     env.DB.prepare(`SELECT DISTINCT title FROM items WHERE status='active' AND (?='' OR title LIKE ?) ORDER BY updated_at DESC LIMIT 8`).bind(query || "", like),
     env.DB.prepare(`SELECT o.id,o.name,o.city,o.neighborhood,o.address,o.description,o.last_active_at,
+      (SELECT b.latitude FROM organization_branches b WHERE b.organization_id=o.id AND b.status='active' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL ORDER BY b.updated_at DESC LIMIT 1) AS latitude,
+      (SELECT b.longitude FROM organization_branches b WHERE b.organization_id=o.id AND b.status='active' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL ORDER BY b.updated_at DESC LIMIT 1) AS longitude,
       COUNT(DISTINCT i.id) AS item_count,
       ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count,
       SUM(CASE WHEN i.availability_status='available' THEN 1 ELSE 0 END) AS available_items
