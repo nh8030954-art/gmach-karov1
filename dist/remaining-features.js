@@ -491,7 +491,7 @@ function osmEmbed(lat,lon){
 }
 function createInteractiveOsmMap(canvas){
   const state={center:{lat:31.55,lon:34.85},zoom:7,points:[],focus:null,popup:null,drag:null};
-  canvas.innerHTML='<div class="gmach-osm-map" style="position:relative;width:100%;height:100%;overflow:hidden;background:#e9efed;touch-action:none;user-select:none"><iframe data-osm-frame title="OpenStreetMap" loading="eager" referrerpolicy="strict-origin-when-cross-origin" style="position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none;background:#e9efed"></iframe><div data-osm-pins style="position:absolute;inset:0;pointer-events:none"></div><div data-osm-controls style="position:absolute;top:12px;left:12px;z-index:6;display:grid;gap:6px"><button type="button" class="button button-secondary button-small" data-osm-zoom="in" aria-label="התקרבות">+</button><button type="button" class="button button-secondary button-small" data-osm-zoom="out" aria-label="התרחקות">−</button></div></div>';
+  canvas.innerHTML='<div class="gmach-osm-map" style="position:relative;width:100%;height:100%;overflow:hidden;background:#e9efed;touch-action:none;user-select:none"><iframe data-osm-frame title="OpenStreetMap" loading="eager" referrerpolicy="strict-origin-when-cross-origin" style="position:absolute;inset:0;width:100%;height:100%;border:0;pointer-events:none;background:#e9efed;z-index:1"></iframe><div data-osm-pins style="position:absolute;inset:0;pointer-events:none;z-index:3"></div><div data-osm-controls style="position:absolute;top:12px;left:12px;z-index:6;display:grid;gap:6px"><button type="button" class="button button-secondary button-small" data-osm-zoom="in" aria-label="התקרבות">+</button><button type="button" class="button button-secondary button-small" data-osm-zoom="out" aria-label="התרחקות">−</button></div></div>';
   const root=canvas.firstElementChild,frame=root.querySelector("[data-osm-frame]"),pins=root.querySelector("[data-osm-pins]");
   const clampLat=lat=>Math.max(-85.05112878,Math.min(85.05112878,Number(lat)||0));
   const world=(lat,lon,z)=>{const n=2**z,x=(Number(lon)+180)/360*n,y=(1-Math.log(Math.tan(clampLat(lat)*Math.PI/180)+1/Math.cos(clampLat(lat)*Math.PI/180))/Math.PI)/2*n;return{x:x*256,y:y*256}};
@@ -540,8 +540,9 @@ function createInteractiveOsmMap(canvas){
 async function geocodeGmachOrganizations(rows){
  const cache=new Map(),resolved=[];
  for(const row of rows||[]){
-   const storedLat=Number(row.latitude),storedLon=Number(row.longitude);
-   if(Number.isFinite(storedLat)&&Number.isFinite(storedLon)){resolved.push({...row,lat:storedLat,lon:storedLon});continue}
+   const hasStored=row.latitude!==null&&row.latitude!==undefined&&row.longitude!==null&&row.longitude!==undefined&&String(row.latitude).trim()!==""&&String(row.longitude).trim()!=="";
+   const storedLat=hasStored?Number(row.latitude):NaN,storedLon=hasStored?Number(row.longitude):NaN;
+   if(Number.isFinite(storedLat)&&Number.isFinite(storedLon)&&Math.abs(storedLat)<=90&&Math.abs(storedLon)<=180&&(storedLat!==0||storedLon!==0)){resolved.push({...row,lat:storedLat,lon:storedLon});continue}
    const address=[row.address,row.city].filter(Boolean).join(", ")||row.city;
    if(!address)continue;
    try{

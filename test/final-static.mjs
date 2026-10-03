@@ -587,3 +587,6 @@ assert.ok(!indexHtml.includes("<script>\n(()=>{const root=document.documentEleme
 assert.ok(remainingClient.includes("frameUrl")&&remainingClient.includes("data-osm-frame"),"map base must use the embedded OpenStreetMap frame instead of blocked tile images");
 
 assert.ok(css.includes("Keep the English desktop links visible")&&css.includes("padding-inline-start:28px"),"English desktop nav must stay visible with spacing before My account");
+
+assert.ok(remainingClient.includes('row.latitude!==null')&&remainingClient.includes('(storedLat!==0||storedLon!==0)'),"map must not treat null coordinates as 0,0");
+assert.ok(remainingClient.includes('pointer-events:none;z-index:3'),"gmach marker layer must stay above the map frame");
