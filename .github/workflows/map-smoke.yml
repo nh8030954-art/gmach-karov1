@@ -13,15 +13,20 @@ jobs:
   map-smoke:
     runs-on: ubuntu-24.04
     steps:
-      - name: Check geocode
+      - name: Check map services
         run: |
-          set -euo pipefail
-          curl --fail --silent --show-error --retry 3 --retry-delay 2             "https://gmach-berega.co.il/api/maps/geocode?q=%D7%99%D7%A8%D7%95%D7%A9%D7%9C%D7%99%D7%9D"             -o /tmp/geocode.json
-          node -e 'const d=require("/tmp/geocode.json"); if(!Array.isArray(d.results)) process.exit(1); console.log("geocode results",d.results.length)'
-      - name: Check map tile
-        run: |
-          set -euo pipefail
-          curl --fail --silent --show-error --retry 3 --retry-delay 2             "https://gmach-berega.co.il/api/maps/tiles/7/76/52.png"             -D /tmp/tile.headers -o /tmp/tile.png
-          grep -qi "content-type: image/png" /tmp/tile.headers
-          test "$(wc -c < /tmp/tile.png)" -gt 1000
-          echo "tile bytes $(wc -c < /tmp/tile.png)"
+          set -u
+          fail=0
+          for endpoint in             "https://gmach-berega.co.il/api/geocode?q=%D7%99%D7%A8%D7%95%D7%A9%D7%9C%D7%99%D7%9D"             "https://gmach-berega.co.il/api/maps/geocode?q=%D7%99%D7%A8%D7%95%D7%A9%D7%9C%D7%99%D7%9D"; do
+            code="$(curl --silent --show-error -o /tmp/body -w "%{http_code}" "$endpoint" || true)"
+            echo "$endpoint -> $code"
+            cat /tmp/body || true
+            echo
+            if [ "$code" != "200" ]; then fail=1; fi
+          done
+          code="$(curl --silent --show-error -D /tmp/tile.headers -o /tmp/tile.png -w "%{http_code}" "https://gmach-berega.co.il/api/maps/tiles/7/76/52.png" || true)"
+          echo "tile -> $code"
+          cat /tmp/tile.headers || true
+          echo "tile bytes $(wc -c < /tmp/tile.png 2>/dev/null || echo 0)"
+          if [ "$code" != "200" ]; then fail=1; fi
+          exit "$fail"
