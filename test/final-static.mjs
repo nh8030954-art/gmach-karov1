@@ -551,3 +551,5 @@ assert.ok(appClient.includes('window.scrollTo({ top: 0, behavior: "auto" })'),"d
 assert.ok(appClient.includes("navigateHomeSection")&&appClient.includes('a[href="/catalog"],a[href="/how-it-works"],a[href="/gmachim"]'),"top navigation must route in-place without a page-top jump");
 
 assert.ok(appClient.includes("data-confirm-collected")&&appClient.includes("שמירת הקצאת יחידות"),"pickup confirmation must stay separate from unit assignment");
+
+assert.ok(appClient.includes('confirmCollected)+"/status"'),"separate pickup confirmation must call the status endpoint");
