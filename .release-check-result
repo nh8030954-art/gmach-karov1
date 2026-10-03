@@ -1,29 +1,29 @@
-sha=148e095c339f809b2cec7ffacd1fc28a7ef8aba0
+sha=aa6ac6e3aa79f3895f4275febe24f6d1ed97ef3f
 install=success
 syntax=success
-tests=failure
+tests=success
 smoke=success
 live=success
-    triggerUncaughtException(
-    ^
-
-AssertionError [ERR_ASSERTION]: English static UI is missing translations: טוענים את האתר…
-
-1 !== 0
-
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/i18n-static.mjs:33:8
-    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
-    at async node:internal/modules/esm/loader:647:26
-    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: 1,
-  expected: 0,
-  operator: 'strictEqual',
-  diff: 'simple'
+        at async getPublicOrganization (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:1704:56)
+        at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:378:26)
+  }
 }
-
-Node.js v24.21.0
+Public organization section unavailable {
+  organizationId: 'synthetic-org-0',
+  section: 'reviews',
+  error: Error: D1_ERROR: no such column: r.item_rating at offset 21: SQLITE_ERROR
+      at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:146:19)
+      at async cloudflare-internal:d1-api:374:41
+      ... 2 lines matching cause stack trace ...
+      at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:378:26) {
+    [cause]: Error: no such column: r.item_rating at offset 21: SQLITE_ERROR
+        at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:147:24)
+        at async cloudflare-internal:d1-api:374:41
+        at async Promise.allSettled (index 1)
+        at async getPublicOrganization (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:1704:56)
+        at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:378:26)
+  }
+}
 Community chat retention static release gate passed.
 QR scanning, structured SEO and accessibility shell gate passed.
 Excel export and QR image scanner gate passed.
@@ -36,5 +36,5 @@ remaining-features Error: Backup checksum mismatch
     at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:904:37)
     at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:378:26)
 Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-03T18:28:44.755Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-03T18:30:01.687Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
