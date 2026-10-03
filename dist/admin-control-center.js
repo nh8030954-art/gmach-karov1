@@ -204,7 +204,14 @@ async function renderEmails(root){
  function openRow(row){current=row;empty.hidden=true;form.hidden=false;form.key.value=row.template_key;form.language.value=row.language;form.enabled.checked=Number(row.enabled)!==0;form.subject.value=row.subject||"";form.bodyText.value=row.body_text||"";const d={...defaults,...(row.design||{})};for(const k of ["primaryColor","buttonColor","backgroundColor","cardColor","textColor","fontFamily","buttonText","logoUrl","footerText"])form[k].value=d[k]||"";form.borderRadius.value=Number(d.borderRadius||20);form.showLogo.checked=d.showLogo!==false;$("[data-template-kind]",form).textContent=(row.language==="he"?"עברית":"English");$("[data-template-title]",form).textContent=labels[row.template_key]||row.template_key;$("[data-template-vars]",form).textContent=(vars[row.template_key]||[]).map(v=>"{{"+v+"}}").join(" · ")||t("אין","None");refreshPreview();form.scrollIntoView({block:"nearest",behavior:"smooth"})}
  $$("[data-edit-template]",root).forEach(b=>b.onclick=()=>{const row=rows.find(r=>r.template_key===b.dataset.editTemplate&&r.language===b.dataset.lang);if(row)openRow(row)});
  ["input","change"].forEach(ev=>form.addEventListener(ev,e=>{if(e.target.matches("input,textarea,select"))refreshPreview()}));
- form.onsubmit=async e=>{e.preventDefault();const b=form.querySelector('button[type="submit"]');b.disabled=true;try{await api("/api/admin/email-templates/"+encodeURIComponent(form.key.value)+"/"+form.language.value,{method:"PUT",body:{subject:form.subject.value,bodyText:form.bodyText.value,enabled:form.enabled.checked,design:designFromForm()}});toast(t("תבנית המייל נשמרה","Email template saved"));await renderEmails(root)}catch(err){toast(err.message,true);b.disabled=false}};
+ form.onsubmit=async e=>{e.preventDefault();const b=form.querySelector('button[type="submit"]');b.disabled=true;try{
+   const key=form.key.value,language=form.language.value,expectedEnabled=form.enabled.checked;
+   await api("/api/admin/email-templates/"+encodeURIComponent(key)+"/"+language,{method:"PUT",body:{subject:form.subject.value,bodyText:form.bodyText.value,enabled:expectedEnabled,design:designFromForm()}});
+   const verify=await api("/api/admin/email-templates"),saved=(verify.templates||[]).find(r=>r.template_key===key&&r.language===language);
+   if(!saved||Boolean(Number(saved.enabled))!==expectedEnabled)throw new Error(t("השינוי נשמר אך אימות הקריאה החוזרת נכשל","The change was saved, but read-back verification failed"));
+   toast(expectedEnabled?t("התבנית נשמרה ופעילה","Template saved and active"):t("התבנית נשמרה והיא מושבתת בפועל","Template saved and confirmed disabled"));
+   await renderEmails(root);
+ }catch(err){toast(err.message,true);b.disabled=false}};
 }
 async function renderModeration(root){
  const x=await api("/api/admin/moderation"),rows=x.jobs||[];

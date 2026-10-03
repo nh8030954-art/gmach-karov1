@@ -605,3 +605,7 @@ assert.ok(adminControlCenter.includes("admin-control-entry"),"super-admin contro
 assert.ok(worker.includes("specificRow")&&worker.includes("Number(specificRow.enabled)===0"),"disabled specific email templates must suppress operational email delivery without generic fallback");
 assert.ok(platformWorker.includes("suppressed: email template disabled")&&platformWorker.includes("suppressed: email preference disabled"),"legacy notification queue must re-check email switches at send time");
 assert.ok(appClient.includes("subtitleEn")&&appClient.includes("Everything available")&&appClient.includes("categoryDisplayName"),"English category carousel and dynamic category options must render in English");
+
+assert.ok(css.includes("#dashboard-view .admin-control-entry")&&css.includes("color:#fff!important"),"super-admin control-center entry must be visible");
+assert.ok(worker.includes("operationalTemplateKey")&&worker.includes('emailTemplateState(env,specific,lang)'),"operational emails must honor the matching admin template toggle");
+assert.ok(adminControlCenter.includes("read-back verification")||adminControlCenter.includes("אימות הקריאה החוזרת"),"admin email template saves must be verified by read-back");

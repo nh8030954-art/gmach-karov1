@@ -3381,11 +3381,25 @@ function israelClock(){
   return String(p.hour||"00")+":"+String(p.minute||"00");
 }
 function inQuietHours(now,start,end){if(!start||!end||start===end)return false;return start<end?now>=start&&now<end:now>=start||now<end}
+function operationalTemplateKey(notification){
+  const type=String(notification?.type||"").toLowerCase(),title=String(notification?.title||"");
+  if(["new_device","pickup_confirmed","loan_cancelled","extension","waitlist","support"].includes(type))return type;
+  if(/איסוף|pickup/i.test(title))return "pickup_confirmed";
+  if(/ביטול|cancel/i.test(title))return "loan_cancelled";
+  if(/הארכ|extension/i.test(title))return "extension";
+  if(/רשימת המתנה|waitlist|התפנה פריט|available/i.test(title))return "waitlist";
+  if(/תמיכה|support/i.test(title))return "support";
+  if(/מכשיר|device sign-in|new device/i.test(title))return "new_device";
+  return "notification";
+}
+async function emailTemplateState(env,key,lang){
+  return env.DB.prepare("SELECT enabled FROM email_templates WHERE template_key=? AND language=?").bind(key,lang).first().catch(()=>null);
+}
 async function sendOperationalNotificationEmail(env,user,notification){
   if(!env.RESEND_API_KEY||!user.email)return false;
   const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/dashboard";
-  const specific=new Set(["new_device","pickup_confirmed","loan_cancelled","extension","waitlist","support"]).has(String(notification.type||""))?String(notification.type):"notification";
-  const specificRow=specific!=="notification"?await env.DB.prepare("SELECT enabled FROM email_templates WHERE template_key=? AND language=?").bind(specific,lang).first().catch(()=>null):null;
+  const specific=operationalTemplateKey(notification);
+  const specificRow=await emailTemplateState(env,specific,lang);
   if(specificRow&&Number(specificRow.enabled)===0)return false;
   let mail=await managedEmailTemplate(env,specific,lang,{subject:en?"Gmach Berega update":"עדכון חדש בגמ״ח ברגע",text:"{{title}}\n\n{{body}}"},{title:notification.title||"",body:notification.body||"",account_url:accountUrl},accountUrl);
   if(!mail&&specific!=="notification"&&!specificRow)mail=await managedEmailTemplate(env,"notification",lang,{subject:en?"Gmach Berega update":"עדכון חדש בגמ״ח ברגע",text:"{{title}}\n\n{{body}}"},{title:notification.title||"",body:notification.body||"",account_url:accountUrl},accountUrl);
@@ -3432,7 +3446,9 @@ async function deliverDailyDigests(env){
     const done=await env.DB.prepare("SELECT id FROM notification_digests WHERE user_id=? AND digest_date=? AND status='sent'").bind(user.id,today).first();if(done)continue;
     const items=await env.DB.prepare(`SELECT n.id,n.title,n.body,n.created_at FROM notifications n WHERE n.user_id=? AND n.created_at>=datetime('now','-4 days') AND NOT EXISTS(SELECT 1 FROM notification_delivery_log l WHERE l.notification_id=n.id AND l.channel='email' AND l.status='sent') ORDER BY n.created_at DESC LIMIT 30`).bind(user.id).all();
     if(!(items.results||[]).length)continue;
-    const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/dashboard",digestBody=(en?"Updates from the last day:":"עדכונים מהיממה האחרונה:")+"\n\n"+items.results.map(x=>"• "+x.title+" — "+x.body).join("\n");
+    const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/dashboard";
+    const digestTemplate=await emailTemplateState(env,"daily_digest",lang);if(digestTemplate&&Number(digestTemplate.enabled)===0)continue;
+    const digestBody=(en?"Updates from the last day:":"עדכונים מהיממה האחרונה:")+"\n\n"+items.results.map(x=>"• "+x.title+" — "+x.body).join("\n");
     const mail=await managedEmailTemplate(env,"daily_digest",lang,{subject:en?"Your daily Gmach Berega summary":"הסיכום היומי שלך מגמ״ח ברגע",text:"{{body}}"},{body:digestBody,account_url:accountUrl},accountUrl);if(!mail)continue;
     const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],...mail})});
     const id=crypto.randomUUID(),now=new Date().toISOString();

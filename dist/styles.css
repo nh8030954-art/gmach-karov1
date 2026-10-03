@@ -1399,3 +1399,17 @@ html[lang="en"] .header-actions #dashboard-button{
 #dashboard-view .admin-control-entry:hover,#dashboard-view .admin-control-entry:focus-visible{
   background:#173f72!important;color:#fff!important;border-color:#173f72!important
 }
+
+/* Super-admin control center entry must remain clearly visible in every dashboard theme. */
+#dashboard-view .admin-control-entry{
+  background:var(--navy)!important;
+  color:#fff!important;
+  border:1px solid var(--navy)!important;
+  box-shadow:0 7px 18px rgba(18,60,70,.16)!important;
+  opacity:1!important;
+}
+#dashboard-view .admin-control-entry:hover,
+#dashboard-view .admin-control-entry:focus-visible{
+  background:color-mix(in srgb,var(--navy) 88%,#fff)!important;
+  color:#fff!important;
+}
