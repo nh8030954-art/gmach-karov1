@@ -42,6 +42,11 @@ for(const language of ['he','en']){
 assert.match(runtime,/characterData:true/,'Translate updated text nodes');
 assert.match(runtime,/attributeFilter:\["placeholder","title","aria-label","value"\]/,'Translate dynamically changed controls');
 console.log(`Static English interface coverage ${(coverage*100).toFixed(1)}% (${hebrew.length-missing.length}/${hebrew.length})`);
+assert.ok(app.includes('compare-rating-row')&&app.includes('ratingStars(item.rating,{size:"compare"})'),'Item comparison must include item star ratings');
+assert.ok(runtime.includes('NEVER_TRANSLATE_SELECTOR=".organization-name')&&runtime.includes('"דירוג פריט":"Item rating"'),'English runtime must preserve gmach names and translate item-rating labels');
+const userContent=readFileSync('dist/user-content-translation.js','utf8');
+assert.ok(!userContent.includes('.organization-hero h2')&&!userContent.includes('.organization-card h3'),'Gmach names must remain in their original language');
+
 
 assert.ok(html.includes("user-content-translation.js"),"Offer optional translation for user written content");
 

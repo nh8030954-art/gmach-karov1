@@ -1,13 +1,13 @@
 (() => {
   'use strict';
   let started = false;
-  const selector = '.item-detail-description,#item-dialog-title,.item-card h3,.item-card p,.organization-hero h2,.organization-hero>p,.organization-card h3,.organization-card p,.review-list blockquote p,.chat-message p,.community-board-card>h3,.community-board-card>p';
+  const selector = '.item-detail-description,#item-dialog-title,.item-card h3,.item-card p,.organization-hero>p,.organization-card p,.review-list blockquote p,.chat-message p,.community-board-card>h3,.community-board-card>p';
   const cache = new Map(), ignored = new WeakSet();
   let timer = 0, busy = false, requests = 0;
   function candidates() {
     const nodes = [];
     for (const element of document.querySelectorAll(selector)) {
-      if (!element.getClientRects().length) continue;
+      if (!element.getClientRects().length || element.closest('.organization-name,[translate="no"],[data-no-translate]')) continue;
       const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
       let node;
       while ((node = walker.nextNode())) {
