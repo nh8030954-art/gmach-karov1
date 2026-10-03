@@ -1693,7 +1693,9 @@ async function getPublicOrganization(env, id) {
       WHERE i.organization_id=? AND i.status='active' ORDER BY i.availability_status,i.updated_at DESC`).bind(id),
     env.DB.prepare(`SELECT r.id,r.rating,r.item_rating,r.service_rating,r.branch_rating,r.comment,r.created_at,r.updated_at,r.helpful_count,r.organization_response,r.organization_response_at,
       substr(u.full_name,1,instr(u.full_name||' ',' ')-1) AS author_name,
-      i.title AS item_title,lr.requested_from,lr.returned_at,b.name AS branch_name
+      i.id AS item_id,i.title AS item_title,
+      CASE WHEN json_valid(i.image_urls) THEN json_extract(i.image_urls,'$[0]') ELSE NULL END AS item_image_url,
+      lr.requested_from,lr.returned_at,b.name AS branch_name
       FROM reviews r JOIN users u ON u.id=r.author_id
       LEFT JOIN loan_requests lr ON lr.id=r.request_id
       LEFT JOIN items i ON i.id=lr.item_id
