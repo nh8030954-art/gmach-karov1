@@ -504,7 +504,7 @@ function createInteractiveOsmMap(canvas){
     for(let ty=minY;ty<=maxY;ty++)for(let tx=minX;tx<=maxX;tx++){
       if(ty<0||ty>=n)continue;
       const wrap=((tx%n)+n)%n,img=document.createElement("img");
-      img.src="https://tile.openstreetmap.org/"+z+"/"+wrap+"/"+ty+".png";
+      img.src="/api/maps/tiles/"+z+"/"+wrap+"/"+ty+".png";
       img.alt="";img.draggable=false;img.decoding="async";img.loading="eager";img.referrerPolicy="origin";
       img.style.cssText="position:absolute;width:256px;height:256px;left:"+(tx*256-left)+"px;top:"+(ty*256-top)+"px;max-width:none";
       tiles.append(img);
@@ -540,25 +540,25 @@ function createInteractiveOsmMap(canvas){
   };
 }
 async function geocodeGmachOrganizations(rows){
- const cache=new Map(),resolved=new Array(rows.length),queue=rows.map((row,index)=>({row,index}));
- async function worker(){
-   while(queue.length){
-     const {row,index}=queue.shift(),address=[row.address,row.city].filter(Boolean).join(", ")||row.city;
-     if(!address)continue;
-     try{
-       let point=cache.get(address);
-       if(!point){
-         const data=await api("/api/maps/geocode?q="+encodeURIComponent(address));
-         const first=data.results?.[0];
-         point=first?{lat:Number(first.lat),lon:Number(first.lon)}:null;
-         cache.set(address,point);
-       }
-       if(point&&Number.isFinite(point.lat)&&Number.isFinite(point.lon))resolved[index]={...row,...point};
-     }catch{}
+ const cache=new Map(),resolved=[];
+ for(const row of rows||[]){
+   const address=[row.address,row.city].filter(Boolean).join(", ")||row.city;
+   if(!address)continue;
+   try{
+     let point=cache.get(address);
+     if(point===undefined){
+       const data=await api("/api/maps/geocode?q="+encodeURIComponent(address));
+       const first=data.results?.[0];
+       point=first?{lat:Number(first.lat),lon:Number(first.lon)}:null;
+       cache.set(address,point);
+       if(data.cached===false)await new Promise(r=>setTimeout(r,1150));
+     }
+     if(point&&Number.isFinite(point.lat)&&Number.isFinite(point.lon))resolved.push({...row,...point});
+   }catch(error){
+     console.warn("Gmach geocoding failed",address,error);
    }
  }
- await Promise.all(Array.from({length:Math.min(6,Math.max(1,rows.length))},()=>worker()));
- return resolved.filter(Boolean);
+ return resolved;
 }
 async function showAddressMap(){
  const d=dialog("map-dialog",lang==="en"?"Gmach map":"מפת הגמ״חים"),b=$(".remaining-body",d);
@@ -579,7 +579,7 @@ async function showAddressMap(){
      org.popupHtml=`<div dir="${lang==="en"?"ltr":"rtl"}"><strong style="font-size:16px">${esc(org.name)}</strong><div style="margin-top:5px">📍 ${esc([org.city,org.neighborhood].filter(Boolean).join(" · "))}</div><div>📦 ${Number(org.item_count||0)} ${lang==="en"?"items":"פריטים"} · ✅ ${Number(org.available_items||0)} ${lang==="en"?"available":"זמינים"}</div>${org.description?`<p style="margin:7px 0">${esc(org.description)}</p>`:""}<button type="button" class="button button-primary button-small" data-map-open-org="${esc(org.id)}">${lang==="en"?"View gmach":"לפרטי הגמ״ח"}</button>${navigationLinks(org.lat,org.lon,org.name)}</div>`;
    });
    map.setPoints(points);map.showCountry();
-   canvas.addEventListener("click",e=>{const button=e.target.closest?.("[data-map-open-org]");if(!button)return;const target=document.querySelector('[data-open-organization="'+CSS.escape(button.dataset.mapOpenOrg)+'"],[data-advanced-org="'+CSS.escape(button.dataset.mapOpenOrg)+'"]');if(target){d.close();target.click()}else toast(lang==="en"?"Open the gmach from the list.":"ניתן לפתוח את הגמ״ח גם מרשימת הגמ״חים.")});
+   canvas.addEventListener("click",e=>{const button=e.target.closest?.("[data-map-open-org]");if(!button)return;d.close();window.dispatchEvent(new CustomEvent("gmach:open-organization",{detail:{id:button.dataset.mapOpenOrg}}))});
    status.textContent=points.length?(lang==="en"?`${points.length} gmachs are shown. Click any marker for details.`:`${points.length} גמ״חים מוצגים על המפה. לחצו על נקודה לפרטים.`):(lang==="en"?"No gmach locations could be placed yet.":"עדיין לא נמצאו כתובות גמ״חים שניתן למקם על המפה.");
  }catch(e){status.textContent=e.message||"טעינת המפה נכשלה";canvas.innerHTML=`<div class="dashboard-empty"><strong>${esc(status.textContent)}</strong></div>`}
  form.onsubmit=async e=>{e.preventDefault();results.innerHTML="<p>מחפשים…</p>";try{const x=await api("/api/maps/geocode?q="+encodeURIComponent(form.q.value));results.innerHTML=x.results.length?x.results.map((r,i)=>`<button type="button" class="button button-secondary" data-map-i="${i}" style="text-align:start">${esc(r.displayName)}</button>`).join(""):"<p>לא נמצאה כתובת.</p>";$$("[data-map-i]",results).forEach(btn=>btn.onclick=()=>{const r=x.results[Number(btn.dataset.mapI)];focusPoint(Number(r.lat),Number(r.lon),r.displayName)})}catch(e){results.innerHTML="<p role=alert>"+esc(e.message)+"</p>"}};
