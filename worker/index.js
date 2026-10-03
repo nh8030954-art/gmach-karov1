@@ -413,10 +413,17 @@ export default {
       }
       return withSecurityHeaders(response);
     } catch (error) {
-      const status = error instanceof HttpError ? error.status : 500;
+      const d1Limit=/exceeded D1's free tier daily row (?:read|write) limit/i.test(String(error?.message||error));
+      const status = d1Limit?503:(error instanceof HttpError ? error.status : 500);
       const requestId = incidentNumber();
-      if (status >= 500) { console.error("Request failed", { requestId, path: url.pathname, error }); try { ctx.waitUntil(recordDistributionError(env,request,error,requestId)); } catch {} }
-      return withSecurityHeaders(json({ error: error instanceof HttpError ? error.message : "אירעה תקלה זמנית בשרת", requestId }, status, { "X-Request-Id": requestId }));
+      if (status >= 500) {
+        console.error("Request failed", { requestId, path: url.pathname, error });
+        // When D1 itself is refusing writes, do not spend another failing D1
+        // write trying to persist the same incident. Console observability remains.
+        if(!d1Limit)try { ctx.waitUntil(recordDistributionError(env,request,error,requestId)); } catch {}
+      }
+      const publicMessage=d1Limit?"שירות הנתונים הגיע זמנית למגבלת קיבולת. הפעולה לא נשמרה; אפשר לנסות שוב לאחר איפוס השירות.":(error instanceof HttpError ? error.message : "אירעה תקלה זמנית בשרת");
+      return withSecurityHeaders(json({ error: publicMessage, requestId }, status, { "X-Request-Id": requestId, ...(d1Limit?{"Retry-After":"900"}:{}) }));
     }
   },
   async scheduled(event, env, ctx) {
@@ -1754,11 +1761,15 @@ async function recordOrganizationView(request,env,organizationId){
   const user=await requireUser(request,env);
   const org=await env.DB.prepare("SELECT id FROM organizations WHERE id=? AND status='approved' AND is_hidden=0 AND deleted_at IS NULL").bind(organizationId).first();
   if(!org)throw new HttpError(404,"הגמ״ח לא נמצא");
-  const now=new Date().toISOString();
+  const previous=await env.DB.prepare("SELECT viewed_at FROM recently_viewed_organizations WHERE user_id=? AND organization_id=?").bind(user.id,organizationId).first();
+  const nowMs=Date.now();
+  if(previous?.viewed_at&&nowMs-Date.parse(previous.viewed_at)<6*60*60*1000)return json({ok:true,viewedAt:previous.viewed_at,refreshed:false},200);
+  const now=new Date(nowMs).toISOString();
   await env.DB.prepare(`INSERT INTO recently_viewed_organizations(user_id,organization_id,viewed_at) VALUES(?,?,?)
     ON CONFLICT(user_id,organization_id) DO UPDATE SET viewed_at=excluded.viewed_at`).bind(user.id,organizationId,now).run();
-  await env.DB.prepare("DELETE FROM recently_viewed_organizations WHERE user_id=? AND organization_id NOT IN (SELECT organization_id FROM recently_viewed_organizations WHERE user_id=? ORDER BY viewed_at DESC LIMIT 20)").bind(user.id,user.id).run();
-  return json({ok:true,viewedAt:now},201);
+  // Do not delete rows on every view. Retrieval is already LIMITed and privacy
+  // retention handles stale rows; this keeps a page view to at most one D1 write.
+  return json({ok:true,viewedAt:now,refreshed:true},201);
 }
 
 async function listHelpRequests(env, url) {
@@ -1839,11 +1850,15 @@ async function createReview(request, env) {
 async function recordAnalytics(request, env) {
   const body = await readJson(request); const allowed = new Set(["search","no_results","item_view","request_created","share"]);
   if (!allowed.has(body.eventType)) throw new HttpError(400,"אירוע אינו תקין");
+  // D1 Free allows 100k rows written/day. Analytics is non-critical and can be
+  // derived in large part from canonical tables, so keep only a small sample.
+  const sampleRate=body.eventType==="share"?0.1:0.02;
+  if(crypto.getRandomValues(new Uint32Array(1))[0]/4294967296>=sampleRate)return json({ok:true,sampled:false},202);
   const user = await currentUser(request, env);
   const source=cleanOptional(body.source,80),referrer=cleanOptional(body.referrer,180),pagePath=cleanOptional(body.pagePath,180);
   await env.DB.prepare("INSERT INTO analytics_events(id,user_id,event_type,query,city,category,entity_id,source,referrer,page_path) VALUES (?,?,?,?,?,?,?,?,?,?)")
     .bind(crypto.randomUUID(),user?.id||null,body.eventType,cleanOptional(body.query,120),cleanOptional(body.city,80),cleanOptional(body.category,40),cleanOptional(body.entityId,100),source,referrer,pagePath).run();
-  return json({ok:true},201);
+  return json({ok:true,sampled:true},201);
 }
 
 async function addFavorite(request, env, itemId) {
@@ -3335,7 +3350,7 @@ export async function translateUserContent(request,env,ctx){
   const body=await readJson(request),texts=body?.texts;
   if(!Array.isArray(texts)||texts.length<1||texts.length>12||texts.some(text=>typeof text!=="string"||text.length<2||text.length>500)||texts.reduce((sum,text)=>sum+text.length,0)>4500)throw new HttpError(400,"יש לשלוח עד 12 קטעי טקסט, באורך כולל של עד 4,500 תווים");
   const identity=request.headers.get("CF-Connecting-IP")||request.headers.get("X-Forwarded-For")||"unknown";
-  await enforcePublicRateLimit(env,identity,"content_translation",ctx,120);
+  await enforceEdgeRateLimit(identity,"content_translation",120);
   const translated=[];
   for(const text of texts){
     if(!/[\u0590-\u05ff]/.test(text)){translated.push(text);continue}
@@ -3347,6 +3362,18 @@ export async function translateUserContent(request,env,ctx){
     }catch(error){console.error("user content translation failed",{error});throw new HttpError(503,"התרגום אינו זמין כרגע. אפשר לנסות שוב מאוחר יותר")}
   }
   return json({translations:translated},200,{"Cache-Control":"no-store"});
+}
+
+async function enforceEdgeRateLimit(identityValue,action,limit=120){
+  const cache=globalThis.caches?.default;
+  if(!cache)return;
+  const identity=await sha256(identityValue),bucket=Math.floor(Date.now()/(15*60*1000));
+  const key=new Request("https://gmach-rate-limit.invalid/"+encodeURIComponent(action)+"/"+identity+"/"+bucket);
+  const existing=await cache.match(key),count=Math.max(0,Number(existing?.headers.get("X-Gmach-Count")||0));
+  if(count>=limit)throw new HttpError(429,"יותר מדי ניסיונות. נסו שוב בעוד 15 דקות");
+  try{
+    await cache.put(key,new Response("",{headers:{"X-Gmach-Count":String(count+1),"Cache-Control":"public, max-age=900"}}));
+  }catch(error){console.warn("edge rate-limit cache unavailable",{action,error:String(error)})}
 }
 
 async function enforcePublicRateLimit(env, identityValue, action, ctx, limit = 10) {
