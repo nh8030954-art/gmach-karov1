@@ -1,0 +1,27 @@
+name: Map production smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/map-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  map-smoke:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check geocode
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 --retry-delay 2             "https://gmach-berega.co.il/api/maps/geocode?q=%D7%99%D7%A8%D7%95%D7%A9%D7%9C%D7%99%D7%9D"             -o /tmp/geocode.json
+          node -e 'const d=require("/tmp/geocode.json"); if(!Array.isArray(d.results)) process.exit(1); console.log("geocode results",d.results.length)'
+      - name: Check map tile
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 3 --retry-delay 2             "https://gmach-berega.co.il/api/maps/tiles/7/76/52.png"             -D /tmp/tile.headers -o /tmp/tile.png
+          grep -qi "content-type: image/png" /tmp/tile.headers
+          test "$(wc -c < /tmp/tile.png)" -gt 1000
+          echo "tile bytes $(wc -c < /tmp/tile.png)"
