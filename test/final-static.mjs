@@ -384,6 +384,10 @@ assert.ok(i18nBoot.includes("scrollRestoration")&&i18nBoot.includes('gmach-site-
 assert.ok(i18nBoot.includes("cache_version===3")&&i18nBoot.includes('--site-font","Assistant, Arial, sans-serif"'),"font boot must set Assistant safely before cached overrides");
 assert.ok(appClient.includes("cache_version:3"),"live settings must refresh versioned font cache");
 assert.ok(appClient.includes('לא הצלחנו לאשר את ההחזרה')&&appClient.includes('setButtonBusy(button,true,"מאשרים…")'),"return confirmation must handle errors and double submits");
+assert.ok(appClient.includes("formatDateTime(r.requested_from)")&&appClient.includes("STATUS_LABELS[r.status]"),"admin loan dates/status must be human formatted");
+assert.ok(worker.includes("outboundNotificationsPaused")&&worker.includes("israelShabbatState(now).closed")&&worker.includes("israelHolidayState(now).closed"),"outbound notifications must pause during Shabbat and holidays");
+assert.ok(worker.includes('url.pathname === "/gmach-berega-logo.jpg"'),"closure landing logo must remain available while site is closed");
+
 assert.ok(worker.includes("post-return follower notification failed")&&worker.includes("post-status waitlist advance failed"),"return completion must survive noncritical side-effect failures");
 
 assert.ok(indexHtml.includes("./app.js?v="),"app cache-busting version missing");
@@ -551,7 +555,7 @@ assert.ok(worker.includes("Number(existingUnits?.count||0)>quantity")&&worker.in
 
 assert.ok(worker.includes("CREATE TABLE IF NOT EXISTS organization_serial_codes")&&worker.includes("CREATE TABLE IF NOT EXISTS item_serial_codes"),"serial identity tables must self-heal at runtime");
 
-assert.ok(indexHtml.includes("route-dashboard-boot")&&appClient.includes('classList.remove("route-dashboard-boot")'),"dashboard boot flash guard missing");
+assert.ok(indexHtml.includes("route-dashboard-boot")&&indexHtml.includes("טוענים את האזור שלי")&&appClient.includes('classList.remove("route-dashboard-boot")'),"dashboard boot stability shell missing");
 assert.ok(appClient.includes("categoryRailPresentation")&&appClient.includes('rail.classList.add("carousel-ready")')&&appClient.includes("window.GmachResetCategoryCarousel=start")&&appClient.includes("Category carousel continuous autoplay v3"),"category carousel visuals and autoplay must both be present");
 assert.ok(!appClient.includes('setAuthMode("login"); updateAuthUI();'),"startup must not flash logged-out auth UI before /auth/me resolves");
 assert.ok(indexHtml.includes('id="notifications-button"')&&indexHtml.includes('style="visibility:visible"'),"notification slot must remain reserved during auth hydration without a layout shift");
