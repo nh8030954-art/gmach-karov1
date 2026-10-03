@@ -909,7 +909,7 @@
       const selectedUnits=()=>$$('input[name="pickup-unit"]:checked',d).map(x=>x.value);
       $("#save-pickup-units",d)?.addEventListener("click",async()=>{
         try{
-          await api("/api/loan-requests/"+encodeURIComponent(requestId)+"/units",{method:"POST",body:{unitIds:selectedUnits()}});
+          await api("/api/loan-requests/"+encodeURIComponent(requestId)+"/assign-units",{method:"POST",body:{unitIds:selectedUnits()}});
           toast("הקצאת היחידות נשמרה");
           closeDialog(d);
           await refreshAccountSnapshot();
