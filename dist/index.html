@@ -1,9 +1,18 @@
 <!doctype html>
-<html lang="he" dir="rtl">
+<html lang="he" dir="rtl" class="site-booting">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#243f75">
+  <style id="boot-critical">
+    html.site-booting body{overflow:hidden}
+    html.site-booting body>*:not(#site-boot-cover){visibility:hidden!important}
+    #site-boot-cover{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;background:#f5f8f6;color:#243f75;font-family:Assistant,Arial,sans-serif}
+    #site-boot-cover[hidden]{display:none}
+    #site-boot-cover .boot-card{display:grid;gap:10px;justify-items:center;padding:28px 34px;border-radius:22px;background:#fff;box-shadow:0 12px 40px #173a4d1c}
+    #site-boot-cover strong{font-size:1.15rem}
+    #site-boot-cover span{font-size:.88rem;color:#60757a}
+  </style>
   <meta name="description" content="גמ״ח ברגע — מוצאים ומשאילים ציוד בחינם, קרוב לבית.">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="he_IL">
@@ -14,7 +23,7 @@
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"גמ״ח ברגע","inLanguage":["he","en"],"description":"פלטפורמה קהילתית למציאת ציוד להשאלה וגמ״חים קרובים","potentialAction":{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"/catalog?q={search_term_string}"},"query-input":"required name=search_term_string"}}</script>
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com https://www.openstreetmap.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';">
 
-  <script src="./i18n-boot.js?v=20261002-1610"></script>
+  <script src="./i18n-boot.js?v=20261003-2128"></script>
   <title>גמ״ח ברגע — גדולה גמילות חסדים יותר מן הצדקה</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#243f75">
@@ -24,8 +33,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=block" rel="stylesheet">
   <link rel="icon" type="image/jpeg" href="./gmach-berega-logo.jpg">
-  <link rel="stylesheet" href="./styles.css?v=20261002-1610">
-  <link rel="stylesheet" href="./motion.css?v=20261002-1610">
+  <link rel="stylesheet" href="./styles.css?v=20261003-2128">
+  <link rel="stylesheet" href="./motion.css?v=20261003-2128">
 
 
 
@@ -55,6 +64,7 @@
 </style>
 </head>
 <body>
+  <div id="site-boot-cover" role="status" aria-live="polite"><div class="boot-card"><strong>גמ״ח ברגע</strong><span>טוענים את האתר…</span></div></div>
   <a class="skip-link" href="#main-content">דלגו לתוכן הראשי</a>
 
   <div id="connection-banner" class="connection-banner" hidden>
@@ -325,7 +335,7 @@
         <div class="dashboard-intro">
           <button class="back-link" type="button" data-go-home>→ חזרה לקטלוג</button>
           <div class="dashboard-title-line">
-            <div><span class="section-kicker">האזור שלי</span><h1 id="dashboard-title">שלום, <span id="dashboard-name">חבר/ה</span></h1><p>אפשר לשאול פריטים וגם לנהל גמ״ח באותו חשבון. פתיחת גמ״ח לא מגבילה את השימוש הרגיל באתר.</p></div>
+            <div><span class="section-kicker">האזור שלי</span><h1 id="dashboard-title">שלום, <span id="dashboard-name"></span></h1><p>אפשר לשאול פריטים וגם לנהל גמ״ח באותו חשבון. פתיחת גמ״ח לא מגבילה את השימוש הרגיל באתר.</p></div>
             <button class="dashboard-account-link" id="dashboard-account-button" type="button" aria-label="פתיחת החשבון שלי"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg><span>החשבון שלי</span></button>
           </div>
         </div>
@@ -640,22 +650,22 @@
     <div id="info-dialog-content" class="legal-copy"></div>
   </dialog>
 
-  <script src="./vendor/qrcode.js?v=20261002-1610" defer></script>
-  <script src="./app.js?v=20261002-1610" defer></script>\n  <script src="./platform-completion.js?v=20261002-1610" defer></script>
-  <script src="./final-features.js?v=20261002-1610" defer></script>
-  <script src="./i18n-en.js?v=20261002-1610" defer></script>
-  <script src="./i18n-errors.js?v=20261002-1610" defer></script>
-  <script src="./remaining-features.js?v=20261002-1610" defer></script>
-  <script src="./requirements-expansion.js?v=20261002-1610" defer></script>
-  <script src="./release-experience.js?v=20261002-1610" defer></script>
-  <script src="./privacy-purge.js?v=20261002-1610" defer></script>
-  <script src="./launch-readiness.js?v=20261002-1610" defer></script>
-  <script src="./distribution-completion.js?v=20261002-1610" defer></script>
-  <script src="./navigation-admin.js?v=20261002-1610" defer></script>
-  <script src="./privacy-availability.js?v=20261002-1610" defer></script>
-  <script src="./admin-control-center.js?v=20261002-1610" defer></script>
-  <script src="./user-content-translation.js?v=20261002-1610" defer></script>
-  <script src="./motion.js?v=20261002-1610" defer></script>
+  <script src="./vendor/qrcode.js?v=20261003-2128" defer></script>
+  <script src="./app.js?v=20261003-2128" defer></script>\n  <script src="./platform-completion.js?v=20261003-2128" defer></script>
+  <script src="./final-features.js?v=20261003-2128" defer></script>
+  <script src="./i18n-en.js?v=20261003-2128" defer></script>
+  <script src="./i18n-errors.js?v=20261003-2128" defer></script>
+  <script src="./remaining-features.js?v=20261003-2128" defer></script>
+  <script src="./requirements-expansion.js?v=20261003-2128" defer></script>
+  <script src="./release-experience.js?v=20261003-2128" defer></script>
+  <script src="./privacy-purge.js?v=20261003-2128" defer></script>
+  <script src="./launch-readiness.js?v=20261003-2128" defer></script>
+  <script src="./distribution-completion.js?v=20261003-2128" defer></script>
+  <script src="./navigation-admin.js?v=20261003-2128" defer></script>
+  <script src="./privacy-availability.js?v=20261003-2128" defer></script>
+  <script src="./admin-control-center.js?v=20261003-2128" defer></script>
+  <script src="./user-content-translation.js?v=20261003-2128" defer></script>
+  <script src="./motion.js?v=20261003-2128" defer></script>
 
 
 
@@ -663,6 +673,6 @@
 
 
 
-  <script src="./release-shell.js?v=20261002-1610" defer></script>
+  <script src="./release-shell.js?v=20261003-2128" defer></script>
 </body>
 </html>
