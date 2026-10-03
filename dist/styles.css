@@ -1,3 +1,4 @@
+html.i18n-en-pending body{visibility:hidden}
 :root { --gmach-css-ready: 1;
 html,body,button,input,select,textarea{font-family:var(--site-font,"Assistant",sans-serif)!important}
   --ink: #15313a;
