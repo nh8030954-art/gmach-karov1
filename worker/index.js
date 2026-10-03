@@ -3385,8 +3385,10 @@ async function sendOperationalNotificationEmail(env,user,notification){
   if(!env.RESEND_API_KEY||!user.email)return false;
   const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/dashboard";
   const specific=new Set(["new_device","pickup_confirmed","loan_cancelled","extension","waitlist","support"]).has(String(notification.type||""))?String(notification.type):"notification";
+  const specificRow=specific!=="notification"?await env.DB.prepare("SELECT enabled FROM email_templates WHERE template_key=? AND language=?").bind(specific,lang).first().catch(()=>null):null;
+  if(specificRow&&Number(specificRow.enabled)===0)return false;
   let mail=await managedEmailTemplate(env,specific,lang,{subject:en?"Gmach Berega update":"עדכון חדש בגמ״ח ברגע",text:"{{title}}\n\n{{body}}"},{title:notification.title||"",body:notification.body||"",account_url:accountUrl},accountUrl);
-  if(!mail&&specific!=="notification")mail=await managedEmailTemplate(env,"notification",lang,{subject:en?"Gmach Berega update":"עדכון חדש בגמ״ח ברגע",text:"{{title}}\n\n{{body}}"},{title:notification.title||"",body:notification.body||"",account_url:accountUrl},accountUrl);
+  if(!mail&&specific!=="notification"&&!specificRow)mail=await managedEmailTemplate(env,"notification",lang,{subject:en?"Gmach Berega update":"עדכון חדש בגמ״ח ברגע",text:"{{title}}\n\n{{body}}"},{title:notification.title||"",body:notification.body||"",account_url:accountUrl},accountUrl);
   if(!mail)return false;
   const unsubToken=Number(user.community_emails_accepted)?await communityUnsubscribeToken(env,user.user_id||user.id):null,unsubUrl=unsubToken?"https://gmach-berega.co.il/api/unsubscribe/community?token="+encodeURIComponent(unsubToken):null;
   if(unsubUrl)mail.text+=(en?"\n\nUnsubscribe from community updates: ":"\n\nהסרה מעדכוני קהילה: ")+unsubUrl;
