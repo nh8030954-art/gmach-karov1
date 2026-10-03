@@ -27,6 +27,15 @@ async function register(){
 window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();installPrompt=e;addInstallButton()});
 window.addEventListener("appinstalled",()=>{installPrompt=null;document.querySelector("[data-install-app]")?.remove()});
 window.addEventListener("online",updateConnection);window.addEventListener("offline",updateConnection);
-const init=()=>{updateConnection();register();const o=new MutationObserver(addInstallButton);o.observe(document.body,{childList:true,subtree:true});addInstallButton()};
+async function revealSite(){
+ const root=document.documentElement,cover=document.getElementById("site-boot-cover");
+ const cssReady=()=>getComputedStyle(root).getPropertyValue("--gmach-css-ready").trim()==="1";
+ const deadline=Date.now()+5000;
+ while(!cssReady()&&Date.now()<deadline)await new Promise(r=>setTimeout(r,50));
+ if(document.fonts?.load){try{await Promise.race([document.fonts.load("1em Assistant"),new Promise(r=>setTimeout(r,2500))])}catch{}}
+ root.classList.remove("site-booting");
+ if(cover)cover.hidden=true;
+}
+const init=()=>{updateConnection();register();const o=new MutationObserver(addInstallButton);o.observe(document.body,{childList:true,subtree:true});addInstallButton();revealSite()};
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
 })();
