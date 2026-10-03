@@ -1,9 +1,9 @@
-sha=3251a9f72042862eed02d000e561db1ea19c541b
+sha=df81f98feef77533abc46c644185847d3e05bf65
 install=success
 syntax=success
 tests=failure
 smoke=failure
-live=success
+live=cancelled
 Release hardening static gate passed.
 Release experience static release gate passed.
 Admin control center static release gate passed.
@@ -13,8 +13,8 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: font boot must ignore stale cached font values
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:384:8 {
+AssertionError [ERR_ASSERTION]: live settings must refresh versioned font cache
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:385:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
@@ -25,8 +25,8 @@ AssertionError [ERR_ASSERTION]: font boot must ignore stale cached font values
 
 Node.js v24.21.0
 
-AssertionError [ERR_ASSERTION]: font boot must ignore stale cached font values
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791050006214:384:8 {
+AssertionError [ERR_ASSERTION]: live settings must refresh versioned font cache
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791050034056:385:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
@@ -36,5 +36,4 @@ AssertionError [ERR_ASSERTION]: font boot must ignore stale cached font values
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-03T17:53:27.154Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
