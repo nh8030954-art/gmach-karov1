@@ -1,4 +1,4 @@
-deploy_sha=0f1ed188763d466f3bb2727aa9a99aa714b598a3
+deploy_sha=8141567e9cd62b0fde5c233274326f4467ce3127
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -9,8 +9,8 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: map must prefer stored coordinates and retain a tile fallback
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:135:8 {
+AssertionError [ERR_ASSERTION]: requirements expansion client not loaded
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:252:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
