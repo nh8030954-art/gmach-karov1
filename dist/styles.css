@@ -158,13 +158,6 @@ img { max-width: 100%; }
 }
 .site-header .header-logo img { width: 230px; height: auto; max-width: none; display: block; transform: translate(-20px, -16px); }
 .brand-logo-crop { overflow: hidden; background: #fff; }
-.english-brand-mark{display:none;width:62px;height:62px;flex:0 0 62px;border-radius:0;background:#fff;box-shadow:none;overflow:hidden}
-.english-brand-mark img{width:100%;height:100%;object-fit:contain;display:block}
-html[lang="en"] .full-brand-logo{display:none!important}
-html[lang="en"] .english-brand-mark{display:grid}
-html[lang="en"] .brand-copy{display:grid!important}
-html[lang="en"] .brand-copy strong{direction:ltr}
-html[lang="en"] .brand-copy small{direction:ltr}
 .brand-footer .brand-logo-crop img { width: 116px; height: auto; max-width: none; display: block; transform: translate(-35px, -12px); }
 .brand-mark svg { width: 34px; height: 34px; stroke-width: 2.3; }
 .brand-copy { display: grid; line-height: 1.1; }
