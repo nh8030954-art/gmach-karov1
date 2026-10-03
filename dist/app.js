@@ -1299,9 +1299,9 @@
   }
   function setupEvents() {
     $("#current-year").textContent = new Date().getFullYear(); const today = new Date().toISOString().slice(0, 10); $("#date-filter").min = today; const nowLocal=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16); $("#request-start").min=nowLocal; $("#request-end").min=nowLocal; $("#request-start").addEventListener("change",()=>{$("#request-end").min=$("#request-start").value||nowLocal;checkRequestedAvailability();}); $("#request-end").addEventListener("change",checkRequestedAvailability); $("#request-quantity").addEventListener("change",checkRequestedAvailability); $("#item-deposit-required").addEventListener("change",()=>{$("#item-deposit-amount-row").hidden=!$("#item-deposit-required").checked;$("#item-deposit-amount").required=$("#item-deposit-required").checked;});
-    $("#mobile-menu-button").addEventListener("click", () => { const menu = $("#mobile-menu"); menu.hidden = !menu.hidden; $("#mobile-menu-button").setAttribute("aria-expanded", String(!menu.hidden)); }); $("#mobile-menu a, #mobile-menu button").forEach(el => el.addEventListener("click", () => { $("#mobile-menu").hidden = true; $("#mobile-menu-button").setAttribute("aria-expanded", "false"); }));
+    $("#mobile-menu-button").addEventListener("click", () => { const menu = $("#mobile-menu"); menu.hidden = !menu.hidden; $("#mobile-menu-button").setAttribute("aria-expanded", String(!menu.hidden)); }); $$("#mobile-menu a, #mobile-menu button").forEach(el => el.addEventListener("click", () => { $("#mobile-menu").hidden = true; $("#mobile-menu-button").setAttribute("aria-expanded", "false"); }));
     const cleanSectionRoutes={"/catalog":"catalog","/how-it-works":"how-it-works","/gmachim":"gmachim"};
-    $('a[href="/catalog"],a[href="/how-it-works"],a[href="/gmachim"]').forEach(link=>link.addEventListener("click",event=>{
+    $$('a[href="/catalog"],a[href="/how-it-works"],a[href="/gmachim"]').forEach(link=>link.addEventListener("click",event=>{
       if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
       const targetId=cleanSectionRoutes[link.getAttribute("href")];if(!targetId)return;
       event.preventDefault();navigateHomeSection(link.getAttribute("href"),targetId);
