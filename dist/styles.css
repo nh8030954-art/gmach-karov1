@@ -1,4 +1,5 @@
 :root { --gmach-css-ready: 1;
+html,body,button,input,select,textarea{font-family:var(--site-font,"Assistant",sans-serif)!important}
   --ink: #15313a;
   --ink-soft: #50666d;
   --navy: #243f75;
@@ -1213,3 +1214,5 @@ html, body { max-width: 100%; overflow-x: clip; }
 
 .loan-date-range{white-space:nowrap;direction:rtl;font-variant-numeric:tabular-nums;color:var(--ink-soft)}
 @media(max-width:560px){.loan-date-range{white-space:normal}}
+
+.review-secondary-ratings{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start}
