@@ -119,15 +119,29 @@ jobs:
               exit "$STATUS"
             fi
           fi
+      - name: Detect targeted reconciliation changes
+        id: targeted_reconcile
+        run: |
+          changed_files="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA")"
+          if printf '%s\n' "$changed_files" | grep -qx 'migrations/0017_per_gmach_item_serials.sql'; then echo "serial_ids=true" >> "$GITHUB_OUTPUT"; else echo "serial_ids=false" >> "$GITHUB_OUTPUT"; fi
+          if printf '%s\n' "$changed_files" | grep -qx 'migrations/0018_backfill_missing_item_units.sql'; then echo "unit_backfill=true" >> "$GITHUB_OUTPUT"; else echo "unit_backfill=false" >> "$GITHUB_OUTPUT"; fi
+          if printf '%s\n' "$changed_files" | grep -qx 'migrations/0019_normalize_site_font.sql'; then echo "font=true" >> "$GITHUB_OUTPUT"; else echo "font=false" >> "$GITHUB_OUTPUT"; fi
+          if printf '%s\n' "$changed_files" | grep -qx 'migrations/0019_high_gmach_serial_codes.sql'; then echo "serial_rebase=true" >> "$GITHUB_OUTPUT"; else echo "serial_rebase=false" >> "$GITHUB_OUTPUT"; fi
+          if printf '%s\n' "$changed_files" | grep -qx 'migrations/0022_reconcile_loan_unit_states.sql'; then echo "loan_states=true" >> "$GITHUB_OUTPUT"; else echo "loan_states=false" >> "$GITHUB_OUTPUT"; fi
       - name: Reconcile per-gmach serial identities directly
+        if: steps.targeted_reconcile.outputs.serial_ids == 'true'
         run: npx wrangler d1 execute DB --remote --file migrations/0017_per_gmach_item_serials.sql
       - name: Backfill missing serialized units directly
+        if: steps.targeted_reconcile.outputs.unit_backfill == 'true'
         run: npx wrangler d1 execute DB --remote --file migrations/0018_backfill_missing_item_units.sql
       - name: Normalize live site font directly
+        if: steps.targeted_reconcile.outputs.font == 'true'
         run: npx wrangler d1 execute DB --remote --file migrations/0019_normalize_site_font.sql
       - name: Rebase gmach serial codes to high range
+        if: steps.targeted_reconcile.outputs.serial_rebase == 'true'
         run: npx wrangler d1 execute DB --remote --file migrations/0019_high_gmach_serial_codes.sql
       - name: Reconcile serialized unit loan states
+        if: steps.targeted_reconcile.outputs.loan_states == 'true'
         run: npx wrangler d1 execute DB --remote --file migrations/0022_reconcile_loan_unit_states.sql
       - name: Publish production Worker
         run: |
