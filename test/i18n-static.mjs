@@ -51,3 +51,7 @@ assert.ok(!userContent.includes('.organization-hero h2')&&!userContent.includes(
 assert.ok(html.includes("user-content-translation.js"),"Offer optional translation for user written content");
 
 for(const phrase of ["Alternative pickup branch","Start here","Recently viewed gmachs","Coordination and timeline","Pickup proposals"]) assert.ok(runtime.includes(phrase),`Missing recent workflow translation: ${phrase}`);
+
+const userTranslator=readFileSync('dist/user-content-translation.js','utf8');
+assert.ok(userTranslator.includes("const selector = 'body'")&&userTranslator.includes("NEVER_TRANSLATE"),"English fallback translation must cover all remaining visible Hebrew while preserving gmach names");
+assert.ok(userTranslator.includes("#organization-title")&&userTranslator.includes("[data-open-organization]"),"gmach names must remain in their original language");
