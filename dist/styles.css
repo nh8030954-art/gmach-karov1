@@ -1390,3 +1390,12 @@ html[lang="en"] .header-actions #dashboard-button{
     gap:8px!important;
   }
 }
+
+/* Super-admin site control entry must stay high-contrast in every dashboard theme. */
+#dashboard-view .admin-control-entry{
+  background:var(--navy)!important;color:#fff!important;border:1px solid var(--navy)!important;
+  box-shadow:0 8px 20px rgba(18,60,70,.16);opacity:1!important
+}
+#dashboard-view .admin-control-entry:hover,#dashboard-view .admin-control-entry:focus-visible{
+  background:#173f72!important;color:#fff!important;border-color:#173f72!important
+}
