@@ -1,8 +1,9 @@
 (()=>{try{
+  document.documentElement.style.setProperty("--site-font","Assistant, Arial, sans-serif");
   if("scrollRestoration" in history)history.scrollRestoration="manual";
   if((location.pathname||"/")==="/"&&!location.hash)scrollTo(0,0);
   if((location.pathname||"/")==="/dashboard")document.documentElement.classList.add("route-dashboard-boot");
-  const root=document.documentElement;root.style.setProperty("--site-font","Assistant, sans-serif");
+  const root=document.documentElement;
   const raw=localStorage.getItem("gmach-site-settings-v1");
   if(raw){
     const s=JSON.parse(raw),color=v=>/^#[0-9a-f]{6}$/i.test(String(v||""));
