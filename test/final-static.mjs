@@ -34,9 +34,9 @@ for(const route of [
   "/api/admin/audit","/api/admin/analytics/operations","/api/faqs","/api/performance","/api/admin/backups"
 ]) assert.ok(finalWorker.includes(route),route+" missing");
 
-assert.ok(html.includes("./platform-completion.js"));
-assert.ok(html.includes("./final-features.js"));
-assert.ok(html.includes("./remaining-features.js"));
+assert.ok(/src="\/?platform-completion\.js(?:\?[^"]*)?"/.test(html));
+assert.ok(/src="\/?final-features\.js(?:\?[^"]*)?"/.test(html));
+assert.ok(/src="\/?remaining-features\.js(?:\?[^"]*)?"/.test(html));
 assert.ok(finalClient.includes("אשף פתיחת גמ״ח"));
 assert.ok(finalClient.includes("chat-attachment"));
 assert.ok(finalClient.includes("מועדפים ובקשות קבועות"));
@@ -128,6 +128,7 @@ for(const token of ["maps.apple.com","data-copy-map-address","navigator.geolocat
 assert.ok(remainingClient.includes("createInteractiveOsmMap")&&remainingClient.includes("/api/maps/tiles/")&&remainingClient.includes("showCountry"),"interactive full-country gmach map missing");
 assert.ok(remainingClient.includes("map-nav-pref-label"),"map navigation preference control must use non-overlapping layout");
 assert.ok(remainingWorker.includes("maps\\/tiles\\/")&&remainingWorker.includes("tile.openstreetmap.org"),"same-origin map tile proxy missing");
+assert.ok(remainingWorker.includes("ensureMapSchema")&&remainingWorker.indexOf("api\\/maps\\/tiles")<remainingWorker.indexOf("await ensureSchema(env)"),"map endpoints must not depend on full schema reconciliation");
 assert.ok(remainingClient.includes('data.cached===false')&&remainingClient.includes('gmach:open-organization'),"gmach map geocoding/open flow regression");
 assert.ok(worker.includes("organization_branches b")&&worker.includes("AS latitude")&&worker.includes("AS longitude"),"discovery must expose stored branch coordinates for the map");
 assert.ok(remainingClient.includes("row.latitude")&&remainingClient.includes("tile.openstreetmap.org"),"map must prefer stored coordinates and retain a tile fallback");
