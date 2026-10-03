@@ -1,9 +1,9 @@
-sha=59e220c2b189e9be2d4239ca26dbb1a7d269c86b
+sha=8a7d2f957e7c015083fb5ab88d13dcfdf147faee
 install=success
 syntax=success
 tests=failure
 smoke=failure
-live=cancelled
+live=success
 QR scanning, structured SEO and accessibility shell gate passed.
 Excel export and QR image scanner gate passed.
 Voice message recording gate passed.
@@ -13,7 +13,7 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: restored category carousel engine missing
+AssertionError [ERR_ASSERTION]: original manual category carousel behavior missing
     at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:541:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
@@ -25,8 +25,8 @@ AssertionError [ERR_ASSERTION]: restored category carousel engine missing
 
 Node.js v24.21.0
 
-AssertionError [ERR_ASSERTION]: restored category carousel engine missing
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791044811617:541:8 {
+AssertionError [ERR_ASSERTION]: original manual category carousel behavior missing
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791045170356:541:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
@@ -36,4 +36,5 @@ AssertionError [ERR_ASSERTION]: restored category carousel engine missing
 }
 
 Node.js v24.21.0
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-03T16:32:50.965Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
