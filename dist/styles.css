@@ -881,8 +881,10 @@ body.toast-visible dialog[open] { max-height: calc(100dvh - 112px) !important; m
 .rating-display{display:inline-flex;align-items:center;gap:6px;direction:rtl;white-space:nowrap}.rating-stars{display:inline-flex;direction:ltr;gap:1px}.rating-star{line-height:1}.rating-star.is-filled{color:#d7a13d}.rating-star.is-empty{color:#d8dedb}.rating-score{font-weight:800;color:var(--navy)}.rating-label{font-weight:800;color:var(--ink)}.rating-count{color:var(--muted);font-size:.78em}
 .rating-item-card .rating-stars{font-size:1rem}.rating-gmach-card .rating-stars{font-size:.8rem}.rating-item-card{font-weight:800}.rating-gmach-card{opacity:.92}
 .rating-item-large{display:flex;flex-wrap:wrap;gap:8px}.rating-item-large .rating-stars{font-size:1.65rem}.rating-item-large .rating-score{font-size:1.05rem}
+.item-rating-hero{display:flex;justify-content:flex-start;align-items:center;margin:4px 0 10px}.item-rating-hero .rating-display{padding:8px 12px;border-radius:14px;background:#fff8ea;border:1px solid #ead5aa}.item-rating-hero .rating-stars{font-size:1.9rem}.item-rating-hero .rating-score{font-size:1.15rem}.item-rating-hero .rating-count{font-size:.85rem}.rating-unrated{font-weight:700;color:var(--muted)}
+
 .rating-gmach-small .rating-stars{font-size:.86rem}.rating-gmach-small .rating-score{font-size:.82rem}.gmach-owner .rating-display{margin-top:4px}
-.rating-gmach-hero{padding:10px 16px;border-radius:999px;background:#fff;border:1px solid var(--line);box-shadow:0 4px 14px #0000000a;font-size:1rem}.rating-gmach-hero .rating-stars{font-size:1.35rem}.rating-gmach-hero .rating-score{font-size:1rem}.rating-gmach-meta .rating-stars{font-size:.9rem}
+.rating-gmach-hero{padding:12px 18px;border-radius:999px;background:#fff;border:1px solid var(--line);box-shadow:0 4px 14px #0000000a;font-size:1.05rem}.rating-gmach-hero .rating-stars{font-size:1.6rem}.rating-gmach-hero .rating-score{font-size:1.1rem}.rating-gmach-meta .rating-stars{font-size:.9rem}
 .rating-mini{gap:4px}.rating-mini .rating-stars{font-size:.78rem}.rating-mini .rating-score{font-size:.72rem}
 .review-list blockquote{position:relative}
 .review-rating-grid{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px}
