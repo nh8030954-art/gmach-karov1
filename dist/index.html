@@ -40,7 +40,18 @@
   @media(max-width:760px){.category-rail.carousel-ready{gap:12px;padding-bottom:4px}.category-rail.carousel-ready .category-card{flex-basis:168px!important;width:168px!important;min-width:168px!important}}
 </style>
 <style id="route-boot-stability">
-  .route-dashboard-boot #main-content{visibility:hidden;min-height:78vh}
+  .route-dashboard-boot #home-view,
+  .route-dashboard-boot #organization-page-view{display:none!important}
+  .route-dashboard-boot #dashboard-view{display:block!important}
+  .route-dashboard-boot #dashboard-content:empty::before{
+    content:"טוענים את האזור שלי…";
+    display:block;
+    min-height:220px;
+    padding:42px 24px;
+    text-align:center;
+    color:#50666d;
+    font-weight:700
+  }
 </style>
 </head>
 <body>
