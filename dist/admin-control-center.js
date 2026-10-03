@@ -240,7 +240,7 @@ function renderExports(root){
 function install(){
  const tab=$("#admin-tab"),actions=$("#dashboard-view .dashboard-actions");
  if(!tab||tab.hidden||!actions||actions.querySelector("[data-admin-control-center]"))return;
- const b=document.createElement("button");b.type="button";b.className="button button-primary";b.dataset.adminControlCenter="1";b.textContent=t("מרכז בקרת האתר","Site control center");b.onclick=openCenter;actions.prepend(b);
+ const b=document.createElement("button");b.type="button";b.className="button admin-control-entry";b.dataset.adminControlCenter="1";b.textContent=t("מרכז בקרת האתר","Site control center");b.onclick=openCenter;actions.prepend(b);
 }
 function init(){const obs=new MutationObserver(install);obs.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:["hidden","lang","dir"]});install()}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
