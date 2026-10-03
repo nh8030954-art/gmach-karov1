@@ -375,6 +375,41 @@
   }
   function renderSkeletons() { $("#items-grid").innerHTML = Array.from({ length: 8 }, () => '<div class="skeleton-card" aria-hidden="true"></div>').join(""); }
   const CATALOG_CACHE_KEY = "gmach-catalog-cache-v1";
+  const ITEM_EN_CACHE_KEY = "gmach-item-content-en-v1";
+  const itemEnglishCache = new Map();
+  try {
+    const saved=JSON.parse(sessionStorage.getItem(ITEM_EN_CACHE_KEY)||"{}");
+    for(const [source,value] of Object.entries(saved)) if(typeof value==="string") itemEnglishCache.set(source,value);
+  } catch {}
+  function persistItemEnglishCache(){
+    try{sessionStorage.setItem(ITEM_EN_CACHE_KEY,JSON.stringify(Object.fromEntries([...itemEnglishCache.entries()].slice(-500))))}catch{}
+  }
+  async function translateItemsForEnglish(items){
+    if(!uiIsEnglish()||!Array.isArray(items)||!items.length)return items;
+    const hebrew=/[\u0590-\u05ff]/;
+    const sources=[];
+    for(const item of items){
+      for(const value of [item?.title,item?.description]){
+        const text=String(value||"").trim();
+        if(text&&hebrew.test(text)&&!itemEnglishCache.has(text)&&!sources.includes(text))sources.push(text);
+      }
+    }
+    for(let offset=0;offset<sources.length;offset+=12){
+      const batch=sources.slice(offset,offset+12);
+      try{
+        const data=await api("/api/translate/user-content",{method:"POST",body:{texts:batch},timeoutMs:12000});
+        const values=Array.isArray(data?.translations)?data.translations:[];
+        batch.forEach((source,index)=>{const value=String(values[index]||"").trim();if(value)itemEnglishCache.set(source,value)});
+      }catch(error){console.warn("Item English translation unavailable",error)}
+    }
+    persistItemEnglishCache();
+    for(const item of items){
+      const title=String(item?.title||""),description=String(item?.description||"");
+      if(hebrew.test(title))item.title=itemEnglishCache.get(title)||"Item";
+      if(hebrew.test(description))item.description=itemEnglishCache.get(description)||"Description temporarily unavailable in English.";
+    }
+    return items;
+  }
   function saveCatalogCache(items) {
     try { localStorage.setItem(CATALOG_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), items })); } catch {}
   }
@@ -392,8 +427,10 @@
       const params = new URLSearchParams();
       if ($("#date-filter").value) params.set("date", $("#date-filter").value);
       const data = await api(`/api/items${params.size ? `?${params}` : ""}`);
-      state.items = data.items || [];
-      saveCatalogCache(state.items);
+      const rawItems=data.items || [];
+      saveCatalogCache(rawItems);
+      await translateItemsForEnglish(rawItems);
+      state.items = rawItems;
       for (const id of state.compareIds) if (!state.items.some(item => String(item.id) === id)) state.compareIds.delete(id);
       applyFilters();
       renderCompareTray();
@@ -405,6 +442,7 @@
       console.error("Unable to load items", error);
       const cachedItems = readCatalogCache();
       if (cachedItems) {
+        await translateItemsForEnglish(cachedItems);
         state.items = cachedItems;
         state.serverAvailable = false;
         applyFilters();
@@ -583,6 +621,7 @@
         const data = await api("/api/items/"+encodeURIComponent(id));
         item = data?.item || null;
         if (item) {
+          await translateItemsForEnglish([item]);
           const existingIndex=state.items.findIndex(row=>String(row.id)===String(item.id));
           if(existingIndex>=0) state.items[existingIndex]=item; else state.items.push(item);
         }
@@ -625,7 +664,7 @@
   }
   async function openOrganization(id) {
     if (!id) return;
-    try { const data = await api(`/api/organizations/${encodeURIComponent(id)}/public`); if(state.user) api(`/api/organizations/${encodeURIComponent(id)}/view`,{method:"POST",body:{}}).catch(()=>{}); const org=data.organization, items=data.items||[], reviews=data.reviews||[], hours=Object.entries(org.hours||{}); $("#organization-page-content").dataset.organizationId=String(id);
+    try { const data = await api(`/api/organizations/${encodeURIComponent(id)}/public`); if(state.user) api(`/api/organizations/${encodeURIComponent(id)}/view`,{method:"POST",body:{}}).catch(()=>{}); const org=data.organization, items=data.items||[], reviews=data.reviews||[], hours=Object.entries(org.hours||{}); await translateItemsForEnglish(items); $("#organization-page-content").dataset.organizationId=String(id);
       $("#organization-page-content").innerHTML = `<article class="organization-detail">${org.temporarily_closed?`<div class="dashboard-empty" role="status"><strong>הגמ״ח סגור זמנית</strong><p>${org.reopens_at?`פתיחה צפויה: ${escapeHTML(formatDateTime(org.reopens_at))}`:"מועד הפתיחה מחדש יעודכן בהמשך."}</p></div>`:""}<div class="organization-hero"><span class="verification-chip">${org.rating ? ratingStars(org.rating,{label:"גמ״ח",size:"gmach-hero",count:Number(org.review_count||0)}) : "חדש — ללא דירוגים"}</span><h2 id="organization-title" class="organization-name" translate="no">${escapeHTML(org.name)}</h2><p>${escapeHTML(org.description)}</p><div class="organization-meta"><span>📍 ${escapeHTML([org.city,org.neighborhood].filter(Boolean).join(", "))}</span><span>${org.rating ? ratingStars(org.rating,{size:"gmach-meta"}) : "עדיין אין דירוגים"}</span><span>${org.last_active_at ? `פעיל ${escapeHTML(formatRelative(org.last_active_at))}` : "פעילות טרם עודכנה"}</span></div></div><div class="organization-facts"><section><h3>תיאום</h3><p>בתיאום דרך האתר</p></section><section><h3>כתובת</h3><p>${escapeHTML(org.address || [org.city,org.neighborhood].filter(Boolean).join(", ") || "לא הוגדרה כתובת")}</p></section><section><h3>שעות פעילות</h3><p>${hours.length ? hours.map(([d,h]) => `${escapeHTML(d)}: ${escapeHTML(h)}`).join(" · ") : "בתיאום מראש"}</p></section><section><h3>אזור שירות</h3><p>${escapeHTML(org.service_area || org.city)}</p></section></div><h3>פריטים בגמ״ח</h3>${[...new Set(items.map(item => item.category || "כללי"))].map(category => `<section class="organization-category"><h4>${escapeHTML(categoryDisplayName(category))}</h4><div class="mini-items">${items.filter(item => (item.category || "כללי") === category).map(item => `<button type="button" data-org-item="${escapeHTML(item.id)}"><strong data-user-content-priority="title">${escapeHTML(item.title)}</strong>${item.subcategory?`<small>${escapeHTML(subcategoryDisplayName(item.subcategory))}</small>`:""}<span>${item.rating ? ratingStars(item.rating,{size:"mini"}) : escapeHTML(item.availability_status === "available" ? "זמין" : "בתיאום")}</span></button>`).join("")}</div></section>`).join("") || "אין כרגע פריטים פעילים"}<h3>דירוגי משתמשים</h3><div class="review-list">${reviews.map(review => `<blockquote data-review-id="${escapeHTML(review.id||"")}"><div class="review-rating-grid">${review.item_rating ? ratingStars(review.item_rating,{size:"review-primary"}) : ""}<div class="review-secondary-ratings">${review.rating ? ratingStars(review.rating,{label:"דירוג הגמ״ח",size:"review-secondary"}) : ""}${review.service_rating ? ratingStars(review.service_rating,{label:"שירות",size:"review-secondary"}) : ""}${review.branch_rating ? ratingStars(review.branch_rating,{label:"סניף",size:"review-secondary"}) : ""}</div></div>${reviewItemLink(review)}<p>${escapeHTML(review.comment || "ללא הערה")}</p><div class="review-byline"><cite>${escapeHTML(review.author_name||"משתמש/ת")}</cite>${review.returned_at || review.requested_from ? `<time datetime="${escapeHTML(review.returned_at||review.requested_from)}">${escapeHTML((review.returned_at||review.requested_from).slice(0,10))}</time>` : ""}${review.branch_name ? `<span>· ${escapeHTML(review.branch_name)}</span>` : ""}</div>${review.organization_response ? `<p><strong>תגובת הגמ״ח:</strong> ${escapeHTML(review.organization_response)}</p>` : ""}<div class="review-actions"><button type="button" class="button button-secondary" data-review-helpful="${escapeHTML(review.id||"")}">מועילה (${Number(review.helpful_count||0)})</button><button type="button" class="button button-secondary" data-review-report="${escapeHTML(review.id||"")}">דיווח</button></div></blockquote>`).join("") || "עדיין אין דירוגים"}</div></article>`;
       if (data.partial) $("#organization-page-content").insertAdjacentHTML("afterbegin", `<p class="dashboard-empty" role="status" data-partial-sections="${escapeHTML((data.partialSections||[]).join(","))}">חלק מפרטי הגמ״ח אינם זמינים כרגע. אפשר לנסות שוב בעוד רגע.</p>`);
       $$('[data-org-item]', $("#organization-page-content")).forEach(button => button.addEventListener("click", () => { openItem(button.dataset.orgItem); }));
