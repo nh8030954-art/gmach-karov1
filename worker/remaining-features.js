@@ -344,7 +344,6 @@ export async function handleRemainingFeatures(request,env,ctx,url){
  try{
   let m=path.match(/^\/api\/maps\/tiles\/(\d+)\/(\d+)\/(\d+)\.png$/);if(m&&method==="GET")return await mapTile(url,m[1],m[2],m[3]);
   if(path==="/api/maps/geocode"&&method==="GET"){await ensureMapSchema(env);return await explicitGeocode(request,env,url)}
-  await ensureSchema(env);
   m=path.match(/^\/api\/items\/([^/]+)\/image-edits$/);if(m&&(method==="GET"||method==="PUT"))return await imageEdits(request,env,decodeURIComponent(m[1]));
   m=path.match(/^\/api\/items\/([^/]+)\/availability-calendar$/);if(m&&method==="GET")return await availabilityCalendar(request,env,decodeURIComponent(m[1]),url);
   m=path.match(/^\/api\/items\/([^/]+)\/similar$/);if(m&&method==="GET")return await similarItems(env,decodeURIComponent(m[1]),url);
