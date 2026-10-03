@@ -3282,7 +3282,7 @@ export async function translateUserContent(request,env,ctx){
   const body=await readJson(request),texts=body?.texts;
   if(!Array.isArray(texts)||texts.length<1||texts.length>12||texts.some(text=>typeof text!=="string"||text.length<2||text.length>500)||texts.reduce((sum,text)=>sum+text.length,0)>4500)throw new HttpError(400,"יש לשלוח עד 12 קטעי טקסט, באורך כולל של עד 4,500 תווים");
   const identity=request.headers.get("CF-Connecting-IP")||request.headers.get("X-Forwarded-For")||"unknown";
-  await enforcePublicRateLimit(env,identity,"content_translation",ctx,20);
+  await enforcePublicRateLimit(env,identity,"content_translation",ctx,120);
   const translated=[];
   for(const text of texts){
     if(!/[\u0590-\u05ff]/.test(text)){translated.push(text);continue}
