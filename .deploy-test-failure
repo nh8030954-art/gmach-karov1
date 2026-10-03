@@ -1,4 +1,4 @@
-deploy_sha=c37f7a1d7eaf2d65824814cf9815ca32ce8d54b7
+deploy_sha=c6416771e3102cd4b45b5eb0cb64d643a05df6e1
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -25,7 +25,7 @@ node:internal/modules/run_main:107
     ^
 
 AssertionError [ERR_ASSERTION]: five-star rating UI missing
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:516:8 {
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:520:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
