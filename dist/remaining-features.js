@@ -371,38 +371,8 @@ Object.assign(I18N.en,I18N_FINAL_EN,{
 });
 let lang=localStorage.getItem("gmach-language")||document.documentElement.lang||"he";
 function replaceTranslatedPhrase(text,he,en){let out=text,pos=0;const isHeb=c=>!!c&&/[\u0590-\u05FF]/.test(c),starts=isHeb(he[0]),ends=isHeb(he[he.length-1]);while((pos=out.indexOf(he,pos))!==-1){const before=out[pos-1]||"",after=out[pos+he.length]||"";if((starts&&isHeb(before))||(ends&&isHeb(after))){pos+=he.length;continue}out=out.slice(0,pos)+en+out.slice(pos+he.length);pos+=en.length}return out}function translateText(raw){if(!raw)return raw;if(I18N.en[raw])return I18N.en[raw];let out=raw;for(const [he,en] of Object.entries(I18N.en).sort((a,b)=>b[0].length-a[0].length)){if(he.length>2&&out.includes(he))out=replaceTranslatedPhrase(out,he,en)}return out}/* English mode translates every visible Hebrew string, including carousel/item content; only organization names stay original. */
-const NEVER_TRANSLATE_SELECTOR=".organization-name,[translate=\"no\"],[data-no-translate]";
-function isNeverTranslateNode(n){return !!n?.parentElement?.closest?.(NEVER_TRANSLATE_SELECTOR)}
-const aiTranslationCache=new Map(),aiTranslationPending=new Map();let aiTranslationTimer=null,aiTranslationBusy=false;
-try{const saved=JSON.parse(sessionStorage.getItem("gmach-en-ai-cache")||"{}");for(const [k,v] of Object.entries(saved))if(typeof v==="string")aiTranslationCache.set(k,v)}catch{}
-function persistAiTranslationCache(){try{const entries=[...aiTranslationCache.entries()].slice(-300);sessionStorage.setItem("gmach-en-ai-cache",JSON.stringify(Object.fromEntries(entries)))}catch{}}
-function applyTranslatedNode(node,source,value){
-  if(!node?.isConnected||lang!=="en"||isNeverTranslateNode(node))return;
-  const full=node.nodeValue||"",trim=full.trim();
-  if(trim!==source&&trim!==translateText(source))return;
-  node.nodeValue=full.replace(trim,value);
-}
-function queueAiTranslation(node,text){
-  const source=String(text||"").trim();
-  if(lang!=="en"||!source||!/[\u0590-\u05ff]/.test(source)||isNeverTranslateNode(node))return;
-  const cached=aiTranslationCache.get(source);if(cached){applyTranslatedNode(node,source,cached);return}
-  if(!aiTranslationPending.has(source))aiTranslationPending.set(source,new Set());
-  aiTranslationPending.get(source).add(node);
-  if(!aiTranslationTimer)aiTranslationTimer=setTimeout(flushAiTranslations,80);
-}
-async function flushAiTranslations(){
-  aiTranslationTimer=null;if(aiTranslationBusy||lang!=="en"||!aiTranslationPending.size)return;
-  aiTranslationBusy=true;
-  const entries=[...aiTranslationPending.entries()].slice(0,12);
-  for(const [source] of entries)aiTranslationPending.delete(source);
-  try{
-    const data=await api("/api/translate/user-content",{method:"POST",body:{texts:entries.map(([source])=>source)}});
-    const values=Array.isArray(data?.translations)?data.translations:[];
-    entries.forEach(([source,nodes],i)=>{const value=String(values[i]||"").trim();if(!value)return;aiTranslationCache.set(source,value);for(const node of nodes)applyTranslatedNode(node,source,value)});
-    persistAiTranslationCache();
-  }catch(error){console.warn("English content translation unavailable",error)}
-  finally{aiTranslationBusy=false;if(aiTranslationPending.size&&!aiTranslationTimer)aiTranslationTimer=setTimeout(flushAiTranslations,120)}
-}
+const NEVER_TRANSLATE_SELECTOR=".organization-name,#organization-title";
+function isNeverTranslateNode(n){return !!n?.parentElement?.closest?.(NEVER_TRANSLATE_SELECTOR+",script,style,noscript,textarea,code,pre")}
 window.GmachTranslate=value=>lang==="en"?translateText(value):value;
 function translateNode(n){
   if(lang!=="en"||isNeverTranslateNode(n))return;
@@ -411,12 +381,13 @@ function translateNode(n){
   if(option&&!option.hasAttribute("value"))option.setAttribute("value",trim);
   const translated=translateText(trim);
   if(translated!==trim)n.nodeValue=full.replace(trim,translated);
-  if(/[\u0590-\u05ff]/.test(translated))queueAiTranslation(n,trim);
+
 }
 Object.assign(I18N.en,{"פרחים":"Flowers","מתאימים":"matching","עודכן":"Updated","פרטי קשר נמסרים רק לאחר אישור הבקשה":"Contact details are shared only after the request is approved","גמ״ח ברגע — גדולה גמילות חסדים יותר מן הצדקה":"Gmach Berega - Kindness connects communities"});
 window.GmachSearchAliases=()=>Object.entries(I18N.en).filter(([he,en])=>/[\u0590-\u05ff]/.test(he)&&/^[a-z][a-z\s-]{2,}$/i.test(en));
-function translate(root=document.body){if(lang!=="en")return;document.documentElement.lang="en";document.documentElement.dir="ltr";const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;while(n=w.nextNode())translateNode(n);$$("input[placeholder],textarea[placeholder],[title],[aria-label],[alt],input[type=button][value],input[type=submit][value]",root).forEach(el=>{for(const a of ["placeholder","title","aria-label","alt","value"]){if(a==="value"&&!el.matches("input[type=button],input[type=submit]"))continue;const v=el.getAttribute(a);if(v){const translated=translateText(v);if(translated!==v)el.setAttribute(a,translated)}}})}
-function observeTranslations(){if(lang!=="en")return;const o=new MutationObserver(ms=>{for(const m of ms){if(m.type==="characterData"){translateNode(m.target);continue}if(m.type==="attributes"){const el=m.target,a=m.attributeName,v=el.getAttribute(a);if(v&&(!(["value"].includes(a))||el.matches("input[type=button],input[type=submit]"))){const translated=translateText(v);if(translated!==v)el.setAttribute(a,translated)}continue}for(const n of m.addedNodes){if(n.nodeType===Node.TEXT_NODE)translateNode(n);else if(n.nodeType===Node.ELEMENT_NODE)translate(n)}}});o.observe(document.body,{childList:true,characterData:true,attributes:true,attributeFilter:["placeholder","title","aria-label","value"],subtree:true})}
+function translate(root=document.body){if(lang!=="en")return;document.documentElement.lang="en";document.documentElement.dir="ltr";const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let n;while(n=w.nextNode())translateNode(n);$$("input[placeholder],textarea[placeholder],[title],[aria-label],[alt],input[type=button][value],input[type=submit][value]",root).forEach(el=>{for(const a of ["placeholder","title","aria-label","alt","value"]){if(a==="value"&&!el.matches("input[type=button],input[type=submit]"))continue;const v=el.getAttribute(a);if(v&&!el.closest(NEVER_TRANSLATE_SELECTOR)){const translated=translateText(v);if(translated!==v)el.setAttribute(a,translated)}}})}
+let translationObserver;
+function observeTranslations(){if(lang!=="en"||translationObserver)return;const o=new MutationObserver(ms=>{for(const m of ms){if(m.type==="characterData"){translateNode(m.target);continue}if(m.type==="attributes"){const el=m.target,a=m.attributeName,v=el.getAttribute(a);if(v&&!el.closest(NEVER_TRANSLATE_SELECTOR)&&(!(["value"].includes(a))||el.matches("input[type=button],input[type=submit]"))){const translated=translateText(v);if(translated!==v)el.setAttribute(a,translated)}continue}for(const n of m.addedNodes){if(n.nodeType===Node.TEXT_NODE)translateNode(n);else if(n.nodeType===Node.ELEMENT_NODE)translate(n)}}});translationObserver=o;o.observe(document.body,{childList:true,characterData:true,attributes:true,attributeFilter:["placeholder","title","aria-label","value","alt"],subtree:true})}
 function installLanguage(){
  if(lang==="en"){document.title=translateText(document.title);const meta=document.querySelector('meta[name="description"]');if(meta)meta.content=translateText(meta.content)}
  const b=$("#language-switch");if(!b)return;

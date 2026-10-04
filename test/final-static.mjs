@@ -141,7 +141,7 @@ const remainingHandler=remainingWorker.slice(remainingWorker.indexOf("export asy
 assert.ok(remainingWorker.includes("ensureMapSchema")&&!remainingHandler.includes("await ensureSchema(env)")&&remainingHandler.includes('if(path==="/api/maps/geocode"&&method==="GET"){await ensureMapSchema(env);'),"map endpoints must avoid full request-time schema reconciliation while geocoding keeps its narrow map schema check");
 assert.ok(remainingClient.includes('/api/geocode?q=')&&remainingClient.includes('gmach:open-organization'),"gmach map geocoding/open flow regression");
 assert.ok(remainingClient.includes('org.review_count')&&remainingClient.includes('"★".repeat(filled)+"☆".repeat(5-filled)')&&remainingClient.includes('class="organization-name" translate="no"'),"map gmach rating stars/name preservation missing");
-assert.ok(remainingClient.includes('/api/translate/user-content')&&remainingClient.includes('queueAiTranslation')&&remainingClient.includes('NEVER_TRANSLATE_SELECTOR=".organization-name'),"English dynamic-content translation fallback missing");
+assert.ok((await readFile('dist/user-content-translation.js','utf8')).includes('/api/translate/user-content')&&!remainingClient.includes('queueAiTranslation')&&remainingClient.includes('NEVER_TRANSLATE_SELECTOR=".organization-name'),"English dynamic-content translation fallback missing");
 assert.ok(remainingClient.includes('?"Hebrew":"English"')&&!remainingClient.includes('?"עברית":"English"'),"English mode language switch must stay English-only");
 
 assert.ok(worker.includes("organization_branches b")&&worker.includes("AS latitude")&&worker.includes("AS longitude"),"discovery must expose stored branch coordinates for the map");

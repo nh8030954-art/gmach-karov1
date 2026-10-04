@@ -1,0 +1,25 @@
+name: English interface checks
+on:
+  push:
+    branches: [fix/complete-english]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm install --no-save playwright@1.55.0
+      - run: npx playwright install --with-deps chromium
+      - run: mkdir -p test/english-previews && node test/english-ui.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: english-previews
+          path: test/english-previews/

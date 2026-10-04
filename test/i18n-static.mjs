@@ -40,7 +40,7 @@ for(const language of ['he','en']){
   assert.equal(sandbox.window.GmachTranslate('השליחה לא הושלמה'),language==='en'?'Sending was not completed':'השליחה לא הושלמה');
 }
 assert.match(runtime,/characterData:true/,'Translate updated text nodes');
-assert.match(runtime,/attributeFilter:\["placeholder","title","aria-label","value"\]/,'Translate dynamically changed controls');
+assert.match(runtime,/attributeFilter:\["placeholder","title","aria-label","value","alt"\]/,'Translate dynamically changed controls');
 assert.ok(runtime.includes('$\("input[placeholder],textarea[placeholder],[title],[aria-label],[alt],input[type=button][value],input[type=submit][value]",root\).forEach'.replaceAll('\\','')),'English runtime must translate every matching control, not only the first');
 console.log(`Static English interface coverage ${(coverage*100).toFixed(1)}% (${hebrew.length-missing.length}/${hebrew.length})`);
 assert.ok(app.includes('compare-rating-row')&&app.includes('ratingStars(item.rating,{size:"compare"})'),'Item comparison must include item star ratings');

@@ -1,112 +1,101 @@
 (() => {
   'use strict';
-  let started = false;
   const selector = 'body';
-  // In English mode the only visible content intentionally preserved in its
-  // original language is the gmach name itself.
-  const NEVER_TRANSLATE = '.organization-name,#organization-title,[data-recent-org] strong,[data-owned-org] h3,.organization-switch .organization-name,.gmach-owner .organization-name';
-  const cache = new Map(), ignored = new WeakSet();
-  const CACHE_KEY='gmach-user-content-en-v2';
-  let timer = 0, busy = false, requests = 0, retryMs = 700;
+  const NEVER_TRANSLATE = '.organization-name,#organization-title';
+  const ATTRIBUTES = ['alt','title','aria-label','placeholder','value'];
+  const cache = new Map();
+  const CACHE_KEY = 'gmach-user-content-en-v3';
+  let timer = 0, busy = false, retryMs = 700;
   try {
-    const saved=JSON.parse(sessionStorage.getItem(CACHE_KEY)||'{}');
-    for(const [k,v] of Object.entries(saved)) if(typeof k==='string'&&typeof v==='string') cache.set(k,v);
+    for (const [key,value] of Object.entries(JSON.parse(sessionStorage.getItem(CACHE_KEY)||'{}')))
+      if (typeof value === 'string' && !/[\u0590-\u05ff]/.test(value)) cache.set(key,value);
   } catch {}
-  function persistCache(){
-    try{
-      const entries=[...cache.entries()].slice(-400);
-      sessionStorage.setItem(CACHE_KEY,JSON.stringify(Object.fromEntries(entries)));
-    }catch{}
+  const english = () => document.documentElement.lang === 'en';
+  const blocked = (el,attribute=false) => !el || el.closest(NEVER_TRANSLATE+',script,style,noscript,code,pre'+(attribute?'':',textarea'));
+  function visible(el) {
+    // Options have no individual layout box; their select does.
+    const target = el?.tagName === 'OPTION' ? el.closest('select') : el;
+    return !!target?.getClientRects().length;
   }
-  function isVisible(el){return !!el?.getClientRects?.().length}
-  function blocked(el){return !el||el.closest(NEVER_TRANSLATE)||el.closest('script,style,noscript,textarea,code,pre')}
+  function chunks(value) {
+    const result=[];
+    while(value.length>500) {
+      let end=value.lastIndexOf(' ',500);
+      if(end<250)end=500;else end++;
+      result.push(value.slice(0,end));value=value.slice(end);
+    }
+    if(value)result.push(value);
+    return result;
+  }
   function candidates() {
-    const nodes = [],seen=new Set();
-    const root=document.body;if(!root)return nodes;
-    const add=node=>{
-      const parent=node?.parentElement,value=node?.nodeValue?.trim()||'';
-      if(!parent||seen.has(node)||!isVisible(parent)||blocked(parent))return;
-      if(!ignored.has(node)&&/[\u0590-\u05ff]/.test(value)&&value.length>=2&&value.length<=500){nodes.push({kind:'text',node,value});seen.add(node)}
-    };
-    const addAttr=(el,name)=>{
-      if(!el||blocked(el)||!isVisible(el))return;
-      const value=String(el.getAttribute(name)||'').trim(),key='@'+name+':'+value;
-      if(!/[\u0590-\u05ff]/.test(value)||value.length<2||value.length>500||seen.has(key))return;
-      nodes.push({kind:'attr',node:el,name,value,key});seen.add(key);
-    };
-    root.querySelectorAll('[data-user-content-priority]').forEach(el=>{
-      const w=document.createTreeWalker(el,NodeFilter.SHOW_TEXT);let n;
-      while((n=w.nextNode())){add(n);if(nodes.length>=12)return}
-    });
-    if(nodes.length<12){
-      const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;
-      while((node=walker.nextNode())){add(node);if(nodes.length>=12)break}
-    }
-    if(nodes.length<12){
-      root.querySelectorAll('img[alt],[title],[aria-label],input[placeholder],textarea[placeholder]').forEach(el=>{
-        for(const name of ['alt','title','aria-label','placeholder']){
-          if(el.hasAttribute(name))addAttr(el,name);
-          if(nodes.length>=12)return;
-        }
-      });
-    }
-    return nodes.slice(0,12);
-  }
-  function apply(group){
-    for(const entry of group){
-      const translated=cache.get(entry.value);if(!translated)continue;
-      if(entry.kind==='text'){
-        ignored.add(entry.node);
-        if(entry.node.isConnected)entry.node.nodeValue=entry.node.nodeValue.replace(entry.value,translated);
-      }else if(entry.node?.isConnected){
-        entry.node.setAttribute(entry.name,translated);
+    const entries=[];const root=document.body;if(!root)return entries;
+    function add(node,name) {
+      const el=name?node:node.parentElement;
+      if(blocked(el,!!name)||!visible(el))return;
+      if(name==='value'&&!el.matches('input[type=button],input[type=submit]'))return;
+      const raw=name?el.getAttribute(name):node.nodeValue;
+      if(!raw||!/[\u0590-\u05ff]/.test(raw))return;
+      const value=raw.trim();
+      // UI phrases use reviewed translations; AI is reserved for remaining content.
+      const local=window.GmachTranslate?.(value)||value;
+      if(local!==value) {
+        if(name)node.setAttribute(name,raw.replace(value,local));
+        else {if(el.tagName==='OPTION'&&!el.hasAttribute('value'))el.setAttribute('value',value);node.nodeValue=raw.replace(value,local)}
       }
+      if(/[\u0590-\u05ff]/.test(local))entries.push({node,name,source:local,parts:chunks(local)});
+    }
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;
+    while((node=walker.nextNode()))add(node);
+    root.querySelectorAll('img[alt],[title],[aria-label],input[placeholder],textarea[placeholder],input[type=button],input[type=submit]').forEach(el=>{
+      for(const name of ATTRIBUTES)if(el.hasAttribute(name))add(el,name);
+    });
+    return entries;
+  }
+  function apply(entries) {
+    if(!english())return;
+    for(const entry of entries) {
+      const {node,name,source,parts}=entry;const el=name?node:node.parentElement;
+      if(!node.isConnected||blocked(el,!!name)||parts.some(part=>/[\u0590-\u05ff]/.test(part)&&!cache.has(part)))continue;
+      const current=name?node.getAttribute(name):node.nodeValue;
+      // A later render/edit must never be overwritten by an old response.
+      if(current?.trim()!==source)continue;
+      const translated=parts.map(part=>cache.get(part)||part).join(' ');
+      if(name)node.setAttribute(name,current.replace(source,translated));
+      else node.nodeValue=current.replace(source,translated);
     }
   }
   async function translate() {
-    if (busy || requests >= 240 || document.documentElement.lang !== 'en') return;
-    const group = candidates();
-    if (!group.length) return;
-    busy = true;
-    try {
-      const pending = [];
-      const values = new Set();
-      for(const entry of group){
-        if(!cache.has(entry.value)&&!values.has(entry.value)){pending.push(entry);values.add(entry.value)}
-      }
-      if (pending.length) {
-        requests++;
-        const response = await fetch('/api/translate/user-content', {
-          method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ texts: pending.slice(0,12).map(({ value }) => value) })
-        });
-        if (!response.ok) throw new Error('Translation unavailable');
-        const result = await response.json();
-        if (!Array.isArray(result.translations) || result.translations.length !== Math.min(pending.length,12)) throw new Error('Invalid translation');
-        pending.slice(0,12).forEach(({ value }, index) => {
-          const translated=String(result.translations[index]||'').trim();
-          if(translated)cache.set(value,translated);
-        });
-        persistCache();
-      }
-      apply(group);
-      retryMs=700;
-    } catch {
-      retryMs=Math.min(5000,Math.round(retryMs*1.6));
-    } finally {
-      busy = false;
-      if (requests < 240 && candidates().length) setTimeout(schedule,retryMs);
+    if(busy||!english())return;
+    const entries=candidates();if(!entries.length)return;
+    const pending=[];let length=0;const seen=new Set();
+    for(const entry of entries)for(const part of entry.parts) {
+      if(!/[\u0590-\u05ff]/.test(part)||cache.has(part)||seen.has(part))continue;
+      if(pending.length>=12||length+part.length>4500)continue;
+      pending.push(part);seen.add(part);length+=part.length;
     }
+    busy=true;
+    try {
+      if(pending.length) {
+        const response=await fetch('/api/translate/user-content',{
+          method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({texts:pending.slice(0,12)})
+        });
+        if(!response.ok)throw new Error('Translation unavailable');
+        const {translations}=await response.json();
+        if(!Array.isArray(translations)||translations.length!==pending.length)throw new Error('Invalid translation');
+        translations.forEach((value,index)=>{
+          if(typeof value==='string'&&value.trim()&&!/[\u0590-\u05ff]/.test(value))cache.set(pending[index],value.trim());
+        });
+        try{sessionStorage.setItem(CACHE_KEY,JSON.stringify(Object.fromEntries([...cache].slice(-400))))}catch{}
+      }
+      apply(entries);retryMs=700;
+    }catch{retryMs=Math.min(15000,Math.round(retryMs*1.6))}
+    finally{busy=false;if(english()&&candidates().length)schedule(retryMs)}
   }
-  function schedule() { if (!timer) timer = setTimeout(() => { timer = 0; translate(); }, 180); }
-  function start() {
-    if (started || document.documentElement.lang !== 'en') return;
-    started = true;
-    new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true, characterData:true });
+  function schedule(delay=180){if(!timer)timer=setTimeout(()=>{timer=0;translate()},delay)}
+  function start(){
+    new MutationObserver(()=>schedule()).observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['alt','title','aria-label','placeholder','value','hidden','class','style','open']});
+    window.addEventListener('gmach-language-change',()=>schedule());
     schedule();
   }
-  window.addEventListener('gmach-language-change', () => {
-    if(document.documentElement.lang==='en'){start();schedule()}
-  });
-  start();
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
