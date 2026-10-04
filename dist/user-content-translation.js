@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const selector = 'body';
-  const NEVER_TRANSLATE = '.organization-name,#organization-title';
+  const NEVER_TRANSLATE = '.organization-name,#organization-title,#dashboard-name,[data-original-name],[translate="no"]';
   const ATTRIBUTES = ['alt','title','aria-label','placeholder','value'];
   const cache = new Map();
   const CACHE_KEY = 'gmach-user-content-en-v3';
