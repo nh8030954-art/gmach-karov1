@@ -197,9 +197,12 @@ async function deleteAdminEntity(request,env,type,id){
   if(type==="organizations"){
     const old=await env.DB.prepare("SELECT id,deleted_at FROM organizations WHERE id=?").bind(id).first();
     if(!old||old.deleted_at)throw new LaunchError(404,"הגמ״ח לא נמצא");
-    const result=await env.DB.prepare("UPDATE organizations SET deleted_at=?,updated_at=? WHERE id=? AND deleted_at IS NULL").bind(now,now,id).run();
-    if(!result.success)throw new LaunchError(500,"מחיקת הגמ״ח נכשלה");
-    return json({ok:true,deleted:true});
+    const results=await env.DB.batch([
+      env.DB.prepare("UPDATE items SET deleted_at=COALESCE(deleted_at,?),updated_at=? WHERE organization_id=? AND deleted_at IS NULL").bind(now,now,id),
+      env.DB.prepare("UPDATE organizations SET deleted_at=?,updated_at=? WHERE id=? AND deleted_at IS NULL").bind(now,now,id)
+    ]);
+    if(results.some(result=>!result.success))throw new LaunchError(500,"מחיקת הגמ״ח והפריטים נכשלה");
+    return json({ok:true,deleted:true,itemsDeleted:true});
   }
   throw new LaunchError(400,"מחיקה נתמכת רק למשתמשים ולגמ״חים");
 }
