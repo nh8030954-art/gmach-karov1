@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import vm from "node:vm";
 import { createHash, createHmac } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import miniflare from "miniflare";
@@ -145,6 +146,20 @@ try {
   result = await request("/api/admin/email-templates/password_reset/enabled", {method:"PATCH",cookie:adminCookie,body:{enabled:false}});
   assert.equal(result.response.status,200,JSON.stringify(result.data));
   const templateRows=(await request("/api/admin/email-templates",{cookie:adminCookie})).data.templates;
+  for(const key of ["verification","password_reset","manager_invite","notification","daily_digest","new_device","pickup_confirmed","loan_cancelled","extension","waitlist","support","system_alert"]){for(const language of ["he","en"]){assert.ok(templateRows.some(r=>r.template_key===key&&r.language===language),key+" missing in "+language);}}
+  const alertSource=await readFile("worker/distribution-completion.js","utf8");
+  const sendAlert=vm.runInNewContext(alertSource.slice(alertSource.indexOf("async function sendAlertEmail"),alertSource.indexOf("async function deliverOpenAlerts"))+";sendAlertEmail",{safe:(value,fallback)=>{try{return JSON.parse(value)}catch{return fallback}}});
+  let alertProviderCalls=0;
+  const alertEnv={DB:db,ADMIN_ALERT_EMAIL:"admin@example.org",RESEND_API_KEY:"test",RESEND_SERVICE:{fetch:async()=>{alertProviderCalls++;return new Response("{}")}}};
+  const alert={id:"template-toggle-test",alert_type:"test",severity:"warning",created_at:new Date().toISOString(),details_json:"{}"};
+  await db.prepare("INSERT INTO system_alerts(id,alert_type,severity,details_json) VALUES(?,?,?,?)").bind(alert.id,alert.alert_type,alert.severity,alert.details_json).run();
+  await request("/api/admin/email-templates/system_alert/enabled",{method:"PATCH",cookie:adminCookie,body:{enabled:false}});
+  assert.equal((await sendAlert(alertEnv,alert)).reason,"template_disabled");assert.equal(alertProviderCalls,0);
+  await request("/api/admin/email-templates/system_alert/enabled",{method:"PATCH",cookie:adminCookie,body:{enabled:true}});
+  assert.equal((await sendAlert(alertEnv,alert)).sent,true);assert.equal(alertProviderCalls,1);
+  await db.prepare("UPDATE email_templates SET enabled=0 WHERE template_key='system_alert' AND language='en'").run();
+  assert.equal((await sendAlert(alertEnv,{...alert,id:"another-alert"})).reason,"template_disabled","A disabled English row also suppresses Hebrew alerts");
+  await request("/api/admin/email-templates/system_alert/enabled",{method:"PATCH",cookie:adminCookie,body:{enabled:true}});
   const resetRows=templateRows.filter(r=>r.template_key==="password_reset");
   assert.equal(resetRows.length,2);assert.ok(resetRows.every(r=>Number(r.enabled)===0));
   const englishReset=resetRows.find(r=>r.language==="en");

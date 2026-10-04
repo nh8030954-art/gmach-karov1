@@ -14,6 +14,7 @@ ALTER_SPECS.unshift(
 );
 let schemaPromise=null;
 
+SEED_SPECS.push("INSERT OR IGNORE INTO email_templates(template_key,language,subject,body_text,enabled,design_json) VALUES\n('system_alert','he','{{title}}','{{body}}',1,'{}'),\n('system_alert','en','{{title}}','{{body}}',1,'{}');\n");
 async function ensureFinalSchema(env){
   if(schemaPromise)return schemaPromise;
   schemaPromise=(async()=>{

@@ -58,13 +58,20 @@ async function contentHash(value){return b64(new Uint8Array(await crypto.subtle.
 async function sendAlertEmail(env,alert){
   const recipient=String(env.ADMIN_ALERT_EMAIL||env.SUPPORT_EMAIL||"").trim();
   if(!recipient||!env.RESEND_API_KEY)return {sent:false,reason:"not_configured"};
+  const state=await env.DB.prepare("SELECT MIN(enabled) AS enabled FROM email_templates WHERE template_key='system_alert'").first();
+  if(state?.enabled!==null&&Number(state?.enabled)===0)return {sent:false,reason:"template_disabled"};
   const existing=await env.DB.prepare("SELECT 1 FROM system_alert_deliveries WHERE alert_id=? AND channel='email' AND recipient=? AND status='sent'").bind(alert.id,recipient).first().catch(()=>null);
   if(existing)return {sent:true,duplicate:true};
   const details=safe(alert.details_json,{});
-  const title="[Gmach Berega] "+String(alert.severity||"warning").toUpperCase()+" - "+String(alert.alert_type||"system alert");
-  const bodyText=["התראת מערכת אוטומטית","סוג: "+alert.alert_type,"חומרה: "+alert.severity,"זמן: "+alert.created_at,"פרטים: "+JSON.stringify(details,null,2)].join("\n");
+  const defaultTitle="[Gmach Berega] "+String(alert.severity||"warning").toUpperCase()+" - "+String(alert.alert_type||"system alert");
+  const defaultBody=["התראת מערכת אוטומטית","סוג: "+alert.alert_type,"חומרה: "+alert.severity,"זמן: "+alert.created_at,"פרטים: "+JSON.stringify(details,null,2)].join("\n");
+  const row=await env.DB.prepare("SELECT subject,body_text FROM email_templates WHERE template_key='system_alert' AND language='he'").first();
+  const vars={title:defaultTitle,body:defaultBody,alert_type:alert.alert_type,severity:alert.severity,created_at:alert.created_at,details:JSON.stringify(details,null,2)};
+  const render=value=>String(value).replace(/\{\{([a-z_]+)\}\}/g,(match,key)=>String(vars[key]??match));
+  const title=render(row?.subject||defaultTitle),bodyText=render(row?.body_text||defaultBody);
   try{
-    const res=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Authorization":"Bearer "+env.RESEND_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({from:String(env.FROM_EMAIL||"Gmach Berega <onboarding@resend.dev>"),to:[recipient],subject:title,text:bodyText})});
+    const deliver=env.RESEND_SERVICE?.fetch?env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE):fetch;
+    const res=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Authorization":"Bearer "+env.RESEND_API_KEY,"Content-Type":"application/json"},body:JSON.stringify({from:String(env.FROM_EMAIL||"Gmach Berega <onboarding@resend.dev>"),to:[recipient],subject:title,text:bodyText})});
     if(!res.ok)throw new Error("Resend "+res.status+" "+(await res.text()).slice(0,300));
     await env.DB.prepare("INSERT OR REPLACE INTO system_alert_deliveries(alert_id,channel,recipient,status,error,sent_at) VALUES(?,'email',?,'sent',NULL,?)").bind(alert.id,recipient,new Date().toISOString()).run();
     return {sent:true};
