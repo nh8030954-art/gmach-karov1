@@ -119,6 +119,12 @@ jobs:
               exit "$STATUS"
             fi
           fi
+      - name: Apply administrator email delivery choice
+        run: |
+          if ! git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -qx "migrations/0034_auth_only_email_controls.sql"; then exit 0; fi
+          npx wrangler d1 execute DB --remote --file migrations/0034_auth_only_email_controls.sql
+          npx wrangler d1 execute DB --remote --command "SELECT SUM(CASE WHEN enabled != CASE WHEN template_key IN ('verification','password_reset') THEN 1 ELSE 0 END THEN 1 ELSE 0 END) AS unexpected, SUM(CASE WHEN template_key IN ('verification','password_reset') AND enabled=1 THEN 1 ELSE 0 END) AS auth_rows FROM email_templates" --json > email-control-state.json
+          node -e "const x=require('./email-control-state.json')[0].results[0];console.log(x);if(Number(x.unexpected)!==0||Number(x.auth_rows)!==4)throw new Error('Auth-only email settings verification failed')"
       - name: Detect targeted reconciliation changes
         id: targeted_reconcile
         run: |

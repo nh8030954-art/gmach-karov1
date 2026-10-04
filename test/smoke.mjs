@@ -85,6 +85,14 @@ try {
     await db.batch(statements.map(statement => db.prepare(statement)));
   }
 
+  const authOnlyRows=(await db.prepare("SELECT template_key,enabled FROM email_templates").all()).results;
+  assert.ok(authOnlyRows.length>=24);
+  for(const row of authOnlyRows)assert.equal(Number(row.enabled),["verification","password_reset"].includes(row.template_key)?1:0,"Only auth emails enabled after rollout");
+  // Restore normal fixture choices for the full workflow regression suite.
+  await db.prepare("UPDATE email_templates SET enabled=1").run();
+  const repeat=(await readFile("migrations/0034_auth_only_email_controls.sql","utf8")).replace(/^\s*--.*$/gm,"");
+  await db.batch(splitMigration(repeat).map(statement=>db.prepare(statement)));
+  assert.equal((await db.prepare("SELECT MIN(enabled) AS enabled FROM email_templates").first()).enabled,1,"One-time rollout must preserve later administrator choices");
   let result = await request("/api/health?deep=1");
   const provisionedAdmin = await (await mf.getD1Database("DB")).prepare("SELECT role,email_verified,totp_enabled FROM users WHERE email=?").bind("netanelhirsh@gmail.com").first();
   assert.deepEqual([provisionedAdmin?.role, provisionedAdmin?.email_verified, provisionedAdmin?.totp_enabled],["admin",1,0],"Requested admin account must be provisioned and require Authenticator setup");
