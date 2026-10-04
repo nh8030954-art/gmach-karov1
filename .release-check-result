@@ -1,40 +1,7 @@
-sha=38db504212b7cf455abcb9aa3c2b22af1bfc4ca9
-install=success
-syntax=success
-tests=failure
-smoke=failure
-live=success
-> gmach-karov@1.0.0 test
-> node test/item-english.mjs && node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
-
-Stored English: cache reuse, edit invalidation, public permissions and unavailable text passed
-Final completion static release gate passed.
-node:internal/modules/run_main:107
-    triggerUncaughtException(
-    ^
-
-AssertionError [ERR_ASSERTION]: single-element selector used with forEach in launch controls
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:73:8 {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
-
-AssertionError [ERR_ASSERTION]: single-element selector used with forEach in launch controls
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791133497797:73:8 {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-04T17:04:58.503Z"}
+sha=6f7730a69c092d56e55c075432fdb70ee7dccb5c
+install=cancelled
+syntax=skipped
+tests=skipped
+smoke=skipped
+live=skipped
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
