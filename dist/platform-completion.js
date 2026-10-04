@@ -15,11 +15,21 @@
       const target=typeof input==="string"?input:input?.url||"";
       if(response.status!==428||method==="GET"||target.includes("/api/admin/action-challenges"))return response;
       let info={};try{info=await response.clone().json()}catch{}
+      const orgDeletion=method==='DELETE'&&/^\/api\/admin\/entities\/organizations\/[^/]+$/.test(new URL(target,location.origin).pathname);
+      let challengeData,code;
+      if(orgDeletion){
       const authenticatorCode=translatedPrompt(document.documentElement.lang==="en"?"Enter the 6-digit code from your Authenticator app to confirm this action:":"הזינו את הקוד בן 6 הספרות מאפליקציית Authenticator לאישור הפעולה:");if(!authenticatorCode)return response;
       const url=new URL(target,location.origin),action=method+" "+url.pathname;
       const challenge=await nativeFetch("/api/admin/action-challenges",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,authenticatorCode:authenticatorCode.trim()})});
-      const challengeData=await challenge.json().catch(()=>({}));if(!challenge.ok)throw new Error(challengeData.error||"לא ניתן ליצור קוד אישור");
-      const code=challengeData.challenge?.code;if(!code)throw new Error("לא ניתן ליצור אישור לפעולה");
+      challengeData=await challenge.json().catch(()=>({}));if(!challenge.ok)throw new Error(challengeData.error||"לא ניתן ליצור קוד אישור");
+      code=challengeData.challenge?.code;if(!code)throw new Error("לא ניתן ליצור אישור לפעולה");
+      }else{
+      if(!translatedConfirm(info.error||"הפעולה דורשת קוד אישור נוסף שיישלח למייל המנהל. להמשיך?"))return response;
+      const url=new URL(target,location.origin),action=method+" "+url.pathname;
+      const challenge=await nativeFetch("/api/admin/action-challenges",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({action})});
+      challengeData=await challenge.json().catch(()=>({}));if(!challenge.ok)throw new Error(challengeData.error||"לא ניתן ליצור קוד אישור");
+      code=translatedPrompt("הזינו את קוד האישור בן 6 הספרות שנשלח למייל:");if(!code)return response;
+      }
       const headers=new Headers(init?.headers||(input instanceof Request?input.headers:undefined)||{});headers.set("X-Admin-Challenge-Id",challengeData.challenge.id);headers.set("X-Admin-Challenge-Code",code.trim());
       const retryInit={...init,method,headers};
       response=await nativeFetch(input,retryInit);return response;

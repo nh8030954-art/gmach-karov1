@@ -660,7 +660,7 @@ try {
   const issued=await request('/api/admin/action-challenges',{method:'POST',cookie:adminCookie,body:{action:'DELETE '+deletePath,authenticatorCode}});
   assert.equal(issued.response.status,200,JSON.stringify(issued.data));assert.equal(sentEmails.length,emailsBeforeStepUp,'Admin confirmation must not send disabled email');
   const challengeHeaders={Cookie:adminCookie,Origin:base,'Sec-Fetch-Site':'same-origin','X-Admin-Challenge-Id':issued.data.challenge.id,'X-Admin-Challenge-Code':issued.data.challenge.code};
-  const wrongPath=await mf.dispatchFetch(base+'/api/admin/entities/users/'+archivedUser,{method:'DELETE',headers:challengeHeaders});assert.equal(wrongPath.status,403);
+  const wrongPath=await mf.dispatchFetch(base+'/api/admin/entities/organizations/another-organization',{method:'DELETE',headers:challengeHeaders});assert.equal(wrongPath.status,403);
   const deleted=await mf.dispatchFetch(base+deletePath,{method:'DELETE',headers:challengeHeaders});assert.equal(deleted.status,200,await deleted.text());
   assert((await db.prepare('SELECT deleted_at FROM organizations WHERE id=?').bind(organizationId).first()).deleted_at);
   assert.equal((await db.prepare('SELECT COUNT(*) n FROM items WHERE organization_id=? AND deleted_at IS NULL').bind(organizationId).first()).n,0,'All gmach items deleted together');
