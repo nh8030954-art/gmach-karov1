@@ -336,5 +336,5 @@ export async function handleLaunchReadiness(request,env,ctx,url){
     if(method==="GET"&&path==="/api/admin/operations/health")return operationalHealth(request,env);
     if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/operations\/alerts\/([^/]+)\/resolve$/)))return resolveAlert(request,env,decodeURIComponent(m[1]));
     return null;
-  }catch(e){if(e instanceof LaunchError)return json({error:e.message},e.status);throw e}
+  }catch(e){if(e instanceof LaunchError)return json({error:e.message},e.status);console.error("Launch readiness route failed",{method:request.method,path:url.pathname,error:String(e?.message||e),stack:String(e?.stack||"")});return json({error:"פעולת הניהול נכשלה",detail:String(e?.message||e).slice(0,300)},500)}
 }
