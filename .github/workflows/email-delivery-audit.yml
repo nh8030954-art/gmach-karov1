@@ -40,5 +40,5 @@ jobs:
 
       - name: Read waitlist delivery times without personal information
         run: |
-          npx wrangler d1 execute DB --remote --command "SELECT n.id,n.type,n.title,n.created_at,l.channel,l.status,l.attempted_at,l.error FROM notifications n LEFT JOIN notification_delivery_log l ON l.notification_id=n.id WHERE n.title='הפריט שביקשתם זמין' AND n.created_at>='2026-10-03' ORDER BY n.created_at DESC LIMIT 30" --json
+          npx wrangler d1 execute DB --remote --command "SELECT n.id,n.type,n.title,n.created_at FROM notifications n WHERE n.title='הפריט שביקשתם זמין' AND n.created_at>='2026-10-03' ORDER BY n.created_at DESC LIMIT 30" --json
           npx wrangler d1 execute DB --remote --command "SELECT notification_type,channel,title,scheduled_at,sent_at,failed_at,error FROM notification_queue WHERE title='הפריט שביקשתם זמין' AND scheduled_at>='2026-10-03' ORDER BY scheduled_at DESC LIMIT 30" --json
