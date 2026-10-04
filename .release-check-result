@@ -1,4 +1,4 @@
-sha=1e59f72beba8ef7533726d86f69fecbe1ca2d31b
+sha=c29aabed2aa569a8d24897143eae1979b1caf1dc
 install=success
 syntax=success
 tests=success
@@ -36,5 +36,5 @@ remaining-features Error: Backup checksum mismatch
     at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:926:37)
     at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:381:26)
 Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-04T17:18:16.266Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-04T17:21:47.154Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
