@@ -168,6 +168,14 @@ try {
   await db.prepare("UPDATE email_templates SET enabled=0 WHERE template_key='system_alert' AND language='en'").run();
   assert.equal((await sendAlert(alertEnv,{...alert,id:"another-alert"})).reason,"template_disabled","A disabled English row also suppresses Hebrew alerts");
   await request("/api/admin/email-templates/system_alert/enabled",{method:"PATCH",cookie:adminCookie,body:{enabled:true}});
+  const platformMailSource=await readFile("worker/platform-completion.js","utf8");
+  let securityMailCalls=0;
+  const securityMail=vm.runInNewContext(platformMailSource.slice(platformMailSource.indexOf("async function sendSecurityEmail"),platformMailSource.indexOf("function operationalEnglish"))+";sendSecurityEmail",{qfirst:async(env,sql,args)=>{try{return await env.DB.prepare(sql).bind(...args).first()}catch{return null}},sendEmail:async()=>{securityMailCalls++}});
+  await request("/api/admin/email-templates/new_device/enabled",{method:"PATCH",cookie:adminCookie,body:{enabled:false}});
+  await securityMail({DB:db},(await db.prepare("SELECT id FROM users WHERE role='admin' LIMIT 1").first()).id,"כניסה ממכשיר חדש","test");assert.equal(securityMailCalls,0,"Disabled new-device mail must not reach provider");
+  await request("/api/admin/email-templates/new_device/enabled",{method:"PATCH",cookie:adminCookie,body:{enabled:true}});
+  await securityMail({DB:db},(await db.prepare("SELECT id FROM users WHERE role='admin' LIMIT 1").first()).id,"כניסה ממכשיר חדש","test");assert.equal(securityMailCalls,1,"Enabled new-device mail reaches provider");
+  await securityMail({DB:{prepare:sql=>sql.includes('MIN(enabled)')?{first:async()=>{throw Error('database unavailable')}}:{bind:()=>({first:async()=>({email:'test@example.org',full_name:'Test',preferred_language:'he'})})}}},"test-user","test","test");assert.equal(securityMailCalls,1,"Unreadable email controls must suppress delivery");
   const resetRows=templateRows.filter(r=>r.template_key==="password_reset");
   assert.equal(resetRows.length,2);assert.ok(resetRows.every(r=>Number(r.enabled)===0));
   const englishReset=resetRows.find(r=>r.language==="en");
