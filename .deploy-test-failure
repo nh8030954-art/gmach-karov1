@@ -1,16 +1,17 @@
-deploy_sha=0df1ca693dd063f5fccc3ddb6d2ff9c393cf29aa
+deploy_sha=b2164893fae8eecfe94f5644d79aa9dff88894f2
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
-> node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
+> node test/item-english.mjs && node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
 
+Stored English: cache reuse, edit invalidation, public permissions and unavailable text passed
 Final completion static release gate passed.
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:167:83 {
+AssertionError [ERR_ASSERTION]: single-element selector used with forEach in launch controls
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:73:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
