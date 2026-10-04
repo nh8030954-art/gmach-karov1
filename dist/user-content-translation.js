@@ -38,7 +38,8 @@
       const value=raw.trim();
       if(!name&&el.tagName==='OPTION'&&!el.hasAttribute('value'))el.setAttribute('value',value);
       // UI phrases use reviewed translations; AI is reserved for remaining content.
-      const local=window.GmachTranslate?.(value)||value;
+      const reviewed=window.GmachTranslate?.(value)||value;
+      const local=/[\u0590-\u05ff]/.test(reviewed)?value:reviewed;
       if(local!==value) {
         if(name)node.setAttribute(name,raw.replace(value,local));
         else {if(el.tagName==='OPTION'&&!el.hasAttribute('value'))el.setAttribute('value',value);node.nodeValue=raw.replace(value,local)}
