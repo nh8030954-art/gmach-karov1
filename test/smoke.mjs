@@ -161,6 +161,14 @@ try {
   await request("/api/auth/forgot-password",{method:"POST",body:{email:"english@example.org"}});
   assert.equal(sentEmails.length,beforeDisabled+1,"Re-enabling restores delivery");
 
+  await db.prepare("INSERT OR REPLACE INTO notification_preferences(user_id,notification_type,email) SELECT id,'loan_status',1 FROM users WHERE email='english@example.org'").run();
+  const exportResult=await request("/api/me/export",{cookie:englishCookie});
+  assert.equal(exportResult.response.status,200,JSON.stringify(exportResult.data));
+  for(const key of ["recentOrganizations","securityEvents","notificationPreferences","savedEntities","dataRequests"]){assert.ok(Array.isArray(exportResult.data[key]),key+" must export an array even with no data");}
+  assert.deepEqual(exportResult.data.recentOrganizations,[]);
+  assert.deepEqual(exportResult.data.savedEntities,[]);
+  assert.deepEqual(exportResult.data.dataRequests,[]);
+  assert.ok(exportResult.data.notificationPreferences.length>0,"Existing preferences must be exported rather than hidden by a query error");
   result = await request("/api/me/favorites-overview");
   assert.equal(result.response.status, 401, "Favorites require authentication");
   result = await request("/api/me/saved-categories/tools", { method: "PUT", cookie: firstCookie });

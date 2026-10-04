@@ -569,7 +569,7 @@ async function calendarPreferences(request,env){const u=await requireUser(reques
 async function saveCalendarPreferences(request,env){const u=await requireUser(request,env),b=await readJson(request),app=["ics","google","apple","outlook"].includes(b.preferredApp)?b.preferredApp:"ics",mins=Math.max(0,Math.min(10080,Number(b.reminderMinutes)||1440));await qrun(env,"INSERT INTO calendar_preferences(user_id,preferred_app,reminder_minutes) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET preferred_app=excluded.preferred_app,reminder_minutes=excluded.reminder_minutes,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')",[u.id,app,mins]);return json({ok:true});}
 async function exportMyData(request,env){
   const u=await requireUser(request,env);
-  const [profile,addresses,orgs,items,loans,reviews,messages,savedSearches,supportTickets,legalConsents]=await Promise.all([
+  const [profile,addresses,orgs,items,loans,reviews,messages,savedSearches,supportTickets,legalConsents,recentOrganizations,securityEvents,notificationPreferences,savedEntities,dataRequests]=await Promise.all([
     qfirst(env,"SELECT full_name,email,phone,city,preferred_language,created_at FROM users WHERE id=?",[u.id]),
     qall(env,"SELECT label,city,is_default,created_at FROM user_addresses WHERE user_id=? ORDER BY is_default DESC,created_at",[u.id]),
     qall(env,"SELECT name,city,address,contact_phone,status,description,created_at FROM organizations WHERE owner_id=? ORDER BY created_at",[u.id]),
@@ -579,12 +579,18 @@ async function exportMyData(request,env){
     qall(env,"SELECT i.title AS item,m.body AS message,m.created_at FROM request_messages m JOIN loan_requests l ON l.id=m.request_id JOIN items i ON i.id=l.item_id WHERE m.sender_id=? OR l.borrower_id=? ORDER BY m.created_at",[u.id,u.id]),
     qall(env,"SELECT name,filters_json,notify,created_at FROM saved_searches WHERE user_id=? ORDER BY created_at",[u.id]),
     qall(env,"SELECT ticket_number,subject,status,created_at,updated_at FROM support_tickets WHERE user_id=? ORDER BY created_at",[u.id]),
-    qall(env,"SELECT document_type,version,accepted_at FROM legal_consents WHERE user_id=? ORDER BY accepted_at",[u.id])
+    qall(env,"SELECT document_type,version,accepted_at FROM legal_consents WHERE user_id=? ORDER BY accepted_at",[u.id]),
+    qall(env,"SELECT organization_id,viewed_at FROM recently_viewed_organizations WHERE user_id=? ORDER BY viewed_at DESC",[u.id]),
+    qall(env,"SELECT event_type,severity,device_label,created_at FROM security_events WHERE user_id=? ORDER BY created_at",[u.id]),
+    qall(env,"SELECT notification_type,in_app,email,push,digest,quiet_start,quiet_end FROM notification_preferences WHERE user_id=?",[u.id]),
+    qall(env,"SELECT entity_type,entity_id,created_at FROM saved_entities WHERE user_id=? ORDER BY created_at",[u.id]),
+    qall(env,"SELECT request_type,details,status,created_at,completed_at FROM user_data_requests WHERE user_id=? ORDER BY created_at",[u.id])
   ]);
   return json({
     exportedAt:new Date().toISOString(),
     language:profile?.preferred_language||"he",
-    profile,addresses,organizations:orgs,items,loans,reviews,messages,savedSearches,supportTickets,legalConsents
+    profile,addresses,organizations:orgs,items,loans,reviews,messages,savedSearches,supportTickets,legalConsents,
+    recentOrganizations,securityEvents,notificationPreferences,savedEntities,dataRequests
   });
 }
 async function dataRequest(request,env){const u=await requireUser(request,env),b=await readJson(request),type=["export","access","correction"].includes(b.type)?b.type:"access",id=crypto.randomUUID();await qrun(env,"INSERT INTO user_data_requests(id,user_id,request_type,details) VALUES(?,?,?,?)",[id,u.id,type,optional(b.details,2000)]);return json({request:{id,type,status:"open"}},201);}

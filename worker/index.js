@@ -3208,7 +3208,7 @@ async function syncItemUnitsToQuantity(env,itemId,desiredQuantity){
     const removable=await env.DB.prepare("SELECT u.id,u.serial_number FROM item_units u WHERE u.item_id=? AND u.status='available' AND NOT EXISTS(SELECT 1 FROM loan_unit_assignments a WHERE a.unit_id=u.id AND a.returned_at IS NULL) ORDER BY u.created_at DESC,u.id DESC").bind(itemId).all();
     const need=active.length-desired;
     if((removable.results||[]).length<need)throw new HttpError(409,"אי אפשר להקטין את הכמות כרגע כי חלק מהיחידות מושאלות או מוקצות לבקשה פעילה");
-    const now=new Date().toISOString(),statements=[env.DB.prepare("UPDATE loan_requests SET branch_id=?,updated_at=? WHERE id=?").bind(selectedBranchId,now,requestId)];
+    const now=new Date().toISOString(),statements=[];
     for(const unit of (removable.results||[]).slice(0,need)){
       statements.push(env.DB.prepare("INSERT OR IGNORE INTO retired_serials(serial_number,item_unit_id,retired_at) VALUES(?,?,?)").bind(unit.serial_number,unit.id,now));
       statements.push(env.DB.prepare("UPDATE item_units SET status='retired',retired_at=?,updated_at=? WHERE id=?").bind(now,now,unit.id));
@@ -3275,7 +3275,7 @@ async function manageLoanUnits(request,env,requestId,write=false){
   if(selectedBranches.length>1)throw new HttpError(409,"יש לבחור יחידות מאותו סניף לאיסוף");
   const selectedBranchId=selectedBranches[0]||loan.branch_id||null;
   const previous=await env.DB.prepare("SELECT unit_id FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL").bind(requestId).all();
-  const now=new Date().toISOString(),statements=[];
+  const now=new Date().toISOString(),statements=[env.DB.prepare("UPDATE loan_requests SET branch_id=?,updated_at=? WHERE id=?").bind(selectedBranchId,now,requestId)];
   for(const row of previous.results||[]){
     if(!unitIds.includes(String(row.unit_id))){
       statements.push(env.DB.prepare("UPDATE loan_unit_assignments SET returned_at=? WHERE request_id=? AND unit_id=? AND returned_at IS NULL").bind(now,requestId,row.unit_id));
