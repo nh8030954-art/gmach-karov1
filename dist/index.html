@@ -15,6 +15,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com https://www.openstreetmap.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';">
 
   <script src="/i18n-boot.js?v=20261003-2710"></script>
+  <script src="/i18n-first-paint.js?v=20261004-stable"></script>
   <title>גמ״ח ברגע — גדולה גמילות חסדים יותר מן הצדקה</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#243f75">
@@ -24,8 +25,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=block" rel="stylesheet">
   <link rel="icon" type="image/jpeg" href="/gmach-berega-logo.jpg">
-  <link rel="stylesheet" href="/styles.css?v=20261003-2710">
-  <link rel="stylesheet" href="/motion.css?v=20261003-2710">
+  <link rel="stylesheet" href="/styles.css?v=20261004-stable">
+  <link rel="stylesheet" href="/motion.css?v=20261004-stable">
 
 
 
@@ -52,6 +53,10 @@
     color:#50666d;
     font-weight:700
   }
+html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"Loading your account…"}
+  html[lang="en"] #dashboard-title{min-height:44px}
+  html[lang="en"] #dashboard-title:has(#dashboard-name:empty){font-size:0;min-height:44px}
+  html[lang="en"] #dashboard-title:has(#dashboard-name:empty)::before{content:"My account";font-size:clamp(1.55rem,3vw,2.2rem)}
 </style>
   <link rel="stylesheet" href="/account-tour.css?v=20261004-spotlight">
 </head>
@@ -644,11 +649,11 @@
 
   <script src="/vendor/qrcode.js?v=20261003-2710" defer></script>
   <script src="/account-tour.js?v=20261004-spotlight" defer></script>
-  <script src="/app.js?v=20261004-0120" defer></script>\n  <script src="/platform-completion.js?v=20261003-2710" defer></script>
+  <script src="/app.js?v=20261004-stable" defer></script>\n  <script src="/platform-completion.js?v=20261003-2710" defer></script>
   <script src="/final-features.js?v=20261003-2710" defer></script>
-  <script src="/i18n-en.js?v=20261004-english-fast" defer></script>
+  <script src="/i18n-en.js?v=20261004-stable" defer></script>
   <script src="/i18n-errors.js?v=20261003-2710" defer></script>
-  <script src="/remaining-features.js?v=20261004-english-fast" defer></script>
+  <script src="/remaining-features.js?v=20261004-stable" defer></script>
   <script src="/requirements-expansion.js?v=20261003-2710" defer></script>
   <script src="/release-experience.js?v=20261003-2710" defer></script>
   <script src="/privacy-purge.js?v=20261003-2710" defer></script>
@@ -657,7 +662,7 @@
   <script src="/navigation-admin.js?v=20261003-2710" defer></script>
   <script src="/privacy-availability.js?v=20261003-2710" defer></script>
   <script src="/admin-control-center.js?v=20261003-2710" defer></script>
-  <script src="/user-content-translation.js?v=20261004-english-fast" defer></script>
+  <script src="/user-content-translation.js?v=20261004-stable" defer></script>
   <script src="/motion.js?v=20261003-2710" defer></script>
 
 

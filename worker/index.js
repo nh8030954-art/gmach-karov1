@@ -1,3 +1,4 @@
+import { attachItemEnglish, prepareSavedItemEnglish, publicItemEnglish } from "./item-english.js";
 import { handleRemainingFeatures, runRemainingMaintenance, ensureRemainingFeaturesSchema } from "./remaining-features.js";
 import { handleRequirementsExpansion, requirementsExpansionPreflight, runRequirementsExpansionMaintenance, ensureRequirementsExpansionSchema } from "./requirements-expansion.js";
 import { handleLaunchReadiness, runLaunchReadinessMaintenance, ensureLaunchReadinessSchema } from "./launch-readiness.js";
@@ -753,7 +754,8 @@ async function routeApi(request, env, ctx, url) {
   const supportTicketStatus = path.match(/^\/api\/me\/support-tickets\/([^/]+)\/status$/);
   if (method === "PATCH" && supportTicketStatus) return updateSupportTicketStatus(request, env, decodeURIComponent(supportTicketStatus[1]));
 
-  if (method === "GET" && path === "/api/items") return listItems(env, url);
+  if (method === "GET" && path === "/api/items/english-content") return publicItemEnglish(request,env,ctx);
+  if (method === "GET" && path === "/api/items") return listItems(env, url, ctx);
   if (method === "GET" && path === "/api/discovery") return discovery(env, url);
   if (method === "POST" && path === "/api/analytics/events") return recordAnalytics(request, env);
   const organizationView = path.match(/^\/api\/organizations\/([^/]+)\/view$/);
@@ -768,8 +770,8 @@ async function routeApi(request, env, ctx, url) {
   if (method === "GET" && path === "/api/site-settings") return getSiteSettings(env);
   if (method === "GET" && path === "/api/page-customizations") return getPageCustomizations(env);
   const itemDetail = path.match(/^\/api\/items\/([^/]+)$/);
-  if (method === "GET" && itemDetail) return getItem(env, decodeURIComponent(itemDetail[1]));
-  if (method === "PATCH" && itemDetail) return updateItem(request, env, decodeURIComponent(itemDetail[1]));
+  if (method === "GET" && itemDetail) return getItem(env, decodeURIComponent(itemDetail[1]), ctx);
+  if (method === "PATCH" && itemDetail) return updateItem(request, env, decodeURIComponent(itemDetail[1]), ctx);
   const itemAvailabilityCheck = path.match(/^\/api\/items\/([^/]+)\/availability-check$/);
   if (method === "GET" && itemAvailabilityCheck) return checkItemAvailability(env, decodeURIComponent(itemAvailabilityCheck[1]), url);
   const inventoryManage = path.match(/^\/api\/items\/([^/]+)\/inventory$/);
@@ -814,7 +816,7 @@ async function routeApi(request, env, ctx, url) {
   if (method === "DELETE" && savedOrganization) return toggleSavedOrganization(request, env, decodeURIComponent(savedOrganization[1]), false);
   const organizationDetail = path.match(/^\/api\/organizations\/([^/]+)$/);
   if (method === "PATCH" && organizationDetail) return updateOrganization(request, env, decodeURIComponent(organizationDetail[1]));
-  if (method === "POST" && path === "/api/items") return createItem(request, env);
+  if (method === "POST" && path === "/api/items") return createItem(request, env, ctx);
   const itemUnits = path.match(/^\/api\/items\/([^/]+)\/units$/);
   if (method === "GET" && itemUnits) return listItemUnits(request, env, decodeURIComponent(itemUnits[1]));
   if (method === "POST" && itemUnits) return createItemUnit(request, env, decodeURIComponent(itemUnits[1]));
@@ -1549,7 +1551,7 @@ async function updateSavedSearch(request,env,id){
   return json({ok:true});
 }
 
-async function listItems(env, url) {
+async function listItems(env, url, ctx) {
   // Repair the legacy review relation once per Worker isolate; then the
   // primary catalog query can return item ratings without a fallback.
   await ensureReviewBranchRatingSchema(env).catch(error => console.error("Review relation repair unavailable", error));
@@ -1632,10 +1634,11 @@ async function listItems(env, url) {
       LIMIT ${catalogLimit}
     `).bind(...fallbackParams).all();
   }
-  return json({ items: result.results.map(mapItem) });
+  await attachItemEnglish(env,result.results,ctx);
+  return json({ items: result.results.map((row)=>({...mapItem(row),titleEnglish:row.titleEnglish,descriptionEnglish:row.descriptionEnglish,englishStatus:row.englishStatus})) });
 }
 
-async function getItem(env, id) {
+async function getItem(env, id, ctx) {
   await ensureReviewBranchRatingSchema(env).catch(error => console.error("Review relation repair unavailable", error));
   const row = await env.DB.prepare(`
     SELECT i.*, o.id AS org_id, o.name AS org_name,
@@ -1651,7 +1654,8 @@ async function getItem(env, id) {
     WHERE i.id = ? AND i.status = 'active' AND i.is_free = 1 AND o.status = 'approved' AND o.is_hidden = 0
   `).bind(id).first();
   if (!row) throw new HttpError(404, "הפריט לא נמצא");
-  return json({ item: mapItem(row) });
+  await attachItemEnglish(env,[row],ctx);
+  return json({ item: {...mapItem(row),titleEnglish:row.titleEnglish,descriptionEnglish:row.descriptionEnglish,englishStatus:row.englishStatus} });
 }
 
 async function discovery(env, url) {
@@ -1943,7 +1947,7 @@ function moneyAgorot(value){ const n=Number(value); if(!Number.isFinite(n)||n<0|
 
 async function notifyMatchingSavedSearches(env,item){const rows=await env.DB.prepare("SELECT id,user_id,name,filters_json FROM saved_searches WHERE notify=1").all();for(const row of rows.results||[]){const f=safeJsonObject(row.filters_json),q=String(f.query||"").trim().toLowerCase(),matchesQuery=!q||[item.title,item.description,item.organizationName].some(v=>String(v||"").toLowerCase().includes(q)),matchesCity=!f.city||String(f.city)===String(item.city),matchesCategory=!f.category||String(f.category)===String(item.category),matchesSubcategory=!f.subcategory||String(f.subcategory)===String(item.subcategory||""),matchesCondition=!f.condition||String(f.condition)===String(item.condition);if(matchesQuery&&matchesCity&&matchesCategory&&matchesSubcategory&&matchesCondition)await notificationStatement(env,row.user_id,"status","פריט חדש מתאים לחיפוש שמור",`${item.title} נוסף ומתאים לחיפוש "${row.name}".`,null).run()}}
 
-async function createItem(request, env) {
+async function createItem(request, env, ctx) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
   if(body.freeConfirmed!==true)throw new HttpError(400,"יש לאשר שהפריט מוצע להשאלה חינמית בלבד");
@@ -2000,10 +2004,11 @@ async function createItem(request, env) {
   await env.DB.prepare("INSERT INTO organization_onboarding(organization_id,first_item_added) VALUES(?,1) ON CONFLICT(organization_id) DO UPDATE SET first_item_added=1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')").bind(organizationId).run().catch(()=>{});
   await syncItemUnitsToQuantity(env,id,quantity);
   if(publishStatus==="active"){await notifyMatchingSavedSearches(env,{id,title,description:body.description,organizationName:organization.name,city:organization.city,category,condition});await notifySavedFollowers(env,{itemId:id,organizationId,category,title,event:"created"});}
+  ctx?.waitUntil(prepareSavedItemEnglish(env,id,ctx).catch(()=>{}));
   return json({ item: { id, status: publishStatus,publishAt } }, 201);
 }
 
-async function updateItem(request, env, id) {
+async function updateItem(request, env, id, ctx) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
   const existing = await env.DB.prepare(`SELECT i.*, o.owner_id, o.city AS org_city, o.neighborhood AS org_neighborhood
@@ -2077,6 +2082,7 @@ async function updateItem(request, env, id) {
     body.approvalMode==="automatic"?"automatic":"manual",body.depositRequired?1:0,body.depositRequired?moneyAgorot(body.depositAmount):0,publishAt,maxPerUser,preparationMinutes,maxLoanDays,serviceRadiusKm,nextStatus,id).run();
   if(body.bookingHorizonMinutes!==undefined)await env.DB.prepare("UPDATE items SET booking_horizon_minutes=? WHERE id=?").bind(positiveInt(body.bookingHorizonMinutes,Number(existing.booking_horizon_minutes||existing.booking_horizon_days*1440),1,1576800,"טווח הזמנה"),id).run();
   await syncItemUnitsToQuantity(env,id,quantity);
+  ctx?.waitUntil(prepareSavedItemEnglish(env,id,ctx).catch(()=>{}));
   return json({ item: { id, status:nextStatus,publishAt,maxPerUser,preparationMinutes,maxLoanDays,serviceRadiusKm } });
 }
 

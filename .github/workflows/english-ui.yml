@@ -1,7 +1,7 @@
 name: English interface checks
 on:
   push:
-    branches: [fix/complete-english, fix/english-performance]
+    branches: [fix/complete-english, fix/english-performance, fix/english-first-paint]
   workflow_dispatch:
 permissions:
   contents: read
@@ -17,7 +17,7 @@ jobs:
       - run: npm ci
       - run: npm install --no-save playwright@1.55.0
       - run: npx playwright install --with-deps chromium
-      - run: mkdir -p test/english-previews && node test/english-ui.cjs
+      - run: mkdir -p test/english-previews && node test/english-ui.cjs && node test/english-first-paint.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

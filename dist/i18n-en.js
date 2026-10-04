@@ -977,3 +977,6 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
   "ניווט בחשבון":"Account navigation",
   "תמונה שצורפה לשיחה":"Image attached to the chat"
 });
+window.GmachEnglish = Object.freeze({...window.GmachEnglish,
+  "מכונת תפירה":"Sewing machine","מכונות תפירה":"Sewing machines","כוס":"Cup","נדנדה":"Swing","פרחים":"Flowers"
+});
