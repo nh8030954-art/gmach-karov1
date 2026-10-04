@@ -22,7 +22,7 @@ function position(){if(!active)return;const a=active;if(!visible(document.queryS
 const r=target.getBoundingClientRect(),vw=innerWidth,vh=innerHeight,pad=7;
 const x=Math.max(8,r.left-pad),y=Math.max(8,r.top-pad),w=Math.min(vw-8,r.right+pad)-x,h=Math.min(vh-8,r.bottom+pad)-y;
 for(const rect of a.dialog.querySelectorAll('[data-tour-hole],[data-tour-outline]')){rect.setAttribute('x',x);rect.setAttribute('y',y);rect.setAttribute('width',Math.max(0,w));rect.setAttribute('height',Math.max(0,h))}
-const card=a.card;card.style.maxHeight=Math.max(150,vh-32)+'px';const cw=card.offsetWidth,ch=card.offsetHeight,gap=18;
+const card=a.card,gap=18,above=y-gap-16,below=vh-y-h-gap-16;card.style.maxHeight=Math.max(140,Math.min(vh-32,Math.max(above,below)))+'px';const cw=card.offsetWidth,ch=card.offsetHeight;
 let top=y+h+gap;if(top+ch>vh-16)top=y-ch-gap;if(top<16)top=Math.max(16,Math.min(vh-ch-16,(vh-ch)/2));
 const left=Math.max(16,Math.min(vw-cw-16,en()?x:x+w-cw));card.style.top=top+'px';card.style.left=left+'px';card.dataset.side=top>=y+h?'below':'above';
 }
