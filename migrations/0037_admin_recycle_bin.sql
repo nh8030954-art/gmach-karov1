@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS admin_recycle_bin(entity_type TEXT NOT NULL CHECK(entity_type IN ('user','organization','item')),entity_id TEXT NOT NULL,label TEXT NOT NULL,previous_state TEXT NOT NULL,archived_by TEXT NOT NULL,archived_at TEXT NOT NULL,PRIMARY KEY(entity_type,entity_id));

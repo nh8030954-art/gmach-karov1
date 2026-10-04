@@ -759,6 +759,11 @@ async function routeApi(request, env, ctx, url) {
   if (method === "GET" && path === "/api/items/english-content") return publicItemEnglish(request,env,ctx);
   if (method === "GET" && path === "/api/items") return listItems(env, url, ctx);
   if (method === "GET" && path === "/api/discovery") return discovery(env, url);
+  if(method==="GET"&&path==="/api/admin/recycle-bin"){await requireAdmin(request,env);return json({entries:(await env.DB.prepare("SELECT entity_type,entity_id,label,archived_at FROM admin_recycle_bin ORDER BY archived_at DESC").all()).results});}
+  const recycleRoute=path.match(/^\/api\/admin\/recycle-bin\/(user|organization|item)\/([^/]+)$/);
+  if(method==="POST"&&recycleRoute)return adminRecycle(request,env,recycleRoute[1],decodeURIComponent(recycleRoute[2]));
+  const activityRoute=path.match(/^\/api\/admin\/users\/([^/]+)\/activity$/);
+  if(method==="GET"&&activityRoute){await requireAdmin(request,env);const id=decodeURIComponent(activityRoute[1]);const [loans,orgs,items,events,help,reviews,reports]=await env.DB.batch([env.DB.prepare("SELECT lr.id,lr.status,lr.requested_from,lr.requested_until,i.title FROM loan_requests lr JOIN items i ON i.id=lr.item_id WHERE lr.borrower_id=? ORDER BY lr.created_at DESC LIMIT 100").bind(id),env.DB.prepare("SELECT id,name,status FROM organizations WHERE owner_id=? ORDER BY created_at DESC LIMIT 100").bind(id),env.DB.prepare("SELECT i.id,i.title,i.status FROM items i JOIN organizations o ON o.id=i.organization_id WHERE o.owner_id=? ORDER BY i.created_at DESC LIMIT 100").bind(id),env.DB.prepare("SELECT event_type,device_label,created_at FROM security_events WHERE user_id=? ORDER BY created_at DESC LIMIT 100").bind(id),env.DB.prepare("SELECT id,title,status,created_at FROM help_requests WHERE requester_id=? ORDER BY created_at DESC LIMIT 100").bind(id),env.DB.prepare("SELECT id,rating,comment AS title,status,created_at FROM reviews WHERE author_id=? ORDER BY created_at DESC LIMIT 100").bind(id),env.DB.prepare("SELECT id,reason AS title,status,created_at FROM reports WHERE reporter_id=? ORDER BY created_at DESC LIMIT 100").bind(id)]);return json({loans:loans.results,organizations:orgs.results,items:items.results,security:events.results,help:help.results,reviews:reviews.results,reports:reports.results});}
   if(method==="POST"&&path==="/api/analytics/visit"){const body=await readJson(request);try{await recordVisit(env,body,Boolean(await currentUser(request,env)))}catch(error){if(error.message.startsWith('Invalid'))throw new HttpError(400,error.message);throw error}return json({ok:true},201);}
   if(method==="GET"&&path==="/api/admin/analytics/visitors"){await requireAdmin(request,env);return json(await visitStats(env));}
   if (method === "POST" && path === "/api/analytics/events") return recordAnalytics(request, env);
@@ -2861,6 +2866,16 @@ async function restoreSiteSettings(request, env, versionId) {
     auditStatement(env, user.id, "site.settings.restore", "site_setting_versions", versionId)
   ]);
   return json({ ok: true });
+}
+
+async function adminRecycle(request,env,type,id){
+ const admin=await requireAdmin(request,env),body=await readJson(request);if(!['archive','restore'].includes(body.action))throw new HttpError(400,'פעולה לא תקינה');if(type==='user'&&id===admin.id)throw new HttpError(400,'אי אפשר למחוק את החשבון המחובר');
+ const specs={user:{table:'users',field:'account_status',label:'full_name',hidden:'suspended'},organization:{table:'organizations',field:'is_hidden',label:'name',hidden:1},item:{table:'items',field:'status',label:'title',hidden:'archived'}},cfg=specs[type];
+ const row=await env.DB.prepare(`SELECT id,${cfg.field} state,${cfg.label} label FROM ${cfg.table} WHERE id=? AND deleted_at IS NULL`).bind(id).first();if(!row)throw new HttpError(404,'הרשומה אינה זמינה');
+ const archived=await env.DB.prepare('SELECT previous_state FROM admin_recycle_bin WHERE entity_type=? AND entity_id=?').bind(type,id).first();
+ if(body.action==='archive'&&archived)return json({ok:true,archived:true});if(body.action==='restore'&&!archived)throw new HttpError(409,'הרשומה אינה בסל המחזור');
+ const now=new Date().toISOString(),stmts=[];if(body.action==='archive')stmts.push(env.DB.prepare('INSERT INTO admin_recycle_bin(entity_type,entity_id,label,previous_state,archived_by,archived_at) VALUES(?,?,?,?,?,?)').bind(type,id,row.label,JSON.stringify(row.state),admin.id,now));else stmts.push(env.DB.prepare('DELETE FROM admin_recycle_bin WHERE entity_type=? AND entity_id=?').bind(type,id));
+ stmts.push(env.DB.prepare(`UPDATE ${cfg.table} SET ${cfg.field}=?,updated_at=? WHERE id=?`).bind(body.action==='archive'?cfg.hidden:JSON.parse(archived.previous_state),now,id));if(type==='user'&&body.action==='archive')stmts.push(env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id));stmts.push(auditStatement(env,admin.id,type+'.'+body.action,type,id));await env.DB.batch(stmts);return json({ok:true,archived:body.action==='archive'});
 }
 
 async function adminUsers(request, env) {

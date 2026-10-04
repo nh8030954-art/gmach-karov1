@@ -618,6 +618,19 @@ try {
   result = await request("/api/organizations", { method: "POST", cookie: adminCookie, origin: "https://evil.example", body: {} });
   assert.equal(result.response.status, 403);
 
+  const archivedUser=(await db.prepare("SELECT id FROM users WHERE email='english@example.org'").first()).id;
+  for(const [type,id,table,field] of [['user',archivedUser,'users','account_status'],['organization',organizationId,'organizations','is_hidden'],['item',itemId,'items','status']]){
+    const before=(await db.prepare(`SELECT ${field} state FROM ${table} WHERE id=?`).bind(id).first()).state;
+    assert.equal((await request('/api/admin/recycle-bin/'+type+'/'+id,{method:'POST',body:{action:'archive'}})).response.status,401);
+    result=await request('/api/admin/recycle-bin/'+type+'/'+id,{method:'POST',cookie:adminCookie,body:{action:'archive'}});assert.equal(result.response.status,200,JSON.stringify(result.data));
+    assert((await request('/api/admin/recycle-bin',{cookie:adminCookie})).data.entries.some(r=>r.entity_id===id));
+    result=await request('/api/admin/recycle-bin/'+type+'/'+id,{method:'POST',cookie:adminCookie,body:{action:'restore'}});assert.equal(result.response.status,200,JSON.stringify(result.data));
+    assert.equal((await db.prepare(`SELECT ${field} state FROM ${table} WHERE id=?`).bind(id).first()).state,before,'Restore original state');
+  }
+  const selfAdmin=(await request("/api/auth/me",{cookie:adminCookie})).data.user.id;
+  assert.equal((await request('/api/admin/recycle-bin/user/'+selfAdmin,{method:'POST',cookie:adminCookie,body:{action:'archive'}})).response.status,400,'Cannot archive own admin');
+  assert.equal((await request('/api/admin/users/'+archivedUser+'/activity',{cookie:adminCookie})).response.status,200);
+  assert((await db.prepare('SELECT id FROM loan_requests WHERE id=?').bind(pickupLoan).first()),'History survives archives');
   console.log("Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.");
 } finally {
   await mf.dispose();

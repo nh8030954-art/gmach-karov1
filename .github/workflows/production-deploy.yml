@@ -119,6 +119,10 @@ jobs:
               exit "$STATUS"
             fi
           fi
+      - name: Ensure visitor analytics and reversible admin schema
+        run: |
+          npx wrangler d1 execute DB --remote --file migrations/0036_visitor_analytics.sql
+          npx wrangler d1 execute DB --remote --file migrations/0037_admin_recycle_bin.sql
       - name: Ensure saved item English content schema
         run: npx wrangler d1 execute DB --remote --file migrations/0035_item_english_content.sql
       - name: Apply administrator email delivery choice
