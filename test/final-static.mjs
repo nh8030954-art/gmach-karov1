@@ -75,6 +75,14 @@ for(const token of ["openOrganizationManager","data-manage-org","org-branch-form
 
 const indexHtml=await readFile("dist/index.html","utf8");
 for(const condition of ["חדש","כמו חדש","מצב טוב","מצב סביר","בלאי נראה לעין"])assert.ok(indexHtml.includes(condition),"condition taxonomy missing: "+condition);
+for(const condition of ["חדש","כמו חדש","מצב טוב","מצב סביר","בלאי נראה לעין"])assert.ok(appClient.includes(condition),"unit condition taxonomy missing: "+condition);
+assert.ok(appClient.includes("await Promise.all([refreshAccountSnapshot(),loadCategoryAliases()])"),"item edit must refresh live category catalog");
+assert.ok(!appClient.includes("(קטגוריה קיימת)"),"item edit must not inject categories outside live catalog");
+assert.ok(worker.includes("validateOptionalPhone(body.phone)"),"branch creation must allow optional phone");
+assert.ok(platformClient.includes("personalExportExcel")&&platformClient.includes("gmach-my-data.xls"),"personal export must download readable Excel");
+assert.ok(platformClient.includes('id="pt-new-ticket"')&&platformClient.includes('api("/api/support"'),"support tab must allow opening a new ticket");
+assert.ok(!indexHtml.includes('class="brand-mark english-brand-mark" aria-hidden="true"><img src="/gmach-berega-mark-cropped.jpg" alt=""></span><span class="brand-copy"'),"duplicate footer logo must be removed");
+
 
 for(const token of ["listItemWaitlist","leaveWaitlist","updateHelpOffer","waitlistEntry","helpOffer"])assert.ok(worker.includes(token),token+" missing from waitlist/community lifecycle");
 for(const token of ["request-partial-options","request-partial-waitlist","joinCurrentRequestWaitlist","openHelpOffers","data-select-offer","data-remove-waitlist","calendar.ics"])assert.ok((appClient+indexHtml).includes(token),token+" missing from waitlist/community/calendar UI");
