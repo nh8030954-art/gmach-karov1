@@ -534,6 +534,12 @@ assert.ok(indexHtml.includes('id="item-subcategory" disabled'),"fixed item subca
 assert.ok(indexHtml.includes('id="item-free" type="checkbox" required')&&!indexHtml.includes('id="item-free" type="checkbox" checked required'),"free-loan confirmation must start unchecked");
 assert.ok(appClient.includes("updateItemSubcategories"),"subcategory dependency logic missing");
 assert.ok(indexHtml.includes('id="subcategory-filter"'),"catalog subcategory filter missing");
+assert.ok(!remainingClient.includes('data.extraCategories="item"'),"legacy checkbox category manager must not be injected into item editing");
+assert.ok(platformClient.includes('data?.language==="en"')&&platformClient.includes('"פרטי חשבון"')&&platformClient.includes('"Profile"'),"personal export must follow account language");
+assert.ok(platform.includes('language:profile?.preferred_language||"he"')&&!platform.includes('securityEvents,dataRequests'),"personal export must be curated for the user");
+assert.ok(worker.includes("b.name AS branch_name")&&appClient.includes("סניף איסוף:"),"pickup branch must be visible in the loan dashboard");
+assert.ok(worker.includes("יש לבחור יחידות מאותו סניף לאיסוף")&&worker.includes("UPDATE loan_requests SET branch_id=?"),"serialized unit allocation must set a single pickup branch");
+
 assert.ok(!appClient.includes("ITEM_SUBCATEGORIES"),"site must not fall back to hardcoded subcategories");
 assert.ok(appClient.includes("state.categoryCatalog")&&appClient.includes("/api/categories"),"live category catalog must drive site-wide category UI");
 assert.ok(adminControlCenter.includes("ניהול קטגוריות וקטגוריות משנה")&&adminControlCenter.includes("data-new-subcategory")&&adminControlCenter.includes("data-delete-category"),"super-admin category CRUD UI missing");
