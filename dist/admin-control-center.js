@@ -248,7 +248,7 @@ function renderExports(root){
 }
 function install(){
  const menuEmail=$("#mobile-email-templates");
- if(menuEmail){const allowed=Boolean($("#admin-tab")&&!$("#admin-tab").hidden);menuEmail.hidden=!allowed;if(allowed&&!menuEmail.dataset.bound){menuEmail.dataset.bound="1";menuEmail.onclick=async()=>{await openCenter();setTimeout(()=>document.querySelector('[data-control-tab="emails"]')?.click(),0)}}}
+ if(menuEmail){const allowed=Boolean($("#admin-tab")&&!$("#admin-tab").hidden);if(menuEmail.hidden!==!allowed)menuEmail.hidden=!allowed;if(allowed&&!menuEmail.dataset.bound){menuEmail.dataset.bound="1";menuEmail.onclick=async()=>{await openCenter();setTimeout(()=>document.querySelector('[data-control-tab="emails"]')?.click(),0)}}}
  const tab=$("#admin-tab"),actions=$("#dashboard-view .dashboard-actions");
  if(!tab||tab.hidden||!actions||actions.querySelector("[data-admin-control-center]"))return;
  const b=document.createElement("button");b.type="button";b.className="button admin-control-entry";b.dataset.adminControlCenter="1";b.textContent=t("מרכז בקרת האתר","Site control center");b.onclick=openCenter;actions.prepend(b);
