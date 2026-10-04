@@ -1,4 +1,4 @@
-import { recordVisit, visitStats } from "./visitor-analytics.js";
+import { recordVisit, visitStats, recordRegistration } from "./visitor-analytics.js";
 import { pickupBranches, branchAvailable } from "./pickup-branches.js";
 import { attachItemEnglish, prepareSavedItemEnglish, publicItemEnglish } from "./item-english.js";
 import { handleRemainingFeatures, runRemainingMaintenance, ensureRemainingFeaturesSchema } from "./remaining-features.js";
@@ -764,8 +764,8 @@ async function routeApi(request, env, ctx, url) {
   if(method==="POST"&&recycleRoute)return adminRecycle(request,env,recycleRoute[1],decodeURIComponent(recycleRoute[2]));
   const activityRoute=path.match(/^\/api\/admin\/users\/([^/]+)\/activity$/);
   if(method==="GET"&&activityRoute){await requireAdmin(request,env);const id=decodeURIComponent(activityRoute[1]);const [loans,orgs,items,events,help,reviews,reports]=await env.DB.batch([env.DB.prepare("SELECT lr.id,lr.status,lr.requested_from,lr.requested_until,i.title FROM loan_requests lr JOIN items i ON i.id=lr.item_id WHERE lr.borrower_id=? ORDER BY lr.created_at DESC LIMIT 100").bind(id),env.DB.prepare("SELECT id,name,status FROM organizations WHERE owner_id=? ORDER BY created_at DESC LIMIT 100").bind(id),env.DB.prepare("SELECT i.id,i.title,i.status FROM items i JOIN organizations o ON o.id=i.organization_id WHERE o.owner_id=? ORDER BY i.created_at DESC LIMIT 100").bind(id),env.DB.prepare("SELECT event_type,device_label,created_at FROM security_events WHERE user_id=? ORDER BY created_at DESC LIMIT 100").bind(id),env.DB.prepare("SELECT id,title,status,created_at FROM help_requests WHERE requester_id=? ORDER BY created_at DESC LIMIT 100").bind(id),env.DB.prepare("SELECT id,rating,comment AS title,status,created_at FROM reviews WHERE author_id=? ORDER BY created_at DESC LIMIT 100").bind(id),env.DB.prepare("SELECT id,reason AS title,status,created_at FROM reports WHERE reporter_id=? ORDER BY created_at DESC LIMIT 100").bind(id)]);return json({loans:loans.results,organizations:orgs.results,items:items.results,security:events.results,help:help.results,reviews:reviews.results,reports:reports.results});}
-  if(method==="POST"&&path==="/api/analytics/visit"){const body=await readJson(request);try{await recordVisit(env,body,Boolean(await currentUser(request,env)))}catch(error){if(error.message.startsWith('Invalid'))throw new HttpError(400,error.message);throw error}return json({ok:true},201);}
-  if(method==="GET"&&path==="/api/admin/analytics/visitors"){await requireAdmin(request,env);return json(await visitStats(env));}
+  if(method==="POST"&&path==="/api/analytics/visit"){const body=await readJson(request);try{await recordVisit(env,body,Boolean(await currentUser(request,env)),request.cf)}catch(error){if(error.message.startsWith('Invalid'))throw new HttpError(400,error.message);throw error}return json({ok:true},201);}
+  if(method==="GET"&&path==="/api/admin/analytics/visitors"){await requireAdmin(request,env);return json(await visitStats(env,url.searchParams.get("period")||"month"));}
   if (method === "POST" && path === "/api/analytics/events") return recordAnalytics(request, env);
   const organizationView = path.match(/^\/api\/organizations\/([^/]+)\/view$/);
   if (method === "POST" && organizationView) return recordOrganizationView(request, env, decodeURIComponent(organizationView[1]));
@@ -1007,6 +1007,7 @@ async function register(request, env, ctx, url) {
     catch (cleanupError) { console.error("Registration cleanup failed", cleanupError); }
     throw new HttpError(503, "לא הצלחנו לשלוח את קוד האימות. שירות המייל אינו זמין כרגע");
   }
+  await recordRegistration(env,request,id).catch(error=>console.error("Registration analytics failed",error));
   return json({ verificationRequired: true, email, expiresInSeconds: 600 }, 201);
 }
 
@@ -2954,7 +2955,10 @@ async function updateAdminUser(request, env, id) {
   const admin = await requireAdmin(request, env);
   if (id === admin.id) throw new HttpError(400, "אי אפשר לשנות את הרשאות החשבון שמחובר כרגע");
   const body = await readJson(request);
-  const role = body.role === "admin" ? "admin" : "member";
+  const existing = await env.DB.prepare("SELECT role FROM users WHERE id=?").bind(id).first();
+  if (!existing) throw new HttpError(404,"המשתמש לא נמצא");
+  if (body.role !== undefined && body.role !== existing.role) throw new HttpError(403,"שינוי הרשאות ניהול משתמשים אינו זמין");
+  const role = existing.role;
   const status = body.accountStatus === "suspended" ? "suspended" : "active";
   const verified = body.emailVerified === true ? 1 : 0;
   const result = await env.DB.prepare("UPDATE users SET role=?,account_status=?,email_verified=?,updated_at=? WHERE id=?").bind(role,status,verified,new Date().toISOString(),id).run();

@@ -161,6 +161,21 @@ try {
   const visitorStats=(await request('/api/admin/analytics/visitors',{cookie:adminCookie})).data;
   assert.equal(Number(visitorStats.summary.visitors),1);assert.equal(Number(visitorStats.summary.visits),2);assert.equal(Number(visitorStats.summary.views),3);assert.equal(Number(visitorStats.summary.guestVisits),2);assert.equal(Number(visitorStats.pages.find(p=>p.path==='/catalog').views),2);assert.equal(visitorStats.sources.find(s=>s.source==='example.org').visits,1);
   assert.equal((await request('/api/analytics/visit',{method:'POST',body:{visitorId:'bad',sessionId,path:'/catalog'}})).response.status,400);
+  const {periodStart,recordRegistration,recordVisit}=await import('../worker/visitor-analytics.js');
+  assert.equal(periodStart('today',new Date('2026-10-04T21:30:00Z')),'2026-10-04T21:00:00.000Z');
+  assert.equal(periodStart('week',new Date('2026-10-04T12:00:00Z')),'2026-10-03T21:00:00.000Z');
+  assert.equal(periodStart('month',new Date('2026-11-12T12:00:00Z')),'2026-10-31T22:00:00.000Z');
+  const analyticsUser=await db.prepare("SELECT id,role FROM users WHERE email='english@example.org'").first();
+  assert.equal((await request('/api/admin/users/'+analyticsUser.id,{method:'PATCH',cookie:adminCookie,body:{role:'admin',accountStatus:'active',emailVerified:true}})).response.status,403);
+  assert.equal((await db.prepare('SELECT role FROM users WHERE id=?').bind(analyticsUser.id).first()).role,analyticsUser.role);
+  assert.equal((await request('/api/admin/users/'+analyticsUser.id,{method:'PATCH',cookie:adminCookie,body:{accountStatus:'active',emailVerified:true}})).response.status,200);
+  await recordRegistration({DB:db},new Request('https://example.org',{headers:{Cookie:'gmach-visitor-id='+visitorId}}),analyticsUser.id);
+  for(const period of ['today','week','month']){const stats=(await request('/api/admin/analytics/visitors?period='+period,{cookie:adminCookie})).data;assert.equal(stats.summary.convertedVisitors,1);assert.equal(stats.summary.conversionRate,100);assert.equal(stats.summary.visitors,1);assert.ok(stats.summary.registrations>=1);assert.equal(stats.pages.find(p=>p.path==='/catalog').visitors,1);assert.ok(stats.timeline.length);}
+  // Existing sessions must count new views by view time rather than their old start time.
+  await db.prepare("UPDATE site_visits SET started_at='2020-01-01T00:00:00.000Z' WHERE session_id=?").bind(sessionId).run();
+  await recordVisit({DB:db},{visitorId,sessionId,path:'/catalog'},false,{city:'Jerusalem',country:'IL'});
+  const cityStats=(await request('/api/admin/analytics/visitors?period=today',{cookie:adminCookie})).data;
+  assert.equal(cityStats.summary.views,4);assert.equal(cityStats.cities.find(c=>c.city==='Jerusalem').visitors,1);
   const templateRows=(await request("/api/admin/email-templates",{cookie:adminCookie})).data.templates;
   for(const key of ["verification","password_reset","manager_invite","notification","daily_digest","new_device","pickup_confirmed","loan_cancelled","extension","waitlist","support","system_alert"]){for(const language of ["he","en"]){assert.ok(templateRows.some(r=>r.template_key===key&&r.language===language),key+" missing in "+language);}}
   const alertSource=await readFile("worker/distribution-completion.js","utf8");
