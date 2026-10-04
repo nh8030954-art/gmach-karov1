@@ -3031,7 +3031,7 @@ async function listBranches(request,env,organizationId){
 async function createBranch(request,env,organizationId){
   const {user}=await requireOrganizationRole(request,env,organizationId,["owner"]),body=await readJson(request),id=crypto.randomUUID();
   const mode=["separate","shared","hybrid"].includes(body.inventoryMode)?body.inventoryMode:"separate";
-  await env.DB.batch([env.DB.prepare("INSERT INTO organization_branches(id,organization_id,name,address,city,latitude,longitude,phone,hours_json,inventory_mode) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(id,organizationId,cleanText(body.name,2,80,"שם הסניף"),cleanText(body.address,5,180,"כתובת"),cleanText(body.city,2,80,"עיר"),Number.isFinite(Number(body.latitude))?Number(body.latitude):null,Number.isFinite(Number(body.longitude))?Number(body.longitude):null,validatePhone(body.phone),sanitizeHours(body.hours),mode),auditStatement(env,user.id,"branch.create","organization_branch",id,{organizationId})]);
+  await env.DB.batch([env.DB.prepare("INSERT INTO organization_branches(id,organization_id,name,address,city,latitude,longitude,phone,hours_json,inventory_mode) VALUES(?,?,?,?,?,?,?,?,?,?)").bind(id,organizationId,cleanText(body.name,2,80,"שם הסניף"),cleanText(body.address,5,180,"כתובת"),cleanText(body.city,2,80,"עיר"),Number.isFinite(Number(body.latitude))?Number(body.latitude):null,Number.isFinite(Number(body.longitude))?Number(body.longitude):null,validateOptionalPhone(body.phone),sanitizeHours(body.hours),mode),auditStatement(env,user.id,"branch.create","organization_branch",id,{organizationId})]);
   return json({branch:{id,organizationId,inventoryMode:mode}},201);
 }
 
@@ -3045,7 +3045,7 @@ async function updateBranch(request,env,id){
   const name=body.name===undefined?branch.name:cleanText(body.name,2,80,"שם הסניף");
   const city=body.city===undefined?branch.city:cleanText(body.city,2,80,"עיר");
   const address=body.address===undefined?branch.address:cleanText(body.address,5,180,"כתובת");
-  const phone=body.phone===undefined?branch.phone:validatePhone(body.phone);
+  const phone=body.phone===undefined?branch.phone:validateOptionalPhone(body.phone);
   const mode=body.inventoryMode===undefined?branch.inventory_mode:(["separate","shared","hybrid"].includes(body.inventoryMode)?body.inventoryMode:null);
   if(!mode) throw new HttpError(400,"מודל המלאי אינו תקין");
   const now=new Date().toISOString();
@@ -3765,6 +3765,10 @@ function validatePhone(value) {
   const phone = String(value || "").trim();
   if (!/^0\d{1,2}[-\s]?\d{3}[-\s]?\d{4}$/.test(phone)) throw new HttpError(400, "מספר הטלפון אינו תקין");
   return phone;
+}
+function validateOptionalPhone(value) {
+  const phone = String(value || "").trim();
+  return phone ? validatePhone(phone) : null;
 }
 
 function validateDate(value, label) {
