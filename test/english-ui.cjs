@@ -17,6 +17,18 @@ await page.evaluate(()=>{const f=document.createElement('section');f.id='english
 await page.waitForFunction(()=>document.querySelector('#long-description').textContent.includes('Translated content')&&!/[\u0590-\u05ff]/.test(document.querySelector('#long-description').textContent),null,{timeout:15000});
 await page.waitForFunction(()=>!/[\u0590-\u05ff]/.test(document.querySelector('#english-fixture textarea').placeholder+document.querySelector('#english-fixture img').alt+document.querySelector('#content').textContent+document.querySelector('#english-fixture option').textContent));
 assert.equal(await page.locator('#dynamic-ui').textContent(),'Allocate units');assert.equal(await page.locator('.organization-name').first().textContent(),'גמ״ח ציוד ירושלים');assert.equal(await page.locator('#original-data').textContent(),'{"name":"נתון מקורי"}');assert.equal(await page.locator('#english-fixture option').getAttribute('value'),'אפשרות חדשה');assert.equal(batches.flat().filter(s=>s==='אבגדהוזחטיכלמנסעפצקרשת').length,1);
+// Animation and unrelated updates must not rescan the page or remount translations.
+await page.waitForTimeout(1000);
+const performanceCheck=await page.evaluate(async()=>{
+  let bodyScans=0,sorts=0;const originalWalker=document.createTreeWalker.bind(document),originalSort=Array.prototype.sort;
+  document.createTreeWalker=(root,...args)=>{if(root===document.body)bodyScans++;return originalWalker(root,...args)};
+  Array.prototype.sort=function(...args){sorts++;return originalSort.apply(this,args)};
+  const start=performance.now();for(let i=0;i<1000;i++){window.GmachTranslate('Unchanged English content '+i);window.GmachTranslate('אבגדהוזחטיכלמנסעפצקרשת')}
+  const lookupMs=performance.now()-start;const target=document.querySelector('#english-fixture');
+  for(let i=0;i<60;i++){target.style.transform='translateX('+i+'px)';const p=document.createElement('span');p.textContent='Updated English content '+i;target.append(p);await new Promise(requestAnimationFrame)}
+  await new Promise(r=>setTimeout(r,1000));document.createTreeWalker=originalWalker;Array.prototype.sort=originalSort;
+  return {bodyScans,sorts,lookupMs};
+});assert.equal(performanceCheck.bodyScans,0,'Animations must not scan the whole page');assert(performanceCheck.sorts<=1,'Dictionary must be sorted once, not for each string');assert(performanceCheck.lookupMs<100,'Cached translations must remain fast');console.log(JSON.stringify({width,performanceCheck}));
 // A user change made while a translation is in flight must survive.
 await page.evaluate(()=>{const el=document.createElement('p');el.id='race';el.textContent='תשרקצפעסנמלכיטחזוהדגבא';document.body.prepend(el)});await page.waitForRequest(r=>r.url().includes('/api/translate/')&&r.postData().includes('תשרקצפעסנמלכיטחזוהדגבא'));await page.evaluate(()=>document.querySelector('#race').textContent='New user content');await page.waitForTimeout(200);assert.equal(await page.locator('#race').textContent(),'New user content');
 await page.screenshot({path:'test/english-previews/'+width+'.png'});console.log(JSON.stringify({width,staticLabels:true,longContent:true,attributes:true,preservedNames:true,originalData:true,requestDeduplication:true,staleResponse:true,batches:batches.length}));await page.close();

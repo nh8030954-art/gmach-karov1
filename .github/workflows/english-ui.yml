@@ -1,7 +1,7 @@
 name: English interface checks
 on:
   push:
-    branches: [fix/complete-english]
+    branches: [fix/complete-english, fix/english-performance]
   workflow_dispatch:
 permissions:
   contents: read

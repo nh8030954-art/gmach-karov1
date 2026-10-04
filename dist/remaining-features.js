@@ -370,13 +370,22 @@ Object.assign(I18N.en,I18N_FINAL_EN,{
   "📷 תמונה":"📷 Photo","🎤 קול":"🎤 Voice","📍 מיקום":"📍 Location"
 });
 let lang=localStorage.getItem("gmach-language")||document.documentElement.lang||"he";
-function replaceTranslatedPhrase(text,he,en){let out=text,pos=0;const isHeb=c=>!!c&&/[\u0590-\u05FF]/.test(c),starts=isHeb(he[0]),ends=isHeb(he[he.length-1]);while((pos=out.indexOf(he,pos))!==-1){const before=out[pos-1]||"",after=out[pos+he.length]||"";if((starts&&isHeb(before))||(ends&&isHeb(after))){pos+=he.length;continue}out=out.slice(0,pos)+en+out.slice(pos+he.length);pos+=en.length}return out}function translateText(raw){if(!raw)return raw;if(I18N.en[raw])return I18N.en[raw];let out=raw;for(const [he,en] of Object.entries(I18N.en).sort((a,b)=>b[0].length-a[0].length)){if(he.length>2&&out.includes(he))out=replaceTranslatedPhrase(out,he,en)}return out}/* English mode translates every visible Hebrew string, including carousel/item content; only organization names stay original. */
+function replaceTranslatedPhrase(text,he,en){let out=text,pos=0;const isHeb=c=>!!c&&/[\u0590-\u05FF]/.test(c),starts=isHeb(he[0]),ends=isHeb(he[he.length-1]);while((pos=out.indexOf(he,pos))!==-1){const before=out[pos-1]||"",after=out[pos+he.length]||"";if((starts&&isHeb(before))||(ends&&isHeb(after))){pos+=he.length;continue}out=out.slice(0,pos)+en+out.slice(pos+he.length);pos+=en.length}return out}let translationPhrases,translationCache=new Map();
+function resetTranslationCache(){translationPhrases=null;translationCache.clear()}
+function translateText(raw){
+  if(!raw||!/[\u0590-\u05ff]/.test(raw))return raw;
+  if(I18N.en[raw])return I18N.en[raw];
+  if(translationCache.has(raw))return translationCache.get(raw);
+  translationPhrases??=Object.entries(I18N.en).filter(([he])=>he.length>2).sort((a,b)=>b[0].length-a[0].length);
+  let out=raw;for(const [he,en] of translationPhrases)if(out.includes(he))out=replaceTranslatedPhrase(out,he,en);
+  if(translationCache.size>=2000)translationCache.clear();translationCache.set(raw,out);return out;
+}/* English mode translates every visible Hebrew string, including carousel/item content; only organization names stay original. */
 const NEVER_TRANSLATE_SELECTOR=".organization-name,#organization-title";
 function isNeverTranslateNode(n){return !!n?.parentElement?.closest?.(NEVER_TRANSLATE_SELECTOR+",script,style,noscript,textarea,code,pre")}
 window.GmachTranslate=value=>lang==="en"?translateText(value):value;
 function translateNode(n){
-  if(lang!=="en"||isNeverTranslateNode(n))return;
-  const full=n.nodeValue||"",trim=full.trim();if(!trim)return;
+  if(lang!=="en")return;
+  const full=n.nodeValue||"",trim=full.trim();if(!trim||!/[\u0590-\u05ff]/.test(trim)||isNeverTranslateNode(n))return;
   const option=n.parentElement?.tagName==="OPTION"?n.parentElement:null;
   if(option&&!option.hasAttribute("value"))option.setAttribute("value",trim);
   const translated=translateText(trim);
@@ -682,6 +691,6 @@ Object.assign(I18N.en,{
 "ציר זמן":"Timeline",
 "אין אירועים עדיין.":"No events yet."
 });
-function init(){installLanguage();if(lang==="en")api("/api/categories?locale=en").then(data=>{for(const category of data.categories||[])if(category.name_en)I18N.en[category.name_he]=category.name_en;translate(document.body)}).catch(()=>{});installMapEntry();installImageEditor();installAdminRemaining();installA11y();const obs=new MutationObserver(()=>{enhanceItemDialog();enhanceOrganizationDialog();installCategoryButtons();renderOrgCategoryTiles();if(lang==="en")translate(document.body);installImageEditor()});obs.observe(document.body,{subtree:true,childList:true});enhanceItemDialog();enhanceOrganizationDialog();installCategoryButtons();renderOrgCategoryTiles()}
+function init(){installLanguage();if(lang==="en")api("/api/categories?locale=en").then(data=>{for(const category of data.categories||[])if(category.name_en)I18N.en[category.name_he]=category.name_en;resetTranslationCache();translate(document.body)}).catch(()=>{});installMapEntry();installImageEditor();installAdminRemaining();installA11y();const obs=new MutationObserver(()=>{enhanceItemDialog();enhanceOrganizationDialog();installCategoryButtons();renderOrgCategoryTiles();installImageEditor()});obs.observe(document.body,{subtree:true,childList:true});enhanceItemDialog();enhanceOrganizationDialog();installCategoryButtons();renderOrgCategoryTiles()}
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
 })();
