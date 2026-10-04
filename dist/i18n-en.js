@@ -980,3 +980,4 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,
 window.GmachEnglish = Object.freeze({...window.GmachEnglish,
   "מכונת תפירה":"Sewing machine","מכונות תפירה":"Sewing machines","כוס":"Cup","נדנדה":"Swing","פרחים":"Flowers"
 });
+window.GmachEnglish=Object.freeze({...window.GmachEnglish,"סניף איסוף":"Pickup branch","סניפי איסוף":"Pickup branches","יש לבחור סניף איסוף":"Choose a pickup branch","סניף האיסוף אינו משויך לפריט":"The pickup branch is not linked to this item","היחידות חייבות להיות מסניף האיסוף שנבחר בבקשה":"Units must be assigned from the selected pickup branch"});

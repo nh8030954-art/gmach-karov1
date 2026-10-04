@@ -1426,3 +1426,6 @@ html[lang="en"] .header-actions #dashboard-button{
 #admin-control-center .dashboard-row p,#admin-control-center .dashboard-row small{margin:0}
 @media(max-width:900px){#admin-control-center .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){#admin-control-center .stats-grid{grid-template-columns:1fr}}
+
+/* Keep the available count below the rating on narrow item cards. */
+@media(max-width:700px){.item-card-media:has(.item-card-rating) .availability-badge{top:70px;right:8px;max-width:calc(100% - 16px);white-space:normal}.item-card-rating{max-width:calc(100% - 16px);padding-inline:8px}.item-card-rating .rating-stars{font-size:1.2rem;gap:1px}}

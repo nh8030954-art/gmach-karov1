@@ -1,3 +1,4 @@
+import { pickupBranches, branchAvailable } from "./pickup-branches.js";
 import { attachItemEnglish, prepareSavedItemEnglish, publicItemEnglish } from "./item-english.js";
 import { handleRemainingFeatures, runRemainingMaintenance, ensureRemainingFeaturesSchema } from "./remaining-features.js";
 import { handleRequirementsExpansion, requirementsExpansionPreflight, runRequirementsExpansionMaintenance, ensureRequirementsExpansionSchema } from "./requirements-expansion.js";
@@ -772,6 +773,8 @@ async function routeApi(request, env, ctx, url) {
   const itemDetail = path.match(/^\/api\/items\/([^/]+)$/);
   if (method === "GET" && itemDetail) return getItem(env, decodeURIComponent(itemDetail[1]), ctx);
   if (method === "PATCH" && itemDetail) return updateItem(request, env, decodeURIComponent(itemDetail[1]), ctx);
+  const pickupBranchRoute=path.match(/^\/api\/items\/([^/]+)\/pickup-branches$/);
+  if(method==="GET"&&pickupBranchRoute)return json({branches:await pickupBranches(env,decodeURIComponent(pickupBranchRoute[1]))});
   const itemAvailabilityCheck = path.match(/^\/api\/items\/([^/]+)\/availability-check$/);
   if (method === "GET" && itemAvailabilityCheck) return checkItemAvailability(env, decodeURIComponent(itemAvailabilityCheck[1]), url);
   const inventoryManage = path.match(/^\/api\/items\/([^/]+)\/inventory$/);
@@ -2266,7 +2269,9 @@ async function checkItemAvailability(env,itemId,url) {
   assertAllowedPickupReturnTime(from,"האיסוף"); assertAllowedPickupReturnTime(until,"ההחזרה");
   const duration=loanMinutes(from,until);
   if(duration<=0) throw new HttpError(400,"מועד ההחזרה חייב להיות אחרי מועד האיסוף");
-  const available=item.availability_status==="unavailable"?0:await availableQuantityForRange(env,itemId,from,until,item.turnaround_minutes,null);
+  const branchId=url.searchParams.get("branchId"),branches=branchId?await pickupBranches(env,itemId):[],branch=branchId?branches.find(b=>b.id===branchId):null;
+  if(branchId&&!branch)throw new HttpError(400,"סניף האיסוף אינו משויך לפריט");
+  const available=item.availability_status==="unavailable"?0:Math.min(await availableQuantityForRange(env,itemId,from,until,item.turnaround_minutes,null),await branchAvailable(env,itemId,branch,from,until,item.turnaround_minutes));
   let nextAvailableAt=null;
   if(!available && item.availability_status!=="unavailable"){
     const duration=Math.max(1,loanMinutes(from,until));
@@ -2283,7 +2288,7 @@ async function checkItemAvailability(env,itemId,url) {
       if(await availableQuantityForRange(env,itemId,cursor,end,item.turnaround_minutes,null)>0){nextAvailableAt=cursor;break;}
     }
   }
-  return json({available:available>0,availableQuantity:available,totalQuantity:Number(item.quantity),nextAvailableAt,
+  return json({available:available>0,availableQuantity:available,totalQuantity:branch?branch.capacity:Number(item.quantity),nextAvailableAt,
     minLoanMinutes:Number(item.min_loan_minutes),maxLoanMinutes:Number(item.max_loan_minutes),
     depositRequired:Boolean(item.deposit_required),depositAmountAgorot:Number(item.deposit_amount_agorot),approvalMode:item.approval_mode});
 }
@@ -2303,9 +2308,13 @@ async function createLoanRequest(request, env) {
   if (item.owner_id === user.id) throw new HttpError(400, "אי אפשר להזמין פריט מהגמ״ח שבבעלותכם. אפשר לשאול פריטים מגמ״חים אחרים.");
   if (item.availability_status === "unavailable") throw new HttpError(409, "הפריט אינו זמין כרגע");
 
+  const branches=await pickupBranches(env,itemId),requestedBranch=cleanOptional(body.branchId,100);
+  const branch=requestedBranch?branches.find(b=>b.id===requestedBranch):branches.length===1?branches[0]:null;
+  if(requestedBranch&&!branch)throw new HttpError(400,"סניף האיסוף אינו משויך לפריט");
+  if(branches.length>1&&!branch)throw new HttpError(400,"יש לבחור סניף איסוף");
   const from = validateLoanDateTime(body.requestedFrom, "מועד האיסוף");
   const until = validateLoanDateTime(body.requestedUntil, "מועד ההחזרה");
-  const availabilityRuleCheck = await checkAvailabilityRules(env,itemId,from,until,cleanOptional(body.branchId,100));
+  const availabilityRuleCheck = await checkAvailabilityRules(env,itemId,from,until,branch?.id||null);
   if (!availabilityRuleCheck.allowed) throw new HttpError(409, availabilityRuleCheck.reason || "המועד אינו זמין לפי כללי הגמ״ח");
   assertAllowedPickupReturnTime(from, "האיסוף");
   assertAllowedPickupReturnTime(until, "ההחזרה");
@@ -2327,16 +2336,16 @@ async function createLoanRequest(request, env) {
   }
   if(Number(item.service_radius_km||0)>0){
     const home=await env.DB.prepare("SELECT latitude,longitude FROM user_addresses WHERE user_id=? ORDER BY is_default DESC,updated_at DESC LIMIT 1").bind(user.id).first();
-    const branch=await env.DB.prepare("SELECT latitude,longitude FROM organization_branches WHERE organization_id=? AND status='active' AND latitude IS NOT NULL AND longitude IS NOT NULL ORDER BY created_at LIMIT 1").bind(item.organization_id).first();
+    const branchLocation=await env.DB.prepare("SELECT latitude,longitude FROM organization_branches WHERE organization_id=? AND (? IS NULL OR id=?) AND status='active' AND latitude IS NOT NULL AND longitude IS NOT NULL ORDER BY created_at LIMIT 1").bind(item.organization_id,branch?.id||null,branch?.id||null).first();
     if(!home?.latitude||!home?.longitude) throw new HttpError(400,"כדי להזמין מוצר עם מגבלת מרחק יש לשמור כתובת מאומתת עם מיקום באזור האישי");
-    if(branch?.latitude&&branch?.longitude){
-      const distance=haversineKm(Number(home.latitude),Number(home.longitude),Number(branch.latitude),Number(branch.longitude));
+    if(branchLocation?.latitude&&branchLocation?.longitude){
+      const distance=haversineKm(Number(home.latitude),Number(home.longitude),Number(branchLocation.latitude),Number(branchLocation.longitude));
       if(distance>Number(item.service_radius_km)) throw new HttpError(409,`המוצר זמין עד ${item.service_radius_km} ק״מ מהסניף. הכתובת השמורה נמצאת במרחק של כ־${distance.toFixed(1)} ק״מ`);
     }
   }
   if (Number(item.deposit_required) && body.depositAccepted !== true) throw new HttpError(400, "יש לאשר את תנאי הפיקדון לפני שליחת ההזמנה");
 
-  const available = await availableQuantityForRange(env,itemId,from,until,Number(item.turnaround_minutes),null);
+  const available = Math.min(await availableQuantityForRange(env,itemId,from,until,Number(item.turnaround_minutes),null),await branchAvailable(env,itemId,branch,from,until,item.turnaround_minutes));
   if (available < quantity) throw new HttpError(409, available > 0 ? `נותרו רק ${available} יחידות בטווח שבחרתם` : "הפריט אינו זמין בטווח שבחרתם");
 
   const id = crypto.randomUUID();
@@ -2345,16 +2354,17 @@ async function createLoanRequest(request, env) {
   const result = await env.DB.prepare(`
     INSERT INTO loan_requests
       (id,item_id,borrower_id,requested_from,requested_until,phone,note,status,quantity,
-       deposit_required_snapshot,deposit_amount_agorot_snapshot,deposit_terms_accepted_at)
-    SELECT ?,?,?,?,?,?,?,?,?,?,?,?
+       deposit_required_snapshot,deposit_amount_agorot_snapshot,deposit_terms_accepted_at,branch_id)
+    SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?
     WHERE (
       SELECT COALESCE(SUM(lr.quantity),0) FROM loan_requests lr
       WHERE lr.item_id=? AND lr.status IN ('pending','approved','collected')
         AND lr.requested_from < ? AND lr.requested_until > ?
     ) + ? <= ?
+    AND (? IS NULL OR (SELECT COALESCE(SUM(quantity),0) FROM loan_requests WHERE item_id=? AND (branch_id=? OR branch_id IS NULL) AND status IN ('pending','approved','collected') AND requested_from<? AND requested_until>?) + ? <= ?)
   `).bind(id,itemId,user.id,from,until,validatePhone(body.phone),cleanOptional(body.note,500),status,quantity,
-    Number(item.deposit_required),Number(item.deposit_amount_agorot),acceptedAt,
-    itemId,until,from,quantity,Number(item.quantity)).run();
+    Number(item.deposit_required),Number(item.deposit_amount_agorot),acceptedAt,branch?.id||null,
+    itemId,until,from,quantity,Number(item.quantity),branch?.id||null,itemId,branch?.id||null,new Date(Date.parse(until)+Number(item.turnaround_minutes||0)*60000).toISOString().slice(0,16),new Date(Date.parse(from)-Number(item.turnaround_minutes||0)*60000).toISOString().slice(0,16),quantity,branch?.capacity||0).run();
   if (!result.meta.changes) throw new HttpError(409, "המלאי נתפס הרגע על ידי הזמנה אחרת. בחרו מועד אחר");
 
   const holdId=crypto.randomUUID();
@@ -2368,7 +2378,7 @@ async function createLoanRequest(request, env) {
       .bind(holdExpiresAt,status==="approved"?"approved_ready_for_pickup":"inventory_held",id),
     notificationStatement(env,item.owner_id,"request","בקשת השאלה חדשה",`${user.full_name} ביקש/ה ${quantity} יחידות של ${item.title}`,id)
   ]);
-  return json({ request:{id,status,holdExpiresAt}, availability:{remaining:Math.max(0,available-quantity)} },201);
+  return json({ request:{id,status,holdExpiresAt,branchId:branch?.id||null}, availability:{remaining:Math.max(0,available-quantity)} },201);
 }
 
 async function dashboard(request, env) {
@@ -3280,6 +3290,7 @@ async function manageLoanUnits(request,env,requestId,write=false){
   const selectedBranches=[...new Set((valid.results||[]).map(row=>row.branch_id).filter(Boolean).map(String))];
   if(selectedBranches.length>1)throw new HttpError(409,"יש לבחור יחידות מאותו סניף לאיסוף");
   const selectedBranchId=selectedBranches[0]||loan.branch_id||null;
+  if(loan.branch_id&&selectedBranchId!==loan.branch_id)throw new HttpError(409,"היחידות חייבות להיות מסניף האיסוף שנבחר בבקשה");
   const previous=await env.DB.prepare("SELECT unit_id FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL").bind(requestId).all();
   const now=new Date().toISOString(),statements=[env.DB.prepare("UPDATE loan_requests SET branch_id=?,updated_at=? WHERE id=?").bind(selectedBranchId,now,requestId)];
   for(const row of previous.results||[]){

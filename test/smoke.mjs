@@ -572,6 +572,25 @@ try {
   assert.equal(result.data.items.length, 2);
   assert.ok(await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='organization_categories'").first());
 
+  // Pickup selection persists and cannot overbook one branch using another branch's units.
+  await db.prepare("INSERT INTO organization_branches(id,organization_id,name,city,address,status) VALUES('pickup-second',?,'סניף שני','ירושלים','כתובת שנייה','active')").bind(organizationId).run();
+  await db.prepare("UPDATE items SET quantity=2 WHERE id=?").bind(itemId).run();
+  await db.prepare("INSERT INTO item_units(id,item_id,serial_number,status,condition) VALUES('pickup-extra-unit',?,'PICKUP-EXTRA','available','good')").bind(itemId).run();
+  const branchUnits=(await db.prepare("SELECT id FROM item_units WHERE item_id=? AND status!='retired' ORDER BY id").bind(itemId).all()).results;
+  await db.prepare("UPDATE item_units SET branch_id=?,status='available' WHERE id=?").bind(branchId,branchUnits[0].id).run();
+  await db.prepare("UPDATE item_units SET branch_id='pickup-second',status='available' WHERE id=?").bind(branchUnits[1].id).run();
+  result=await request(`/api/items/${itemId}/pickup-branches`);
+  assert.equal(result.response.status,200,JSON.stringify(result.data));assert.equal(result.data.branches.length,2);
+  const pickupBody={itemId,requestedFrom:'2026-10-15T10:00',requestedUntil:'2026-10-16T12:00',quantity:1,depositAccepted:true,phone:'052-7654321'};
+  result=await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:pickupBody});assert.equal(result.response.status,400,'Multiple branches require an explicit choice');
+  result=await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:{...pickupBody,branchId:'foreign'}});assert.equal(result.response.status,400,'Reject unrelated branch');
+  result=await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:{...pickupBody,branchId}});assert.equal(result.response.status,201,JSON.stringify(result.data));
+  const pickupLoan=result.data.request.id;assert.equal((await db.prepare('SELECT branch_id FROM loan_requests WHERE id=?').bind(pickupLoan).first()).branch_id,branchId);
+  result=await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:{...pickupBody,branchId}});assert.equal(result.response.status,409,'Full branch must not borrow stock from another branch');
+  result=await request(`/api/items/${itemId}/availability-check?from=2026-10-15T10%3A00&until=2026-10-16T12%3A00&branchId=pickup-second`);assert.equal(result.response.status,200,JSON.stringify(result.data));assert.equal(result.data.availableQuantity,1);
+  await db.prepare("UPDATE loan_requests SET status='approved' WHERE id=?").bind(pickupLoan).run();
+  result=await request(`/api/loan-requests/${pickupLoan}/assign-units`,{method:'POST',cookie:adminCookie,body:{unitIds:[branchUnits[1].id]}});assert.equal(result.response.status,409,'Pickup assignment cannot silently change the selected branch');
+
   result = await request("/api/auth/logout", { method: "POST", cookie: borrowerCookie });
   assert.equal(result.response.status, 200);
   result = await request("/api/auth/me", { cookie: borrowerCookie });

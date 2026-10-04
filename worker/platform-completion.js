@@ -497,12 +497,17 @@ async function assignUnits(request,env,id){
   if(ids.length!==Number(x.quantity||1))throw new HttpError(400,"מספר היחידות אינו מתאים לכמות");
   const current=await qall(env,"SELECT unit_id FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL",[id]);
   const currentIds=(current||[]).map(r=>String(r.unit_id)),now=new Date().toISOString(),s=[];
+  const selectedBranches=new Set();
   for(const unitId of ids){
-    const u=await qfirst(env,"SELECT id,status FROM item_units WHERE id=? AND item_id=?",[unitId,x.item_id]);
+    const u=await qfirst(env,"SELECT id,status,branch_id FROM item_units WHERE id=? AND item_id=?",[unitId,x.item_id]);
     if(!u||!["available","held","loaned"].includes(u.status))throw new HttpError(409,"יחידה אינה זמינה");
+    if(u.branch_id)selectedBranches.add(u.branch_id);
+    if(x.branch_id&&u.branch_id&&u.branch_id!==x.branch_id)return json({error:"היחידות חייבות להיות מסניף האיסוף שנבחר בבקשה"},409);
     const conflict=await qfirst(env,"SELECT request_id FROM loan_unit_assignments WHERE unit_id=? AND request_id<>? AND returned_at IS NULL LIMIT 1",[unitId,id]);
     if(conflict)throw new HttpError(409,"יחידה כבר מוקצית להשאלה אחרת");
   }
+  if(selectedBranches.size>1)return json({error:"יש לבחור יחידות מאותו סניף לאיסוף"},409);
+  if(!x.branch_id&&selectedBranches.size===1)s.push(env.DB.prepare("UPDATE loan_requests SET branch_id=?,updated_at=? WHERE id=?").bind([...selectedBranches][0],now,id));
   for(const oldId of currentIds)if(!ids.includes(oldId)){
     s.push(env.DB.prepare("DELETE FROM loan_unit_assignments WHERE request_id=? AND unit_id=? AND returned_at IS NULL").bind(id,oldId));
     s.push(env.DB.prepare("UPDATE item_units SET status='available',updated_at=? WHERE id=? AND status IN ('held','loaned')").bind(now,oldId));
@@ -510,7 +515,7 @@ async function assignUnits(request,env,id){
   const targetStatus=x.status==="collected"?"loaned":"held";
   for(const unitId of ids){
     s.push(env.DB.prepare("INSERT OR IGNORE INTO loan_unit_assignments(request_id,unit_id,assigned_at) VALUES(?,?,?)").bind(id,unitId,now));
-    s.push(env.DB.prepare("UPDATE item_units SET status=?,updated_at=? WHERE id=?").bind(targetStatus,now,unitId));
+    s.push(env.DB.prepare("UPDATE item_units SET branch_id=COALESCE(branch_id,?),status=?,updated_at=? WHERE id=?").bind(x.branch_id||null,targetStatus,now,unitId));
   }
   if(s.length)await env.DB.batch(s);
   return json({ok:true,units:ids,status:x.status});

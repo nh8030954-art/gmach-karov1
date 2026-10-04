@@ -15,7 +15,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com https://www.openstreetmap.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';">
 
   <script src="/i18n-boot.js?v=20261003-2710"></script>
-  <script src="/i18n-first-paint.js?v=20261004-names-header"></script>
+  <script src="/i18n-first-paint.js?v=20261004-names-branches-tour"></script>
   <title>גמ״ח ברגע — גדולה גמילות חסדים יותר מן הצדקה</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#243f75">
@@ -25,7 +25,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=block" rel="stylesheet">
   <link rel="icon" type="image/jpeg" href="/gmach-berega-logo.jpg">
-  <link rel="stylesheet" href="/styles.css?v=20261004-stable">
+  <link rel="stylesheet" href="/styles.css?v=20261004-names-branches-tour">
   <link rel="stylesheet" href="/motion.css?v=20261004-names-header">
 
 
@@ -58,7 +58,7 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
   html[lang="en"] #dashboard-title:has(#dashboard-name:empty){font-size:0;min-height:44px}
   html[lang="en"] #dashboard-title:has(#dashboard-name:empty)::before{content:"My account";font-size:clamp(1.55rem,3vw,2.2rem)}
 </style>
-  <link rel="stylesheet" href="/account-tour.css?v=20261004-spotlight">
+  <link rel="stylesheet" href="/account-tour.css?v=20261004-names-branches-tour">
 </head>
 <body>
   <a class="skip-link" href="#main-content">דלגו לתוכן הראשי</a>
@@ -492,7 +492,7 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
     <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת החלון">×</button>
     <div class="dialog-heading"><span class="section-kicker">בקשת השאלה חינמית</span><h2 id="request-title">מתי תרצו את הפריט?</h2><p id="request-item-name"></p></div>
     <form id="request-form" class="stack-form">
-      <input id="request-item-id" type="hidden">
+      <input id="request-item-id" type="hidden"><label id="request-branch-field" hidden><span data-pickup-label>סניף איסוף</span><select id="request-branch"></select></label><p id="request-branch-address" class="form-hint"></p>
       <p class="form-hint">בחרו מועד התחלה ומועד החזרה. לחיצה על שדה התאריך פותחת את יומן המכשיר; הזמינות תיבדק לאחר הבחירה.</p>
       <div class="two-columns"><div><label for="request-start"><span>מועד תחילת ההשאלה</span></label><input id="request-start" type="datetime-local" aria-label="בחירת תאריך ושעת התחלה" required><button class="button button-secondary button-small calendar-picker-button" type="button" data-open-date-picker="request-start">📅 בחירה ביומן</button></div><div><label for="request-end"><span>מועד החזרת הפריט</span></label><input id="request-end" type="datetime-local" aria-label="בחירת תאריך ושעת החזרה" required><button class="button button-secondary button-small calendar-picker-button" type="button" data-open-date-picker="request-end">📅 בחירה ביומן</button></div></div>
       <label><span>כמות</span><input id="request-quantity" type="number" min="1" max="999" value="1" required></label>
@@ -648,21 +648,21 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
   </dialog>
 
   <script src="/vendor/qrcode.js?v=20261003-2710" defer></script>
-  <script src="/account-tour.js?v=20261004-spotlight" defer></script>
-  <script src="/app.js?v=20261004-names-header" defer></script>
-  <script src="/platform-completion.js?v=20261003-2710" defer></script>
-  <script src="/final-features.js?v=20261004-names-header" defer></script>
-  <script src="/i18n-en.js?v=20261004-stable" defer></script>
+  <script src="/account-tour.js?v=20261004-names-branches-tour" defer></script>
+  <script src="/app.js?v=20261004-names-branches-tour" defer></script>
+  <script src="/platform-completion.js?v=20261004-names-branches-tour" defer></script>
+  <script src="/final-features.js?v=20261004-names-branches-tour" defer></script>
+  <script src="/i18n-en.js?v=20261004-names-branches-tour" defer></script>
   <script src="/i18n-errors.js?v=20261003-2710" defer></script>
-  <script src="/remaining-features.js?v=20261004-names-header" defer></script>
+  <script src="/remaining-features.js?v=20261004-names-branches-tour" defer></script>
   <script src="/requirements-expansion.js?v=20261004-names-header" defer></script>
   <script src="/release-experience.js?v=20261003-2710" defer></script>
   <script src="/privacy-purge.js?v=20261004-names-header" defer></script>
-  <script src="/launch-readiness.js?v=20261004-names-header" defer></script>
-  <script src="/distribution-completion.js?v=20261004-names-header2" defer></script>
+  <script src="/launch-readiness.js?v=20261004-names-branches-tour" defer></script>
+  <script src="/distribution-completion.js?v=20261004-names-branches-tour" defer></script>
   <script src="/navigation-admin.js?v=20261003-2710" defer></script>
   <script src="/privacy-availability.js?v=20261004-names-header" defer></script>
-  <script src="/admin-control-center.js?v=20261004-names-header" defer></script>
+  <script src="/admin-control-center.js?v=20261004-names-branches-tour" defer></script>
   <script src="/user-content-translation.js?v=20261004-names-header" defer></script>
   <script src="/motion.js?v=20261003-2710" defer></script>
 

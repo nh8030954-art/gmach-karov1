@@ -3,3 +3,5 @@
 .account-tour-buttons{position:sticky;bottom:-1px;background:white;padding-top:8px}
 
 .account-tour-replay{margin-inline-start:12px;margin-block-end:12px}
+
+@media(min-width:761px){.account-spotlight-tour{z-index:100050}.account-tour-card{animation:none}}
