@@ -5,3 +5,5 @@
 .account-tour-replay{margin-inline-start:12px;margin-block-end:12px}
 
 @media(min-width:761px){.account-spotlight-tour{z-index:100050}.account-tour-card{animation:none}}
+
+@media(min-width:761px){.account-spotlight-tour[dir="rtl"]{width:100%;animation:none}.account-spotlight-tour[dir="rtl"] .account-tour-shade{direction:ltr}.account-spotlight-tour[dir="rtl"] .account-tour-card{right:auto;text-align:right}}
