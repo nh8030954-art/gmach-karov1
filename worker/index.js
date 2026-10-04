@@ -3731,7 +3731,7 @@ function parseEmailDesign(value){try{return {...EMAIL_DESIGN_DEFAULT,...(JSON.pa
 function renderEmailVars(value,vars){let out=String(value||"");for(const [k,v] of Object.entries(vars||{}))out=out.replaceAll("{{"+k+"}}",String(v??""));return out}
 async function managedEmailTemplate(env,key,language,defaults,vars={},actionUrl=""){
   const lang=language==="en"?"en":"he";
-  const row=await env.DB.prepare("SELECT subject,body_text,design_json,enabled FROM email_templates WHERE template_key=? AND language=?").bind(key,lang).first().catch(()=>null);
+  const row=await env.DB.prepare("SELECT subject,body_text,design_json,enabled FROM email_templates WHERE template_key=? AND language=?").bind(key,lang).first().catch(()=>null); const state=await env.DB.prepare("SELECT MIN(enabled) AS enabled FROM email_templates WHERE template_key=?").bind(key).first().catch(()=>null); if(state&&Number(state.enabled)===0)return null;
   if(row&&Number(row.enabled)===0)return null;
   const subject=renderEmailVars(row?.subject||defaults.subject,vars),text=renderEmailVars(row?.body_text||defaults.text,vars),d=parseEmailDesign(row?.design_json);
   const dir=lang==="en"?"ltr":"rtl",logo=d.showLogo&&d.logoUrl?'<img src="'+escapeHtmlEmail(d.logoUrl)+'" alt="Gmach Berega" style="display:block;max-width:150px;max-height:76px;margin:0 auto 18px;object-fit:contain">':"";
