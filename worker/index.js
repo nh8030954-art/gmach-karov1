@@ -2402,17 +2402,18 @@ async function dashboard(request, env) {
     "items"
   );
   const requestsResult = await safeAll(
-    env.DB.prepare(`SELECT lr.id,lr.item_id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,lr.manager_note,lr.created_at,lr.quantity,lr.deposit_required_snapshot,lr.deposit_amount_agorot_snapshot,lr.workflow_status,lr.extension_status,lr.extension_until,lr.change_pending_json,lr.cancellation_undo_until,
-      i.title AS item_title,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,
+    env.DB.prepare(`SELECT lr.id,lr.item_id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,lr.manager_note,lr.created_at,lr.quantity,lr.deposit_required_snapshot,lr.deposit_amount_agorot_snapshot,lr.workflow_status,lr.extension_status,lr.extension_until,lr.change_pending_json,lr.cancellation_undo_until,lr.branch_id,
+      i.title AS item_title,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,b.name AS branch_name,b.city AS branch_city,b.address AS branch_address,
       CASE WHEN o.owner_id = ? THEN 'incoming' ELSE 'outgoing' END AS direction,
-      CASE WHEN lr.borrower_id = ? AND lr.status IN ('approved','collected') THEN c.contact_phone ELSE NULL END AS contact_phone
+      CASE WHEN lr.borrower_id = ? AND lr.status IN ('approved','collected','returned') THEN c.contact_phone ELSE NULL END AS contact_phone
       FROM loan_requests lr JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id
       JOIN users u ON u.id = lr.borrower_id LEFT JOIN organization_contacts c ON c.organization_id = o.id
+      LEFT JOIN organization_branches b ON b.id=lr.branch_id
       WHERE lr.borrower_id = ? OR o.owner_id = ? ORDER BY lr.created_at DESC`).bind(user.id, user.id, user.id, user.id),
     env.DB.prepare(`SELECT lr.id,lr.item_id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,NULL AS manager_note,lr.created_at,
       COALESCE(lr.quantity,1) AS quantity,0 AS deposit_required_snapshot,0 AS deposit_amount_agorot_snapshot,NULL AS workflow_status,NULL AS extension_status,
-      NULL AS extension_until,NULL AS change_pending_json,NULL AS cancellation_undo_until,
-      i.title AS item_title,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,
+      NULL AS extension_until,NULL AS change_pending_json,NULL AS cancellation_undo_until,NULL AS branch_id,
+      i.title AS item_title,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,NULL AS branch_name,NULL AS branch_city,NULL AS branch_address,
       CASE WHEN o.owner_id = ? THEN 'incoming' ELSE 'outgoing' END AS direction,NULL AS contact_phone
       FROM loan_requests lr JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id
       JOIN users u ON u.id = lr.borrower_id
@@ -2459,6 +2460,10 @@ async function dashboard(request, env) {
     borrower_name: row.direction === "incoming" ? row.borrower_name : undefined,
     borrower_phone: row.direction === "incoming" && ["approved","collected","returned"].includes(row.status) ? row.phone : undefined,
     contact_phone: row.contact_phone,
+    branch_id: row.branch_id || null,
+    branch_name: row.branch_name || null,
+    branch_city: row.branch_city || null,
+    branch_address: row.branch_address || null,
     items: { title: row.item_title, organizations: { name: row.org_name } }
   }));
   return json({
