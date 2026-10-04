@@ -1,4 +1,6 @@
 window.GmachEnglish = Object.freeze({
+  "קוד Authenticator אינו נכון או שפג תוקפו":"The Authenticator code is incorrect or has expired",
+  "קוד האישור כבר נוצל או שפג תוקפו":"The confirmation has already been used or has expired",
   "יש להפעיל אימות דו שלבי לפני כניסה להנהלת האתר":"Enable two-factor authentication before accessing site administration",
   "יש להפעיל אימות דו שלבי באפליקציית Authenticator לפני כניסה להנהלת האתר":"Enable Authenticator two-factor authentication before accessing site administration",...window.GmachEnglish,...{
   "JSON לא תקין": "Invalid JSON",

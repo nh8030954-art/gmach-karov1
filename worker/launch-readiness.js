@@ -335,7 +335,7 @@ export async function handleLaunchReadiness(request,env,ctx,url){
     if(method==="GET"&&path==="/api/admin/export.csv")return adminExportCsv(request,env,url);
     if(method==="GET"&&path==="/api/admin/export.xls")return adminExportXls(request,env,url);
     if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/entities\/(users|organizations|items|support)\/([^/]+)$/)))return patchAdminEntity(request,env,m[1],decodeURIComponent(m[2]));
-    if(method==="DELETE"&&(m=path.match(/^\/api\/admin\/entities\/(users|organizations)\/([^/]+)$/)))return deleteAdminEntity(request,env,m[1],decodeURIComponent(m[2]));
+    if(method==="DELETE"&&(m=path.match(/^\/api\/admin\/entities\/(users|organizations)\/([^/]+)$/)))return await deleteAdminEntity(request,env,m[1],decodeURIComponent(m[2]));
     if(method==="GET"&&path==="/api/admin/operations/health")return operationalHealth(request,env);
     if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/operations\/alerts\/([^/]+)\/resolve$/)))return resolveAlert(request,env,decodeURIComponent(m[1]));
     return null;
