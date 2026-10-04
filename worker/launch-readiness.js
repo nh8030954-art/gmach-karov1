@@ -10,7 +10,8 @@ export async function ensureLaunchReadinessSchema(env){
     const statements=[
       "CREATE TABLE IF NOT EXISTS operational_health_snapshots (id TEXT PRIMARY KEY,status TEXT NOT NULL CHECK(status IN ('healthy','warning','critical')),payload_json TEXT NOT NULL DEFAULT '{}',created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))",
       "CREATE INDEX IF NOT EXISTS operational_health_created_idx ON operational_health_snapshots(created_at DESC)",
-      "CREATE INDEX IF NOT EXISTS system_alerts_type_open_idx ON system_alerts(alert_type,resolved_at,created_at DESC)"
+      "CREATE INDEX IF NOT EXISTS system_alerts_type_open_idx ON system_alerts(alert_type,resolved_at,created_at DESC)",
+      "CREATE TABLE IF NOT EXISTS admin_recycle_bin(entity_type TEXT NOT NULL CHECK(entity_type IN ('user','organization','item')),entity_id TEXT NOT NULL,label TEXT NOT NULL,previous_state TEXT NOT NULL,archived_by TEXT NOT NULL,archived_at TEXT NOT NULL,PRIMARY KEY(entity_type,entity_id))"
     ];
     for(const sql of statements)await env.DB.prepare(sql).run();
     return true;
