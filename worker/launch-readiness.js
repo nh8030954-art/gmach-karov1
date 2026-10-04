@@ -182,6 +182,34 @@ async function patchAdminEntity(request,env,type,id){
 }
 
 
+async function deleteAdminEntity(request,env,type,id){
+  const admin=await requireAdmin(request,env),now=new Date().toISOString();
+  if(type==="users"){
+    const old=await env.DB.prepare("SELECT id,email,full_name,role,account_status,deleted_at FROM users WHERE id=?").bind(id).first();
+    if(!old||old.deleted_at)throw new LaunchError(404,"המשתמש לא נמצא");
+    if(String(old.email||"").toLowerCase()==="netanelhirsh@gmail.com")throw new LaunchError(403,"אי אפשר למחוק את מנהל-העל הראשי");
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO admin_recycle_bin(entity_type,entity_id,label,previous_state,archived_by,archived_at) VALUES('user',?,?,?,?,?) ON CONFLICT(entity_type,entity_id) DO UPDATE SET label=excluded.label,previous_state=excluded.previous_state,archived_by=excluded.archived_by,archived_at=excluded.archived_at").bind(id,old.full_name||old.email||id,JSON.stringify(old),admin.id,now),
+      env.DB.prepare("UPDATE users SET deleted_at=?,account_status='suspended',updated_at=? WHERE id=?").bind(now,now,id),
+      env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(id),
+      audit(env,admin.id,"admin.entity.user.delete","user",id,old,{deleted_at:now,account_status:"suspended"})
+    ]);
+    return json({ok:true,deleted:true});
+  }
+  if(type==="organizations"){
+    const old=await env.DB.prepare("SELECT id,name,status,is_hidden,temporarily_closed,reopens_at,deleted_at FROM organizations WHERE id=?").bind(id).first();
+    if(!old||old.deleted_at)throw new LaunchError(404,"הגמ״ח לא נמצא");
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO admin_recycle_bin(entity_type,entity_id,label,previous_state,archived_by,archived_at) VALUES('organization',?,?,?,?,?) ON CONFLICT(entity_type,entity_id) DO UPDATE SET label=excluded.label,previous_state=excluded.previous_state,archived_by=excluded.archived_by,archived_at=excluded.archived_at").bind(id,old.name||id,JSON.stringify(old),admin.id,now),
+      env.DB.prepare("UPDATE organizations SET deleted_at=?,is_hidden=1,temporarily_closed=1,updated_at=? WHERE id=?").bind(now,now,id),
+      env.DB.prepare("UPDATE items SET deleted_at=COALESCE(deleted_at,?),status='archived',availability_status='unavailable',updated_at=? WHERE organization_id=? AND deleted_at IS NULL").bind(now,now,id),
+      audit(env,admin.id,"admin.entity.organization.delete","organization",id,old,{deleted_at:now,is_hidden:1,temporarily_closed:1})
+    ]);
+    return json({ok:true,deleted:true});
+  }
+  throw new LaunchError(400,"מחיקה נתמכת רק למשתמשים ולגמ״חים");
+}
+
 async function operationalHealth(request,env){
   await requireAdmin(request,env);const now=Date.now();
   const [backup,drill,failedQueue,failedOutbox,critical,totals,inventoryMismatch]=await env.DB.batch([
@@ -309,7 +337,7 @@ export async function handleLaunchReadiness(request,env,ctx,url){
     if(method==="GET"&&path==="/api/admin/entities")return adminEntities(request,env,url);
     if(method==="GET"&&path==="/api/admin/export.csv")return adminExportCsv(request,env,url);
     if(method==="GET"&&path==="/api/admin/export.xls")return adminExportXls(request,env,url);
-    if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/entities\/(users|organizations|items|support)\/([^/]+)$/)))return patchAdminEntity(request,env,m[1],decodeURIComponent(m[2]));
+    if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/entities\/(users|organizations|items|support)\/([^/]+)$/)))return patchAdminEntity(request,env,m[1],decodeURIComponent(m[2]));\n    if(method==="DELETE"&&(m=path.match(/^\\/api\\/admin\\/entities\\/(users|organizations)\\/([^/]+)$/)))return deleteAdminEntity(request,env,m[1],decodeURIComponent(m[2]));
     if(method==="GET"&&path==="/api/admin/operations/health")return operationalHealth(request,env);
     if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/operations\/alerts\/([^/]+)\/resolve$/)))return resolveAlert(request,env,decodeURIComponent(m[1]));
     return null;
