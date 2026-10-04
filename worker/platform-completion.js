@@ -569,24 +569,23 @@ async function calendarPreferences(request,env){const u=await requireUser(reques
 async function saveCalendarPreferences(request,env){const u=await requireUser(request,env),b=await readJson(request),app=["ics","google","apple","outlook"].includes(b.preferredApp)?b.preferredApp:"ics",mins=Math.max(0,Math.min(10080,Number(b.reminderMinutes)||1440));await qrun(env,"INSERT INTO calendar_preferences(user_id,preferred_app,reminder_minutes) VALUES(?,?,?) ON CONFLICT(user_id) DO UPDATE SET preferred_app=excluded.preferred_app,reminder_minutes=excluded.reminder_minutes,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')",[u.id,app,mins]);return json({ok:true});}
 async function exportMyData(request,env){
   const u=await requireUser(request,env);
-  const [profile,orgs,items,loans,reviews,messages,addresses,savedSearches,savedEntities,notificationPreferences,supportTickets,securityEvents,legalConsents,recentOrganizations,dataRequests]=await Promise.all([
-    qfirst(env,"SELECT id,email,full_name,role,phone,city,preferred_language,preferred_navigation,terms_accepted_at,privacy_accepted_at,created_at,last_login_at FROM users WHERE id=?",[u.id]),
-    qall(env,"SELECT * FROM organizations WHERE owner_id=?",[u.id]),
-    qall(env,"SELECT i.* FROM items i JOIN organizations o ON o.id=i.organization_id WHERE o.owner_id=?",[u.id]),
-    qall(env,"SELECT * FROM loan_requests WHERE borrower_id=?",[u.id]),
-    qall(env,"SELECT * FROM reviews WHERE author_id=?",[u.id]),
-    qall(env,"SELECT m.* FROM request_messages m JOIN loan_requests l ON l.id=m.request_id WHERE m.sender_id=? OR l.borrower_id=?",[u.id,u.id]),
-    qall(env,"SELECT id,label,city,latitude,longitude,is_default,created_at,updated_at FROM user_addresses WHERE user_id=?",[u.id]),
-    qall(env,"SELECT * FROM saved_searches WHERE user_id=?",[u.id]),
-    qall(env,"SELECT * FROM saved_entities WHERE user_id=?",[u.id]),
-    qall(env,"SELECT * FROM notification_preferences WHERE user_id=?",[u.id]),
-    qall(env,"SELECT * FROM support_tickets WHERE user_id=?",[u.id]),
-    qall(env,"SELECT id,event_type,severity,device_label,details_json,created_at FROM security_events WHERE user_id=? ORDER BY created_at DESC LIMIT 1000",[u.id]),
-    qall(env,"SELECT document_type,version,accepted_at,source FROM legal_consents WHERE user_id=? ORDER BY accepted_at DESC",[u.id]),
-    qall(env,"SELECT r.organization_id,r.viewed_at,o.name,o.city FROM recently_viewed_organizations r JOIN organizations o ON o.id=r.organization_id WHERE r.user_id=? ORDER BY r.viewed_at DESC",[u.id]),
-    qall(env,"SELECT id,request_type,details,status,created_at,completed_at FROM user_data_requests WHERE user_id=? ORDER BY created_at DESC",[u.id])
+  const [profile,addresses,orgs,items,loans,reviews,messages,savedSearches,supportTickets,legalConsents]=await Promise.all([
+    qfirst(env,"SELECT full_name,email,phone,city,preferred_language,created_at FROM users WHERE id=?",[u.id]),
+    qall(env,"SELECT label,city,is_default,created_at FROM user_addresses WHERE user_id=? ORDER BY is_default DESC,created_at",[u.id]),
+    qall(env,"SELECT name,city,address,contact_phone,status,description,created_at FROM organizations WHERE owner_id=? ORDER BY created_at",[u.id]),
+    qall(env,"SELECT i.title,o.name AS organization_name,i.category,i.subcategory,i.condition,i.quantity,i.availability_status,i.status,i.created_at FROM items i JOIN organizations o ON o.id=i.organization_id WHERE o.owner_id=? ORDER BY i.created_at",[u.id]),
+    qall(env,"SELECT i.title AS item,o.name AS organization,lr.status,lr.quantity,lr.requested_from,lr.requested_until,lr.created_at FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.borrower_id=? ORDER BY lr.created_at",[u.id]),
+    qall(env,"SELECT o.name AS organization,i.title AS item,r.rating AS organization_rating,r.item_rating,r.service_rating,r.comment,r.status,r.created_at FROM reviews r LEFT JOIN items i ON i.id=r.item_id LEFT JOIN organizations o ON o.id=r.organization_id WHERE r.author_id=? ORDER BY r.created_at",[u.id]),
+    qall(env,"SELECT i.title AS item,m.body AS message,m.created_at FROM request_messages m JOIN loan_requests l ON l.id=m.request_id JOIN items i ON i.id=l.item_id WHERE m.sender_id=? OR l.borrower_id=? ORDER BY m.created_at",[u.id,u.id]),
+    qall(env,"SELECT name,filters_json,notify,created_at FROM saved_searches WHERE user_id=? ORDER BY created_at",[u.id]),
+    qall(env,"SELECT ticket_number,subject,status,created_at,updated_at FROM support_tickets WHERE user_id=? ORDER BY created_at",[u.id]),
+    qall(env,"SELECT document_type,version,accepted_at FROM legal_consents WHERE user_id=? ORDER BY accepted_at",[u.id])
   ]);
-  return json({exportedAt:new Date().toISOString(),profile,addresses,organizations:orgs,items,loans,reviews,messages,savedSearches,savedEntities,notificationPreferences,supportTickets,securityEvents,legalConsents,recentOrganizations,dataRequests});
+  return json({
+    exportedAt:new Date().toISOString(),
+    language:profile?.preferred_language||"he",
+    profile,addresses,organizations:orgs,items,loans,reviews,messages,savedSearches,supportTickets,legalConsents
+  });
 }
 async function dataRequest(request,env){const u=await requireUser(request,env),b=await readJson(request),type=["export","access","correction"].includes(b.type)?b.type:"access",id=crypto.randomUUID();await qrun(env,"INSERT INTO user_data_requests(id,user_id,request_type,details) VALUES(?,?,?,?)",[id,u.id,type,optional(b.details,2000)]);return json({request:{id,type,status:"open"}},201);}
 
