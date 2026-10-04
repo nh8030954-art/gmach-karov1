@@ -25,26 +25,7 @@ function modal(title,html){
   d.innerHTML=`<div class="platform-dialog-inner" dir="${document.documentElement.lang==="en"?"ltr":"rtl"}"><div class="platform-dialog-head"><h2>${esc(title)}</h2><button type="button" class="platform-dialog-close" aria-label="סגירה">×</button></div><div id="final-feature-body">${html}</div></div>`;
   $(".platform-dialog-close",d).onclick=()=>d.close();d.showModal();return d;
 }
-async function installTour(){
-  try{
-    const me=await api("/api/auth/me");if(!me.user)return;
-    const data=await api("/api/me/tours/dashboard");
-    if(data.tour?.completed_at||data.tour?.dismissed_at)return;
-    const steps=[
-      ["ברוכים הבאים","מכאן אפשר לחפש מוצר, לבקש מהקהילה, לעקוב אחר השאלות ולפתוח גמ״ח."],
-      ["חיפוש והשאלה","חפשו מוצר לפי שם, עיר, מרחק וזמינות. בעמוד המוצר בוחרים תאריך, שעה וכמות."],
-      ["האזור האישי","באזור האישי תראו בקשות, החזרות, התראות, כתובות, מכשירים, מועדפים ולוח זמנים."],
-      ["ניהול גמ״ח","אם אתם מנהלים גמ״ח, המרכז המתקדם מרכז סניפים, מלאי, QR, הרשאות ודוחות."]
-    ];
-    let step=Math.min(Number(data.tour?.last_step||0),steps.length-1);
-    const render=()=>{
-      const [h,p]=steps[step],d=modal(h,`<p style="line-height:1.7">${esc(p)}</p><div class="platform-progress"><span style="width:${((step+1)/steps.length)*100}%"></span></div><p class="platform-muted">שלב ${step+1} מתוך ${steps.length}</p><div class="platform-row-actions"><button class="platform-action secondary" id="tour-skip">דלג ואל תציג שוב</button>${step?'<button class="platform-action secondary" id="tour-prev">הקודם</button>':""}<button class="platform-action" id="tour-next">${step===steps.length-1?"סיום":"הבא"}</button></div>`);
-      $("#tour-skip",d).onclick=async()=>{await api("/api/me/tours/dashboard",{method:"PATCH",body:{step,dismissed:true}});d.close()};
-      $("#tour-prev",d)?.addEventListener("click",()=>{step--;d.close();render()});
-      $("#tour-next",d).onclick=async()=>{if(step===steps.length-1){await api("/api/me/tours/dashboard",{method:"PATCH",body:{step,completed:true}});d.close()}else{step++;await api("/api/me/tours/dashboard",{method:"PATCH",body:{step}});d.close();render()}};
-    };render();
-  }catch{}
-}
+async function installTour(){await window.GmachStartAccountTour?.()}
 async function openOrganizationOnboardingPreview(orgId){
   const [pub,status]=await Promise.all([api("/api/organizations/"+encodeURIComponent(orgId)+"/public"),api("/api/organizations/"+encodeURIComponent(orgId)+"/onboarding").catch(()=>({readiness:{}}))]);
   await api("/api/organizations/"+encodeURIComponent(orgId)+"/onboarding",{method:"PATCH",body:{previewSeen:true}}).catch(()=>{});
