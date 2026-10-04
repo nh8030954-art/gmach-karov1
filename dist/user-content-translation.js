@@ -20,7 +20,7 @@
   function chunks(value) {
     const result=[];
     while(value.length>500) {
-      let end=value.lastIndexOf(' ',500);
+      let end=value.lastIndexOf(' ',499);
       if(end<250)end=500;else end++;
       result.push(value.slice(0,end));value=value.slice(end);
     }
@@ -36,6 +36,7 @@
       const raw=name?el.getAttribute(name):node.nodeValue;
       if(!raw||!/[\u0590-\u05ff]/.test(raw))return;
       const value=raw.trim();
+      if(!name&&el.tagName==='OPTION'&&!el.hasAttribute('value'))el.setAttribute('value',value);
       // UI phrases use reviewed translations; AI is reserved for remaining content.
       const local=window.GmachTranslate?.(value)||value;
       if(local!==value) {
