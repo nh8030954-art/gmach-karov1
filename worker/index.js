@@ -3208,7 +3208,7 @@ async function syncItemUnitsToQuantity(env,itemId,desiredQuantity){
     const removable=await env.DB.prepare("SELECT u.id,u.serial_number FROM item_units u WHERE u.item_id=? AND u.status='available' AND NOT EXISTS(SELECT 1 FROM loan_unit_assignments a WHERE a.unit_id=u.id AND a.returned_at IS NULL) ORDER BY u.created_at DESC,u.id DESC").bind(itemId).all();
     const need=active.length-desired;
     if((removable.results||[]).length<need)throw new HttpError(409,"אי אפשר להקטין את הכמות כרגע כי חלק מהיחידות מושאלות או מוקצות לבקשה פעילה");
-    const now=new Date().toISOString(),statements=[];
+    const now=new Date().toISOString(),statements=[env.DB.prepare("UPDATE loan_requests SET branch_id=?,updated_at=? WHERE id=?").bind(selectedBranchId,now,requestId)];
     for(const unit of (removable.results||[]).slice(0,need)){
       statements.push(env.DB.prepare("INSERT OR IGNORE INTO retired_serials(serial_number,item_unit_id,retired_at) VALUES(?,?,?)").bind(unit.serial_number,unit.id,now));
       statements.push(env.DB.prepare("UPDATE item_units SET status='retired',retired_at=?,updated_at=? WHERE id=?").bind(now,now,unit.id));
@@ -3267,10 +3267,13 @@ async function manageLoanUnits(request,env,requestId,write=false){
   const required=Math.max(1,Number(loan.quantity||1));
   if(unitIds.length!==required)throw new HttpError(400,"יש לבחור בדיוק "+required+" יחידות לאיסוף");
   const placeholders=unitIds.map(()=>"?").join(",");
-  const valid=await env.DB.prepare("SELECT id FROM item_units WHERE item_id=? AND id IN ("+placeholders+") AND status IN ('available','held','loaned')").bind(loan.item_id,...unitIds).all();
+  const valid=await env.DB.prepare("SELECT id,branch_id FROM item_units WHERE item_id=? AND id IN ("+placeholders+") AND status IN ('available','held','loaned')").bind(loan.item_id,...unitIds).all();
   if((valid.results||[]).length!==unitIds.length)throw new HttpError(409,"אחת היחידות שנבחרו אינה זמינה");
   const conflict=await env.DB.prepare("SELECT COUNT(*) AS count FROM loan_unit_assignments WHERE unit_id IN ("+placeholders+") AND request_id<>? AND returned_at IS NULL").bind(...unitIds,requestId).first();
   if(Number(conflict?.count||0)>0)throw new HttpError(409,"אחת היחידות כבר מוקצית להשאלה אחרת");
+  const selectedBranches=[...new Set((valid.results||[]).map(row=>row.branch_id).filter(Boolean).map(String))];
+  if(selectedBranches.length>1)throw new HttpError(409,"יש לבחור יחידות מאותו סניף לאיסוף");
+  const selectedBranchId=selectedBranches[0]||loan.branch_id||null;
   const previous=await env.DB.prepare("SELECT unit_id FROM loan_unit_assignments WHERE request_id=? AND returned_at IS NULL").bind(requestId).all();
   const now=new Date().toISOString(),statements=[];
   for(const row of previous.results||[]){
