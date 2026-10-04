@@ -136,18 +136,40 @@
   async function renderTransfers(){const data=await api("/api/me/organization-transfers");body.innerHTML=`<h3>העברות בעלות</h3><h4>הזמנות שקיבלת</h4><div class="pt-list">${(data.incoming||[]).map(x=>`<div class="pt-card"><strong>${esc(x.organization_name)}</strong><div class="pt-muted">מאת ${esc(x.from_name)} · ${esc(x.status)} · בתוקף עד ${esc(x.expires_at)}</div>${x.status==="pending"?`<div class="pt-row"><button class="pt-btn primary" data-transfer-accept="${esc(x.id)}">קבלת בעלות</button><button class="pt-btn danger" data-transfer-decline="${esc(x.id)}">דחייה</button></div>`:""}</div>`).join("")||'<p class="pt-muted">אין הזמנות ממתינות.</p>'}</div><h4>העברות ששלחת</h4><div class="pt-list">${(data.outgoing||[]).map(x=>`<div class="pt-card"><strong>${esc(x.organization_name)}</strong><div class="pt-muted">אל ${esc(x.to_name||x.to_email)} · ${esc(x.status)} · בתוקף עד ${esc(x.expires_at)}</div></div>`).join("")||'<p class="pt-muted">אין העברות שנשלחו.</p>'}</div><div class="pt-status"></div>`;const respond=async(id,accept)=>{try{await api("/api/organization-transfers/"+encodeURIComponent(id)+"/respond",{method:"POST",body:{accept}});setStatus(accept?"הבעלות הועברה לחשבון שלך.":"ההזמנה נדחתה.");await renderTransfers()}catch(e){setStatus(e.message,true)}};body.querySelectorAll("[data-transfer-accept]").forEach(b=>b.onclick=()=>respond(b.dataset.transferAccept,true));body.querySelectorAll("[data-transfer-decline]").forEach(b=>b.onclick=()=>respond(b.dataset.transferDecline,false))}
 
   function personalExportExcel(data){
+    const lang=data?.language==="en"?"en":"he",en=lang==="en";
     const xmlEscape=value=>String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[ch]));
-    const scalar=value=>value&&typeof value==="object"?JSON.stringify(value):value??"";
-    const safeSheet=(name,index)=>String(name||("Sheet"+index)).replace(/[\\\/?*\[\]:]/g," ").slice(0,31)||("Sheet"+index);
-    const sections=Object.entries(data||{}).filter(([key])=>key!=="exportedAt");
-    const worksheet=(name,value,index)=>{
-      const rows=Array.isArray(value)?value:(value&&typeof value==="object"?[value]:[{value}]);
-      const columns=[...new Set(rows.flatMap(row=>row&&typeof row==="object"&&!Array.isArray(row)?Object.keys(row):["value"]))];
-      const rowXml=vals=>"<Row>"+vals.map(v=>'<Cell><Data ss:Type="String">'+xmlEscape(scalar(v))+"</Data></Cell>").join("")+"</Row>";
-      return '<Worksheet ss:Name="'+xmlEscape(safeSheet(name,index))+'"><Table>'+rowXml(columns)+rows.map(row=>rowXml(columns.map(col=>row&&typeof row==="object"&&!Array.isArray(row)?row[col]:row))).join("")+"</Table></Worksheet>";
+    const sectionNames={
+      profile:en?"Profile":"פרטי חשבון",addresses:en?"Saved addresses":"כתובות שמורות",organizations:en?"My gmachs":"הגמ״חים שלי",
+      items:en?"My items":"הפריטים שלי",loans:en?"My loans":"ההשאלות שלי",reviews:en?"My reviews":"הדירוגים שלי",
+      messages:en?"Loan messages":"הודעות בהשאלות",savedSearches:en?"Saved searches":"חיפושים שמורים",
+      supportTickets:en?"Support requests":"פניות לתמיכה",legalConsents:en?"Consents":"הסכמות"
     };
-    const summary='<Worksheet ss:Name="Summary"><Table><Row><Cell><Data ss:Type="String">Exported at</Data></Cell><Cell><Data ss:Type="String">'+xmlEscape(data?.exportedAt||new Date().toISOString())+'</Data></Cell></Row></Table></Worksheet>';
-    const xml='<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'+summary+sections.map(([name,value],i)=>worksheet(name,value,i+1)).join("")+"</Workbook>";
+    const labels={
+      full_name:[ "שם מלא","Full name"],email:["אימייל","Email"],phone:["טלפון","Phone"],city:["עיר/יישוב","City / locality"],preferred_language:["שפת חשבון","Account language"],created_at:["נוצר בתאריך","Created at"],
+      label:["שם הכתובת","Address label"],is_default:["ברירת מחדל","Default"],name:["שם","Name"],address:["כתובת","Address"],contact_phone:["טלפון","Phone"],status:["מצב","Status"],description:["תיאור","Description"],
+      title:["שם הפריט","Item"],organization_name:["גמ״ח","Gmach"],organization:["גמ״ח","Gmach"],category:["קטגוריה","Category"],subcategory:["קטגוריית משנה","Subcategory"],condition:["מצב הפריט","Condition"],quantity:["כמות","Quantity"],availability_status:["זמינות","Availability"],
+      item:["פריט","Item"],requested_from:["מתאריך","From"],requested_until:["עד תאריך","Until"],organization_rating:["דירוג גמ״ח","Gmach rating"],item_rating:["דירוג פריט","Item rating"],service_rating:["דירוג שירות","Service rating"],comment:["הערה","Comment"],
+      message:["הודעה","Message"],filters_json:["מסננים","Filters"],notify:["התראות פעילות","Notifications enabled"],ticket_number:["מספר פנייה","Ticket number"],subject:["נושא","Subject"],updated_at:["עודכן בתאריך","Updated at"],document_type:["מסמך","Document"],version:["גרסה","Version"],accepted_at:["אושר בתאריך","Accepted at"]
+    };
+    const statusMap={
+      active:["פעיל","Active"],approved:["אושר","Approved"],pending:["ממתין","Pending"],returned:["הוחזר","Returned"],collected:["נאסף","Collected"],cancelled:["בוטל","Cancelled"],declined:["נדחה","Declined"],archived:["בארכיון","Archived"],available:["זמין","Available"],unavailable:["לא זמין","Unavailable"],reserved:["בתיאום","Reserved"],published:["פורסם","Published"],hidden:["מוסתר","Hidden"]
+    };
+    const display=value=>{
+      if(value===true||value===1)return en?"Yes":"כן";
+      if(value===false||value===0)return en?"No":"לא";
+      const key=String(value??"");return statusMap[key]?(en?statusMap[key][1]:statusMap[key][0]):key;
+    };
+    const safeSheet=(name,index)=>String(name||("Sheet"+index)).replace(/[\\\/?*\[\]:]/g," ").slice(0,31)||("Sheet"+index);
+    const sections=Object.entries(data||{}).filter(([key])=>sectionNames[key]);
+    const worksheet=(key,value,index)=>{
+      const rows=Array.isArray(value)?value:(value&&typeof value==="object"?[value]:[]);
+      const columns=[...new Set(rows.flatMap(row=>row&&typeof row==="object"&&!Array.isArray(row)?Object.keys(row):[]))];
+      const rowXml=vals=>"<Row>"+vals.map(v=>'<Cell><Data ss:Type="String">'+xmlEscape(display(v))+"</Data></Cell>").join("")+"</Row>";
+      const header=columns.map(col=>labels[col]?(en?labels[col][1]:labels[col][0]):col);
+      return '<Worksheet ss:Name="'+xmlEscape(safeSheet(sectionNames[key],index))+'"><Table>'+rowXml(header)+rows.map(row=>rowXml(columns.map(col=>row[col]))).join("")+"</Table></Worksheet>";
+    };
+    const summaryName=en?"Summary":"סיכום",exportedLabel=en?"Exported at":"מועד הייצוא",summary='<Worksheet ss:Name="'+summaryName+'"><Table><Row><Cell><Data ss:Type="String">'+exportedLabel+'</Data></Cell><Cell><Data ss:Type="String">'+xmlEscape(data?.exportedAt||new Date().toISOString())+'</Data></Cell></Row></Table></Worksheet>';
+    const xml='<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'+summary+sections.map(([key,value],i)=>worksheet(key,value,i+1)).join("")+"</Workbook>";
     return new Blob(["\ufeff",xml],{type:"application/vnd.ms-excel;charset=utf-8"});
   }
 
@@ -157,7 +179,7 @@
       <form class="pt-form" id="pt-data-request-form" hidden><h4 id="pt-data-request-title"></h4><label for="pt-data-request-details">פרטי הבקשה</label><textarea id="pt-data-request-details" name="details" rows="4" maxlength="2000" minlength="5" required></textarea><div class="pt-row"><button class="pt-btn primary" type="submit">שליחת הבקשה</button><button class="pt-btn" type="button" id="pt-data-request-cancel">ביטול</button></div></form></section>
       <section class="pt-card"><h3>מחיקת חשבון</h3><p>בקשת מחיקה מתחילה תקופת המתנה של שבעה ימים. אם יש השאלות פעילות, הטיפול ימתין לסגירתן.</p><button class="pt-btn danger" id="pt-request-deletion" type="button">בקשת מחיקת חשבון</button>
       <form class="pt-form" id="pt-deletion-form" hidden><p>לאחר שליחת הבקשה אפשר לבטל אותה במשך שבעה ימים בלשונית הפרופיל.</p><label><input type="checkbox" required> הבנתי ואני מבקש/ת להתחיל בתהליך מחיקת החשבון</label><div class="pt-row"><button class="pt-btn danger" type="submit">אישור בקשת המחיקה</button><button class="pt-btn" type="button" id="pt-deletion-cancel">ביטול</button></div></form></section></div><div class="pt-status" role="status" aria-live="polite"></div>`;
-    $("#pt-export-data",body).onclick=async()=>{try{const data=await api("/api/me/export");const blob=personalExportExcel(data),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="gmach-my-data.xls";a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);setStatus("קובץ Excel קריא עם גיליונות נפרדים נוצר.")}catch(e){setStatus(e.message,true)}};
+    $("#pt-export-data",body).onclick=async()=>{try{const data=await api("/api/me/export");const blob=personalExportExcel(data),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=(data?.language==="en"?"my-gmach-data.xls":"נתוני-גמח-ברגע.xls");a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);setStatus("קובץ Excel קריא עם גיליונות נפרדים נוצר.")}catch(e){setStatus(e.message,true)}};
     const form=$("#pt-data-request-form",body);
     for(const [id,type,title] of [["pt-data-access","access","מה תרצו לקבל בבקשת העיון?"],["pt-data-correct","correction","איזה מידע תרצו לתקן?"]]){
       $("#"+id,body).onclick=()=>{form.reset();form.dataset.requestType=type;$("#pt-data-request-title",body).textContent=title;form.hidden=false;$("#pt-data-request-details",body).focus()};
