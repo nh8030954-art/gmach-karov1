@@ -58,8 +58,8 @@ async function contentHash(value){return b64(new Uint8Array(await crypto.subtle.
 async function sendAlertEmail(env,alert){
   const recipient=String(env.ADMIN_ALERT_EMAIL||env.SUPPORT_EMAIL||"").trim();
   if(!recipient||!env.RESEND_API_KEY)return {sent:false,reason:"not_configured"};
-  const state=await env.DB.prepare("SELECT MIN(enabled) AS enabled FROM email_templates WHERE template_key='system_alert'").first();
-  if(state?.enabled!==null&&Number(state?.enabled)===0)return {sent:false,reason:"template_disabled"};
+  const state=await env.DB.prepare("SELECT MIN(enabled) AS enabled FROM email_templates WHERE template_key='system_alert'").first().catch(()=>null);
+  if(!state||state.enabled==null||Number(state.enabled)!==1)return {sent:false,reason:"template_disabled"};
   const existing=await env.DB.prepare("SELECT 1 FROM system_alert_deliveries WHERE alert_id=? AND channel='email' AND recipient=? AND status='sent'").bind(alert.id,recipient).first().catch(()=>null);
   if(existing)return {sent:true,duplicate:true};
   const details=safe(alert.details_json,{});

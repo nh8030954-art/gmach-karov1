@@ -626,7 +626,7 @@ async function processNotificationQueue(env,now){
       const lang=n.preferred_language==="en"?"en":"he",title=String(n.title||"");
       const templateKey=n.channel==="digest"?"daily_digest":prefType==="security"?"new_device":prefType==="waitlist"?"waitlist":prefType==="support"?"support":(/הארכ|extension/i.test(title)?"extension":/ביטול|cancel/i.test(title)?"loan_cancelled":/איסוף|pickup/i.test(title)?"pickup_confirmed":"notification");
       const template=await qfirst(env,"SELECT MIN(enabled) AS enabled FROM email_templates WHERE template_key=?",[templateKey]);
-      if((n.channel==="email"||n.channel==="digest")&&template&&template.enabled!==null&&Number(template.enabled)===0){await qrun(env,"UPDATE notification_queue SET sent_at=?,error=? WHERE id=?",[now,"suppressed: email template disabled",n.id]);continue;}
+      if((n.channel==="email"||n.channel==="digest")&&(!template||template.enabled==null||Number(template.enabled)!==1)){await qrun(env,"UPDATE notification_queue SET sent_at=?,error=? WHERE id=?",[now,"suppressed: email template disabled",n.id]);continue;}
       if(n.channel==="digest"){
         const key=n.user_id; if(!digestGroups.has(key))digestGroups.set(key,{user:n,items:[]});digestGroups.get(key).items.push(n);continue;
       }

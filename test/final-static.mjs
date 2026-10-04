@@ -616,7 +616,7 @@ assert.ok(remainingClient.includes("attempt<4")&&remainingClient.includes("city!
 assert.ok(remainingClient.includes("screenX=wp.x-left")&&remainingClient.includes("screenY=wp.y-top"),"gmach markers must be positioned from Web Mercator coordinates on every render");
 
 assert.ok(adminControlCenter.includes("admin-control-entry"),"super-admin control center entry must use dedicated high-contrast styling");
-assert.ok(worker.includes("specificRow")&&worker.includes("Number(specificRow.enabled)===0"),"disabled specific email templates must suppress operational email delivery without generic fallback");
+assert.ok(worker.includes("specificRow")&&worker.includes("Number(specificRow.enabled)!==1"),"disabled specific email templates must suppress operational email delivery without generic fallback");
 assert.ok(platform.includes("suppressed: email template disabled")&&platform.includes("suppressed: email preference disabled"),"legacy notification queue must re-check email switches at send time");
 assert.ok(appClient.includes("subtitleEn")&&appClient.includes("Everything available")&&appClient.includes("categoryDisplayName"),"English category carousel and dynamic category options must render in English");
 

@@ -176,6 +176,9 @@ try {
   await request("/api/admin/email-templates/new_device/enabled",{method:"PATCH",cookie:adminCookie,body:{enabled:true}});
   await securityMail({DB:db},(await db.prepare("SELECT id FROM users WHERE role='admin' LIMIT 1").first()).id,"כניסה ממכשיר חדש","test");assert.equal(securityMailCalls,1,"Enabled new-device mail reaches provider");
   await securityMail({DB:{prepare:sql=>sql.includes('MIN(enabled)')?{first:async()=>{throw Error('database unavailable')}}:{bind:()=>({first:async()=>({email:'test@example.org',full_name:'Test',preferred_language:'he'})})}}},"test-user","test","test");assert.equal(securityMailCalls,1,"Unreadable email controls must suppress delivery");
+  const mailSource=await readFile("worker/index.js","utf8");
+  const managedMail=vm.runInNewContext(mailSource.slice(mailSource.indexOf("async function managedEmailTemplate"),mailSource.indexOf("async function sendVerificationEmail"))+";managedEmailTemplate");
+  for(const key of ["verification","password_reset","manager_invite","notification","daily_digest","new_device","pickup_confirmed","loan_cancelled","extension","waitlist","support","system_alert"]){for(const language of ["he","en"]){for(const failure of ["disabled","missing","database_error"]){const gateDB={prepare:()=>({bind:()=>({first:async()=>{if(failure==="database_error")throw Error("unavailable");return failure==="missing"?null:{enabled:0}}})})};assert.equal(await managedMail({DB:gateDB},key,language,{subject:"test",text:"test"}),null,key+" "+language+" must suppress "+failure);}}}
   const resetRows=templateRows.filter(r=>r.template_key==="password_reset");
   assert.equal(resetRows.length,2);assert.ok(resetRows.every(r=>Number(r.enabled)===0));
   const englishReset=resetRows.find(r=>r.language==="en");

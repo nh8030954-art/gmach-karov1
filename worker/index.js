@@ -3505,9 +3505,8 @@ async function sendOperationalNotificationEmail(env,user,notification){
   const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/dashboard";
   const specific=operationalTemplateKey(notification);
   const specificRow=await emailTemplateState(env,specific,lang);
-  if(specificRow&&specificRow.enabled!==null&&Number(specificRow.enabled)===0)return false;
+  if(!specificRow||specificRow.enabled==null||Number(specificRow.enabled)!==1)return false;
   let mail=await managedEmailTemplate(env,specific,lang,{subject:en?"Gmach Berega update":"עדכון חדש בגמ״ח ברגע",text:"{{title}}\n\n{{body}}"},{title:notification.title||"",body:notification.body||"",account_url:accountUrl},accountUrl);
-  if(!mail&&specific!=="notification"&&!specificRow)mail=await managedEmailTemplate(env,"notification",lang,{subject:en?"Gmach Berega update":"עדכון חדש בגמ״ח ברגע",text:"{{title}}\n\n{{body}}"},{title:notification.title||"",body:notification.body||"",account_url:accountUrl},accountUrl);
   if(!mail)return false;
   const unsubToken=Number(user.community_emails_accepted)?await communityUnsubscribeToken(env,user.user_id||user.id):null,unsubUrl=unsubToken?"https://gmach-berega.co.il/api/unsubscribe/community?token="+encodeURIComponent(unsubToken):null;
   if(unsubUrl)mail.text+=(en?"\n\nUnsubscribe from community updates: ":"\n\nהסרה מעדכוני קהילה: ")+unsubUrl;
@@ -3570,7 +3569,7 @@ async function deliverDailyDigests(env){
     const items=await env.DB.prepare(`SELECT n.id,n.title,n.body,n.created_at FROM notifications n WHERE n.user_id=? AND n.created_at>=datetime('now','-4 days') AND NOT EXISTS(SELECT 1 FROM notification_delivery_log l WHERE l.notification_id=n.id AND l.channel='email' AND l.status='sent') ORDER BY n.created_at DESC LIMIT 30`).bind(user.id).all();
     if(!(items.results||[]).length)continue;
     const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/dashboard";
-    const digestTemplate=await emailTemplateState(env,"daily_digest",lang);if(digestTemplate&&digestTemplate.enabled!==null&&Number(digestTemplate.enabled)===0)continue;
+    const digestTemplate=await emailTemplateState(env,"daily_digest",lang);if(!digestTemplate||digestTemplate.enabled==null||Number(digestTemplate.enabled)!==1)continue;
     const digestBody=(en?"Updates from the last day:":"עדכונים מהיממה האחרונה:")+"\n\n"+items.results.map(x=>"• "+x.title+" — "+x.body).join("\n");
     const mail=await managedEmailTemplate(env,"daily_digest",lang,{subject:en?"Your daily Gmach Berega summary":"הסיכום היומי שלך מגמ״ח ברגע",text:"{{body}}"},{body:digestBody,account_url:accountUrl},accountUrl);if(!mail)continue;
     const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],...mail,...sacredEmailScheduleFields()})});
@@ -3766,7 +3765,7 @@ function parseEmailDesign(value){try{return {...EMAIL_DESIGN_DEFAULT,...(JSON.pa
 function renderEmailVars(value,vars){let out=String(value||"");for(const [k,v] of Object.entries(vars||{}))out=out.replaceAll("{{"+k+"}}",String(v??""));return out}
 async function managedEmailTemplate(env,key,language,defaults,vars={},actionUrl=""){
   const lang=language==="en"?"en":"he";
-  const row=await env.DB.prepare("SELECT subject,body_text,design_json,enabled FROM email_templates WHERE template_key=? AND language=?").bind(key,lang).first().catch(()=>null); const state=await env.DB.prepare("SELECT MIN(enabled) AS enabled FROM email_templates WHERE template_key=?").bind(key).first().catch(()=>null); if(state&&state.enabled!==null&&Number(state.enabled)===0)return null;
+  const row=await env.DB.prepare("SELECT subject,body_text,design_json,enabled FROM email_templates WHERE template_key=? AND language=?").bind(key,lang).first().catch(()=>null); const state=await env.DB.prepare("SELECT MIN(enabled) AS enabled FROM email_templates WHERE template_key=?").bind(key).first().catch(()=>null); if(!state||state.enabled==null||Number(state.enabled)!==1)return null;
   if(row&&Number(row.enabled)===0)return null;
   const subject=renderEmailVars(row?.subject||defaults.subject,vars),text=renderEmailVars(row?.body_text||defaults.text,vars),d=parseEmailDesign(row?.design_json);
   const dir=lang==="en"?"ltr":"rtl",logo=d.showLogo&&d.logoUrl?'<img src="'+escapeHtmlEmail(d.logoUrl)+'" alt="Gmach Berega" style="display:block;max-width:150px;max-height:76px;margin:0 auto 18px;object-fit:contain">':"";
