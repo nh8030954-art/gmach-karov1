@@ -1573,7 +1573,7 @@ async function listItems(env, url, ctx) {
   const catalogLimit = Number.isFinite(requestedCatalogLimit)
     ? Math.max(1, Math.min(maximumCatalogLimit, requestedCatalogLimit))
     : maximumCatalogLimit;
-  const where = ["i.status = 'active'", "i.is_free = 1", "o.status = 'approved'", "o.is_hidden = 0"];
+  const where = ["i.status = 'active'", "i.deleted_at IS NULL", "i.is_free = 1", "o.status = 'approved'", "o.is_hidden = 0", "o.deleted_at IS NULL"];
   const query = cleanOptional(url.searchParams.get("q"), 120);
   const category = cleanOptional(url.searchParams.get("category"), 40);
   const city = cleanOptional(url.searchParams.get("city"), 80);
@@ -1623,7 +1623,7 @@ async function listItems(env, url, ctx) {
     `).bind(...params).all();
   } catch (error) {
     console.error("Enhanced catalog query failed; serving compatible catalog", error);
-    const fallbackWhere = ["i.status = 'active'", "i.is_free = 1", "o.status = 'approved'"];
+    const fallbackWhere = ["i.status = 'active'", "i.deleted_at IS NULL", "i.is_free = 1", "o.status = 'approved'", "o.is_hidden = 0", "o.deleted_at IS NULL"];
     const fallbackParams = [];
     if (query) {
       fallbackWhere.push("(i.title LIKE ? OR i.description LIKE ? OR o.name LIKE ?)");
@@ -1703,7 +1703,7 @@ async function getPublicOrganization(env, id) {
     o.website_url,o.hours_json,o.service_area,o.pickup_options,o.last_active_at,o.verified_phone,o.verified_address,
     ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
     FROM organizations o LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
-    WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 AND EXISTS (SELECT 1 FROM items pi WHERE pi.organization_id=o.id AND pi.status='active' AND pi.deleted_at IS NULL) GROUP BY o.id`).bind(id).first();
+    WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 AND o.deleted_at IS NULL AND EXISTS (SELECT 1 FROM items pi WHERE pi.organization_id=o.id AND pi.status='active' AND pi.deleted_at IS NULL) GROUP BY o.id`).bind(id).first();
   if (!organization) throw new HttpError(404, "הגמ״ח לא נמצא");
   await ensureReviewBranchRatingSchema(env).catch(error => console.error("Review relation repair unavailable", error));
   // Repair a missing category relation for older deployments, while allowing
@@ -1717,7 +1717,7 @@ async function getPublicOrganization(env, id) {
       CASE WHEN (SELECT COUNT(*) FROM item_units su WHERE su.item_id=i.id AND su.status!='retired')=i.quantity
           THEN (SELECT COUNT(*) FROM item_units su WHERE su.item_id=i.id AND su.status IN ('available','held','loaned'))
           ELSE i.quantity END AS available_count FROM items i JOIN organizations o ON o.id=i.organization_id
-      WHERE i.organization_id=? AND i.status='active' ORDER BY i.availability_status,i.updated_at DESC`).bind(id),
+      WHERE i.organization_id=? AND i.status='active' AND i.deleted_at IS NULL AND o.deleted_at IS NULL ORDER BY i.availability_status,i.updated_at DESC`).bind(id),
     env.DB.prepare(`SELECT r.id,r.rating,r.item_rating,r.service_rating,r.branch_rating,r.comment,r.created_at,r.updated_at,r.helpful_count,r.organization_response,r.organization_response_at,
       substr(u.full_name,1,instr(u.full_name||' ',' ')-1) AS author_name,
       i.id AS item_id,i.title AS item_title,
@@ -1741,7 +1741,7 @@ async function getPublicOrganization(env, id) {
     try {
       const compatibleItems = await env.DB.prepare(`SELECT i.*,o.id AS org_id,o.name AS org_name,i.quantity AS available_count
         FROM items i JOIN organizations o ON o.id=i.organization_id
-        WHERE i.organization_id=? AND i.status='active' ORDER BY i.updated_at DESC`).bind(id).all();
+        WHERE i.organization_id=? AND i.status='active' AND i.deleted_at IS NULL AND o.deleted_at IS NULL ORDER BY i.updated_at DESC`).bind(id).all();
       items = compatibleItems.results.map(mapItem);
     } catch (error) {
       console.error("Compatible public organization items unavailable", { organizationId: id, error });
