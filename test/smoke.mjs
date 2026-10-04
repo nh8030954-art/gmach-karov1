@@ -153,6 +153,14 @@ try {
   assert.equal(result.response.status,401,"Only the authenticated admin may toggle mail");
   result = await request("/api/admin/email-templates/password_reset/enabled", {method:"PATCH",cookie:adminCookie,body:{enabled:false}});
   assert.equal(result.response.status,200,JSON.stringify(result.data));
+  const visitorId=crypto.randomUUID(),sessionId=crypto.randomUUID();
+  result=await request('/api/analytics/visit',{method:'POST',body:{visitorId,sessionId,path:'/catalog',referrer:'https://example.org/search?q=private'}});assert.equal(result.response.status,201);
+  await request('/api/analytics/visit',{method:'POST',body:{visitorId,sessionId,path:'/catalog'}});
+  await request('/api/analytics/visit',{method:'POST',body:{visitorId,sessionId:crypto.randomUUID(),path:'/gmach/test'}});
+  assert.equal((await request('/api/admin/analytics/visitors')).response.status,401);
+  const visitorStats=(await request('/api/admin/analytics/visitors',{cookie:adminCookie})).data;
+  assert.equal(Number(visitorStats.summary.visitors),1);assert.equal(Number(visitorStats.summary.visits),2);assert.equal(Number(visitorStats.summary.views),3);assert.equal(Number(visitorStats.summary.guestVisits),2);assert.equal(Number(visitorStats.pages.find(p=>p.path==='/catalog').views),2);assert.equal(visitorStats.sources.find(s=>s.source==='example.org').visits,1);
+  assert.equal((await request('/api/analytics/visit',{method:'POST',body:{visitorId:'bad',sessionId,path:'/catalog'}})).response.status,400);
   const templateRows=(await request("/api/admin/email-templates",{cookie:adminCookie})).data.templates;
   for(const key of ["verification","password_reset","manager_invite","notification","daily_digest","new_device","pickup_confirmed","loan_cancelled","extension","waitlist","support","system_alert"]){for(const language of ["he","en"]){assert.ok(templateRows.some(r=>r.template_key===key&&r.language===language),key+" missing in "+language);}}
   const alertSource=await readFile("worker/distribution-completion.js","utf8");

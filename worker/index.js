@@ -1,3 +1,4 @@
+import { recordVisit, visitStats } from "./visitor-analytics.js";
 import { pickupBranches, branchAvailable } from "./pickup-branches.js";
 import { attachItemEnglish, prepareSavedItemEnglish, publicItemEnglish } from "./item-english.js";
 import { handleRemainingFeatures, runRemainingMaintenance, ensureRemainingFeaturesSchema } from "./remaining-features.js";
@@ -758,6 +759,8 @@ async function routeApi(request, env, ctx, url) {
   if (method === "GET" && path === "/api/items/english-content") return publicItemEnglish(request,env,ctx);
   if (method === "GET" && path === "/api/items") return listItems(env, url, ctx);
   if (method === "GET" && path === "/api/discovery") return discovery(env, url);
+  if(method==="POST"&&path==="/api/analytics/visit"){const body=await readJson(request);try{await recordVisit(env,body,Boolean(await currentUser(request,env)))}catch(error){if(error.message.startsWith('Invalid'))throw new HttpError(400,error.message);throw error}return json({ok:true},201);}
+  if(method==="GET"&&path==="/api/admin/analytics/visitors"){await requireAdmin(request,env);return json(await visitStats(env));}
   if (method === "POST" && path === "/api/analytics/events") return recordAnalytics(request, env);
   const organizationView = path.match(/^\/api\/organizations\/([^/]+)\/view$/);
   if (method === "POST" && organizationView) return recordOrganizationView(request, env, decodeURIComponent(organizationView[1]));
@@ -3598,6 +3601,7 @@ async function runScheduledMaintenance(env) {
     env.DB.prepare("UPDATE loan_requests SET workflow_status='overdue' WHERE status='collected' AND requested_until<? AND workflow_status!='overdue'").bind(now),
     env.DB.prepare("UPDATE request_messages SET body='הודעה שנמחקה בהתאם למדיניות השמירה',media_url=NULL,deleted_at=? WHERE created_at<datetime(?,'-1 year') AND deleted_at IS NULL").bind(now,now),
     env.DB.prepare("DELETE FROM notifications WHERE read_at IS NOT NULL AND created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-180 days')"),
+    env.DB.prepare("DELETE FROM site_visits WHERE started_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-395 days')"),
     env.DB.prepare("DELETE FROM analytics_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-395 days')"),
     env.DB.prepare("INSERT INTO operational_state(key,value,updated_at) VALUES ('last_maintenance_at',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(now,now)
   ]);
