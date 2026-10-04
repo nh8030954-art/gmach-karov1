@@ -140,6 +140,27 @@ try {
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(sentEmails.at(-1).subject, "Reset your Gmach Berega password");
 
+  result = await request("/api/admin/email-templates/password_reset/enabled", {method:"PATCH",body:{enabled:false}});
+  assert.equal(result.response.status,401,"Only the authenticated admin may toggle mail");
+  result = await request("/api/admin/email-templates/password_reset/enabled", {method:"PATCH",cookie:adminCookie,body:{enabled:false}});
+  assert.equal(result.response.status,200,JSON.stringify(result.data));
+  const templateRows=(await request("/api/admin/email-templates",{cookie:adminCookie})).data.templates;
+  const resetRows=templateRows.filter(r=>r.template_key==="password_reset");
+  assert.equal(resetRows.length,2);assert.ok(resetRows.every(r=>Number(r.enabled)===0));
+  const englishReset=resetRows.find(r=>r.language==="en");
+  result=await request("/api/admin/email-templates/password_reset/en",{method:"PUT",cookie:adminCookie,body:{subject:englishReset.subject,bodyText:englishReset.body_text,design:englishReset.design}});
+  assert.equal(result.response.status,200,JSON.stringify(result.data));
+  assert.ok((await request("/api/admin/email-templates",{cookie:adminCookie})).data.templates.filter(r=>r.template_key==="password_reset").every(r=>Number(r.enabled)===0),"Editing text must preserve disabled status");
+  await db.prepare("DELETE FROM auth_challenges WHERE purpose='email_verify'").run();
+  const beforeDisabled=sentEmails.length;
+  for(const email of ["english@example.org","first@example.org"]){await request("/api/auth/forgot-password",{method:"POST",body:{email}});}
+  assert.equal(sentEmails.length,beforeDisabled,"Disabled mail must never reach provider in either language");
+  result=await request("/api/admin/email-templates/password_reset/enabled",{method:"PATCH",cookie:adminCookie,body:{enabled:true}});
+  assert.equal(result.response.status,200);
+  await db.prepare("DELETE FROM auth_challenges WHERE purpose='email_verify'").run();
+  await request("/api/auth/forgot-password",{method:"POST",body:{email:"english@example.org"}});
+  assert.equal(sentEmails.length,beforeDisabled+1,"Re-enabling restores delivery");
+
   result = await request("/api/me/favorites-overview");
   assert.equal(result.response.status, 401, "Favorites require authentication");
   result = await request("/api/me/saved-categories/tools", { method: "PUT", cookie: firstCookie });

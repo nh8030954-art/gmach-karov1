@@ -341,10 +341,15 @@ function emailDesign(input){
 async function templates(request,env,key=null,lang=null){
   const a=await requireAdmin(request,env);
   if(request.method==="GET"){const rows=await env.DB.prepare("SELECT * FROM email_templates ORDER BY template_key,language").all();return json({templates:(rows.results||[]).map(r=>({...r,design:safeJson(r.design_json,{})}))})}
+  if(request.method==="PATCH"){
+    const b=await body(request);if(typeof b.enabled!=="boolean")throw new FinalError(400,"נדרש מצב הפעלה תקין");
+    const existing=await env.DB.prepare("SELECT template_key FROM email_templates WHERE template_key=? LIMIT 1").bind(key).first();if(!existing)throw new FinalError(404,"התבנית לא נמצאה");
+    await env.DB.prepare("UPDATE email_templates SET enabled=?,updated_by=?,updated_at=? WHERE template_key=?").bind(b.enabled?1:0,a.id,new Date().toISOString(),key).run();return json({ok:true,enabled:b.enabled});
+  }
   const b=await body(request),language=lang==="en"?"en":"he",design=emailDesign(b.design||{});
   await env.DB.prepare(`INSERT INTO email_templates(template_key,language,subject,body_text,design_json,enabled,updated_by,updated_at) VALUES(?,?,?,?,?,?,?,?)
-    ON CONFLICT(template_key,language) DO UPDATE SET subject=excluded.subject,body_text=excluded.body_text,design_json=excluded.design_json,enabled=excluded.enabled,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
-    .bind(clean(key,2,80),language,clean(b.subject,1,160,"נושא"),clean(b.bodyText,2,8000,"תוכן"),JSON.stringify(design),b.enabled===false?0:1,a.id,new Date().toISOString()).run();
+    ON CONFLICT(template_key,language) DO UPDATE SET subject=excluded.subject,body_text=excluded.body_text,design_json=excluded.design_json,enabled=CASE WHEN ? THEN excluded.enabled ELSE email_templates.enabled END,updated_by=excluded.updated_by,updated_at=excluded.updated_at`)
+    .bind(clean(key,2,80),language,clean(b.subject,1,160,"נושא"),clean(b.bodyText,2,8000,"תוכן"),JSON.stringify(design),b.enabled===false?0:1,a.id,new Date().toISOString(),Object.prototype.hasOwnProperty.call(b,"enabled")?1:0).run();
   if(Object.prototype.hasOwnProperty.call(b,"enabled"))await env.DB.prepare("UPDATE email_templates SET enabled=?,updated_by=?,updated_at=? WHERE template_key=?").bind(b.enabled===false?0:1,a.id,new Date().toISOString(),clean(key,2,80)).run();
   return json({ok:true,design});
 }
@@ -510,6 +515,7 @@ export async function handleFinalFeatures(request,env,ctx,url){
     m=path.match(/^\/api\/help-requests\/([^/]+)\/matches$/);if(m&&method==="GET")return await communityMatches(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/reviews\/([^/]+)\/(edit|helpful|report|respond)$/);if(m&&(method==="PATCH"||method==="POST"))return await reviewAction(request,env,decodeURIComponent(m[1]),m[2]);
     if(path==="/api/admin/email-templates"&&method==="GET")return await templates(request,env);
+    m=path.match(/^\/api\/admin\/email-templates\/([^/]+)\/enabled$/);if(m&&method==="PATCH")return await templates(request,env,decodeURIComponent(m[1]));
     m=path.match(/^\/api\/admin\/email-templates\/([^/]+)\/(he|en)$/);if(m&&method==="PUT")return await templates(request,env,decodeURIComponent(m[1]),m[2]);
     if(path==="/api/admin/holiday-rules"&&method==="GET")return await holidays(request,env);
     if(path==="/api/admin/holiday-rules"&&method==="POST")return await holidays(request,env);
