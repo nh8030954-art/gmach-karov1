@@ -3134,7 +3134,7 @@ async function createOrganizationInvitation(request,env,organizationId,url){
         if(he&&en)mail={subject:"Invitation to manage a gmach | הזמנה לניהול גמ״ח",text:en.text+"\n\n"+he.text,html:'<div dir="ltr">'+en.html+'</div><div dir="rtl">'+he.html+"</div>"};
         else mail=en||he;
       }
-      if(mail){const deliver=env.RESEND_SERVICE?.fetch?env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE):fetch;const res=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[invitedEmail],...mail})});emailSent=res.ok;}
+      if(mail){const deliver=env.RESEND_SERVICE?.fetch?env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE):fetch;const res=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[invitedEmail],...mail,...sacredEmailScheduleFields()})});emailSent=res.ok;}
     }catch(error){console.error("manager invitation email failed",{organizationId,invitedEmail,error});}
   }
   return json({invitation:{id,role,expiresAt,url:inviteUrl,invitedEmail,emailSent}},201);
@@ -3511,13 +3511,31 @@ async function sendOperationalNotificationEmail(env,user,notification){
   if(!mail)return false;
   const unsubToken=Number(user.community_emails_accepted)?await communityUnsubscribeToken(env,user.user_id||user.id):null,unsubUrl=unsubToken?"https://gmach-berega.co.il/api/unsubscribe/community?token="+encodeURIComponent(unsubToken):null;
   if(unsubUrl)mail.text+=(en?"\n\nUnsubscribe from community updates: ":"\n\nהסרה מעדכוני קהילה: ")+unsubUrl;
-  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],...mail})});
+  const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],...mail,...sacredEmailScheduleFields()})});
   if(!response.ok)throw new Error("Email provider returned "+response.status);return true;
 }
 async function outboundNotificationsPaused(env,now=new Date()){
   if(israelShabbatState(now).closed)return true;
   if(israelHolidayState(now).closed)return true;
   return Boolean(await activePlatformClosure(env,now));
+}
+function sacredEmailResumeAt(now=new Date()){
+  let cursor=new Date(now);
+  let deferred=false;
+  for(let i=0;i<8;i++){
+    const states=[israelShabbatState(cursor),israelHolidayState(cursor)]
+      .filter(state=>state?.closed&&state?.reopensAt);
+    if(!states.length)return deferred?cursor.toISOString():null;
+    deferred=true;
+    const reopenMs=Math.max(...states.map(state=>Date.parse(state.reopensAt)).filter(Number.isFinite));
+    if(!Number.isFinite(reopenMs))return null;
+    cursor=new Date(Math.max(cursor.getTime()+60*1000,reopenMs+2*60*1000));
+  }
+  return deferred?cursor.toISOString():null;
+}
+function sacredEmailScheduleFields(now=new Date()){
+  const scheduledAt=sacredEmailResumeAt(now);
+  return scheduledAt?{scheduled_at:scheduledAt}:{};
 }
 async function deliverNotificationChannels(env){
   if(await outboundNotificationsPaused(env))return;
@@ -3555,7 +3573,7 @@ async function deliverDailyDigests(env){
     const digestTemplate=await emailTemplateState(env,"daily_digest",lang);if(digestTemplate&&digestTemplate.enabled!==null&&Number(digestTemplate.enabled)===0)continue;
     const digestBody=(en?"Updates from the last day:":"עדכונים מהיממה האחרונה:")+"\n\n"+items.results.map(x=>"• "+x.title+" — "+x.body).join("\n");
     const mail=await managedEmailTemplate(env,"daily_digest",lang,{subject:en?"Your daily Gmach Berega summary":"הסיכום היומי שלך מגמ״ח ברגע",text:"{{body}}"},{body:digestBody,account_url:accountUrl},accountUrl);if(!mail)continue;
-    const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],...mail})});
+    const response=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[user.email],...mail,...sacredEmailScheduleFields()})});
     const id=crypto.randomUUID(),now=new Date().toISOString();
     if(response.ok){await env.DB.batch([env.DB.prepare("INSERT OR REPLACE INTO notification_digests(id,user_id,digest_date,payload_json,status,sent_at) VALUES(?,?,?,?, 'sent',?)").bind(id,user.id,today,JSON.stringify({count:items.results.length}),now),...items.results.map(x=>env.DB.prepare("INSERT OR REPLACE INTO notification_delivery_log(notification_id,channel,status,attempted_at,error) VALUES(?, 'email','sent',?,NULL)").bind(x.id,now))]);}
     else await env.DB.prepare("INSERT OR REPLACE INTO notification_digests(id,user_id,digest_date,payload_json,status) VALUES(?,?,?,?, 'failed')").bind(id,user.id,today,JSON.stringify({status:response.status})).run();
@@ -3766,7 +3784,7 @@ async function sendVerificationEmail(env,email,fullName,code,language="he"){
   },{full_name:fullName,code});
   if(!mail)return;
   const deliver=env.RESEND_SERVICE?.fetch?env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE):fetch;
-  const response=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[email],...mail})});
+  const response=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[email],...mail,...sacredEmailScheduleFields()})});
   if(!response.ok)throw new Error(`Resend returned ${response.status}`);
 }
 async function sendPasswordResetEmail(env,email,fullName,code,language="he"){
@@ -3777,7 +3795,7 @@ async function sendPasswordResetEmail(env,email,fullName,code,language="he"){
   },{full_name:fullName,code});
   if(!mail)return;
   const deliver=env.RESEND_SERVICE?.fetch?env.RESEND_SERVICE.fetch.bind(env.RESEND_SERVICE):fetch;
-  const response=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[email],...mail})});
+  const response=await deliver("https://api.resend.com/emails",{method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${env.RESEND_API_KEY}`},body:JSON.stringify({from:String(env.RESEND_FROM_EMAIL||DEFAULT_FROM_EMAIL),to:[email],...mail,...sacredEmailScheduleFields()})});
   if(!response.ok)throw new Error(`Resend returned ${response.status}`);
 }
 
