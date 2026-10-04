@@ -22,7 +22,6 @@ jobs:
       - run: npm ci
       - name: Read live template switches and delivery evidence
         run: |
-          npx wrangler d1 execute DB --remote --command "INSERT OR IGNORE INTO email_templates(template_key,language,subject,body_text,enabled,design_json) VALUES('system_alert','he','{{title}}','{{body}}',0,'{}'),('system_alert','en','{{title}}','{{body}}',0,'{}')" --json
           npx wrangler d1 execute DB --remote --command "SELECT template_key,language,enabled FROM email_templates ORDER BY template_key,language" --json
           npx wrangler d1 execute DB --remote --command "SELECT name FROM sqlite_master WHERE type='table'" --json > audit-tables.json
           node <<'NODE'
@@ -38,3 +37,8 @@ jobs:
           fs.writeFileSync('audit-counts.sql',queries.join(' UNION ALL ')+';');
           NODE
           npx wrangler d1 execute DB --remote --command "$(cat audit-counts.sql)" --json
+
+      - name: Read waitlist delivery times without personal information
+        run: |
+          npx wrangler d1 execute DB --remote --command "SELECT n.id,n.type,n.title,n.created_at,l.channel,l.status,l.attempted_at,l.error FROM notifications n LEFT JOIN notification_delivery_log l ON l.notification_id=n.id WHERE n.title='הפריט שביקשתם זמין' AND n.created_at>='2026-10-03' ORDER BY n.created_at DESC LIMIT 30" --json
+          npx wrangler d1 execute DB --remote --command "SELECT notification_type,channel,title,scheduled_at,sent_at,failed_at,error FROM notification_queue WHERE title='הפריט שביקשתם זמין' AND scheduled_at>='2026-10-03' ORDER BY scheduled_at DESC LIMIT 30" --json
