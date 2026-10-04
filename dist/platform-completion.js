@@ -135,13 +135,29 @@
 
   async function renderTransfers(){const data=await api("/api/me/organization-transfers");body.innerHTML=`<h3>העברות בעלות</h3><h4>הזמנות שקיבלת</h4><div class="pt-list">${(data.incoming||[]).map(x=>`<div class="pt-card"><strong>${esc(x.organization_name)}</strong><div class="pt-muted">מאת ${esc(x.from_name)} · ${esc(x.status)} · בתוקף עד ${esc(x.expires_at)}</div>${x.status==="pending"?`<div class="pt-row"><button class="pt-btn primary" data-transfer-accept="${esc(x.id)}">קבלת בעלות</button><button class="pt-btn danger" data-transfer-decline="${esc(x.id)}">דחייה</button></div>`:""}</div>`).join("")||'<p class="pt-muted">אין הזמנות ממתינות.</p>'}</div><h4>העברות ששלחת</h4><div class="pt-list">${(data.outgoing||[]).map(x=>`<div class="pt-card"><strong>${esc(x.organization_name)}</strong><div class="pt-muted">אל ${esc(x.to_name||x.to_email)} · ${esc(x.status)} · בתוקף עד ${esc(x.expires_at)}</div></div>`).join("")||'<p class="pt-muted">אין העברות שנשלחו.</p>'}</div><div class="pt-status"></div>`;const respond=async(id,accept)=>{try{await api("/api/organization-transfers/"+encodeURIComponent(id)+"/respond",{method:"POST",body:{accept}});setStatus(accept?"הבעלות הועברה לחשבון שלך.":"ההזמנה נדחתה.");await renderTransfers()}catch(e){setStatus(e.message,true)}};body.querySelectorAll("[data-transfer-accept]").forEach(b=>b.onclick=()=>respond(b.dataset.transferAccept,true));body.querySelectorAll("[data-transfer-decline]").forEach(b=>b.onclick=()=>respond(b.dataset.transferDecline,false))}
 
+  function personalExportExcel(data){
+    const xmlEscape=value=>String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[ch]));
+    const scalar=value=>value&&typeof value==="object"?JSON.stringify(value):value??"";
+    const safeSheet=(name,index)=>String(name||("Sheet"+index)).replace(/[\\\/?*\[\]:]/g," ").slice(0,31)||("Sheet"+index);
+    const sections=Object.entries(data||{}).filter(([key])=>key!=="exportedAt");
+    const worksheet=(name,value,index)=>{
+      const rows=Array.isArray(value)?value:(value&&typeof value==="object"?[value]:[{value}]);
+      const columns=[...new Set(rows.flatMap(row=>row&&typeof row==="object"&&!Array.isArray(row)?Object.keys(row):["value"]))];
+      const rowXml=vals=>"<Row>"+vals.map(v=>'<Cell><Data ss:Type="String">'+xmlEscape(scalar(v))+"</Data></Cell>").join("")+"</Row>";
+      return '<Worksheet ss:Name="'+xmlEscape(safeSheet(name,index))+'"><Table>'+rowXml(columns)+rows.map(row=>rowXml(columns.map(col=>row&&typeof row==="object"&&!Array.isArray(row)?row[col]:row))).join("")+"</Table></Worksheet>";
+    };
+    const summary='<Worksheet ss:Name="Summary"><Table><Row><Cell><Data ss:Type="String">Exported at</Data></Cell><Cell><Data ss:Type="String">'+xmlEscape(data?.exportedAt||new Date().toISOString())+'</Data></Cell></Row></Table></Worksheet>';
+    const xml='<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">'+summary+sections.map(([name,value],i)=>worksheet(name,value,i+1)).join("")+"</Workbook>";
+    return new Blob(["\ufeff",xml],{type:"application/vnd.ms-excel;charset=utf-8"});
+  }
+
   async function renderPrivacy(){
     body.innerHTML=`<div class="pt-grid">
       <section class="pt-card"><h3>הנתונים שלי</h3><p>אפשר לייצא עותק של נתוני החשבון או לשלוח בקשה לעיון ולתיקון מידע.</p><div class="pt-row"><button class="pt-btn" id="pt-export-data" type="button">ייצוא הנתונים שלי</button><button class="pt-btn" id="pt-data-access" type="button">בקשת עיון</button><button class="pt-btn" id="pt-data-correct" type="button">בקשת תיקון</button></div>
       <form class="pt-form" id="pt-data-request-form" hidden><h4 id="pt-data-request-title"></h4><label for="pt-data-request-details">פרטי הבקשה</label><textarea id="pt-data-request-details" name="details" rows="4" maxlength="2000" minlength="5" required></textarea><div class="pt-row"><button class="pt-btn primary" type="submit">שליחת הבקשה</button><button class="pt-btn" type="button" id="pt-data-request-cancel">ביטול</button></div></form></section>
       <section class="pt-card"><h3>מחיקת חשבון</h3><p>בקשת מחיקה מתחילה תקופת המתנה של שבעה ימים. אם יש השאלות פעילות, הטיפול ימתין לסגירתן.</p><button class="pt-btn danger" id="pt-request-deletion" type="button">בקשת מחיקת חשבון</button>
       <form class="pt-form" id="pt-deletion-form" hidden><p>לאחר שליחת הבקשה אפשר לבטל אותה במשך שבעה ימים בלשונית הפרופיל.</p><label><input type="checkbox" required> הבנתי ואני מבקש/ת להתחיל בתהליך מחיקת החשבון</label><div class="pt-row"><button class="pt-btn danger" type="submit">אישור בקשת המחיקה</button><button class="pt-btn" type="button" id="pt-deletion-cancel">ביטול</button></div></form></section></div><div class="pt-status" role="status" aria-live="polite"></div>`;
-    $("#pt-export-data",body).onclick=async()=>{try{const response=await fetch("/api/me/export",{credentials:"same-origin"});if(!response.ok)throw new Error("הייצוא נכשל");const blob=await response.blob(),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="gmach-my-data.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setStatus("קובץ הנתונים נוצר.")}catch(e){setStatus(e.message,true)}};
+    $("#pt-export-data",body).onclick=async()=>{try{const data=await api("/api/me/export");const blob=personalExportExcel(data),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="gmach-my-data.xls";a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);setStatus("קובץ Excel קריא עם גיליונות נפרדים נוצר.")}catch(e){setStatus(e.message,true)}};
     const form=$("#pt-data-request-form",body);
     for(const [id,type,title] of [["pt-data-access","access","מה תרצו לקבל בבקשת העיון?"],["pt-data-correct","correction","איזה מידע תרצו לתקן?"]]){
       $("#"+id,body).onclick=()=>{form.reset();form.dataset.requestType=type;$("#pt-data-request-title",body).textContent=title;form.hidden=false;$("#pt-data-request-details",body).focus()};
@@ -249,7 +265,9 @@
   }
 
   async function renderSupport(){
-    const data=await api("/api/me/support-tickets");body.innerHTML=`<h3>הפניות שלי</h3><div class="pt-list" id="pt-ticket-list"></div><div class="pt-status"></div>`;const list=$("#pt-ticket-list",body);
+    const data=await api("/api/me/support-tickets");body.innerHTML=`<h3>הפניות שלי</h3><section class="pt-card"><h4>פתיחת פנייה חדשה</h4><form class="pt-form" id="pt-new-ticket"><label>נושא<input name="subject" minlength="2" maxlength="120" required></label><label>הודעה<textarea name="message" minlength="10" maxlength="2000" rows="5" required></textarea></label><button class="pt-btn primary">שליחת פנייה</button></form></section><div class="pt-list" id="pt-ticket-list"></div><div class="pt-status"></div>`;const list=$("#pt-ticket-list",body);
+    $("#pt-new-ticket",body).onsubmit=async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector("button");button.disabled=true;try{await api("/api/support",{method:"POST",body:{name:profile?.full_name||profile?.fullName||"משתמש",email:profile?.email||"",subject:form.subject.value.trim(),message:form.message.value.trim()}});form.reset();await renderSupport();setStatus("הפנייה נשלחה לצוות התמיכה.")}catch(error){setStatus(error.message,true);button.disabled=false}};
+
     if(!data.tickets.length)list.innerHTML='<p class="pt-muted">אין פניות קודמות. ניתן לפתוח פנייה דרך "צור קשר".</p>';
     for(const t of data.tickets){
       const d=document.createElement("div");d.className="pt-card";
