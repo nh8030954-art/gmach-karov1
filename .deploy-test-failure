@@ -1,4 +1,4 @@
-deploy_sha=7b8a5a514211b529cf42ec6d377bc530972016a8
+deploy_sha=ff6d098d35c234eb4f374cd8f6d97f374584638c
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -9,8 +9,8 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: personal export must download readable Excel
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:82:8 {
+AssertionError [ERR_ASSERTION]: single-element selector used as collection
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:167:83 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
