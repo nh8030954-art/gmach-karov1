@@ -1,4 +1,4 @@
-sha=088a4a7d49b814af1d1ef5230654dcca6f2aa074
+sha=b0384dda3e6434e1bfa3a0cd99cb164c22770ba3
 install=success
 syntax=success
 tests=failure
@@ -13,8 +13,8 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:167:83 {
+AssertionError [ERR_ASSERTION]: personal export must download readable Excel
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:82:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
@@ -25,8 +25,8 @@ AssertionError [ERR_ASSERTION]: single-element selector used as collection
 
 Node.js v24.21.0
 
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791092343859:167:83 {
+AssertionError [ERR_ASSERTION]: personal export must download readable Excel
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs?release=1791092378633:82:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
@@ -36,5 +36,5 @@ AssertionError [ERR_ASSERTION]: single-element selector used as collection
 }
 
 Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-04T05:39:04.455Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-04T05:39:39.206Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
