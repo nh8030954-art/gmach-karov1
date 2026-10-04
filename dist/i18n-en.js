@@ -1,4 +1,5 @@
 window.GmachEnglish = Object.freeze({
+  "תבניות מייל":"Email templates",
   "טוענים את האתר…":"Loading the site…",
   "אבטחת חשבון הנהלת האתר":"Site administration account security",
   "כדי להיכנס להנהלת האתר, סרקו קוד באפליקציית Authenticator והפעילו אימות דו שלבי.":"Scan the code in an Authenticator app and enable two-factor authentication to access site administration.",
