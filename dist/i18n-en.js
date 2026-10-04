@@ -968,3 +968,12 @@ window.GmachEnglish = Object.freeze({...window.GmachEnglish,...{
   "צפייה בגמ\"ח": "View gmach",
   "החלף שפה": "Switch language"
 }});
+window.GmachEnglish = Object.freeze({...window.GmachEnglish,
+  "/catalog או https://...":"/catalog or https://...",
+  "התקרבות":"Zoom in",
+  "התרחקות":"Zoom out",
+  "כתבו הודעה":"Write a message",
+  "מצב ההשאלה":"Loan status",
+  "ניווט בחשבון":"Account navigation",
+  "תמונה שצורפה לשיחה":"Image attached to the chat"
+});
