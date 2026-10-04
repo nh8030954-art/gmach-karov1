@@ -1,6 +1,6 @@
-sha=33ea3814bf4af5bd0ac2337d1d8e4eece1ce571f
-install=cancelled
-syntax=skipped
+sha=cf7a7d2f193e757faf50b934a9157d850accb233
+install=success
+syntax=failure
 tests=skipped
 smoke=skipped
 live=skipped
