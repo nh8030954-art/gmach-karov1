@@ -2,7 +2,7 @@ const {chromium}=require('playwright');const fs=require('fs');const assert=requi
 (async()=>{const browser=await chromium.launch();try{for(const width of [1440,390]){
 const page=await browser.newPage({viewport:{width,height:900},bypassCSP:true});const batches=[];
 await page.route('**/api/translate/user-content',async route=>{const {texts}=route.request().postDataJSON();batches.push(texts);assert(texts.length<=12);assert(texts.reduce((n,t)=>n+t.length,0)<=4500);assert(texts.every(t=>t.length<=500));await new Promise(r=>setTimeout(r,50));await route.fulfill({json:{translations:texts.map(()=> 'Translated content')}})});
-await page.route('**/api/**',route=>route.fulfill({json:{categories:[],user:null}}));
+await page.route('**/api/**',route=>route.request().url().includes('/api/translate/')?route.fallback():route.fulfill({json:{categories:[],user:null}}));
 await page.route('https://example.test/',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><body></body>'}));await page.goto('https://example.test/');
 let html=fs.readFileSync('dist/index.html','utf8').replace(/<script\b[\s\S]*?<\/script>/gi,'').replace(/<link\b[^>]*>/gi,'');await page.setContent(html);
 await page.evaluate(()=>{document.documentElement.lang='en';document.documentElement.dir='ltr';localStorage.setItem('gmach-language','en')});
