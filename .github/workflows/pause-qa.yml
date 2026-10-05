@@ -1,0 +1,46 @@
+name: Pause QA environment
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/pause-qa.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: qa-deploy
+  cancel-in-progress: true
+jobs:
+  pause:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Pause QA only with no database bindings or scheduled activity
+        run: |
+          mkdir -p /tmp/gmach-paused-qa
+          cat > /tmp/gmach-paused-qa/worker.js <<'JS'
+          export default {fetch(){return new Response('QA is paused by the site owner.',{status:503,headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store','X-QA-Paused':'true'}})},scheduled(){}};
+          JS
+          cat > /tmp/gmach-paused-qa/wrangler.json <<'JSON'
+          {"name":"gmach-karov1-qa","main":"worker.js","compatibility_date":"2026-09-20","workers_dev":true,"triggers":{"crons":[]}}
+          JSON
+          npx wrangler deploy --config /tmp/gmach-paused-qa/wrangler.json
+      - name: Verify QA schedules are empty and QA is paused
+        run: |
+          node --input-type=module <<'NODE'
+          const base='https://api.cloudflare.com/client/v4/accounts/'+process.env.CLOUDFLARE_ACCOUNT_ID+'/workers/scripts/gmach-karov1-qa';
+          const r=await fetch(base+'/schedules',{headers:{Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN}}),data=await r.json();
+          if(!data.success||data.result?.schedules?.length!==0)throw new Error('QA cron removal not confirmed: '+JSON.stringify(data));
+          console.log('QA scheduled triggers: 0');
+          const qa=await fetch('https://gmach-karov1-qa.nh8030954.workers.dev/api/health');
+          if(qa.status!==503||qa.headers.get('X-QA-Paused')!=='true')throw new Error('QA pause response not confirmed');
+          console.log('QA paused response confirmed; no database access');
+          NODE
