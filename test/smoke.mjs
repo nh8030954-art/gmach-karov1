@@ -646,25 +646,22 @@ try {
   assert.equal((await request('/api/admin/recycle-bin/user/'+selfAdmin,{method:'POST',cookie:adminCookie,body:{action:'archive'}})).response.status,400,'Cannot archive own admin');
   assert.equal((await request('/api/admin/users/'+archivedUser+'/activity',{cookie:adminCookie})).response.status,200);
   assert((await db.prepare('SELECT id FROM loan_requests WHERE id=?').bind(pickupLoan).first()),'History survives archives');
-  // Exercise the real step-up flow: no preinserted challenge and no email delivery.
+  // Counts follow the public catalogue; gmach deletion needs the existing admin session only.
+  async function assertPublicCategoryCounts(){const discovery=(await request('/api/discovery')).data;const catalog=(await request('/api/items')).data.items;const expected={};for(const item of catalog)expected[item.category]=(expected[item.category]||0)+1;assert.deepEqual(Object.fromEntries(discovery.categories.map(r=>[r.category,Number(r.count)])),expected);}
+  await assertPublicCategoryCounts();
+  await db.prepare('UPDATE organizations SET is_hidden=1 WHERE id=?').bind(organizationId).run();await assertPublicCategoryCounts();
+  await db.prepare('UPDATE organizations SET is_hidden=0 WHERE id=?').bind(organizationId).run();
   const deletePath='/api/admin/entities/organizations/'+organizationId;
-  const emailsBeforeStepUp=sentEmails.length;
-  const initialDelete=await request(deletePath,{method:'DELETE',cookie:adminCookie});
-  assert.equal(initialDelete.response.status,428,JSON.stringify(initialDelete.data));
-  assert.equal(initialDelete.data.authenticatorRequired,true);
-  assert.equal((await db.prepare('SELECT deleted_at FROM organizations WHERE id=?').bind(organizationId).first()).deleted_at,null);
-  assert.equal((await request('/api/admin/action-challenges',{method:'POST',cookie:adminCookie,body:{action:'DELETE '+deletePath,authenticatorCode:'bad'}})).response.status,403);
-  const currentCounter=Buffer.alloc(8);currentCounter.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));
-  const currentDigest=createHmac('sha1',Buffer.from(bytes)).update(currentCounter).digest(),currentOffset=currentDigest.at(-1)&15;
-  const authenticatorCode=String((currentDigest.readUInt32BE(currentOffset)&0x7fffffff)%1000000).padStart(6,'0');
-  const issued=await request('/api/admin/action-challenges',{method:'POST',cookie:adminCookie,body:{action:'DELETE '+deletePath,authenticatorCode}});
-  assert.equal(issued.response.status,200,JSON.stringify(issued.data));assert.equal(sentEmails.length,emailsBeforeStepUp,'Admin confirmation must not send disabled email');
-  const challengeHeaders={Cookie:adminCookie,Origin:base,'Sec-Fetch-Site':'same-origin','X-Admin-Challenge-Id':issued.data.challenge.id,'X-Admin-Challenge-Code':issued.data.challenge.code};
-  const wrongPath=await mf.dispatchFetch(base+'/api/admin/entities/organizations/another-organization',{method:'DELETE',headers:challengeHeaders});assert.equal(wrongPath.status,403);
-  const deleted=await mf.dispatchFetch(base+deletePath,{method:'DELETE',headers:challengeHeaders});assert.equal(deleted.status,200,await deleted.text());
+  assert.equal((await request(deletePath,{method:'DELETE'})).response.status,401);
+  const freshMember=(await request('/api/auth/login',{method:'POST',body:{email:'english@example.org',password:'EnglishUserPass!456'}})).response.headers.get('set-cookie')?.split(';')[0];
+  assert.ok(freshMember);assert.equal((await request(deletePath,{method:'DELETE',cookie:freshMember})).response.status,403);
+  const emailsBeforeDelete=sentEmails.length;
+  const deleted=await request(deletePath,{method:'DELETE',cookie:adminCookie});assert.equal(deleted.response.status,200,JSON.stringify(deleted.data));
+  assert.equal(sentEmails.length,emailsBeforeDelete,'Deletion needs no email confirmation');
   assert((await db.prepare('SELECT deleted_at FROM organizations WHERE id=?').bind(organizationId).first()).deleted_at);
-  assert.equal((await db.prepare('SELECT COUNT(*) n FROM items WHERE organization_id=? AND deleted_at IS NULL').bind(organizationId).first()).n,0,'All gmach items deleted together');
-  const replay=await mf.dispatchFetch(base+deletePath,{method:'DELETE',headers:challengeHeaders});assert.equal(replay.status,403,'One-use challenge cannot be replayed');
+  assert.equal((await db.prepare('SELECT COUNT(*) n FROM items WHERE organization_id=? AND deleted_at IS NULL').bind(organizationId).first()).n,0);
+  // Simulate an older deletion that left active, undeleted child items behind.
+  await db.prepare('UPDATE items SET deleted_at=NULL,status=\'active\' WHERE organization_id=?').bind(organizationId).run();await assertPublicCategoryCounts();
   console.log("Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.");
 } finally {
   await mf.dispose();

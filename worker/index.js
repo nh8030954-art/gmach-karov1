@@ -1683,7 +1683,7 @@ async function discovery(env, url) {
   if(availableOnly)orgWhere.push("EXISTS (SELECT 1 FROM items ai WHERE ai.organization_id=o.id AND ai.status='active' AND ai.deleted_at IS NULL AND ai.availability_status='available')");
   if(minRating>0){orgWhere.push("COALESCE((SELECT AVG(rr.rating) FROM reviews rr WHERE rr.organization_id=o.id AND rr.status='published'),0)>=?");orgBind.push(minRating)}
   const [categories, cities, suggestions, organizations] = await env.DB.batch([
-    env.DB.prepare(`SELECT category,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY category ORDER BY count DESC`),
+    env.DB.prepare(`SELECT i.category,COUNT(*) AS count FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.status='active' AND i.deleted_at IS NULL AND i.is_free=1 AND o.status='approved' AND o.is_hidden=0 AND o.deleted_at IS NULL GROUP BY i.category ORDER BY count DESC`),
     env.DB.prepare(`SELECT city,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY city ORDER BY count DESC LIMIT 80`),
     env.DB.prepare(`SELECT DISTINCT title FROM items WHERE status='active' AND (?='' OR title LIKE ?) ORDER BY updated_at DESC LIMIT 8`).bind(query || "", like),
     env.DB.prepare(`SELECT o.id,o.name,o.city,o.neighborhood,o.address,o.description,o.last_active_at,
