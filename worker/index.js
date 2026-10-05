@@ -1913,7 +1913,8 @@ async function createOrganization(request, env) {
   await env.DB.batch([
     env.DB.prepare("INSERT INTO organizations (id,owner_id,name,primary_category,city,neighborhood,description,address,website_url,service_area,hours_json,pickup_options,last_active_at,status,verified,is_hidden,organization_type) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'approved',0,1,?)")
       .bind(id, user.id, values.name, category, values.city, values.neighborhood, values.description, values.address, null, values.serviceArea, values.hoursJson, values.pickupOptions, new Date().toISOString(),["private","family","community","nonprofit","business","authority"].includes(body.organizationType)?body.organizationType:"private"),
-    env.DB.prepare("INSERT INTO organization_contacts (organization_id,contact_phone) VALUES (?,?)").bind(id, values.phone)
+    env.DB.prepare("INSERT INTO organization_contacts (organization_id,contact_phone) VALUES (?,?)").bind(id, values.phone),
+    env.DB.prepare("INSERT INTO organization_serial_codes (organization_id) VALUES (?)").bind(id)
   ]);
   return json({ organization: { id, ...values, primaryCategory: category, status: "approved" } }, 201);
 }
@@ -2943,7 +2944,7 @@ async function restorePageCustomizationVersion(request, env, versionId) {
 async function adminContent(request, env) {
   await requireAdmin(request, env);
   const [organizations, items, requests, reports, versions] = await env.DB.batch([
-    env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,o.verified,o.is_hidden,o.created_at,u.full_name AS owner_name,u.email AS owner_email,osc.code AS gmach_code FROM organizations o LEFT JOIN users u ON u.id=o.owner_id LEFT JOIN organization_serial_codes osc ON osc.organization_id=o.id ORDER BY o.created_at DESC LIMIT 500`),
+    env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.address,o.description,o.status,o.verified,o.is_hidden,o.temporarily_closed,o.reopens_at,o.created_at,o.updated_at,u.full_name AS owner_name,u.email AS owner_email,osc.code AS gmach_code,(SELECT COUNT(*) FROM items i WHERE i.organization_id=o.id AND i.deleted_at IS NULL) AS item_count,(SELECT COUNT(*) FROM items i WHERE i.organization_id=o.id AND i.deleted_at IS NULL AND i.status='active') AS active_item_count FROM organizations o LEFT JOIN users u ON u.id=o.owner_id LEFT JOIN organization_serial_codes osc ON osc.organization_id=o.id WHERE o.deleted_at IS NULL ORDER BY o.created_at DESC LIMIT 500`),
     env.DB.prepare(`SELECT i.id,i.title,i.category,i.subcategory,i.description,i.condition,i.quantity,i.status,i.availability_status,i.created_at,o.name AS organization_name,(SELECT COUNT(*) FROM item_units iu WHERE iu.item_id=i.id AND iu.status!='retired') AS unit_count FROM items i JOIN organizations o ON o.id=i.organization_id ORDER BY i.created_at DESC LIMIT 1000`),
     env.DB.prepare(`SELECT lr.id,lr.status,lr.requested_from,lr.requested_until,lr.created_at,i.title AS item_title,b.full_name AS borrower_name,b.email AS borrower_email,o.name AS organization_name FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN users b ON b.id=lr.borrower_id JOIN organizations o ON o.id=i.organization_id ORDER BY lr.created_at DESC LIMIT 1000`),
     env.DB.prepare(`SELECT r.id,r.reason,r.status,r.created_at,i.title AS item_title,u.full_name AS reporter_name FROM reports r JOIN items i ON i.id=r.item_id JOIN users u ON u.id=r.reporter_id ORDER BY r.created_at DESC LIMIT 500`),
