@@ -15,7 +15,7 @@
       const target=typeof input==="string"?input:input?.url||"";
       if(response.status!==428||method==="GET"||target.includes("/api/admin/action-challenges"))return response;
       let info={};try{info=await response.clone().json()}catch{}
-      const orgDeletion=method==='DELETE'&&/^\/api\/admin\/entities\/organizations\/[^/]+$/.test(new URL(target,location.origin).pathname);
+      const actionPath=new URL(target,location.origin).pathname;const orgDeletion=(method==='DELETE'&&/^\/api\/admin\/entities\/organizations\/[^/]+$/.test(actionPath))||(method==='PATCH'&&/^\/api\/admin\/(organizations\/[^/]+|loan-requests\/[^/]+\/override)$/.test(actionPath));
       let challengeData,code;
       if(orgDeletion){
       const authenticatorCode=translatedPrompt(document.documentElement.lang==="en"?"Enter the 6-digit code from your Authenticator app to confirm this action:":"הזינו את הקוד בן 6 הספרות מאפליקציית Authenticator לאישור הפעולה:");if(!authenticatorCode)return response;

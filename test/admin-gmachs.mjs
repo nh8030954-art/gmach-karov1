@@ -1,0 +1,31 @@
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import {readFile} from 'node:fs/promises';
+const source=await readFile('dist/admin-gmachs.js','utf8');
+for(const language of ['he','en']){
+ const dialog={open:false,innerHTML:'',showModal(){this.open=true},close(){this.open=false},querySelector(){return {}},querySelectorAll(){return []}};
+ const organization={id:'o1',name:'כהן <script>',owner_name:'ישראל לוי',owner_email:'owner@example.org',gmach_code:150,status:'pending',is_hidden:1,temporarily_closed:1,hours_json:'{"ראשון":"09:00–17:00"}',organization_type:'private'};
+ const document={documentElement:{lang:language},querySelector(){return dialog},addEventListener(){}};
+ const esc=v=>String(v??'').replaceAll('<','&lt;').replaceAll('>','&gt;');
+ const window={GmachOriginalName:v=>'<span translate="no">'+esc(v)+'</span>'};
+ vm.runInNewContext(source,{document,window,Date,JSON,Number,String,FormData,fetch:async()=>({ok:true,json:async()=>({organization,items:[{id:'i1',title:'פריט',item_code:1,status:'active',quantity:2}],loans:[]})})});
+ assert.match(window.GmachAdmin.summary(organization),/data-admin-gmach-open="o1"/);
+ await window.GmachAdmin.open('o1');
+ assert.match(dialog.innerHTML,/name="hoursStart0" value="09:00"/);
+ assert.match(dialog.innerHTML,/name="hoursEnd0" value="17:00"/);
+ assert.match(dialog.innerHTML,/name="status"/);
+ assert.match(dialog.innerHTML,/data-gmach-item="i1"/);
+ assert.match(dialog.innerHTML,/data-gmach-edit-item="i1"/);
+ assert.match(dialog.innerHTML,/data-gmach-units="i1"/);
+ assert.match(dialog.innerHTML,/name="ownerEmail"/);
+ assert.match(dialog.innerHTML,/name="isHidden" type="checkbox" checked/);
+ assert.match(dialog.innerHTML,/name="temporarilyClosed" type="checkbox" checked/);
+ assert.doesNotMatch(dialog.innerHTML,/<script>/);
+ assert.match(dialog.innerHTML,/ישראל לוי/);
+}
+const app=await readFile('dist/app.js','utf8');
+const exports=app.match(/window.GmachAdminTools=\{([^;]+)\};/)[1];
+for(const name of exports.match(/open[A-Za-z]+/g)||[])assert.match(app,new RegExp('(?:async )?function '+name+'\\('),'Every exported admin tool exists: '+name);
+assert.doesNotMatch(app,/<select data-user-role=/,'Admin promotion must not be exposed in the UI');
+for(const file of ['dist/app.js','dist/admin-control-center.js','dist/launch-readiness.js'])assert.match(await readFile(file,'utf8'),/GmachAdmin.summary/,'All gmach lists share one management entry point');
+console.log('Gmach admin UI passed in Hebrew and English: complete controls, tool wiring and escaped original names.');

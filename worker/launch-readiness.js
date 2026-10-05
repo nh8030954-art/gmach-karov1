@@ -1,3 +1,4 @@
+import { adminGmachSelect } from "./admin-gmachs.js";
 
 const SESSION_COOKIE="gmach_session";
 class LaunchError extends Error{constructor(status,message){super(message);this.status=status}}
@@ -137,7 +138,7 @@ async function adminEntities(request,env,url){
     if(q){sql+=" AND (email LIKE ? OR full_name LIKE ?)";args.push(like,like)}if(status){sql+=" AND account_status=?";args.push(status)}
     sql+=" ORDER BY COALESCE(last_login_at,created_at) DESC LIMIT 300";
   }else if(type==="organizations"){
-    sql="SELECT o.id,o.name,o.city,o.status,o.is_hidden,o.temporarily_closed,o.reopens_at,o.owner_id,o.created_at,o.updated_at,u.full_name owner_name,u.email owner_email FROM organizations o LEFT JOIN users u ON u.id=o.owner_id WHERE o.deleted_at IS NULL";
+    sql=adminGmachSelect+" WHERE o.deleted_at IS NULL";
     if(q){sql+=" AND (o.name LIKE ? OR o.city LIKE ? OR u.email LIKE ?)";args.push(like,like,like)}if(status){sql+=" AND o.status=?";args.push(status)}
     sql+=" ORDER BY o.updated_at DESC LIMIT 300";
   }else if(type==="items"){
@@ -156,6 +157,7 @@ async function adminEntities(request,env,url){
 async function patchAdminEntity(request,env,type,id){
   const admin=await requireAdmin(request,env),b=await body(request),now=new Date().toISOString();
   if(type==="users"){
+    if(b.role!==undefined)throw new LaunchError(403,"שינוי הרשאות ניהול אינו זמין");
     const old=await env.DB.prepare("SELECT id,account_status FROM users WHERE id=? AND deleted_at IS NULL").bind(id).first();if(!old)throw new LaunchError(404,"המשתמש לא נמצא");if(id===admin.id&&b.accountStatus==="suspended")throw new LaunchError(400,"אי אפשר להשעות את חשבון המנהל הנוכחי");
     const next=["active","suspended"].includes(b.accountStatus)?b.accountStatus:old.account_status;
     const statements=[env.DB.prepare("UPDATE users SET account_status=?,updated_at=? WHERE id=?").bind(next,now,id),audit(env,admin.id,"admin.entity.user","user",id,old,{account_status:next})];
@@ -334,7 +336,7 @@ export async function handleLaunchReadiness(request,env,ctx,url){
     if(method==="GET"&&path==="/api/admin/entities")return adminEntities(request,env,url);
     if(method==="GET"&&path==="/api/admin/export.csv")return adminExportCsv(request,env,url);
     if(method==="GET"&&path==="/api/admin/export.xls")return adminExportXls(request,env,url);
-    if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/entities\/(users|organizations|items|support)\/([^/]+)$/)))return patchAdminEntity(request,env,m[1],decodeURIComponent(m[2]));
+    if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/entities\/(users|organizations|items|support)\/([^/]+)$/)))return await patchAdminEntity(request,env,m[1],decodeURIComponent(m[2]));
     if(method==="DELETE"&&(m=path.match(/^\/api\/admin\/entities\/(users|organizations)\/([^/]+)$/)))return await deleteAdminEntity(request,env,m[1],decodeURIComponent(m[2]));
     if(method==="GET"&&path==="/api/admin/operations/health")return operationalHealth(request,env);
     if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/operations\/alerts\/([^/]+)\/resolve$/)))return resolveAlert(request,env,decodeURIComponent(m[1]));

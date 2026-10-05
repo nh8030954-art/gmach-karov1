@@ -27,7 +27,7 @@ async function request(path, { method = "GET", body, cookie, form, origin = base
     headers.set("Sec-Fetch-Site", origin === base ? "same-origin" : "cross-site");
   }
   if (cookie) headers.set("Cookie", cookie);
-  if (cookie && cookie === adminSessionCookie && !["GET", "HEAD"].includes(method) && /^\/api\/admin\/(users|organizations|items|reports|backups|moderation)(\/|$)/.test(path)) {
+  if (cookie && cookie === adminSessionCookie && !["GET", "HEAD"].includes(method) && /^\/api\/admin\/(users|organizations|items|reports|backups|moderation|entities)(\/|$)/.test(path)) {
     const db = await mf.getD1Database("DB"), code = "123456", challengeId = crypto.randomUUID();
     const admin = await db.prepare("SELECT id FROM users WHERE email=?").bind("admin@example.org").first();
     await db.prepare("INSERT INTO admin_action_challenges(id,user_id,action,token_hash,expires_at) VALUES(?,?,?,?,?)")
@@ -330,6 +330,33 @@ try {
   result = await request("/api/organizations", { method: "POST", cookie: adminCookie, body: { name: "גמ״ח בדיקה", primaryCategory: "אירועים", city: "ירושלים", neighborhood: "מרכז", address: "רחוב הבדיקה 1, ירושלים", serviceArea: "ירושלים והסביבה", hours: { "ראשון": "09:00–17:00", "שני": "09:00–17:00" }, description: "ציוד חינמי לאירועים קהילתיים ולשמחות משפחתיות.", phone: "050-1234567" } });
   assert.equal(result.response.status, 201);
   const organizationId = result.data.organization.id;
+  const unconfirmed=await mf.dispatchFetch(base+`/api/admin/organizations/${organizationId}`,{method:'PATCH',headers:{Cookie:adminCookie,Origin:base,'Content-Type':'application/json'},body:JSON.stringify({name:'ללא אישור'})});
+  assert.equal(unconfirmed.status,428,'Gmach changes expose a usable confirmation response instead of a server error');
+  const tokenCounter=Buffer.alloc(8);tokenCounter.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));const tokenDigest=createHmac('sha1',Buffer.from(bytes)).update(tokenCounter).digest(),tokenOffset=tokenDigest.at(-1)&15;
+  const tokenCode=String((tokenDigest.readUInt32BE(tokenOffset)&0x7fffffff)%1000000).padStart(6,'0');
+  const mailBeforeChallenge=sentEmails.length;
+  const confirmGmach=await request('/api/admin/action-challenges',{method:'POST',cookie:adminCookie,body:{action:`PATCH /api/admin/organizations/${organizationId}`,authenticatorCode:tokenCode}});
+  assert.equal(confirmGmach.response.status,200,JSON.stringify(confirmGmach.data));assert.ok(confirmGmach.data.challenge.code);assert.equal(sentEmails.length,mailBeforeChallenge,'Gmach confirmation works without disabled email');
+  assert.equal((await request('/api/admin/entities/users/'+analyticsUser.id,{method:'PATCH',cookie:adminCookie,body:{role:'admin'}})).response.status,403);
+  assert.equal((await db.prepare('SELECT role FROM users WHERE id=?').bind(analyticsUser.id).first()).role,'member');
+  const initialGmachCode=result.data.organization.gmachCode;
+  assert.ok(initialGmachCode>=150,"A new gmach receives a number immediately, before its first item");
+  assert.equal((await db.prepare("SELECT code FROM organization_serial_codes WHERE organization_id=?").bind(organizationId).first()).code,initialGmachCode);
+  assert.equal((await request(`/api/admin/organizations/${organizationId}`)).response.status,401);
+  assert.equal((await request(`/api/admin/organizations/${organizationId}`,{cookie:englishCookie})).response.status,403);
+  result=await request(`/api/admin/organizations/${organizationId}`,{cookie:adminCookie});
+  assert.equal(result.data.organization.gmach_code,initialGmachCode);
+  assert.equal(result.data.organization.contact_phone,"050-1234567");
+  result=await request(`/api/admin/organizations/${organizationId}`,{method:"PATCH",cookie:adminCookie,body:{status:"pending",isHidden:false,temporarilyClosed:true,reopensAt:"2026-10-06T09:00:00Z",name:"גמ״ח מעודכן",phone:"052-1234567",ownerEmail:"admin@example.org"}});
+  assert.equal(result.response.status,200,JSON.stringify(result.data));
+  const contentGmach=(await request('/api/admin/content',{cookie:adminCookie})).data.organizations.find(o=>o.id===organizationId);
+  const entityGmach=(await request('/api/admin/entities?type=organizations',{cookie:adminCookie})).data.entities.find(o=>o.id===organizationId);
+  assert.deepEqual(entityGmach,contentGmach,"Every admin list shares the same complete organization data and state");
+  assert.deepEqual([contentGmach.status,contentGmach.is_hidden,contentGmach.temporarily_closed,contentGmach.contact_phone],["pending",0,1,"052-1234567"]);
+  assert.equal((await request(`/api/admin/organizations/${organizationId}`,{method:"PATCH",cookie:adminCookie,body:{reopensAt:"bad-date"}})).response.status,400);
+  result=await request(`/api/admin/organizations/${organizationId}`,{method:"PATCH",cookie:adminCookie,body:{status:"approved",isHidden:true,temporarilyClosed:false,reopensAt:null,phone:"050-1234567"}});
+  assert.equal(result.response.status,200,JSON.stringify(result.data));
+
 
   result = await request("/api/items", { method: "POST", cookie: adminCookie, body: { organizationId, title: "ערכת קישוטים לבדיקה", category: "אירועים", condition: "מצוין", quantity: 1, description: "ערכת קישוטים מלאה שנועדה לבדוק את תהליך הפרסום באתר.", loanConditions: "איסוף עצמי", depositRequired: true, depositAmount: "100", freeConfirmed: true } });
   assert.equal(result.response.status, 201);

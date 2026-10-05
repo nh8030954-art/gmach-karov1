@@ -156,7 +156,7 @@ export async function platformPreflight(request,env,url){
   const block=await currentSecurityBlock(request,env);
   if(block) return json({error:"הגישה הוגבלה זמנית בעקבות פעילות חריגה",blockedUntil:block.blocked_until},429);
   if(!["POST","PUT","PATCH","DELETE"].includes(request.method.toUpperCase())) return null;
-  try { await requireAdminActionChallenge(request,env,url); } catch(error) { if(error instanceof HttpError&&request.method==='DELETE'&&/^\/api\/admin\/entities\/organizations\/[^/]+$/.test(url.pathname))return json({error:error.message,authenticatorRequired:error.status===428},error.status); throw error; }
+  try { await requireAdminActionChallenge(request,env,url); } catch(error) { if(error instanceof HttpError&&((request.method==='DELETE'&&/^\/api\/admin\/entities\/organizations\/[^/]+$/.test(url.pathname))||(request.method==='PATCH'&&/^\/api\/admin\/(organizations\/[^/]+|loan-requests\/[^/]+\/override)$/.test(url.pathname))))return json({error:error.message,authenticatorRequired:error.status===428},error.status); throw error; }
   // Request and account rate limits continue to protect this endpoint.
   return null;
 }
@@ -605,7 +605,7 @@ async function dataRequest(request,env){const u=await requireUser(request,env),b
 async function createLegacyAdminActionChallenge(request,env){const admin=await requireAdmin(request,env),b=await readJson(request),action=clean(b.action,3,120,"פעולה"),code=(()=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return String(100000+(a[0]%900000))})(),id=crypto.randomUUID(),expires=new Date(Date.now()+10*60000).toISOString();await qrun(env,"INSERT INTO admin_action_challenges(id,user_id,action,token_hash,expires_at) VALUES(?,?,?,?,?)",[id,admin.id,action,await sha256(code),expires]);await sendSecurityEmail(env,admin.id,"קוד אישור לפעולת מנהל",`קוד האישור לפעולה ${action} הוא ${code}. הקוד תקף ל-10 דקות.`);return json({challenge:{id,action,expiresAt:expires}})}
 async function createAdminActionChallenge(request,env){
  try{
- const copy=request.clone(),b=await readJson(request);if(!/^DELETE \/api\/admin\/entities\/organizations\/[^/]+$/.test(String(b.action||"")))return createLegacyAdminActionChallenge(copy,env);
+ const copy=request.clone(),b=await readJson(request);if(!/^(DELETE \/api\/admin\/entities\/organizations\/[^/]+|PATCH \/api\/admin\/(organizations\/[^/]+|loan-requests\/[^/]+\/override))$/.test(String(b.action||"")))return createLegacyAdminActionChallenge(copy,env);
  const admin=await requireAdmin(request,env),action=clean(b.action,3,120,"פעולה");
  if(!/^(POST|PUT|PATCH|DELETE) \/api\/admin\//.test(action))throw new HttpError(400,"פעולה לא תקינה");
  if(!admin.totp_secret||!await verifyTotp(admin.totp_secret,String(b.authenticatorCode||'').trim()))throw new HttpError(403,"קוד Authenticator אינו נכון או שפג תוקפו");

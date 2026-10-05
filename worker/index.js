@@ -1,3 +1,4 @@
+import { adminGmachSelect, loadAdminGmachDetails } from "./admin-gmachs.js";
 import { verifyTotp } from "./totp.js";
 import { recordVisit, visitStats, recordRegistration } from "./visitor-analytics.js";
 import { pickupBranches, branchAvailable } from "./pickup-branches.js";
@@ -912,6 +913,7 @@ async function routeApi(request, env, ctx, url) {
   const adminUser = path.match(/^\/api\/admin\/users\/([^/]+)$/);
   if (method === "PATCH" && adminUser) return updateAdminUser(request, env, decodeURIComponent(adminUser[1]));
   const adminOrganization = path.match(/^\/api\/admin\/organizations\/([^/]+)$/);
+  if (method === "GET" && adminOrganization) { await requireAdmin(request,env); const details=await loadAdminGmachDetails(env,decodeURIComponent(adminOrganization[1])); if(!details)throw new HttpError(404,"הגמ״ח לא נמצא"); return json(details); }
   if (method === "PATCH" && adminOrganization) return moderateOrganization(request, env, decodeURIComponent(adminOrganization[1]));
   const adminItem = path.match(/^\/api\/admin\/items\/([^/]+)$/);
   if (method === "PATCH" && adminItem) return moderateItem(request, env, decodeURIComponent(adminItem[1]));
@@ -1913,9 +1915,11 @@ async function createOrganization(request, env) {
   await env.DB.batch([
     env.DB.prepare("INSERT INTO organizations (id,owner_id,name,primary_category,city,neighborhood,description,address,website_url,service_area,hours_json,pickup_options,last_active_at,status,verified,is_hidden,organization_type) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'approved',0,1,?)")
       .bind(id, user.id, values.name, category, values.city, values.neighborhood, values.description, values.address, null, values.serviceArea, values.hoursJson, values.pickupOptions, new Date().toISOString(),["private","family","community","nonprofit","business","authority"].includes(body.organizationType)?body.organizationType:"private"),
-    env.DB.prepare("INSERT INTO organization_contacts (organization_id,contact_phone) VALUES (?,?)").bind(id, values.phone)
+    env.DB.prepare("INSERT INTO organization_contacts (organization_id,contact_phone) VALUES (?,?)").bind(id, values.phone),
+    env.DB.prepare("INSERT INTO organization_serial_codes(code,organization_id) SELECT MAX(150,COALESCE(MAX(code),149)+1),? FROM organization_serial_codes").bind(id)
   ]);
-  return json({ organization: { id, ...values, primaryCategory: category, status: "approved" } }, 201);
+  const serial=await env.DB.prepare("SELECT code FROM organization_serial_codes WHERE organization_id=?").bind(id).first();
+  return json({ organization: { id, ...values, gmachCode:serial.code, primaryCategory: category, status: "approved" } }, 201);
 }
 
 async function updateOrganization(request, env, id) {
@@ -2943,9 +2947,9 @@ async function restorePageCustomizationVersion(request, env, versionId) {
 async function adminContent(request, env) {
   await requireAdmin(request, env);
   const [organizations, items, requests, reports, versions] = await env.DB.batch([
-    env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,o.verified,o.is_hidden,o.created_at,u.full_name AS owner_name,u.email AS owner_email,osc.code AS gmach_code FROM organizations o LEFT JOIN users u ON u.id=o.owner_id LEFT JOIN organization_serial_codes osc ON osc.organization_id=o.id ORDER BY o.created_at DESC LIMIT 500`),
-    env.DB.prepare(`SELECT i.id,i.title,i.category,i.subcategory,i.description,i.condition,i.quantity,i.status,i.availability_status,i.created_at,o.name AS organization_name,(SELECT COUNT(*) FROM item_units iu WHERE iu.item_id=i.id AND iu.status!='retired') AS unit_count FROM items i JOIN organizations o ON o.id=i.organization_id ORDER BY i.created_at DESC LIMIT 1000`),
-    env.DB.prepare(`SELECT lr.id,lr.status,lr.requested_from,lr.requested_until,lr.created_at,i.title AS item_title,b.full_name AS borrower_name,b.email AS borrower_email,o.name AS organization_name FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN users b ON b.id=lr.borrower_id JOIN organizations o ON o.id=i.organization_id ORDER BY lr.created_at DESC LIMIT 1000`),
+    env.DB.prepare(adminGmachSelect+" WHERE o.deleted_at IS NULL ORDER BY o.created_at DESC LIMIT 500"),
+    env.DB.prepare(`SELECT i.id,i.organization_id,i.title,i.category,i.subcategory,i.description,i.condition,i.quantity,i.status,i.availability_status,i.created_at,o.name AS organization_name,(SELECT COUNT(*) FROM item_units iu WHERE iu.item_id=i.id AND iu.status!='retired') AS unit_count FROM items i JOIN organizations o ON o.id=i.organization_id ORDER BY i.created_at DESC LIMIT 1000`),
+    env.DB.prepare(`SELECT lr.id,i.organization_id,lr.status,lr.requested_from,lr.requested_until,lr.created_at,i.title AS item_title,b.full_name AS borrower_name,b.email AS borrower_email,o.name AS organization_name FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN users b ON b.id=lr.borrower_id JOIN organizations o ON o.id=i.organization_id ORDER BY lr.created_at DESC LIMIT 1000`),
     env.DB.prepare(`SELECT r.id,r.reason,r.status,r.created_at,i.title AS item_title,u.full_name AS reporter_name FROM reports r JOIN items i ON i.id=r.item_id JOIN users u ON u.id=r.reporter_id ORDER BY r.created_at DESC LIMIT 500`),
     env.DB.prepare(`SELECT v.id,v.created_at,u.full_name AS created_by_name FROM page_customization_versions v LEFT JOIN users u ON u.id=v.created_by ORDER BY v.created_at DESC LIMIT 100`)
   ]);
@@ -3004,18 +3008,29 @@ function auditStatement(env, actorId, action, entityType, entityId = null, metad
 async function moderateOrganization(request, env, id) {
   const admin=await requireAdmin(request, env),body=await readJson(request);
   const current=await env.DB.prepare("SELECT * FROM organizations WHERE id=?").bind(id).first();
-  if(!current)throw new HttpError(404,"הגמ״ח לא נמצא");
+  if(!current||current.deleted_at)throw new HttpError(404,"הגמ״ח לא נמצא");
   const status=body.status===undefined?current.status:String(body.status);
-  if(!["approved","rejected"].includes(status))throw new HttpError(400,"סטטוס האישור אינו תקין");
+  if(!["pending","approved","rejected"].includes(status))throw new HttpError(400,"סטטוס האישור אינו תקין");
   const name=body.name===undefined?current.name:cleanText(body.name,2,100,"שם הגמ״ח");
   const primaryCategory=body.primaryCategory===undefined?current.primary_category:cleanOptional(body.primaryCategory,80);
   const city=body.city===undefined?current.city:cleanText(body.city,2,80,"עיר");
   const neighborhood=body.neighborhood===undefined?current.neighborhood:cleanOptional(body.neighborhood,80);
   const description=body.description===undefined?current.description:cleanText(body.description,2,1200,"תיאור");
+  const address=body.address===undefined?current.address:cleanText(body.address,5,180,"כתובת"),serviceArea=body.serviceArea===undefined?current.service_area:requiredServiceArea(body.serviceArea),hours=body.hours===undefined?current.hours_json:requiredHours(body.hours),pickup=body.pickupOptions===undefined?current.pickup_options:sanitizePickupOptions(body.pickupOptions);
+  const hidden=body.isHidden===undefined?current.is_hidden:(body.isHidden===true?1:0),closed=body.temporarilyClosed===undefined?current.temporarily_closed:(body.temporarilyClosed===true?1:0);
+  const reopens=body.reopensAt===undefined?current.reopens_at:(body.reopensAt?new Date(body.reopensAt):null);
+  if(reopens instanceof Date&&Number.isNaN(reopens.getTime()))throw new HttpError(400,"מועד הפתיחה אינו תקין");
+  const reopensAt=reopens instanceof Date?reopens.toISOString():reopens;
+  const organizationType=body.organizationType===undefined?current.organization_type:String(body.organizationType);
+  if(!["private","family","community","nonprofit","business","authority"].includes(organizationType))throw new HttpError(400,"סוג הגמ״ח אינו תקין");
+  const phone=body.phone===undefined?undefined:validatePhone(body.phone);
+  let ownerId=current.owner_id;
+  if(body.ownerEmail!==undefined){const owner=await env.DB.prepare("SELECT id FROM users WHERE email=? AND deleted_at IS NULL AND account_status='active'").bind(normalizeEmail(body.ownerEmail)).first();if(!owner)throw new HttpError(400,"הבעלים חייב להיות משתמש פעיל באתר");ownerId=owner.id;}
   const now=new Date().toISOString();
   await env.DB.batch([
-    env.DB.prepare("UPDATE organizations SET name=?,primary_category=?,city=?,neighborhood=?,description=?,status=?,verified=0,updated_at=? WHERE id=?").bind(name,primaryCategory,city,neighborhood,description,status,now,id),
-    auditStatement(env,admin.id,"admin.organization.update","organization",id,{name,primaryCategory,city,neighborhood,status})
+    env.DB.prepare("UPDATE organizations SET name=?,primary_category=?,city=?,neighborhood=?,description=?,address=?,service_area=?,hours_json=?,pickup_options=?,organization_type=?,owner_id=?,status=?,is_hidden=?,temporarily_closed=?,reopens_at=?,verified=0,updated_at=? WHERE id=? AND deleted_at IS NULL").bind(name,primaryCategory,city,neighborhood,description,address,serviceArea,hours,pickup,organizationType,ownerId,status,hidden,closed,reopensAt,now,id),
+    ...(phone===undefined?[]:[env.DB.prepare("INSERT INTO organization_contacts(organization_id,contact_phone) VALUES(?,?) ON CONFLICT(organization_id) DO UPDATE SET contact_phone=excluded.contact_phone").bind(id,phone)]),
+    auditStatement(env,admin.id,"admin.organization.update","organization",id,{name,primaryCategory,city,neighborhood,status,isHidden:hidden,temporarilyClosed:closed,reopensAt,ownerId})
   ]);
   return json({id,name,primaryCategory,city,neighborhood,description,status});
 }
