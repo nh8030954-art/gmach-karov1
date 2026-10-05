@@ -1,4 +1,4 @@
-name: Read D1 usage and query insights
+name: Read QA D1 query insights
 on:
   push:
     branches: [fix/admin-delete-500]
@@ -19,19 +19,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Read account database metrics since UTC midnight
-        run: |
-          node --input-type=module <<'NODE'
-          const account=process.env.CLOUDFLARE_ACCOUNT_ID,token=process.env.CLOUDFLARE_API_TOKEN;
-          const query='query($account: string!, $day: Date!){viewer{accounts(filter:{accountTag:$account}){d1AnalyticsAdaptiveGroups(limit:20,filter:{date_geq:$day}){dimensions{databaseId date}sum{rowsRead rowsWritten readQueries writeQueries}}}}}';
-          const r=await fetch('https://api.cloudflare.com/client/v4/graphql',{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({query,variables:{account,day:new Date().toISOString().slice(0,10)}})});
-          console.log('Daily analytics',JSON.stringify(await r.json()));
-          const names=await fetch('https://api.cloudflare.com/client/v4/accounts/'+account+'/d1/database',{headers:{Authorization:'Bearer '+token}});
-          const d=await names.json();console.log('Database names',JSON.stringify(d.result?.map(x=>({id:x.uuid,name:x.name}))||d.errors));
-          NODE
-      - name: Read top write queries without executing them
-        continue-on-error: true
-        run: npx wrangler d1 insights DB --sort-type=sum --sort-by=writes --limit=10 --timePeriod=6h --json
-      - name: Read top read queries without executing them
-        continue-on-error: true
-        run: npx wrangler d1 insights DB --sort-type=sum --sort-by=reads --limit=5 --timePeriod=6h --json
+      - name: Read QA top write queries
+        run: npx wrangler d1 insights gmach-karov-db-qa --sort-type=sum --sort-by=writes --limit=8 --timePeriod=6h --json
+      - name: Read QA top read queries
+        run: npx wrangler d1 insights gmach-karov-db-qa --sort-type=sum --sort-by=reads --limit=5 --timePeriod=6h --json
