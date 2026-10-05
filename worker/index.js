@@ -1,3 +1,4 @@
+import { ensureLoanCosts, loanCostProjection, loanCostInput, loanCostStatement } from "./loan-costs.js";
 import { adminGmachSelect, loadAdminGmachDetails } from "./admin-gmachs.js";
 import { verifyTotp } from "./totp.js";
 import { recordVisit, visitStats, recordRegistration } from "./visitor-analytics.js";
@@ -223,13 +224,13 @@ async function serveSeoEntityPage(request,env,url){
     kind="category";id=decodeURIComponent(m[1]);
     row=await env.DB.prepare("SELECT id,name_he,name_en,image_url,status FROM categories WHERE id=? OR name_he=? LIMIT 1").bind(id,id).first();
     if(!row)return null;
-    title=(row.name_he||id)+" להשאלה בחינם | גמ״ח ברגע";description="מצאו "+(row.name_he||id)+" להשאלה בחינם מגמ״חים ואנשים טובים ברחבי ישראל.";
+    title=(row.name_he||id)+" להשאלה ללא תשלום או בתשלום סמלי | גמ״ח ברגע";description="מצאו "+(row.name_he||id)+" להשאלה ללא תשלום או בתשלום סמלי מגמ״חים ואנשים טובים ברחבי ישראל.";
     image=row.image_url||null;noindex=row.status!=="active";
   }else if((m=url.pathname.match(/^\/area\/([^/]+)$/))){
     kind="area";id=decodeURIComponent(m[1]);
     const exists=await env.DB.prepare("SELECT COUNT(*) AS count FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.status='active' AND i.deleted_at IS NULL AND o.is_hidden=0 AND o.deleted_at IS NULL AND (i.city=? OR o.city=?)").bind(id,id).first();
     if(!Number(exists?.count||0))return null;
-    title="גמ״חים וציוד להשאלה ב"+id+" | גמ״ח ברגע";description="מצאו ציוד להשאלה בחינם וגמ״חים פעילים ב"+id+".";
+    title="גמ״חים וציוד להשאלה ב"+id+" | גמ״ח ברגע";description="מצאו ציוד להשאלה ללא תשלום או בתשלום סמלי וגמ״חים פעילים ב"+id+".";
     image=null;noindex=false;
   }else return null;
   const assetUrl=new URL("/",url.origin);
@@ -326,6 +327,7 @@ export default {
         }
       }
       if (url.pathname.startsWith("/api/")) {
+        await ensureLoanCosts(env);
         const preflight = await platformPreflight(request, env, url);
         if (preflight) return withSecurityHeaders(preflight);
         const expansionPreflight = await requirementsExpansionPreflight(request, env, url);
@@ -1608,7 +1610,7 @@ async function listItems(env, url, ctx) {
   let result;
   try {
     result = await env.DB.prepare(`
-      SELECT i.*, o.id AS org_id, o.name AS org_name,
+      SELECT i.*,${loanCostProjection}, o.id AS org_id, o.name AS org_name,
         o.last_active_at AS org_last_active_at,
         (SELECT ROUND(AVG(r.rating),1) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_rating,
         (SELECT COUNT(*) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_review_count,
@@ -1638,7 +1640,7 @@ async function listItems(env, url, ctx) {
     if (condition) { fallbackWhere.push("COALESCE(NULLIF(i.condition_detail,''),CASE i.condition WHEN 'טוב' THEN 'מצב טוב' WHEN 'מצוין' THEN 'כמו חדש' ELSE i.condition END) = ?"); fallbackParams.push(condition); }
     if (availableOnly) fallbackWhere.push("i.availability_status = 'available'");
     result = await env.DB.prepare(`
-      SELECT i.*, o.id AS org_id, o.name AS org_name,
+      SELECT i.*,${loanCostProjection}, o.id AS org_id, o.name AS org_name,
         NULL AS org_last_active_at, NULL AS org_rating, 0 AS org_review_count,
         NULL AS item_rating, 0 AS item_review_count, CASE WHEN (SELECT COUNT(*) FROM item_units su WHERE su.item_id=i.id AND su.status!='retired')=i.quantity
           THEN (SELECT COUNT(*) FROM item_units su WHERE su.item_id=i.id AND su.status IN ('available','held','loaned'))
@@ -1656,7 +1658,7 @@ async function listItems(env, url, ctx) {
 async function getItem(env, id, ctx) {
   await ensureReviewBranchRatingSchema(env).catch(error => console.error("Review relation repair unavailable", error));
   const row = await env.DB.prepare(`
-    SELECT i.*, o.id AS org_id, o.name AS org_name,
+    SELECT i.*,${loanCostProjection}, o.id AS org_id, o.name AS org_name,
       o.last_active_at AS org_last_active_at,
       (SELECT ROUND(AVG(r.rating),1) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_rating,
       (SELECT COUNT(*) FROM reviews r WHERE r.organization_id=o.id AND r.status='published') AS org_review_count,
@@ -1713,7 +1715,7 @@ async function getPublicOrganization(env, id) {
   // valid public sections to load if unrelated optional schema work fails.
   await ensureCompletePlatformSchema(env).catch(error => console.error("Public organization relation repair unavailable", { organizationId: id, error }));
   const queries = [
-    env.DB.prepare(`SELECT i.*,o.id AS org_id,o.name AS org_name,o.last_active_at AS org_last_active_at,
+    env.DB.prepare(`SELECT i.*,${loanCostProjection},o.id AS org_id,o.name AS org_name,o.last_active_at AS org_last_active_at,
       NULL AS org_rating,0 AS org_review_count,
       (SELECT ROUND(AVG(r.item_rating),1) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_rating,
       (SELECT COUNT(*) FROM reviews r WHERE r.item_id=i.id AND r.status='published' AND r.item_rating IS NOT NULL) AS item_review_count,
@@ -1742,7 +1744,7 @@ async function getPublicOrganization(env, id) {
     // Public pages must still show listed equipment while optional review and
     // inventory migrations are being reconciled on an older D1 database.
     try {
-      const compatibleItems = await env.DB.prepare(`SELECT i.*,o.id AS org_id,o.name AS org_name,i.quantity AS available_count
+      const compatibleItems = await env.DB.prepare(`SELECT i.*,${loanCostProjection},o.id AS org_id,o.name AS org_name,i.quantity AS available_count
         FROM items i JOIN organizations o ON o.id=i.organization_id
         WHERE i.organization_id=? AND i.status='active' AND i.deleted_at IS NULL AND o.deleted_at IS NULL ORDER BY i.updated_at DESC`).bind(id).all();
       items = compatibleItems.results.map(mapItem);
@@ -1967,7 +1969,8 @@ async function notifyMatchingSavedSearches(env,item){const rows=await env.DB.pre
 async function createItem(request, env, ctx) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
-  if(body.freeConfirmed!==true)throw new HttpError(400,"יש לאשר שהפריט מוצע להשאלה חינמית בלבד");
+  if(body.freeConfirmed!==true&&body.nominalPolicyConfirmed!==true)throw new HttpError(400,"יש לאשר שהפריט מוצע ללא תשלום או לכל היותר בתשלום סמלי");
+  let loanCost;try{loanCost=loanCostInput(body)}catch(e){throw new HttpError(e.status||400,e.message)}
   const organizationId = cleanText(body.organizationId, 1, 100, "גמ״ח");
   const organization = await env.DB.prepare("SELECT * FROM organizations WHERE id = ? AND owner_id = ? AND status IN ('pending','approved')")
     .bind(organizationId, user.id).first();
@@ -1985,7 +1988,7 @@ async function createItem(request, env, ctx) {
   if(maxLoanMinutes<minLoanMinutes) throw new HttpError(400,"משך ההשאלה המקסימלי חייב להיות גדול או שווה למינימלי");
   const subcategory=fixedSubcategory(body.subcategory);
   const id = crypto.randomUUID();
-  await env.DB.prepare(`
+  const itemInsert=env.DB.prepare(`
     INSERT INTO items (id,organization_id,title,category,description,condition,condition_detail,quantity,loan_conditions,city,neighborhood,item_type,subcategory,tags_json,pickup_method,inventory_updated_at,
       min_loan_minutes,max_loan_minutes,booking_notice_minutes,turnaround_minutes,booking_horizon_days,approval_mode,deposit_required,deposit_amount_agorot,
       publish_at,max_per_user,preparation_minutes,max_loan_days,service_radius_km,status,availability_status,is_free,icon,cover_color)
@@ -2012,7 +2015,8 @@ async function createItem(request, env, ctx) {
     positiveInt(body.preparationMinutes,0,0,10080,"זמן הכנה"),
     body.maxLoanDays?positiveInt(body.maxLoanDays,1,1,3650,"ימי השאלה מרביים"):null,
     body.serviceRadiusKm?Math.max(0.1,Math.min(500,Number(body.serviceRadiusKm))):null
-  ).run();
+  );
+  await env.DB.batch([itemInsert,...(loanCost.mode==="nominal"?[loanCostStatement(env,id,loanCost)]:[])]);
   if(body.bookingHorizonMinutes!==undefined)await env.DB.prepare("UPDATE items SET booking_horizon_minutes=? WHERE id=?").bind(positiveInt(body.bookingHorizonMinutes,525600,1,1576800,"טווח הזמנה"),id).run();
   const publishAt=body.publishAt?validateDateTime(body.publishAt,"מועד פרסום"):null;
   const publishStatus=publishAt&&Date.parse(publishAt)>Date.now()?"pending":"active";
@@ -2028,7 +2032,7 @@ async function createItem(request, env, ctx) {
 async function updateItem(request, env, id, ctx) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
-  const existing = await env.DB.prepare(`SELECT i.*, o.owner_id, o.city AS org_city, o.neighborhood AS org_neighborhood
+  const existing = await env.DB.prepare(`SELECT i.*,${loanCostProjection}, o.owner_id, o.city AS org_city, o.neighborhood AS org_neighborhood
     FROM items i JOIN organizations o ON o.id = i.organization_id
     WHERE i.id = ? AND (o.owner_id = ? OR ? = 'admin')`).bind(id, user.id, user.role).first();
   if (!existing) throw new HttpError(404, "הפריט לא נמצא או שאין הרשאה לערוך אותו");
@@ -2043,7 +2047,8 @@ async function updateItem(request, env, id, ctx) {
     return json({ id, status });
   }
 
-  if(body.freeConfirmed!==true)throw new HttpError(400,"יש לאשר שהפריט מוצע להשאלה חינמית בלבד");
+  if(body.freeConfirmed!==true&&body.nominalPolicyConfirmed!==true)throw new HttpError(400,"יש לאשר שהפריט מוצע ללא תשלום או לכל היותר בתשלום סמלי");
+  let loanCost;try{loanCost=loanCostInput(body,existing)}catch(e){throw new HttpError(e.status||400,e.message)}
   const category = cleanText(body.category, 2, 40, "קטגוריה");
   const conditionInfo = normalizeProductCondition(cleanText(body.condition, 2, 30, "מצב הפריט"));
   const condition = conditionInfo.base;
@@ -2070,12 +2075,14 @@ async function updateItem(request, env, id, ctx) {
     const next={title:values.title,category,description:values.description,condition,quantity,loan_conditions:values.loanConditions}[key];
     return String(next??"")!==String(existing[key]??"");
   });
-  await env.DB.prepare(`UPDATE items SET title = ?, category = ?, description = ?, condition = ?, condition_detail=?, quantity = ?, loan_conditions = ?,item_type=?,pickup_method=?,subcategory=?,tags_json=?,inventory_updated_at=?,
+  const costChanged=loanCost.mode!==(existing.payment_mode||'free')||loanCost.explanation!==(existing.cost_explanation||'');
+  const itemUpdate=env.DB.prepare(`UPDATE items SET title = ?, category = ?, description = ?, condition = ?, condition_detail=?, quantity = ?, loan_conditions = ?,item_type=?,pickup_method=?,subcategory=?,tags_json=?,inventory_updated_at=?,
     city = ?, neighborhood = ?, status = ?, material_version=material_version+?,last_material_change_at=CASE WHEN ? THEN ? ELSE last_material_change_at END, updated_at = ? WHERE id = ?`).bind(
     values.title, category, values.description, condition, conditionInfo.detail, quantity, values.loanConditions,values.itemType,values.pickupMethod,values.subcategory,values.tagsJson,new Date().toISOString(),
-    existing.org_city, existing.org_neighborhood, status, materialChange?1:0,materialChange?1:0,new Date().toISOString(),new Date().toISOString(), id
-  ).run();
-  if(materialChange){
+    existing.org_city, existing.org_neighborhood, status, (materialChange||costChanged)?1:0,(materialChange||costChanged)?1:0,new Date().toISOString(),new Date().toISOString(), id
+  );
+  await env.DB.batch([itemUpdate,loanCostStatement(env,id,loanCost)]);
+  if(materialChange||costChanged){
     const active=await env.DB.prepare("SELECT lr.id,lr.borrower_id FROM loan_requests lr WHERE lr.item_id=? AND lr.status IN ('pending','approved')").bind(id).all();
     const statements=[];
     for(const requestRow of active.results||[]){
@@ -2215,7 +2222,7 @@ async function availableQuantityForRange(env,itemId,from,until,turnaroundMinutes
 }
 async function ownedItem(request,env,itemId){
   const user=await requireUser(request,env);
-  const item=await env.DB.prepare(`SELECT i.*,o.owner_id FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.id=?`).bind(itemId).first();
+  const item=await env.DB.prepare(`SELECT i.*,${loanCostProjection},o.owner_id FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.id=?`).bind(itemId).first();
   if(!item||(item.owner_id!==user.id&&user.role!=="admin")) throw new HttpError(403,"אין הרשאה לנהל את המלאי הזה");
   return {user,item};
 }
@@ -2419,12 +2426,12 @@ async function dashboard(request, env) {
     "organizations"
   );
   const itemsResult = await safeAll(
-    env.DB.prepare(`SELECT i.id,i.organization_id,i.title,i.category,i.description,i.condition,i.condition_detail,i.quantity,i.loan_conditions,i.image_urls,
+    env.DB.prepare(`SELECT ${loanCostProjection},i.id,i.organization_id,i.title,i.category,i.description,i.condition,i.condition_detail,i.quantity,i.loan_conditions,i.image_urls,
       i.status,i.availability_status,i.created_at,o.name AS org_name,i.item_type,i.subcategory,i.tags_json,i.pickup_method,i.inventory_updated_at,
       (SELECT COUNT(*) FROM item_units iu WHERE iu.item_id=i.id AND iu.status!='retired') AS unit_count,
       i.min_loan_minutes,i.max_loan_minutes,i.booking_notice_minutes,i.turnaround_minutes,i.booking_horizon_days,i.approval_mode,i.deposit_required,i.deposit_amount_agorot
       FROM items i JOIN organizations o ON o.id = i.organization_id WHERE o.owner_id = ? ORDER BY i.created_at DESC`).bind(user.id),
-    env.DB.prepare(`SELECT i.id,i.organization_id,i.title,i.category,i.description,i.condition,NULL AS condition_detail,i.quantity,i.loan_conditions,i.image_urls,
+    env.DB.prepare(`SELECT ${loanCostProjection},i.id,i.organization_id,i.title,i.category,i.description,i.condition,NULL AS condition_detail,i.quantity,i.loan_conditions,i.image_urls,
       i.status,i.availability_status,i.created_at,o.name AS org_name,NULL AS item_type,NULL AS subcategory,NULL AS tags_json,NULL AS pickup_method,NULL AS inventory_updated_at,
       0 AS unit_count,NULL AS min_loan_minutes,NULL AS max_loan_minutes,NULL AS booking_notice_minutes,NULL AS turnaround_minutes,NULL AS booking_horizon_days,
       'manual' AS approval_mode,0 AS deposit_required,0 AS deposit_amount_agorot
@@ -3705,6 +3712,8 @@ function mapItem(row) {
   return {
     id: row.id,
     title: row.title,
+    paymentMode:row.payment_mode||"free",
+    costExplanation:row.cost_explanation||"",
     category: row.category,
     description: row.description,
     condition: publicProductCondition(row.condition,row.condition_detail),

@@ -361,6 +361,21 @@ try {
   result = await request("/api/items", { method: "POST", cookie: adminCookie, body: { organizationId, title: "ערכת קישוטים לבדיקה", category: "אירועים", condition: "מצוין", quantity: 1, description: "ערכת קישוטים מלאה שנועדה לבדוק את תהליך הפרסום באתר.", loanConditions: "איסוף עצמי", depositRequired: true, depositAmount: "100", freeConfirmed: true } });
   assert.equal(result.response.status, 201);
   const itemId = result.data.item.id;
+  const costBody={title:"ערכת קישוטים לבדיקה",category:"אירועים",condition:"מצוין",quantity:1,description:"ערכת קישוטים מלאה שנועדה לבדוק את תהליך הפרסום באתר.",loanConditions:"איסוף עצמי",nominalPolicyConfirmed:true,paymentMode:"nominal",costExplanation:"תשלום סמלי לכיסוי ניקוי בלבד",depositRequired:true,depositAmount:"100"};
+  result=await request(`/api/items/${itemId}`,{method:"PATCH",cookie:adminCookie,body:costBody});assert.equal(result.response.status,200,JSON.stringify(result.data));
+  const nominalItem=(await request(`/api/items/${itemId}`)).data.item;
+  assert.equal(nominalItem.paymentMode,"nominal");assert.equal(nominalItem.costExplanation,costBody.costExplanation);
+  assert.equal(nominalItem.depositRequired,true);assert.equal(nominalItem.depositAmountAgorot,10000,'Deposit remains separate from the nominal fee');
+  assert.equal((await request('/api/items')).data.items.find(i=>i.id===itemId).paymentMode,'nominal');
+  assert.equal((await request(`/api/organizations/${organizationId}/public`)).data.items.find(i=>i.id===itemId).paymentMode,'nominal');
+  assert.equal((await request('/api/me/dashboard',{cookie:adminCookie})).data.items.find(i=>i.id===itemId).payment_mode,'nominal');
+  result=await request(`/api/items/${itemId}`,{method:"PATCH",cookie:adminCookie,body:{...costBody,paymentMode:'commercial'}});assert.equal(result.response.status,400);
+  result=await request(`/api/items/${itemId}`,{method:"PATCH",cookie:adminCookie,body:{...costBody,costExplanation:'x'.repeat(501)}});assert.equal(result.response.status,400);
+  result=await request(`/api/items/${itemId}`,{method:"PATCH",cookie:adminCookie,body:{...costBody,costExplanation:''}});assert.equal(result.response.status,200,'Explanation is optional');
+  result=await request(`/api/items/${itemId}`,{method:"PATCH",cookie:adminCookie,body:{...costBody,paymentMode:'free'}});assert.equal(result.response.status,200);
+  const freeAgain=(await request(`/api/items/${itemId}`)).data.item;assert.equal(freeAgain.paymentMode,'free');assert.equal(freeAgain.costExplanation,'','Switching to no charge clears a stale fee explanation');
+  assert.equal((await db.prepare('SELECT COUNT(*) n FROM item_loan_costs WHERE item_id=?').bind(itemId).first()).n,0);
+
 
   result = await request(`/api/items/${itemId}/units`, { cookie: adminCookie });
   assert.equal(result.response.status,200,JSON.stringify(result.data));

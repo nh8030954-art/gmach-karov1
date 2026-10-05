@@ -412,7 +412,7 @@ async function logicalBackup(request,env){
   const a=await requireAdmin(request,env),id=crypto.randomUUID(),started=new Date().toISOString();
   await env.DB.prepare("INSERT INTO backup_runs(id,backup_type,status,started_at) VALUES(?,'manual','started',?)").bind(id,started).run();
   try{
-    const tables=["users","organizations","organization_branches","items","item_units","loan_requests","notifications","reviews","help_requests","support_tickets","categories","site_settings"];
+    const tables=["users","organizations","organization_branches","items","item_loan_costs","item_units","loan_requests","notifications","reviews","help_requests","support_tickets","categories","site_settings"];
     const dump={version:1,createdAt:started,tables:{}};
     for(const t of tables){const rows=await env.DB.prepare(`SELECT * FROM ${t}`).all();dump.tables[t]=rows.results}
     const raw=JSON.stringify(dump),checksum=await hash(raw),key=`_system-backups/${started.replace(/[:.]/g,"-")}-${id}.json`;

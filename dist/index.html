@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#243f75">
-  <meta name="description" content="גמ״ח ברגע — מוצאים ומשאילים ציוד בחינם, קרוב לבית.">
+  <meta name="description" content="גמ״ח ברגע — מוצאים ומשאילים ציוד ללא תשלום או בתשלום סמלי, קרוב לבית.">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="he_IL">
   <meta property="og:site_name" content="גמ״ח ברגע">
-  <meta property="og:title" content="גמ״ח ברגע — מוצאים ומשאילים ציוד בחינם">
+  <meta property="og:title" content="גמ״ח ברגע — מוצאים ומשאילים ציוד ללא תשלום או בתשלום סמלי">
   <meta property="og:description" content="פלטפורמה קהילתית למציאת גמ״חים, ציוד להשאלה ובקשות עזרה קרוב לבית.">
   <meta name="twitter:card" content="summary">
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"גמ״ח ברגע","inLanguage":["he","en"],"description":"פלטפורמה קהילתית למציאת ציוד להשאלה וגמ״חים קרובים","potentialAction":{"@type":"SearchAction","target":{"@type":"EntryPoint","urlTemplate":"/catalog?q={search_term_string}"},"query-input":"required name=search_term_string"}}</script>
@@ -16,7 +16,7 @@
 
   <script src="/sacred-closure.js?v=20261004"></script>
   <script src="/i18n-boot.js?v=20261003-2710"></script>
-  <script src="/i18n-first-paint.js?v=20261004-names-branches-tour"></script>
+  <script src="/i18n-first-paint.js?v=20261005-nominal"></script>
   <title>גמ״ח ברגע — גדולה גמילות חסדים יותר מן הצדקה</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <meta name="theme-color" content="#243f75">
@@ -128,9 +128,9 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
           <svg class="hero-flow" viewBox="0 0 900 420" preserveAspectRatio="none"><path d="M55 326C186 126 286 352 445 207S717 72 852 193"/><circle cx="55" cy="326" r="7"/></svg>
         </div>
         <div class="hero-copy">
-          <span class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span> הכול בהשאלה חינם</span>
+          <span class="eyebrow"><span class="eyebrow-dot" aria-hidden="true"></span> השאלה ללא תשלום או בתשלום סמלי</span>
           <h1 id="hero-title">מה תרצו לקבל היום?</h1>
-          <p>מוצאים ציוד להשאלה בחינם מגמ״חים ואנשים טובים קרוב לבית.</p>
+          <p>מוצאים ציוד להשאלה ללא תשלום או בתשלום סמלי מגמ״חים קרוב לבית.</p>
         </div>
 
         <form class="search-panel" id="search-form" role="search">
@@ -192,7 +192,7 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
         <div class="nearby-motion-scene" aria-hidden="true">
           <svg viewBox="0 0 920 230" preserveAspectRatio="none"><path class="map-road" d="M20 190C142 95 239 206 355 116S575 35 708 114s148 41 192-20"/><path class="map-road road-two" d="M90 22c95 76 182 50 268 116s207 22 286-48 165-20 238 69"/></svg>
           <span class="story-pin pin-a"></span><span class="story-pin pin-b"></span><span class="story-pin pin-c"></span><span class="story-pin pin-d"></span>
-          <article class="story-item-card"><span>זמין בחינם</span><strong>העזרה קרובה יותר ממה שחושבים</strong><small>מגמ״ח מדורג באזור שלכם</small></article>
+          <article class="story-item-card"><span>זמין להשאלה</span><strong>העזרה קרובה יותר ממה שחושבים</strong><small>מגמ״ח מדורג באזור שלכם</small></article>
         </div>
         <div class="section-heading">
           <div><span class="section-kicker">זמין להשאלה</span><h2 id="catalog-title">פריטים קרובים אליכם</h2><p id="results-summary" aria-live="polite">טוענים פריטים זמינים…</p></div>
@@ -218,8 +218,8 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
         <div class="empty-state" id="empty-state" hidden>
           <span class="empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4M8 11h6"/></svg></span>
           <h3>הקטלוג נבנה יחד עם הקהילה</h3>
-          <p>מנהלים גמ״ח או מחזיקים ציוד שאפשר להשאיל? פרסמו אותו בחינם ועזרו למשפחה הבאה.</p>
-          <button class="button button-primary" type="button" id="empty-clear-button">פרסום גמ״ח בחינם</button>
+          <p>מנהלים גמ״ח או מחזיקים ציוד שאפשר להשאיל? פרסמו אותו באתר ועזרו למשפחה הבאה.</p>
+          <button class="button button-primary" type="button" id="empty-clear-button">פרסום גמ״ח</button>
         </div>
         <div class="catalog-footer"><button class="button button-secondary" id="load-more-button" type="button">הצגת פריטים נוספים</button></div>
       </section>
@@ -235,7 +235,7 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
           <ol class="steps-grid">
             <li><span class="step-number">1</span><span class="step-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span><h3>מוצאים</h3><p>מחפשים לפי פריט ועיר ובוחרים את מה שמתאים.</p></li>
             <li><span class="step-number">2</span><span class="step-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M8 11h8M8 15h5"/></svg></span><h3>מבקשים</h3><p>שולחים בקשת השאלה קצרה. מנהל הגמ״ח מאשר ומתאם.</p></li>
-            <li><span class="step-number">3</span><span class="step-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 14h4l2-3 4 6 2-3h4"/><path d="M5 20h14M7 14V6h10v8"/></svg></span><h3>אוספים ומחזירים</h3><p>מקבלים את הפריט בחינם ומחזירים בזמן ובמצב טוב.</p></li>
+            <li><span class="step-number">3</span><span class="step-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 14h4l2-3 4 6 2-3h4"/><path d="M5 20h14M7 14V6h10v8"/></svg></span><h3>אוספים ומחזירים</h3><p>מקבלים את הפריט לפי התנאים שפורסמו ומחזירים בזמן ובמצב טוב.</p></li>
           </ol>
           <div class="loan-journey" aria-hidden="true">
             <div class="journey-person journey-borrower"><span></span><b>קהילה</b></div>
@@ -276,7 +276,7 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
           <div class="trust-grid">
             <article><span class="trust-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s8-4 8-11V5l-8-3-8 3v5c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/></svg></span><h3>דירוגים מניסיון אמיתי</h3><p>רק מי שהשלים השאלה יכול לדרג גמ״ח, מוצר ושירות, וניתן לדווח על מידע שגוי.</p></article>
             <article><span class="trust-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v2"/></svg></span><h3>פרטים אישיים נשארים פרטיים</h3><p>פרטי קשר אינם מוצגים בקטלוג הפתוח ונחשפים רק למי שצריך.</p></article>
-            <article><span class="trust-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg></span><h3>הכול ללא תשלום</h3><p>הפרסום, הבקשה וההשאלה בפלטפורמה חינמיים לחלוטין.</p></article>
+            <article><span class="trust-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg></span><h3>גמילות חסדים נגישה</h3><p>הפרסום והבקשה באתר ללא תשלום. הפריטים מוצעים ללא תשלום או לכל היותר בתשלום סמלי.</p></article>
           </div>
         </div>
       </section>
@@ -285,8 +285,8 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
         <div class="callout-copy">
           <span class="section-kicker light-kicker">יש לכם ציוד שעוזר לאחרים?</span>
           <h2 id="gmach-callout-title">מנהלים גמ״ח? הגיעו ליותר אנשים</h2>
-          <p>פותחים עמוד, מפרסמים פריטים ומנהלים בקשות במקום אחד. הפרסום והניהול בחינם.</p>
-          <div class="callout-actions"><button class="button button-light" id="callout-add-gmach" type="button">פתיחת גמ״ח בחינם</button><button class="callout-link" id="callout-learn-more" type="button">מה מקבלים? <span aria-hidden="true">←</span></button></div>
+          <p>פותחים עמוד, מפרסמים פריטים ומנהלים בקשות במקום אחד. הפרסום והניהול ללא תשלום.</p>
+          <div class="callout-actions"><button class="button button-light" id="callout-add-gmach" type="button">פתיחת גמ״ח</button><button class="callout-link" id="callout-learn-more" type="button">מה מקבלים? <span aria-hidden="true">←</span></button></div>
         </div>
         <ul class="callout-benefits"><li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg> ניהול זמינות</li><li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg> בקשות מסודרות</li><li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg> חשיפה קהילתית</li></ul>
         <div class="publish-sequence" aria-label="תהליך פרסום פריט בגמ״ח"><span class="publish-object"><b>1</b> מוסיפים פריט<small>תמונה, זמינות ותנאי השאלה</small></span><i aria-hidden="true"></i><span class="publish-card"><b>2</b> פותחים עמוד גמ״ח<small>אזור · קטגוריה · שעות פעילות</small></span><i aria-hidden="true"></i><span class="publish-result"><b>3</b> הקהילה מוצאת אותו<small>הפריט מופיע בחיפוש ובמפה</small></span></div>
@@ -315,7 +315,7 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
           <div class="community-cycle" aria-label="מחזור ההשאלה בקהילה">
             <svg viewBox="0 0 760 300" aria-hidden="true"><path d="M615 150C615 60 510 28 380 28S145 60 145 150 250 272 380 272 615 240 615 150Z"/><path class="cycle-progress" d="M615 150C615 60 510 28 380 28S145 60 145 150 250 272 380 272 615 240 615 150Z"/></svg>
             <span class="cycle-heart" aria-hidden="true">♡</span>
-            <span class="cycle-step c1"><b>1</b>מוצאים פריט</span><span class="cycle-step c2"><b>2</b>שולחים בקשה</span><span class="cycle-step c3"><b>3</b>מקבלים בחינם</span><span class="cycle-step c4"><b>4</b>מחזירים בזמן</span><span class="cycle-step c5"><b>5</b>עוזר למשפחה הבאה</span>
+            <span class="cycle-step c1"><b>1</b>מוצאים פריט</span><span class="cycle-step c2"><b>2</b>שולחים בקשה</span><span class="cycle-step c3"><b>3</b>מקבלים את הפריט</span><span class="cycle-step c4"><b>4</b>מחזירים בזמן</span><span class="cycle-step c5"><b>5</b>עוזר למשפחה הבאה</span>
           </div>
           <p class="network-caption">כל פריט חוזר למעגל וממשיך לעזור לעוד אנשים בקהילה.</p>
           <div class="community-actions"><button class="button button-primary" type="button" id="motion-search-item">חיפוש פריט</button><button class="button button-secondary" type="button" id="motion-open-gmach">פתיחת גמ״ח</button></div>
@@ -324,7 +324,7 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
 
       <section class="faq-section section-shell" id="faq" aria-labelledby="faq-title">
         <div class="section-heading centered-heading"><div><span class="section-kicker">חשוב לדעת</span><h2 id="faq-title">שאלות נפוצות</h2></div></div>
-        <div class="faq-list"><details><summary>האם השירות עולה כסף?</summary><p>לא. החיפוש, הפרסום וההשאלה דרך האתר חינמיים.</p></details><details><summary>איך יודעים שהגמ״ח אמין?</summary><p>חפשו דירוגים, זמן פעילות אחרון ועדכון מלאי.</p></details><details><summary>איך מקבלים ציוד?</summary><p>שולחים בקשה עם תאריכים, מקבלים אישור ומתאמים בצ׳אט הפרטי.</p></details><details><summary>לא מצאתי את מה שחיפשתי—מה עושים?</summary><p>שולחים בקשת עזרה והיא מופיעה לגמ״חים הרלוונטיים.</p></details></div>
+        <div class="faq-list"><details><summary>האם השירות עולה כסף?</summary><p>החיפוש והפרסום באתר ללא תשלום. גמ״חים יכולים להציע פריטים ללא תשלום או בתשלום סמלי, כפי שמוצג בפריט.</p></details><details><summary>איך יודעים שהגמ״ח אמין?</summary><p>חפשו דירוגים, זמן פעילות אחרון ועדכון מלאי.</p></details><details><summary>איך מקבלים ציוד?</summary><p>שולחים בקשה עם תאריכים, מקבלים אישור ומתאמים בצ׳אט הפרטי.</p></details><details><summary>לא מצאתי את מה שחיפשתי—מה עושים?</summary><p>שולחים בקשת עזרה והיא מופיעה לגמ״חים הרלוונטיים.</p></details></div>
       </section>
     </section>
 
@@ -365,7 +365,7 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
   
   <footer class="site-footer">
     <div class="footer-inner">
-      <div class="footer-brand"><a class="brand brand-footer" href="/"><span class="brand-mark brand-logo-crop footer-logo full-brand-logo" aria-hidden="true"><img src="/gmach-berega-full.jpg" alt=""></span><span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span></a><p>מחברים בין מי שיש לו לבין מי שצריך — בחינם, בפשטות ובאחריות.</p></div>
+      <div class="footer-brand"><a class="brand brand-footer" href="/"><span class="brand-mark brand-logo-crop footer-logo full-brand-logo" aria-hidden="true"><img src="/gmach-berega-full.jpg" alt=""></span><span class="brand-copy"><strong>גמ״ח ברגע</strong><small>גדולה גמילות חסדים יותר מן הצדקה</small></span></a><p>מחברים בין מי שיש לו לבין מי שצריך — ללא תשלום או בתשלום סמלי, בפשטות ובאחריות.</p></div>
       <div class="footer-links"><div><strong>למצוא</strong><a href="/catalog">כל הפריטים</a><a href="/how-it-works">איך זה עובד</a></div><div><strong>לשתף</strong><button type="button" data-footer-add-gmach>פרסום גמ״ח</button><button type="button" data-footer-add-item>הוספת פריט</button></div><div><strong>חשוב לדעת</strong><button type="button" data-open-info="safety">כללי השאלה בטוחה</button><button type="button" data-open-info="terms">תנאי שימוש</button><button type="button" data-open-info="privacy">פרטיות</button><button type="button" data-open-accessibility-statement>הצהרת נגישות</button><button type="button" id="support-form-button">יצירת קשר ותמיכה</button></div></div>
     </div>
     <div class="footer-bottom"><span>© <span id="current-year"></span> גמ״ח ברגע</span><span>קהילה שמשאילה, קהילה שצומחת</span></div>
@@ -492,7 +492,7 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
 
   <dialog class="modal modal-medium" id="request-dialog" aria-labelledby="request-title">
     <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת החלון">×</button>
-    <div class="dialog-heading"><span class="section-kicker">בקשת השאלה חינמית</span><h2 id="request-title">מתי תרצו את הפריט?</h2><p id="request-item-name"></p></div>
+    <div class="dialog-heading"><span class="section-kicker">בקשת השאלה</span><h2 id="request-title">מתי תרצו את הפריט?</h2><p id="request-item-name"></p><p id="request-cost-notice" class="dashboard-note"></p></div>
     <form id="request-form" class="stack-form">
       <input id="request-item-id" type="hidden"><label id="request-branch-field" hidden><span data-pickup-label>סניף איסוף</span><select id="request-branch"></select></label><p id="request-branch-address" class="form-hint"></p>
       <p class="form-hint">בחרו מועד התחלה ומועד החזרה. לחיצה על שדה התאריך פותחת את יומן המכשיר; הזמינות תיבדק לאחר הבחירה.</p>
@@ -514,7 +514,7 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
       <label><span>כמה מילים למנהל הגמ״ח <small>(רשות)</small></span><textarea id="request-note" rows="3" maxlength="500" placeholder="למה אתם צריכים את הפריט ומתי נוח לאסוף"></textarea></label>
       
       <button class="button button-primary button-full" type="submit">שליחת הבקשה</button>
-      <p class="free-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg> הבקשה וההשאלה ללא תשלום</p>
+      <p class="free-note"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg> הפריט מוצע ללא תשלום או בתשלום סמלי</p>
     </form>
   </dialog>
 
@@ -522,7 +522,7 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
     <button class="dialog-close" type="button" data-close-dialog aria-label="סגירת החלון">×</button>
     <div class="dialog-heading align-start"><span class="section-kicker">מצטרפים לקהילה</span><h2 id="gmach-form-title">פתיחת עמוד גמ״ח</h2><p id="gmach-form-description">ממלאים פרטים בסיסיים. העמוד יפורסם אוטומטית לאחר הוספת המוצר הראשון.</p></div>
     <form id="gmach-form" class="stack-form">
-      <div class="two-columns"><label><span>שם הגמ״ח</span><input id="gmach-name" required maxlength="90" placeholder="למשל: גמ״ח אירועים משפחת לוי"></label><label><span>סוג הגוף המפעיל</span><select id="gmach-organization-type" required><option value="private">אדם פרטי</option><option value="family">משפחה</option><option value="community">קהילה או בית כנסת</option><option value="nonprofit">עמותה</option><option value="business">עסק שמשאיל בחינם</option><option value="authority">רשות או מוסד</option></select></label></div><div class="two-columns"><label><span>תחום מרכזי</span><select id="gmach-category" required><option value="">בחירה</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option><option>כללי</option></select><button class="link-button" id="gmach-suggest-category-button" type="button">לא מצאת קטגוריה? - אפשר להציע חדשה</button></label></div>
+      <div class="two-columns"><label><span>שם הגמ״ח</span><input id="gmach-name" required maxlength="90" placeholder="למשל: גמ״ח אירועים משפחת לוי"></label><label><span>סוג הגוף המפעיל</span><select id="gmach-organization-type" required><option value="private">אדם פרטי</option><option value="family">משפחה</option><option value="community">קהילה או בית כנסת</option><option value="nonprofit">עמותה</option><option value="business">עסק שמשאיל ללא תשלום או בתשלום סמלי</option><option value="authority">רשות או מוסד</option></select></label></div><div class="two-columns"><label><span>תחום מרכזי</span><select id="gmach-category" required><option value="">בחירה</option><option>אירועים</option><option>כלי עבודה</option><option>תינוקות</option><option>רפואה</option><option>טיולים</option><option>בית ואירוח</option><option>כללי</option></select><button class="link-button" id="gmach-suggest-category-button" type="button">לא מצאת קטגוריה? - אפשר להציע חדשה</button></label></div>
       <div class="two-columns"><label><span>עיר</span><input id="gmach-city" list="israel-cities" required autocomplete="address-level2"></label><label><span>שכונה <small>(רשות)</small></span><input id="gmach-neighborhood"></label></div>
       <label><span>כתובת מלאה <small>(מוצגת לציבור בעמוד הגמ״ח)</small></span><input id="gmach-address" autocomplete="street-address" required></label>
       <label><span>אזור שירות</span><select id="gmach-service-area" required><option value="">בחירת אזור</option><option>כל הארץ</option><option>צפון</option><option>חיפה והקריות</option><option>השרון</option><option>גוש דן</option><option>ירושלים והסביבה</option><option>השפלה</option><option>דרום</option><option>אילת והערבה</option></select></label>
@@ -542,7 +542,7 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
       </fieldset>
       <label><span>תיאור קצר</span><textarea id="gmach-description" rows="3" maxlength="600" required placeholder="מה אפשר להשאיל, למי מיועד ואיך מתאמים"></textarea></label>
       <label><span>טלפון ליצירת קשר <small>(זמין למנהל הגמ״ח, אינו מוצג לציבור)</small></span><input id="gmach-phone" type="tel" inputmode="tel" dir="ltr" required></label>
-      <label class="consent-row"><input id="gmach-consent" type="checkbox" required><span>אני מאשר/ת שהפעילות, הפריטים, הבקשות והתיאום ינוהלו בתוך גמ״ח ברגע; שהפריטים יוצעו ללא תשלום; ושקראתי את <button type="button" data-open-info="terms">תנאי השימוש</button> ואת <button type="button" data-open-info="privacy">מדיניות הפרטיות</button>.</span></label>
+      <label class="consent-row"><input id="gmach-consent" type="checkbox" required><span>אני מאשר/ת שהפעילות, הפריטים, הבקשות והתיאום ינוהלו בתוך גמ״ח ברגע; שהגמ״ח יגבה לכל היותר תשלום סמלי עבור הפריטים ויציין זאת בפרסום; ושקראתי את <button type="button" data-open-info="terms">תנאי השימוש</button> ואת <button type="button" data-open-info="privacy">מדיניות הפרטיות</button>.</span></label>
       <button class="button button-primary button-full" id="gmach-submit" type="submit">פתיחת גמ״ח</button>
     </form>
   </dialog>
@@ -573,7 +573,8 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
         </div>
       </details>
       <label><span>תמונות הפריט <small>(אפשר עד 12 תמונות, כל תמונה עד 5MB)</small></span><input id="item-images" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
-      <label class="consent-row"><input id="item-free" type="checkbox" required><span>הפריט מוצע להשאלה חינמית בלבד.</span></label>
+      <div class="two-columns"><label><span>עלות ההשאלה</span><select id="item-payment-mode"><option value="free">ללא תשלום</option><option value="nominal">תשלום סמלי</option></select></label><label id="item-cost-explanation-row" hidden><span>הסבר לתשלום הסמלי (לא חובה)</span><textarea id="item-cost-explanation" maxlength="500" placeholder="למשל: לכיסוי ניקוי ותחזוקה"></textarea></label></div>
+      <label class="consent-row"><input id="item-free" type="checkbox" required><span>אני מאשר/ת שהפריט מוצע ללא תשלום או לכל היותר בתשלום סמלי, בהתאם לסימון בפרסום.</span></label>
       <button class="button button-primary button-full" id="item-submit" type="submit">פרסום הפריט</button>
     </form>
   </dialog>
@@ -613,7 +614,7 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
     <div class="dialog-heading align-start"><span class="section-kicker">שומרים על הקהילה</span><h2 id="report-title">דיווח על פריט</h2><p>הדיווח נשלח להנהלת האתר ואינו מוצג למפרסם.</p></div>
     <form id="report-form" class="stack-form">
       <input id="report-item-id" type="hidden">
-      <label><span>מה הבעיה?</span><select id="report-reason" required><option value="">בחירה</option><option value="incorrect">מידע לא נכון</option><option value="unsafe">פריט לא בטיחותי</option><option value="commercial">בקשת תשלום</option><option value="unavailable">הפריט אינו זמין</option><option value="other">אחר</option></select></label>
+      <label><span>מה הבעיה?</span><select id="report-reason" required><option value="">בחירה</option><option value="incorrect">מידע לא נכון</option><option value="unsafe">פריט לא בטיחותי</option><option value="commercial">תשלום שלא פורסם או מעבר לסמלי</option><option value="unavailable">הפריט אינו זמין</option><option value="other">אחר</option></select></label>
       <label><span>פרטים נוספים <small>(רשות)</small></span><textarea id="report-details" rows="4" maxlength="800"></textarea></label>
       <button class="button button-primary button-full" id="report-submit" type="submit">שליחת דיווח</button>
     </form>
@@ -652,12 +653,12 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
   <script src="/vendor/qrcode.js?v=20261003-2710" defer></script>
   <script src="/account-tour.js?v=20261004-hebrew-desktop-tour" defer></script>
   <script src="/admin-gmachs.js?v=20261005-complete" defer></script>
-  <script src="/app.js?v=20261005-complete" defer></script>
+  <script src="/app.js?v=20261005-nominal" defer></script>
   <script src="/platform-completion.js?v=20261005-gmach-controls" defer></script>
-  <script src="/final-features.js?v=20261004-names-branches-tour" defer></script>
-  <script src="/i18n-en.js?v=20261004-names-branches-tour" defer></script>
+  <script src="/final-features.js?v=20261005-nominal" defer></script>
+  <script src="/i18n-en.js?v=20261005-nominal" defer></script>
   <script src="/i18n-errors.js?v=20261003-2710" defer></script>
-  <script src="/remaining-features.js?v=20261004-names-branches-tour" defer></script>
+  <script src="/remaining-features.js?v=20261005-nominal" defer></script>
   <script src="/requirements-expansion.js?v=20261004-names-header" defer></script>
   <script src="/release-experience.js?v=20261003-2710" defer></script>
   <script src="/privacy-purge.js?v=20261004-names-header" defer></script>
