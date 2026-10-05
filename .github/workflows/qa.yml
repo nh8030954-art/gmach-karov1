@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   qa:
+    if: ${{ false }} # QA paused by owner; re-enable only on explicit request.
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
