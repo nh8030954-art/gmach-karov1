@@ -1,40 +1,7 @@
-sha=7d0b45baa091c1428121c2cbed60849afaaa948d
-install=success
-syntax=success
-tests=failure
-smoke=failure
-live=success
-    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:175:41)
-    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:362:91)
-    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:927:37)
-    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:382:26)
-node:internal/modules/run_main:107
-    triggerUncaughtException(
-    ^
-
-AssertionError [ERR_ASSERTION]: Gmach serial code must start at 150 or above
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:342:10
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
-AssertionError [ERR_ASSERTION]: Gmach serial code must start at 150 or above
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs?release=1791191473382:342:10
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
-  diff: 'simple'
-}
-
-Node.js v24.21.0
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-05T09:11:18.137Z"}
+sha=cd5b12c683059fbbe9af4692113d143addffdd66
+install=skipped
+syntax=skipped
+tests=skipped
+smoke=skipped
+live=skipped
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
