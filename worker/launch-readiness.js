@@ -137,7 +137,7 @@ async function adminEntities(request,env,url){
     if(q){sql+=" AND (email LIKE ? OR full_name LIKE ?)";args.push(like,like)}if(status){sql+=" AND account_status=?";args.push(status)}
     sql+=" ORDER BY COALESCE(last_login_at,created_at) DESC LIMIT 300";
   }else if(type==="organizations"){
-    sql="SELECT o.id,o.name,o.city,o.status,o.is_hidden,o.temporarily_closed,o.reopens_at,o.owner_id,o.created_at,o.updated_at,u.full_name owner_name,u.email owner_email FROM organizations o LEFT JOIN users u ON u.id=o.owner_id WHERE o.deleted_at IS NULL";
+    sql="SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.address,o.description,o.status,o.is_hidden,o.temporarily_closed,o.reopens_at,o.owner_id,o.created_at,o.updated_at,u.full_name owner_name,u.email owner_email,osc.code gmach_code,(SELECT COUNT(*) FROM items i WHERE i.organization_id=o.id AND i.deleted_at IS NULL) item_count,(SELECT COUNT(*) FROM items i WHERE i.organization_id=o.id AND i.deleted_at IS NULL AND i.status='active') active_item_count FROM organizations o LEFT JOIN users u ON u.id=o.owner_id LEFT JOIN organization_serial_codes osc ON osc.organization_id=o.id WHERE o.deleted_at IS NULL";
     if(q){sql+=" AND (o.name LIKE ? OR o.city LIKE ? OR u.email LIKE ?)";args.push(like,like,like)}if(status){sql+=" AND o.status=?";args.push(status)}
     sql+=" ORDER BY o.updated_at DESC LIMIT 300";
   }else if(type==="items"){
