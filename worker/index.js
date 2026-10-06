@@ -1,3 +1,4 @@
+import { ensureServiceRanges, getServiceRange, serviceRangeInput, serviceRangeStatement, resolveServiceLocation, evaluateServiceRange, distanceKm } from "./service-range.js";
 import { ensureLoanCosts, loanCostProjection, loanCostInput, loanCostStatement } from "./loan-costs.js";
 import { adminGmachSelect, loadAdminGmachDetails } from "./admin-gmachs.js";
 import { verifyTotp } from "./totp.js";
@@ -328,6 +329,7 @@ export default {
       }
       if (url.pathname.startsWith("/api/")) {
         await ensureLoanCosts(env);
+        await ensureServiceRanges(env);
         const preflight = await platformPreflight(request, env, url);
         if (preflight) return withSecurityHeaders(preflight);
         const expansionPreflight = await requirementsExpansionPreflight(request, env, url);
@@ -825,6 +827,18 @@ async function routeApi(request, env, ctx, url) {
   const organizationMember = path.match(/^\/api\/organizations\/([^/]+)\/members\/([^/]+)$/);
   if (method === "DELETE" && organizationMember) return removeOrganizationMember(request, env, decodeURIComponent(organizationMember[1]), decodeURIComponent(organizationMember[2]));
   const publicOrganization = path.match(/^\/api\/organizations\/([^/]+)\/public$/);
+  const serviceSettings = path.match(/^\/api\/organizations\/([^/]+)\/service-range$/);
+  if(method==="GET"&&serviceSettings){
+    const user=await requireUser(request,env),id=decodeURIComponent(serviceSettings[1]);
+    const org=await env.DB.prepare("SELECT id FROM organizations WHERE id=? AND (owner_id=? OR ?='admin')").bind(id,user.id,user.role).first();
+    if(!org)throw new HttpError(404,"הגמ״ח לא נמצא או שאין הרשאה לערוך אותו");
+    return json({serviceRange:await getServiceRange(env,id)});
+  }
+  const serviceEligibility = path.match(/^\/api\/organizations\/([^/]+)\/service-eligibility$/);
+  if (method === "GET" && serviceEligibility) {
+    const user=await requireUser(request,env);
+    return json(await organizationServiceEligibility(env,decodeURIComponent(serviceEligibility[1]),user));
+  }
   if (method === "GET" && publicOrganization) return getPublicOrganization(env, decodeURIComponent(publicOrganization[1]));
   const savedOrganization = path.match(/^\/api\/saved-organizations\/([^/]+)$/);
   if (method === "POST" && savedOrganization) return toggleSavedOrganization(request, env, decodeURIComponent(savedOrganization[1]), true);
@@ -1766,7 +1780,7 @@ async function getPublicOrganization(env, id) {
   }
   const categories = categoriesResult.status === "fulfilled" ? categoriesResult.value.results : [];
   const partialSections = [["items", itemsResult], ["reviews", reviewsResult], ["categories", categoriesResult]].filter(([,result]) => result.status === "rejected").map(([section]) => section);
-  return json({ organization: { ...organization, verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options), categories }, items, reviews, partial: partialSections.length > 0, partialSections });
+  return json({ organization: { ...organization, serviceRange:await getServiceRange(env,id), verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options), categories }, items, reviews, partial: partialSections.length > 0, partialSections });
 }
 
 async function toggleSavedOrganization(request, env, organizationId, save) {
@@ -1896,10 +1910,27 @@ async function removeFavorite(request, env, itemId) {
   return json({ favorite: false });
 }
 
+async function organizationServiceEligibility(env,id,user) {
+  const org=await env.DB.prepare("SELECT id,address,city FROM organizations WHERE id=? AND status='approved' AND deleted_at IS NULL").bind(id).first();
+  if(!org)throw new HttpError(404,"הגמ״ח לא נמצא");
+  const policy=await getServiceRange(env,id);
+  if(policy.radiusKm==null)return evaluateServiceRange(policy,0);
+  const home=await env.DB.prepare("SELECT address_cipher,city FROM user_addresses WHERE user_id=? ORDER BY is_default DESC,updated_at DESC LIMIT 1").bind(user.id).first();
+  const profile=home||await env.DB.prepare("SELECT address_cipher,city FROM users WHERE id=?").bind(user.id).first();
+  try {
+    const address=await decryptPrivateValue(profile?.address_cipher,env);
+    const homeLocation=await resolveServiceLocation(env,address,profile?.city||'');
+    const orgLocation=await resolveServiceLocation(env,org.address,org.city);
+    return evaluateServiceRange(policy,distanceKm(homeLocation,orgLocation));
+  }catch(e){throw new HttpError(e.status||503,e.message);}
+}
+function parseServiceRange(body,existing) {try{return serviceRangeInput(body,existing)}catch(e){throw new HttpError(e.status||400,e.message)}}
+
 async function createOrganization(request, env) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
   const id = crypto.randomUUID();
+  const serviceRange=parseServiceRange(body);
   const category = cleanText(body.primaryCategory, 2, 40, "תחום");
   const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
   if (!categoryRow) throw new HttpError(400, "נא לבחור תחום תקין");
@@ -1917,6 +1948,7 @@ async function createOrganization(request, env) {
   await env.DB.batch([
     env.DB.prepare("INSERT INTO organizations (id,owner_id,name,primary_category,city,neighborhood,description,address,website_url,service_area,hours_json,pickup_options,last_active_at,status,verified,is_hidden,organization_type) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'approved',0,1,?)")
       .bind(id, user.id, values.name, category, values.city, values.neighborhood, values.description, values.address, null, values.serviceArea, values.hoursJson, values.pickupOptions, new Date().toISOString(),["private","family","community","nonprofit","business","authority"].includes(body.organizationType)?body.organizationType:"private"),
+    serviceRangeStatement(env,id,serviceRange),
     env.DB.prepare("INSERT INTO organization_contacts (organization_id,contact_phone) VALUES (?,?)").bind(id, values.phone),
     env.DB.prepare("INSERT INTO organization_serial_codes(code,organization_id) SELECT MAX(150,COALESCE(MAX(code),149)+1),? FROM organization_serial_codes").bind(id)
   ]);
@@ -1950,12 +1982,14 @@ async function updateOrganization(request, env, id) {
     address: cleanText(body.address, 5, 180, "כתובת מלאה"),
     serviceArea: requiredServiceArea(body.serviceArea), hoursJson: requiredHours(body.hours), pickupOptions: sanitizePickupOptions(body.pickupOptions)
   };
+  const serviceRange=parseServiceRange(body,await getServiceRange(env,id));
   const status = existing.status === "rejected" && user.role !== "admin" ? "rejected" : "approved";
   const now = new Date().toISOString();
   await env.DB.batch([
     env.DB.prepare(`UPDATE organizations SET name = ?, primary_category = ?, city = ?, neighborhood = ?, description = ?,address=?,website_url=?,service_area=?,hours_json=?,pickup_options=?,last_active_at=?,organization_type=?,
       status = ?, verified = 0, updated_at = ? WHERE id = ?`)
       .bind(values.name, category, values.city, values.neighborhood, values.description,values.address,null,values.serviceArea,values.hoursJson,values.pickupOptions,now,["private","family","community","nonprofit","business","authority"].includes(body.organizationType)?body.organizationType:(existing.organization_type||"private"),status, now, id),
+    serviceRangeStatement(env,id,serviceRange),
     env.DB.prepare("UPDATE organization_contacts SET contact_phone = ? WHERE organization_id = ?").bind(values.phone, id)
   ]);
   return json({ organization: { id, ...values, primaryCategory: category, status, hidden: Boolean(existing.is_hidden) } });
@@ -2327,6 +2361,9 @@ async function createLoanRequest(request, env) {
   `).bind(itemId).first();
   if (!item) throw new HttpError(404, "הפריט לא נמצא");
   if (item.owner_id === user.id) throw new HttpError(400, "אי אפשר להזמין פריט מהגמ״ח שבבעלותכם. אפשר לשאול פריטים מגמ״חים אחרים.");
+  const serviceEligibility=await organizationServiceEligibility(env,item.organization_id,user);
+  const distanceException=serviceEligibility.outside&&serviceEligibility.exceptionAvailable&&body.distanceException===true;
+  if(!serviceEligibility.allowed&&!distanceException)throw new HttpError(403,serviceEligibility.message);
   if (item.availability_status === "unavailable") throw new HttpError(409, "הפריט אינו זמין כרגע");
 
   const branches=await pickupBranches(env,itemId),requestedBranch=cleanOptional(body.branchId,100);
@@ -2370,7 +2407,7 @@ async function createLoanRequest(request, env) {
   if (available < quantity) throw new HttpError(409, available > 0 ? `נותרו רק ${available} יחידות בטווח שבחרתם` : "הפריט אינו זמין בטווח שבחרתם");
 
   const id = crypto.randomUUID();
-  const status = item.approval_mode === "automatic" ? "approved" : "pending";
+  const status = item.approval_mode === "automatic" && !distanceException ? "approved" : "pending";
   const acceptedAt = Number(item.deposit_required) ? new Date().toISOString() : null;
   const result = await env.DB.prepare(`
     INSERT INTO loan_requests
@@ -2383,7 +2420,7 @@ async function createLoanRequest(request, env) {
         AND lr.requested_from < ? AND lr.requested_until > ?
     ) + ? <= ?
     AND (? IS NULL OR (SELECT COALESCE(SUM(quantity),0) FROM loan_requests WHERE item_id=? AND (branch_id=? OR branch_id IS NULL) AND status IN ('pending','approved','collected') AND requested_from<? AND requested_until>?) + ? <= ?)
-  `).bind(id,itemId,user.id,from,until,validatePhone(body.phone),cleanOptional(body.note,500),status,quantity,
+  `).bind(id,itemId,user.id,from,until,validatePhone(body.phone),(distanceException?`בקשת חריגה מטווח שירות: כתובת במרחק כ־${serviceEligibility.distanceKm} ק״מ, טווח הגמ״ח ${serviceEligibility.radiusKm} ק״מ.\n`:"")+ (cleanOptional(body.note,500)||""),status,quantity,
     Number(item.deposit_required),Number(item.deposit_amount_agorot),acceptedAt,branch?.id||null,
     itemId,until,from,quantity,Number(item.quantity),branch?.id||null,itemId,branch?.id||null,new Date(Date.parse(until)+Number(item.turnaround_minutes||0)*60000).toISOString().slice(0,16),new Date(Date.parse(from)-Number(item.turnaround_minutes||0)*60000).toISOString().slice(0,16),quantity,branch?.capacity||0).run();
   if (!result.meta.changes) throw new HttpError(409, "המלאי נתפס הרגע על ידי הזמנה אחרת. בחרו מועד אחר");
@@ -2392,7 +2429,7 @@ async function createLoanRequest(request, env) {
   const holdExpiresAt=new Date(Date.now()+24*60*60*1000).toISOString();
   await env.DB.batch([
     env.DB.prepare("INSERT INTO loan_request_events(id,request_id,actor_id,event_type,details_json) VALUES (?,?,?,?,?)")
-      .bind(crypto.randomUUID(),id,user.id,"created",JSON.stringify({from,until,quantity,status})),
+      .bind(crypto.randomUUID(),id,user.id,"created",JSON.stringify({from,until,quantity,status,distanceException,serviceRadiusKm:serviceEligibility.radiusKm})),
     env.DB.prepare("INSERT INTO inventory_holds(id,item_id,user_id,request_id,quantity,starts_at,ends_at,expires_at,status) VALUES(?,?,?,?,?,?,?,?,?)")
       .bind(holdId,itemId,user.id,id,quantity,from,until,holdExpiresAt,status==="approved"?"converted":"active"),
     env.DB.prepare("UPDATE loan_requests SET hold_expires_at=?,workflow_status=? WHERE id=?")

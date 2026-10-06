@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import { serviceRangeInput,evaluateServiceRange,distanceKm,resolveServiceLocation } from '../worker/service-range.js';
+assert.equal(serviceRangeInput({}).radiusKm,null);
+for(const radius of [2,5,10,20,50])assert.equal(serviceRangeInput({serviceRadiusKm:radius}).radiusKm,radius);
+for(const radius of [-1,0,3,Infinity,'x',{}])assert.throws(()=>serviceRangeInput({serviceRadiusKm:radius}));
+assert.throws(()=>serviceRangeInput({allowDistanceException:'false'}));
+assert.deepEqual(serviceRangeInput({},{radiusKm:10,allowException:true}),{radiusKm:10,allowException:true});
+assert.equal(serviceRangeInput({serviceRadiusKm:null,allowDistanceException:true}).allowException,false);
+assert.equal(evaluateServiceRange({radiusKm:10,allowException:false},10).allowed,true);
+assert.equal(evaluateServiceRange({radiusKm:10,allowException:false},10.001).allowed,false);
+assert.equal(evaluateServiceRange({radiusKm:10,allowException:true},12).exceptionAvailable,true);
+assert.equal(evaluateServiceRange({radiusKm:null,allowException:false},1000).allowed,true);
+assert.ok(distanceKm({latitude:31.78,longitude:35.22},{latitude:31.9,longitude:35.22})>10);
+// Missing and unresolvable addresses fail closed; city-centre coordinates are insufficient.
+await assert.rejects(resolveServiceLocation({},null),/כתובת מלאה/);
+const env={DB:{prepare:sql=>({bind(){return this},async first(){return null},async run(){return {meta:{changes:1}}}})},SERVICE_RANGE_GEOCODER:{fetch:async()=>Response.json([{type:'city',lat:'31.78',lon:'35.22'}])}};
+await assert.rejects(resolveServiceLocation(env,'רחוב הבדיקה 12','ירושלים'),/מיקום מדויק/);
+env.SERVICE_RANGE_GEOCODER.fetch=async()=>Response.json([]);
+await assert.rejects(resolveServiceLocation(env,'רחוב הבדיקה 12','ירושלים'),/מיקום מדויק/);
+env.SERVICE_RANGE_GEOCODER.fetch=async()=>new Response('',{status:503});
+await assert.rejects(resolveServiceLocation(env,'רחוב הבדיקה 12','ירושלים'),e=>e.status===503);
+console.log('Service range policy and geocoding tests passed');

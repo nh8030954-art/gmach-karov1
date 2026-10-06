@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS organization_service_ranges (organization_id TEXT PRIMARY KEY REFERENCES organizations(id) ON DELETE CASCADE,radius_km INTEGER CHECK(radius_km IN (2,5,10,20,50)),allow_exception INTEGER NOT NULL DEFAULT 0 CHECK(allow_exception IN (0,1)));
+CREATE TABLE IF NOT EXISTS service_location_cache (address_hash TEXT PRIMARY KEY,latitude REAL NOT NULL,longitude REAL NOT NULL,expires_at TEXT NOT NULL);

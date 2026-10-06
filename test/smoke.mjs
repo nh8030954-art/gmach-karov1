@@ -454,8 +454,39 @@ try {
 
   result = await request(`/api/favorites/${itemId}`, { method: "POST", cookie: borrowerCookie });
   assert.equal(result.response.status, 200);
-  result = await request("/api/loan-requests", { method: "POST", cookie: borrowerCookie, body: { itemId, requestedFrom: "2026-10-08T10:00", requestedUntil: "2026-10-09T12:00", quantity: 1, depositAccepted: true, phone: "052-7654321", note: "לאירוע משפחתי" } });
+  // Service range enforcement must survive a direct API request and forged coordinates.
+  const rangePolicy=await request(`/api/organizations/${organizationId}/service-range`,{cookie:adminCookie});
+  assert.equal(rangePolicy.data.serviceRange.radiusKm,null);
+  assert.equal((await request(`/api/organizations/${organizationId}/service-range`,{cookie:borrowerCookie})).response.status,404);
+  assert.equal((await request(`/api/organizations/${organizationId}/service-eligibility`)).response.status,401);
+  await db.prepare("INSERT OR REPLACE INTO organization_service_ranges(organization_id,radius_km,allow_exception) VALUES(?,5,0)").bind(organizationId).run();
+  const rangeBorrower=await db.prepare('SELECT id,address_cipher FROM users WHERE email=?').bind('borrower@example.com').first();
+  await db.prepare('UPDATE users SET address_cipher=NULL WHERE id=?').bind(rangeBorrower.id).run();
+  assert.equal((await request(`/api/organizations/${organizationId}/service-eligibility`,{cookie:borrowerCookie})).response.status,400,'Missing address must not bypass service range');
+  await db.prepare('UPDATE users SET address_cipher=? WHERE id=?').bind(rangeBorrower.address_cipher,rangeBorrower.id).run();
+  const savedHome=await request('/api/me/addresses',{method:'POST',cookie:borrowerCookie,body:{label:'בית',city:'ירושלים',address:'רחוב הבדיקה 12',isDefault:true,latitude:0,longitude:0}});
+  assert.equal(savedHome.response.status,201,JSON.stringify(savedHome.data));
+  async function seedServiceLocation(address,city,latitude,longitude){const hash=createHash('sha256').update([address.trim(),city.trim()].filter(Boolean).join(', ').toLowerCase()).digest('hex');await db.prepare('INSERT OR REPLACE INTO service_location_cache(address_hash,latitude,longitude,expires_at) VALUES(?,?,?,?)').bind(hash,latitude,longitude,new Date(Date.now()+86400000).toISOString()).run();}
+  const serviceOrg=await db.prepare('SELECT address,city FROM organizations WHERE id=?').bind(organizationId).first();
+  await seedServiceLocation(serviceOrg.address,serviceOrg.city,31.78,35.22);
+  await seedServiceLocation('רחוב הבדיקה 12','ירושלים',31.79,35.22);
+  assert.equal((await request(`/api/organizations/${organizationId}/service-eligibility`,{cookie:borrowerCookie})).data.allowed,true);
+  await seedServiceLocation('רחוב הבדיקה 12','ירושלים',31.9,35.22);
+  const denied=await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:{itemId,distanceException:true,latitude:31.78,longitude:35.22}});
+  assert.equal(denied.response.status,403,JSON.stringify(denied.data));
+  assert.ok(denied.data.error.includes('5'));
+  assert.equal((await request(`/api/organizations/${organizationId}/public`)).response.status,200,'Public items remain visible outside range');
+  await db.prepare('UPDATE organization_service_ranges SET allow_exception=1 WHERE organization_id=?').bind(organizationId).run();
+  assert.equal((await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:{itemId}})).response.status,403,'Exception requires an explicit request');
+  await db.prepare("UPDATE items SET approval_mode='automatic' WHERE id=?").bind(itemId).run();
+  result = await request("/api/loan-requests", { method: "POST", cookie: borrowerCookie, body: { itemId, requestedFrom: "2026-10-08T10:00", requestedUntil: "2026-10-09T12:00", quantity: 1, depositAccepted: true, phone: "052-7654321", note: "לאירוע משפחתי",distanceException:true } });
   assert.equal(result.response.status, 201);
+  assert.equal(result.data.request.status,'pending','Distance exceptions must never be automatically approved');
+  const exceptionRow=await db.prepare('SELECT note FROM loan_requests WHERE id=?').bind(result.data.request.id).first();
+  assert.ok(exceptionRow.note.startsWith('בקשת חריגה מטווח שירות:'));
+  await db.prepare('DELETE FROM organization_service_ranges WHERE organization_id=?').bind(organizationId).run();
+  await db.prepare("UPDATE items SET approval_mode='manual' WHERE id=?").bind(itemId).run();
+  await db.prepare('DELETE FROM user_addresses WHERE id=?').bind(savedHome.data.address.id).run();
   const requestId = result.data.request.id;
   result = await request(`/api/loan-requests/${requestId}/pickup-proposals`, { method:"POST",cookie:adminCookie,body:{startsAt:"2026-10-08T18:00:00Z",endsAt:"2026-10-08T19:00:00Z"} });
   assert.equal(result.response.status,201,JSON.stringify(result.data));
