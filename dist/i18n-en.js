@@ -1,9 +1,12 @@
 window.GmachEnglish = Object.freeze({
+"כתובת וטלפון הגמ״ח יוצגו לאחר אישור בקשת ההשאלה":"The gmach address and phone are shown after your borrowing request is approved",
+"לא ניתן לבדוק את טווח השירות כרגע":"The service radius cannot be checked right now",
+
 "אני מבקש/ת חריגה מטווח השירות ומבין/ה שנדרש אישור מנהל הגמ״ח":"I request a distance exception and understand that manager approval is required",
 "טווח שירות סביב כתובת הגמ״ח":"Service radius around the gmach address",
 "ללא הגבלת מרחק":"No distance limit",
 "אפשר בקשת חריגה — מחוץ לטווח נדרש אישור שלי":"Allow distance exceptions — requests outside the radius require my approval",
-"כולם יכולים לראות את הגמ״ח והפריטים. המרחק נבדק בקו אווירי לפי הכתובת השמורה של המשתמש וכתובת הגמ״ח.":"Everyone can view the gmach and its items. Straight-line distance is calculated from the saved user address and the gmach address.",
+"המרחק נבדק בקו אווירי לפי הכתובת השמורה של המשתמש וכתובת הגמ״ח.":"Straight-line distance is calculated from the saved user address and the gmach address.",
 "יש לבחור טווח שירות של 2, 5, 10, 20, 50 ק״מ או ללא הגבלה":"Choose a service radius of 2, 5, 10, 20 or 50 km, or no distance limit",
 "הגדרת בקשת החריגה אינה תקינה":"Invalid distance exception setting",
 "כדי לבדוק את טווח השירות יש לשמור כתובת מלאה באזור האישי":"Save a full address in your account to check the service radius",

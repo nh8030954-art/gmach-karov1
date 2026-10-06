@@ -290,6 +290,10 @@ async function importItems(request,env){
 }
 
 
+function publicSnapshotCacheKey(value) {
+  const url=new URL(value);url.searchParams.set('__privacy','approved-contact-2026-10-06');
+  return new Request(url.toString(),{method:'GET',headers:{Accept:'application/json'}});
+}
 async function invalidatePublicSnapshotRoots(origin) {
   if (typeof caches === "undefined") return;
   const cache = caches.default;
@@ -297,7 +301,7 @@ async function invalidatePublicSnapshotRoots(origin) {
     "/api/items",
     "/api/categories",
     "/api/discovery"
-  ].map(path => cache.delete(new Request(origin + path, { method:"GET", headers:{ "Accept":"application/json" } })).catch(() => false)));
+  ].map(path => cache.delete(publicSnapshotCacheKey(origin + path)).catch(() => false)));
 }
 
 export default {
@@ -346,7 +350,7 @@ export default {
         })[url.pathname] : null;
         if (publicSnapshotPolicy && typeof caches !== "undefined") {
           const cache = caches.default;
-          const cacheKey = new Request(url.toString(), { method:"GET", headers:{ "Accept":"application/json" } });
+          const cacheKey = publicSnapshotCacheKey(url.toString());
           const snapshot = await cache.match(cacheKey);
           if (snapshot) {
             const cachedAt = Date.parse(snapshot.headers.get("X-Data-Cached-At") || "");
@@ -788,7 +792,14 @@ async function routeApi(request, env, ctx, url) {
   if (method === "GET" && itemDetail) return getItem(env, decodeURIComponent(itemDetail[1]), ctx);
   if (method === "PATCH" && itemDetail) return updateItem(request, env, decodeURIComponent(itemDetail[1]), ctx);
   const pickupBranchRoute=path.match(/^\/api\/items\/([^/]+)\/pickup-branches$/);
-  if(method==="GET"&&pickupBranchRoute)return json({branches:await pickupBranches(env,decodeURIComponent(pickupBranchRoute[1]))});
+  if(method==="GET"&&pickupBranchRoute)return json({branches:(await pickupBranches(env,decodeURIComponent(pickupBranchRoute[1]))).map(({address,...branch})=>branch)});
+  const pickupDetails = path.match(/^\/api\/loan-requests\/([^/]+)\/pickup-details$/);
+  if(method==="GET"&&pickupDetails){
+    const {user,row}=await getRequestParticipant(request,env,decodeURIComponent(pickupDetails[1]));
+    if(user.id===row.borrower_id&&user.role!=="admin"&&!["approved","collected","returned"].includes(row.status))throw new HttpError(403,"כתובת וטלפון הגמ״ח יוצגו לאחר אישור בקשת ההשאלה");
+    const details=await env.DB.prepare("SELECT COALESCE(b.address,o.address) AS address,COALESCE(b.city,o.city) AS city,COALESCE(NULLIF(b.phone,''),c.contact_phone) AS phone FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id LEFT JOIN organization_contacts c ON c.organization_id=o.id LEFT JOIN organization_branches b ON b.id=lr.branch_id WHERE lr.id=?").bind(row.id).first();
+    return json({pickup:details});
+  }
   const itemAvailabilityCheck = path.match(/^\/api\/items\/([^/]+)\/availability-check$/);
   if (method === "GET" && itemAvailabilityCheck) return checkItemAvailability(env, decodeURIComponent(itemAvailabilityCheck[1]), url);
   const inventoryManage = path.match(/^\/api\/items\/([^/]+)\/inventory$/);
@@ -837,7 +848,8 @@ async function routeApi(request, env, ctx, url) {
   const serviceEligibility = path.match(/^\/api\/organizations\/([^/]+)\/service-eligibility$/);
   if (method === "GET" && serviceEligibility) {
     const user=await requireUser(request,env);
-    return json(await organizationServiceEligibility(env,decodeURIComponent(serviceEligibility[1]),user));
+    const {distanceKm:privateDistance,...eligibility}=await organizationServiceEligibility(env,decodeURIComponent(serviceEligibility[1]),user);
+    return json(eligibility);
   }
   if (method === "GET" && publicOrganization) return getPublicOrganization(env, decodeURIComponent(publicOrganization[1]));
   const savedOrganization = path.match(/^\/api\/saved-organizations\/([^/]+)$/);
@@ -944,7 +956,7 @@ async function routeApi(request, env, ctx, url) {
   if (finalFeaturesResponse) return finalFeaturesResponse;
   const remainingFeaturesResponse = await handleRemainingFeatures(request, env, ctx, url);
   if (remainingFeaturesResponse) return remainingFeaturesResponse;
-  const requirementsExpansionResponse = await handleRequirementsExpansion(request, env, ctx, url);
+  const requirementsExpansionResponse = await handleRequirementsExpansion(request, env, ctx, url, organizationServiceEligibility);
   if (requirementsExpansionResponse) return requirementsExpansionResponse;
   const launchReadinessResponse = await handleLaunchReadiness(request, env, ctx, url);
   if (launchReadinessResponse) return launchReadinessResponse;
@@ -1704,9 +1716,7 @@ async function discovery(env, url) {
     env.DB.prepare(`SELECT i.category,COUNT(*) AS count FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.status='active' AND i.deleted_at IS NULL AND i.is_free=1 AND o.status='approved' AND o.is_hidden=0 AND o.deleted_at IS NULL GROUP BY i.category ORDER BY count DESC`),
     env.DB.prepare(`SELECT city,COUNT(*) AS count FROM items WHERE status='active' AND is_free=1 GROUP BY city ORDER BY count DESC LIMIT 80`),
     env.DB.prepare(`SELECT DISTINCT title FROM items WHERE status='active' AND (?='' OR title LIKE ?) ORDER BY updated_at DESC LIMIT 8`).bind(query || "", like),
-    env.DB.prepare(`SELECT o.id,o.name,o.city,o.neighborhood,o.address,o.description,o.last_active_at,
-      (SELECT b.latitude FROM organization_branches b WHERE b.organization_id=o.id AND b.status='active' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL ORDER BY b.updated_at DESC LIMIT 1) AS latitude,
-      (SELECT b.longitude FROM organization_branches b WHERE b.organization_id=o.id AND b.status='active' AND b.latitude IS NOT NULL AND b.longitude IS NOT NULL ORDER BY b.updated_at DESC LIMIT 1) AS longitude,
+    env.DB.prepare(`SELECT o.id,o.name,o.city,o.neighborhood,o.description,o.last_active_at,
       COUNT(DISTINCT i.id) AS item_count,
       ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count,
       SUM(CASE WHEN i.availability_status='available' THEN 1 ELSE 0 END) AS available_items
@@ -1718,7 +1728,7 @@ async function discovery(env, url) {
 }
 
 async function getPublicOrganization(env, id) {
-  const organization = await env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.address,o.description,o.status,
+  const organization = await env.DB.prepare(`SELECT o.id,o.name,o.primary_category,o.city,o.neighborhood,o.description,o.status,
     o.website_url,o.hours_json,o.service_area,o.pickup_options,o.last_active_at,o.verified_phone,o.verified_address,
     ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
     FROM organizations o LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
@@ -2477,9 +2487,11 @@ async function dashboard(request, env) {
   );
   const requestsResult = await safeAll(
     env.DB.prepare(`SELECT lr.id,lr.item_id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,lr.manager_note,lr.created_at,lr.quantity,lr.deposit_required_snapshot,lr.deposit_amount_agorot_snapshot,lr.workflow_status,lr.extension_status,lr.extension_until,lr.change_pending_json,lr.cancellation_undo_until,lr.branch_id,
-      i.title AS item_title,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,b.name AS branch_name,b.city AS branch_city,b.address AS branch_address,
+      i.title AS item_title,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,b.name AS branch_name,b.city AS branch_city,
+      b.address AS branch_address,
+      CASE WHEN lr.status IN ('approved','collected','returned') THEN COALESCE(b.address,o.address) ELSE NULL END AS pickup_address,
       CASE WHEN o.owner_id = ? THEN 'incoming' ELSE 'outgoing' END AS direction,
-      CASE WHEN lr.borrower_id = ? AND lr.status IN ('approved','collected','returned') THEN c.contact_phone ELSE NULL END AS contact_phone
+      CASE WHEN lr.borrower_id = ? AND lr.status IN ('approved','collected','returned') THEN COALESCE(NULLIF(b.phone,''),c.contact_phone) ELSE NULL END AS contact_phone
       FROM loan_requests lr JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id
       JOIN users u ON u.id = lr.borrower_id LEFT JOIN organization_contacts c ON c.organization_id = o.id
       LEFT JOIN organization_branches b ON b.id=lr.branch_id
@@ -2537,7 +2549,8 @@ async function dashboard(request, env) {
     branch_id: row.branch_id || null,
     branch_name: row.branch_name || null,
     branch_city: row.branch_city || null,
-    branch_address: row.branch_address || null,
+    branch_address: (row.direction==="incoming"||["approved","collected","returned"].includes(row.status))?(row.branch_address||null):null,
+    pickup_address:["approved","collected","returned"].includes(row.status)?(row.pickup_address||null):null,
     items: { title: row.item_title, organizations: { name: row.org_name } }
   }));
   return json({

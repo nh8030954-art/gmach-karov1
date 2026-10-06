@@ -43,7 +43,7 @@ async function publicBranches(env,orgId){
   const org=await env.DB.prepare("SELECT id,name,status,is_hidden,temporarily_closed,reopens_at FROM organizations WHERE id=? AND deleted_at IS NULL").bind(orgId).first();
   if(!org||org.status!=="approved"||Number(org.is_hidden))throw new ExpansionError(404,"הגמ״ח לא נמצא");
   const rows=await env.DB.prepare(`
-    SELECT b.id,b.name,b.address,b.city,b.latitude,b.longitude,b.phone,b.hours_json,b.status,b.reopens_at,b.inventory_mode,
+    SELECT b.id,b.name,b.city,b.hours_json,b.status,b.reopens_at,b.inventory_mode,
       ROUND(AVG(r.branch_rating),1) AS rating,COUNT(r.branch_rating) AS review_count,
       (SELECT COUNT(*) FROM item_units iu JOIN items i ON i.id=iu.item_id WHERE iu.branch_id=b.id AND i.status='active' AND iu.status='available') AS available_units
     FROM organization_branches b
@@ -81,20 +81,23 @@ async function multiRangeCheck(request,env,itemId){
   for(const range of ranges){const x=await availabilityForRange(env,itemId,range.from,range.until);results.push({...range,availableQuantity:x.available,available:x.available>=quantity});}
   return json({itemId,quantity,allAvailable:results.every(x=>x.available),ranges:results});
 }
-async function multiRangeRequest(request,env,itemId){
+async function multiRangeRequest(request,env,itemId,checkService){
   const user=await requireUser(request,env),body=await readJson(request),quantity=Math.max(1,Math.min(999,Number(body.quantity)||1)),ranges=normalizeRanges(body),phone=optional(body.phone,30)||user.phone;
   if(!phone)throw new ExpansionError(400,"נדרש מספר טלפון");
   const item=await env.DB.prepare("SELECT i.*,o.owner_id,o.name AS organization_name FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.id=? AND i.status='active' AND o.status='approved' AND o.is_hidden=0").bind(itemId).first();
   if(!item)throw new ExpansionError(404,"הפריט לא נמצא");if(item.owner_id===user.id)throw new ExpansionError(400,"אי אפשר להזמין פריט מהגמ״ח שלכם");
+  if(!checkService)throw new ExpansionError(503,"לא ניתן לבדוק את טווח השירות כרגע");
+  const eligibility=await checkService(env,item.organization_id,user),distanceException=eligibility.outside&&eligibility.exceptionAvailable&&body.distanceException===true;
+  if(!eligibility.allowed&&!distanceException)throw new ExpansionError(403,eligibility.message);
   for(const range of ranges){const x=await availabilityForRange(env,itemId,range.from,range.until);if(x.available<quantity)throw new ExpansionError(409,"אחד הטווחים כבר אינו זמין בכמות המבוקשת");}
-  const batchId=crypto.randomUUID(),created=[],now=new Date().toISOString(),status=item.approval_mode==="automatic"?"approved":"pending";
+  const batchId=crypto.randomUUID(),created=[],now=new Date().toISOString(),status=item.approval_mode==="automatic"&&!distanceException?"approved":"pending";
   try{
     for(const range of ranges){
       const id=crypto.randomUUID();
       const result=await env.DB.prepare(`INSERT INTO loan_requests(id,item_id,borrower_id,requested_from,requested_until,phone,note,status,quantity,workflow_status,multi_range_batch_id,updated_at)
         SELECT ?,?,?,?,?,?,?,?,?,?,?,?
         WHERE (SELECT COALESCE(SUM(quantity),0) FROM loan_requests WHERE item_id=? AND status IN ('pending','approved','collected') AND requested_from<? AND requested_until>?) + ? <= ?`)
-        .bind(id,itemId,user.id,range.from,range.until,phone,optional(body.note,500),status,quantity,status==="approved"?"approved_ready_for_pickup":"inventory_held",batchId,now,itemId,range.until,range.from,quantity,Number(item.quantity)).run();
+        .bind(id,itemId,user.id,range.from,range.until,phone,(distanceException?`בקשת חריגה מטווח שירות: כ־${eligibility.distanceKm} ק״מ; טווח ${eligibility.radiusKm} ק״מ.\n`:"")+(optional(body.note,500)||""),status,quantity,status==="approved"?"approved_ready_for_pickup":"inventory_held",batchId,now,itemId,range.until,range.from,quantity,Number(item.quantity)).run();
       if(!result.meta.changes)throw new ExpansionError(409,"המלאי נתפס בזמן שליחת קבוצת הטווחים");
       created.push(id);
       await env.DB.prepare("INSERT INTO loan_status_events(id,request_id,status,actor_id,note) VALUES(?,?,?,?,?)").bind(crypto.randomUUID(),id,"multi_range_created",user.id,"batch:"+batchId).run().catch(()=>{});
@@ -195,13 +198,13 @@ export async function runRequirementsExpansionMaintenance(env){
   for(const row of expired.results||[])await releaseExpiredLoanHold(env,row.request_id);
 }
 
-export async function handleRequirementsExpansion(request,env,ctx,url){
+export async function handleRequirementsExpansion(request,env,ctx,url,checkService){
   const method=request.method.toUpperCase(),path=url.pathname;
   try{
     let m;
     if(method==="GET"&&(m=path.match(/^\/api\/organizations\/([^/]+)\/branches-public$/)))return publicBranches(env,decodeURIComponent(m[1]));
     if(method==="POST"&&(m=path.match(/^\/api\/items\/([^/]+)\/multi-range-check$/)))return multiRangeCheck(request,env,decodeURIComponent(m[1]));
-    if(method==="POST"&&(m=path.match(/^\/api\/items\/([^/]+)\/multi-range-request$/)))return multiRangeRequest(request,env,decodeURIComponent(m[1]));
+    if(method==="POST"&&(m=path.match(/^\/api\/items\/([^/]+)\/multi-range-request$/)))return await multiRangeRequest(request,env,decodeURIComponent(m[1]),checkService);
     if(method==="GET"&&path==="/api/me/reports")return myReports(request,env);
     if(method==="GET"&&(m=path.match(/^\/api\/admin\/users\/([^/]+)\/full$/)))return adminUserDetail(request,env,decodeURIComponent(m[1]));
     if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/users\/([^/]+)\/control$/)))return adminUserControl(request,env,decodeURIComponent(m[1]));

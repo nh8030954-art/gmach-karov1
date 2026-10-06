@@ -475,6 +475,9 @@ try {
   const denied=await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:{itemId,distanceException:true,latitude:31.78,longitude:35.22}});
   assert.equal(denied.response.status,403,JSON.stringify(denied.data));
   assert.ok(denied.data.error.includes('5'));
+  const multiRangeDenied=await request(`/api/items/${itemId}/multi-range-request`,{method:'POST',cookie:borrowerCookie,body:{ranges:[{from:'2026-10-08T10:00',until:'2026-10-09T12:00'}],phone:'052-7654321',distanceException:true}});
+  assert.equal(multiRangeDenied.response.status,403,'Multi-range API must enforce the organization service radius too');
+
   assert.equal((await request(`/api/organizations/${organizationId}/public`)).response.status,200,'Public items remain visible outside range');
   await db.prepare('UPDATE organization_service_ranges SET allow_exception=1 WHERE organization_id=?').bind(organizationId).run();
   assert.equal((await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:{itemId}})).response.status,403,'Exception requires an explicit request');
@@ -488,6 +491,16 @@ try {
   await db.prepare("UPDATE items SET approval_mode='manual' WHERE id=?").bind(itemId).run();
   await db.prepare('DELETE FROM user_addresses WHERE id=?').bind(savedHome.data.address.id).run();
   const requestId = result.data.request.id;
+  assert.equal((await request(`/api/loan-requests/${requestId}/pickup-details`,{cookie:borrowerCookie})).response.status,403,'Pending borrower cannot reveal pickup details');
+  assert.equal((await request(`/api/loan-requests/${requestId}/pickup-details`,{cookie:englishCookie})).response.status,403,'Another user cannot reveal pickup details');
+  const pendingDashboard=(await request('/api/me/dashboard',{cookie:borrowerCookie})).data.requests.find(x=>x.id===requestId);
+  assert.equal(pendingDashboard.pickup_address,null);
+  assert.equal(pendingDashboard.branch_address,null);
+  assert.equal(pendingDashboard.contact_phone,null);
+  const pendingCalendar=await request(`/api/loan-requests/${requestId}/calendar.ics`,{cookie:borrowerCookie});
+  assert.equal(pendingCalendar.response.status,200);
+  assert.ok(!pendingCalendar.data.includes(serviceOrg.address),'Pending calendar cannot reveal the gmach address');
+
   result = await request(`/api/loan-requests/${requestId}/pickup-proposals`, { method:"POST",cookie:adminCookie,body:{startsAt:"2026-10-08T18:00:00Z",endsAt:"2026-10-08T19:00:00Z"} });
   assert.equal(result.response.status,201,JSON.stringify(result.data));
   result = await request(`/api/loan-requests/${requestId}/timeline`, { cookie:borrowerCookie });
@@ -542,6 +555,14 @@ try {
   assert.equal(result.data.requests[0].status, "approved");
   assert.equal(result.data.requests[0].manager_note, "איסוף מהכניסה בשעה 19:00");
   assert.equal(result.data.requests[0].contact_phone, "050-1234567");
+  const selectedPickupBranch=(await db.prepare('SELECT branch_id FROM loan_requests WHERE id=?').bind(requestId).first()).branch_id;
+  const expectedPickupAddress=selectedPickupBranch?(await db.prepare('SELECT address FROM organization_branches WHERE id=?').bind(selectedPickupBranch).first()).address:serviceOrg.address;
+  assert.equal(result.data.requests[0].pickup_address,expectedPickupAddress);
+  const approvedPickup=await request(`/api/loan-requests/${requestId}/pickup-details`,{cookie:borrowerCookie});
+  assert.equal(approvedPickup.response.status,200);
+  assert.equal(approvedPickup.data.pickup.address,expectedPickupAddress);
+  assert.equal(approvedPickup.data.pickup.phone,'050-1234567');
+
   assert.deepEqual(result.data.favorites, [itemId]);
 
   result = await request("/api/notifications", { cookie: borrowerCookie });
@@ -606,7 +627,7 @@ try {
   result = await request(`/api/organizations/${organizationId}/public`);
   assert.equal(result.response.status, 200);
   assert.equal(result.data.items.length, 2);
-  assert.equal(result.data.organization.address, "רחוב הבדיקה 1, ירושלים");
+  assert.equal(Object.hasOwn(result.data.organization,"address"),false,"Public organization address must be withheld");
   assert.equal(Object.hasOwn(result.data.organization, "contact_phone"), false);
   assert.equal(result.data.partial, false, "Public gmach details must not degrade on a migrated database");
   result = await request("/api/organizations/nonexistent/public");
@@ -688,6 +709,14 @@ try {
   await db.prepare("UPDATE item_units SET branch_id='pickup-second',status='available' WHERE id=?").bind(branchUnits[1].id).run();
   result=await request(`/api/items/${itemId}/pickup-branches`);
   assert.equal(result.response.status,200,JSON.stringify(result.data));assert.equal(result.data.branches.length,2);
+  for(const branch of result.data.branches)assert.equal(Object.hasOwn(branch,'address'),false);
+  const publicBranches=(await request(`/api/organizations/${organizationId}/branches-public`)).data.branches;
+  for(const branch of publicBranches)for(const key of ['address','phone','latitude','longitude'])assert.equal(Object.hasOwn(branch,key),false,`Public branch leaks ${key}`);
+  const branchSearch=(await request('/api/search/branches?city='+encodeURIComponent('ירושלים'))).data.branches;
+  for(const branch of branchSearch){assert.equal(Object.hasOwn(branch,'address'),false);assert.equal(Object.hasOwn(branch,'phone'),false);if(branch.latitude!=null)assert.equal(branch.latitude,Math.round(branch.latitude*10)/10);}
+  const publicDiscovery=(await request('/api/discovery')).data.organizations;
+  for(const org of publicDiscovery)for(const key of ['address','phone','latitude','longitude'])assert.equal(Object.hasOwn(org,key),false,`Discovery leaks ${key}`);
+
   const pickupBody={itemId,requestedFrom:'2026-10-15T10:00',requestedUntil:'2026-10-16T12:00',quantity:1,depositAccepted:true,phone:'052-7654321'};
   result=await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:pickupBody});assert.equal(result.response.status,400,'Multiple branches require an explicit choice');
   result=await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:{...pickupBody,branchId:'foreign'}});assert.equal(result.response.status,400,'Reject unrelated branch');

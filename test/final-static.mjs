@@ -144,8 +144,9 @@ assert.ok(remainingClient.includes('org.review_count')&&remainingClient.includes
 assert.ok((await readFile('dist/user-content-translation.js','utf8')).includes('/api/translate/user-content')&&!remainingClient.includes('queueAiTranslation')&&remainingClient.includes('NEVER_TRANSLATE_SELECTOR=".organization-name'),"English dynamic-content translation fallback missing");
 assert.ok(remainingClient.includes('?"Hebrew":"English"')&&!remainingClient.includes('?"עברית":"English"'),"English mode language switch must stay English-only");
 
-assert.ok(worker.includes("organization_branches b")&&worker.includes("AS latitude")&&worker.includes("AS longitude"),"discovery must expose stored branch coordinates for the map");
-assert.ok(remainingClient.includes("row.latitude")&&remainingClient.includes("/api/maps/tiles/"),"map must prefer stored coordinates and use same-origin tile loading");
+const publicDiscoveryCode=worker.slice(worker.indexOf("async function discovery("),worker.indexOf("async function getPublicOrganization("));
+assert.ok(!publicDiscoveryCode.includes("o.address")&&!publicDiscoveryCode.includes("AS latitude")&&!publicDiscoveryCode.includes("AS longitude"),"discovery must withhold precise pickup locations");
+assert.ok(remainingClient.includes("full=city")&&remainingClient.includes("/api/maps/tiles/"),"public map uses city-level locations and same-origin tiles");
 
 
 for(const token of ["manageLoanUnits","const loanUnits =","loan_unit_assignments"])assert.ok(worker.includes(token),token+" missing from pickup unit assignment backend");
@@ -608,7 +609,7 @@ assert.ok(remainingClient.includes("data-osm-tiles")&&remainingClient.includes('
 
 assert.ok(css.includes("Keep the English desktop links visible")&&css.includes("padding-inline-start:28px"),"English desktop nav must stay visible with spacing before My account");
 
-assert.ok(remainingClient.includes('row.latitude!==null')&&remainingClient.includes('(storedLat!==0||storedLon!==0)'),"map must not treat null coordinates as 0,0");
+assert.ok(remainingClient.includes('city=String(row.city||"").trim(),full=city')&&!remainingClient.includes('storedLat'),"Public gmach map resolves only city-level locations");
 assert.ok(remainingClient.includes('pointer-events:none;z-index:3'),"gmach marker layer must stay above the map frame");
 
 assert.ok(remainingClient.includes("attempt<4")&&remainingClient.includes("city!==full")&&remainingClient.includes("await sleep(1250)"),"gmach map geocoding must retry throttled requests and fall back to city");

@@ -181,7 +181,7 @@ async function proposeBranch(request,env,requestId){
         JOIN users u ON u.id=p.proposed_by
         WHERE p.request_id=? ORDER BY p.created_at DESC LIMIT 30`).bind(requestId).all()
     ]);
-    return json({currentBranchId:row.branch_id||null,branches:branches.results,proposals:proposals.results.map(p=>({...p,canRespond:p.status==="pending"&&p.proposed_by!==user.id&&Date.parse(p.expires_at)>Date.now()}))});
+    return json({currentBranchId:row.branch_id||null,branches:branches.results.map(({address,...branch})=>user.id===row.owner_id||user.role==="admin"?{...branch,address}:branch),proposals:proposals.results.map(p=>({...p,canRespond:p.status==="pending"&&p.proposed_by!==user.id&&Date.parse(p.expires_at)>Date.now()}))});
   }
   const b=await body(request),to=clean(b.toBranchId,1,100,"סניף");
   if(to===row.branch_id)throw new FinalError(400,"יש לבחור סניף חלופי");

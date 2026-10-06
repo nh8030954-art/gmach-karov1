@@ -610,12 +610,7 @@ async function geocodeGmachOrganizations(rows){
    return null;
  };
  for(const row of rows||[]){
-   const hasStored=row.latitude!==null&&row.latitude!==undefined&&row.longitude!==null&&row.longitude!==undefined&&String(row.latitude).trim()!==""&&String(row.longitude).trim()!=="";
-   const storedLat=hasStored?Number(row.latitude):NaN,storedLon=hasStored?Number(row.longitude):NaN;
-   if(Number.isFinite(storedLat)&&Number.isFinite(storedLon)&&Math.abs(storedLat)<=90&&Math.abs(storedLon)<=180&&(storedLat!==0||storedLon!==0)){
-     resolved.push({...row,lat:storedLat,lon:storedLon});continue;
-   }
-   const full=[row.address,row.city].filter(Boolean).join(", "),city=String(row.city||"").trim();
+   const city=String(row.city||"").trim(),full=city;
    let point=await geocode(full||city);
    if(!point&&city&&city!==full)point=await geocode(city);
    if(point&&Number.isFinite(point.lat)&&Number.isFinite(point.lon))resolved.push({...row,...point});
@@ -638,7 +633,7 @@ async function showAddressMap(){
    const discovery=await api("/api/discovery"),organizations=discovery.organizations||[];
    const points=await geocodeGmachOrganizations(organizations);
    points.forEach(org=>{
-     {const rating=Math.max(0,Math.min(5,Number(org.rating)||0)),filled=Math.max(0,Math.min(5,Math.round(rating))),stars="★".repeat(filled)+"☆".repeat(5-filled),reviewCount=Number(org.review_count||0);org.popupHtml=`<div dir="${lang==="en"?"ltr":"rtl"}"><strong class="organization-name" translate="no" style="font-size:16px">${window.GmachOriginalName(org.name)}</strong><div style="margin-top:5px">📍 ${esc([org.city,org.neighborhood].filter(Boolean).join(" · "))}</div><div style="margin-top:6px;font-weight:700"><span aria-label="${lang==="en"?"Gmach rating":"דירוג הגמ״ח"} ${rating.toFixed(1)} ${lang==="en"?"out of 5":"מתוך 5"}" style="color:#b07b2f;letter-spacing:1px">${stars}</span> <span>${rating?rating.toFixed(1):"—"}/5</span> <small>(${reviewCount} ${lang==="en"?(reviewCount===1?"review":"reviews"):"דירוגים"})</small></div><div style="margin-top:5px">📦 ${Number(org.item_count||0)} ${lang==="en"?"items":"פריטים"} · ✅ ${Number(org.available_items||0)} ${lang==="en"?"available":"זמינים"}</div>${org.description?`<p style="margin:7px 0">${esc(org.description)}</p>`:""}<button type="button" class="button button-primary button-small" data-map-open-org="${esc(org.id)}">${lang==="en"?"View gmach":"לפרטי הגמ״ח"}</button>${navigationLinks(org.lat,org.lon,org.name)}</div>`;}
+     {const rating=Math.max(0,Math.min(5,Number(org.rating)||0)),filled=Math.max(0,Math.min(5,Math.round(rating))),stars="★".repeat(filled)+"☆".repeat(5-filled),reviewCount=Number(org.review_count||0);org.popupHtml=`<div dir="${lang==="en"?"ltr":"rtl"}"><strong class="organization-name" translate="no" style="font-size:16px">${window.GmachOriginalName(org.name)}</strong><div style="margin-top:5px">📍 ${esc([org.city,org.neighborhood].filter(Boolean).join(" · "))}</div><div style="margin-top:6px;font-weight:700"><span aria-label="${lang==="en"?"Gmach rating":"דירוג הגמ״ח"} ${rating.toFixed(1)} ${lang==="en"?"out of 5":"מתוך 5"}" style="color:#b07b2f;letter-spacing:1px">${stars}</span> <span>${rating?rating.toFixed(1):"—"}/5</span> <small>(${reviewCount} ${lang==="en"?(reviewCount===1?"review":"reviews"):"דירוגים"})</small></div><div style="margin-top:5px">📦 ${Number(org.item_count||0)} ${lang==="en"?"items":"פריטים"} · ✅ ${Number(org.available_items||0)} ${lang==="en"?"available":"זמינים"}</div>${org.description?`<p style="margin:7px 0">${esc(org.description)}</p>`:""}<button type="button" class="button button-primary button-small" data-map-open-org="${esc(org.id)}">${lang==="en"?"View gmach":"לפרטי הגמ״ח"}</button><p>${lang==="en"?"Approximate area only. Pickup details appear after approval.":"אזור משוער בלבד. פרטי האיסוף יוצגו לאחר אישור."}</p></div>`;}
    });
    map.setPoints(points);map.showCountry();
    canvas.addEventListener("click",e=>{const button=e.target.closest?.("[data-map-open-org]");if(!button)return;d.close();window.dispatchEvent(new CustomEvent("gmach:open-organization",{detail:{id:button.dataset.mapOpenOrg}}))});
