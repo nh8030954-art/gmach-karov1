@@ -36,6 +36,7 @@ async function purgeDeletedUser(env,user){
  const detail={deleted:[],anonymized:[],media:[]};
  try{
   const media=await allSafe(env,"SELECT id,media_url FROM request_messages WHERE sender_id=? AND media_url IS NOT NULL",[user.id]);
+  media.push(...await allSafe(env,"SELECT id,media_url FROM organization_chat_messages WHERE sender_id=? AND media_url IS NOT NULL",[user.id]));
   for(const m of media){const key=mediaKey(m.media_url);if(key&&env.ITEM_IMAGES?.delete){try{await env.ITEM_IMAGES.delete(key);mediaDeleted++;detail.media.push(key)}catch{}}}
   const deleteOps=[
    ["sessions","DELETE FROM sessions WHERE user_id=?"],
@@ -63,6 +64,8 @@ async function purgeDeletedUser(env,user){
   ];
   for(const [name,sql] of deleteOps){const args=name==="user_blocks"?[user.id,user.id]:[user.id],n=await runSafe(env,sql,args);if(n){rowsDeleted+=n;detail.deleted.push([name,n])}}
   const anonOps=[
+   ["organization_chat_messages","UPDATE organization_chat_messages SET body='[תוכן נמחק לבקשת המשתמש]',media_url=NULL,metadata_json='{}',deleted_at=COALESCE(deleted_at,?) WHERE sender_id=?",[now,user.id]],
+   ["organization_chat_requests","UPDATE organization_chat_requests SET note='[תוכן נמחק לבקשת המשתמש]',status='cancelled',updated_at=? WHERE borrower_id=?",[now,user.id]],
    ["request_messages","UPDATE request_messages SET body='[תוכן נמחק לבקשת המשתמש]',media_url=NULL,deleted_at=COALESCE(deleted_at,?) WHERE sender_id=?",[now,user.id]],
    ["reviews","UPDATE reviews SET comment=NULL,updated_at=COALESCE(updated_at,?) WHERE author_id=?",[now,user.id]],
    ["help_requests","UPDATE help_requests SET title='בקשה שנמחקה',description='התוכן נמחק לבקשת המשתמש',city='לא זמין',status='closed',updated_at=? WHERE requester_id=?",[now,user.id]],

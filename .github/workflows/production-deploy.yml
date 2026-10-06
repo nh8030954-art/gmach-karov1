@@ -124,6 +124,10 @@ jobs:
           npx wrangler d1 execute DB --remote --file migrations/0036_visitor_analytics.sql
           npx wrangler d1 execute DB --remote --file migrations/0037_admin_recycle_bin.sql
           npx wrangler d1 execute DB --remote --file migrations/0038_visitor_detail.sql
+      - name: Enable approved gmachs without inventory and chat requests
+        run: |
+          if ! git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -qx "migrations/0040_organization_chats.sql"; then exit 0; fi
+          npx wrangler d1 execute DB --remote --file migrations/0040_organization_chats.sql
       - name: Ensure saved item English content schema
         run: npx wrangler d1 execute DB --remote --file migrations/0035_item_english_content.sql
       - name: Assign missing gmach serial numbers without renumbering
@@ -193,7 +197,7 @@ jobs:
           fi
           for attempt in 1 2 3; do
             body="$(curl --fail --silent --show-error --max-time 20 "$origin/api/organizations/$org_id/public")"
-            if printf '%s' "$body" | jq -e '.partial == false and (.items | length) > 0 and (.organization | has("contact_phone") | not) and (.organization | has("address") | not)' >/dev/null; then
+            if printf '%s' "$body" | jq -e '.partial == false and (.items | type) == "array" and (.organization | has("contact_phone") | not) and (.organization | has("address") | not)' >/dev/null; then
               echo "Public gmach address and contact details are private."
               exit 0
             fi

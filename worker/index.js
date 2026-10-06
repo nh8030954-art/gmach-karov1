@@ -1,3 +1,4 @@
+import { ensureOrganizationChats, isOrganizationChat, chatMessageTable } from "./organization-chats.js";
 import { ensureServiceRanges, getServiceRange, serviceRangeInput, serviceRangeStatement, resolveServiceLocation, evaluateServiceRange, distanceKm } from "./service-range.js";
 import { ensureLoanCosts, loanCostProjection, loanCostInput, loanCostStatement } from "./loan-costs.js";
 import { adminGmachSelect, loadAdminGmachDetails } from "./admin-gmachs.js";
@@ -291,7 +292,7 @@ async function importItems(request,env){
 
 
 function publicSnapshotCacheKey(value) {
-  const url=new URL(value);url.searchParams.set('__privacy','approved-contact-2026-10-06');
+  const url=new URL(value);url.searchParams.set('__privacy','approved-contact-chats-2026-10-06');
   return new Request(url.toString(),{method:'GET',headers:{Accept:'application/json'}});
 }
 async function invalidatePublicSnapshotRoots(origin) {
@@ -334,10 +335,13 @@ export default {
       if (url.pathname.startsWith("/api/")) {
         await ensureLoanCosts(env);
         await ensureServiceRanges(env);
+        await ensureOrganizationChats(env);
         const preflight = await platformPreflight(request, env, url);
         if (preflight) return withSecurityHeaders(preflight);
         const expansionPreflight = await requirementsExpansionPreflight(request, env, url);
         if (expansionPreflight) return withSecurityHeaders(expansionPreflight);
+        const organizationChatRoute=/^\/api\/(?:organization-chat|organizations\/[^/]+\/chat-requests|loan-requests\/gc-|messages\/gc-)/.test(url.pathname);
+        if(organizationChatRoute){const response=await routeApi(request,env,ctx,url);return withSecurityHeaders(response);}
         const completionResponse = await handlePlatformCompletionApi(request, env, ctx, url);
         if (completionResponse) {
           if (!["GET","HEAD","OPTIONS"].includes(request.method) && completionResponse.ok) await invalidatePublicSnapshotRoots(url.origin);
@@ -675,6 +679,8 @@ async function routeApi(request, env, ctx, url) {
   const method = request.method.toUpperCase();
   const path = url.pathname;
   if (!["GET", "HEAD", "OPTIONS"].includes(method)) assertSameOrigin(request, url);
+  const orgChatResponse=await routeOrganizationChats(request,env,url);
+  if(orgChatResponse)return orgChatResponse;
   if (method === "OPTIONS") return new Response(null, { status: 204 });
 
   if (method === "GET" && path === "/api/health") {
@@ -1706,9 +1712,9 @@ async function discovery(env, url) {
   const like = `%${String(query || "").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
   const orgCity=cleanOptional(url.searchParams.get("orgCity"),80),orgCategory=cleanOptional(url.searchParams.get("orgCategory"),80),orgQuery=cleanOptional(url.searchParams.get("orgQuery"),100);
   const minRating=Math.max(0,Math.min(5,Number(url.searchParams.get("minRating"))||0)),availableOnly=url.searchParams.get("orgAvailable")==="1";
-  const orgWhere=["o.status='approved'","o.is_hidden=0","o.deleted_at IS NULL","EXISTS (SELECT 1 FROM items vi WHERE vi.organization_id=o.id AND vi.status='active' AND vi.deleted_at IS NULL)"],orgBind=[];
+  const orgWhere=["o.status='approved'","o.is_hidden=0","o.deleted_at IS NULL"],orgBind=[];
   if(orgCity){orgWhere.push("o.city=?");orgBind.push(orgCity)}
-  if(orgCategory){orgWhere.push("EXISTS (SELECT 1 FROM items ci WHERE ci.organization_id=o.id AND ci.status='active' AND ci.deleted_at IS NULL AND ci.category=?)");orgBind.push(orgCategory)}
+  if(orgCategory){orgWhere.push("(o.primary_category=? OR EXISTS (SELECT 1 FROM items ci WHERE ci.organization_id=o.id AND ci.status='active' AND ci.deleted_at IS NULL AND ci.category=?))");orgBind.push(orgCategory,orgCategory)}
   if(orgQuery){const oq=`%${orgQuery.replaceAll("%","\\%").replaceAll("_","\\_")}%`;orgWhere.push("(o.name LIKE ? ESCAPE '\\' OR o.description LIKE ? ESCAPE '\\' OR o.city LIKE ? ESCAPE '\\')");orgBind.push(oq,oq,oq)}
   if(availableOnly)orgWhere.push("EXISTS (SELECT 1 FROM items ai WHERE ai.organization_id=o.id AND ai.status='active' AND ai.deleted_at IS NULL AND ai.availability_status='available')");
   if(minRating>0){orgWhere.push("COALESCE((SELECT AVG(rr.rating) FROM reviews rr WHERE rr.organization_id=o.id AND rr.status='published'),0)>=?");orgBind.push(minRating)}
@@ -1732,7 +1738,7 @@ async function getPublicOrganization(env, id) {
     o.website_url,o.hours_json,o.service_area,o.pickup_options,o.last_active_at,o.verified_phone,o.verified_address,
     ROUND(AVG(r.rating),1) AS rating,COUNT(DISTINCT r.id) AS review_count
     FROM organizations o LEFT JOIN reviews r ON r.organization_id=o.id AND r.status='published'
-    WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 AND o.deleted_at IS NULL AND EXISTS (SELECT 1 FROM items pi WHERE pi.organization_id=o.id AND pi.status='active' AND pi.deleted_at IS NULL) GROUP BY o.id`).bind(id).first();
+    WHERE o.id=? AND o.status='approved' AND o.is_hidden=0 AND o.deleted_at IS NULL GROUP BY o.id`).bind(id).first();
   if (!organization) throw new HttpError(404, "הגמ״ח לא נמצא");
   await ensureReviewBranchRatingSchema(env).catch(error => console.error("Review relation repair unavailable", error));
   // Repair a missing category relation for older deployments, while allowing
@@ -1956,7 +1962,7 @@ async function createOrganization(request, env) {
     pickupOptions: sanitizePickupOptions(body.pickupOptions)
   };
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO organizations (id,owner_id,name,primary_category,city,neighborhood,description,address,website_url,service_area,hours_json,pickup_options,last_active_at,status,verified,is_hidden,organization_type) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'approved',0,1,?)")
+    env.DB.prepare("INSERT INTO organizations (id,owner_id,name,primary_category,city,neighborhood,description,address,website_url,service_area,hours_json,pickup_options,last_active_at,status,verified,is_hidden,organization_type) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'approved',0,0,?)")
       .bind(id, user.id, values.name, category, values.city, values.neighborhood, values.description, values.address, null, values.serviceArea, values.hoursJson, values.pickupOptions, new Date().toISOString(),["private","family","community","nonprofit","business","authority"].includes(body.organizationType)?body.organizationType:"private"),
     serviceRangeStatement(env,id,serviceRange),
     env.DB.prepare("INSERT INTO organization_contacts (organization_id,contact_phone) VALUES (?,?)").bind(id, values.phone),
@@ -2558,6 +2564,7 @@ async function dashboard(request, env) {
     organizations,
     items,
     requests,
+    chatRequests:await listOrganizationChatRequests(env,user),
     favorites: (favoritesResult.results || []).map(row => row.item_id),
     savedOrganizations: savedOrganizationsResult.results || [],
     recentlyViewedOrganizations: recentOrganizationsResult.results || [],
@@ -2663,8 +2670,96 @@ async function updateAvailability(request, env, id) {
   return json({ id, availabilityStatus: availability });
 }
 
+async function organizationChatParticipant(env,id,user,allowAdmin=true){
+  const row=await env.DB.prepare(`SELECT c.*,o.owner_id,o.name AS org_name,o.deleted_at AS org_deleted,u.account_status AS borrower_status FROM organization_chat_requests c JOIN organizations o ON o.id=c.organization_id JOIN users u ON u.id=c.borrower_id WHERE c.id=?`).bind(id).first();
+  if(!row||row.org_deleted)throw new HttpError(404,"הבקשה לא נמצאה");
+  const participant=user.id===row.borrower_id||user.id===row.owner_id;
+  if(!participant&&!(allowAdmin&&user.role==='admin'))throw new HttpError(403,"אין הרשאה לשיחה");
+  if(row.status!=='approved')throw new HttpError(403,"הצ׳אט ייפתח לאחר אישור מנהל הגמ״ח");
+  if(row.borrower_status!=='active')throw new HttpError(403,"החשבון אינו פעיל");
+  return {user,row:{...row,chatOnly:true,item_title:"צ׳אט עם הגמ״ח",returned_at:null},participant};
+}
+async function organizationChatPickup(env,row,user){
+  if(row.status!=='approved')return null;
+  return await env.DB.prepare('SELECT o.address,o.city,c.contact_phone AS phone FROM organizations o LEFT JOIN organization_contacts c ON c.organization_id=o.id WHERE o.id=? AND o.deleted_at IS NULL').bind(row.organization_id).first();
+}
+async function listOrganizationChatRequests(env,user){
+  const rows=await env.DB.prepare(`SELECT c.id,c.status,c.note,c.distance_exception,c.created_at,c.organization_id,o.name AS organization_name,u.full_name AS borrower_name,
+    CASE WHEN c.borrower_id=? THEN 'outgoing' ELSE 'incoming' END AS direction,
+    CASE WHEN c.status='approved' THEN o.address ELSE NULL END AS address,
+    CASE WHEN c.status='approved' THEN oc.contact_phone ELSE NULL END AS phone
+    FROM organization_chat_requests c JOIN organizations o ON o.id=c.organization_id JOIN users u ON u.id=c.borrower_id LEFT JOIN organization_contacts oc ON oc.organization_id=o.id
+    WHERE (c.borrower_id=? OR o.owner_id=?) AND o.deleted_at IS NULL ORDER BY c.created_at DESC LIMIT 200`).bind(user.id,user.id,user.id).all();
+  return rows.results||[];
+}
+async function routeOrganizationChats(request,env,url){
+  const method=request.method,path=url.pathname;
+  let m=path.match(/^\/api\/organizations\/([^/]+)\/chat-requests$/);
+  if(m&&method==='POST'){
+    const user=await requireUser(request,env),orgId=decodeURIComponent(m[1]),body=await readJson(request);
+    const org=await env.DB.prepare("SELECT id,owner_id,temporarily_closed FROM organizations WHERE id=? AND status='approved' AND is_hidden=0 AND deleted_at IS NULL").bind(orgId).first();
+    if(!org)throw new HttpError(404,"הגמ״ח לא נמצא");
+    if(org.owner_id===user.id)throw new HttpError(400,"אין צורך לשלוח בקשה לגמ״ח שלך");
+    const existing=await env.DB.prepare("SELECT id,status FROM organization_chat_requests WHERE organization_id=? AND borrower_id=? AND status IN ('pending','approved')").bind(orgId,user.id).first();
+    if(existing)return json({chatRequest:existing});
+    if(org.temporarily_closed)throw new HttpError(409,"הגמ״ח סגור זמנית");
+    const item=await env.DB.prepare("SELECT id FROM items WHERE organization_id=? AND status='active' AND deleted_at IS NULL LIMIT 1").bind(orgId).first();
+    if(item)throw new HttpError(409,"בגמ״ח זה יש לבחור פריט ולשלוח בקשת השאלה");
+    const blocked=await env.DB.prepare('SELECT 1 FROM user_blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?) LIMIT 1').bind(user.id,org.owner_id,org.owner_id,user.id).first();
+    if(blocked)throw new HttpError(403,"לא ניתן לשלוח בקשה למשתמש הזה");
+    const eligibility=await organizationServiceEligibility(env,orgId,user),exception=eligibility.outside&&eligibility.exceptionAvailable&&body.distanceException===true;
+    if(!eligibility.allowed&&!exception)throw new HttpError(403,eligibility.message);
+    const note=cleanText(body.note,2,1000,"תיאור הבקשה");assertSafeChatText(note);
+    const recent=await env.DB.prepare("SELECT COUNT(*) AS count FROM organization_chat_requests WHERE borrower_id=? AND created_at>=strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 hour')").bind(user.id).first();
+    if(Number(recent?.count||0)>=10)throw new HttpError(429,"נשלחו יותר מדי בקשות. נסו שוב בהמשך");
+    const id='gc-'+crypto.randomUUID();
+    try{await env.DB.batch([
+      env.DB.prepare('INSERT INTO organization_chat_requests(id,organization_id,borrower_id,note,distance_exception) VALUES(?,?,?,?,?)').bind(id,orgId,user.id,note,exception?1:0),
+      notificationStatement(env,org.owner_id,'request','בקשת פתיחת צ׳אט חדשה',`${user.full_name}: ${note.slice(0,120)}`)
+    ]);}catch(e){if(String(e).includes('UNIQUE')){const row=await env.DB.prepare("SELECT id,status FROM organization_chat_requests WHERE organization_id=? AND borrower_id=? AND status IN ('pending','approved')").bind(orgId,user.id).first();if(row)return json({chatRequest:row});}throw e}
+    return json({chatRequest:{id,status:'pending'}},201);
+  }
+  m=path.match(/^\/api\/organization-chat-requests\/([^/]+)\/status$/);
+  if(m&&method==='PATCH'){
+    const user=await requireUser(request,env),id=decodeURIComponent(m[1]),body=await readJson(request);
+    const row=await env.DB.prepare('SELECT c.*,o.owner_id,o.deleted_at FROM organization_chat_requests c JOIN organizations o ON o.id=c.organization_id WHERE c.id=?').bind(id).first();
+    if(!row||row.deleted_at)throw new HttpError(404,"הבקשה לא נמצאה");
+    const owner=row.owner_id===user.id,borrower=row.borrower_id===user.id,target=body.status;
+    if(!(owner&&['approved','declined'].includes(target)||borrower&&target==='cancelled'))throw new HttpError(403,"אין הרשאה לשינוי הבקשה");
+    if(row.status!=='pending'&&!(borrower&&row.status==='approved'&&target==='cancelled'))throw new HttpError(409,"הבקשה כבר טופלה");
+    if(target==='approved'){
+      const block=await env.DB.prepare('SELECT 1 FROM user_blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?) LIMIT 1').bind(row.borrower_id,row.owner_id,row.owner_id,row.borrower_id).first();
+      if(block)throw new HttpError(403,"לא ניתן לאשר שיחה עם משתמש חסום");
+    }
+    const changed=await env.DB.prepare("UPDATE organization_chat_requests SET status=?,updated_at=? WHERE id=? AND status=?").bind(target,new Date().toISOString(),id,row.status).run();
+    if(!changed.meta.changes)throw new HttpError(409,"הבקשה כבר טופלה");
+    await notificationStatement(env,owner?row.borrower_id:row.owner_id,'status',target==='approved'?'בקשת פתיחת הצ׳אט אושרה':'בקשת הצ׳אט עודכנה',target==='approved'?'אפשר לפתוח את הצ׳אט באזור האישי.':'אפשר לראות את מצב הבקשה באזור האישי.').run();
+    return json({id,status:target});
+  }
+  m=path.match(/^\/api\/messages\/(gc-[^/]+)(\/report)?$/);
+  if(m&&['PATCH','DELETE','POST'].includes(method)){
+    const user=await requireUser(request,env),id=decodeURIComponent(m[1]);
+    const row=await env.DB.prepare('SELECT * FROM organization_chat_messages WHERE id=?').bind(id).first();
+    if(!row)throw new HttpError(404,"ההודעה לא נמצאה");
+    await organizationChatParticipant(env,row.request_id,user);
+    if(m[2]&&method==='POST'){
+      if(row.sender_id===user.id)throw new HttpError(400,"לא ניתן לדווח על הודעה ששלחתם");
+      const body=await readJson(request),reason=cleanText(body.reason,2,500,"סיבת הדיווח");
+      await env.DB.prepare('INSERT OR IGNORE INTO organization_chat_reports(id,message_id,reporter_id,reason) VALUES(?,?,?,?)').bind(crypto.randomUUID(),id,user.id,reason).run();return json({ok:true});
+    }
+    if(m[2]||method==='POST')throw new HttpError(405,"הפעולה אינה נתמכת");
+    if(row.sender_id!==user.id)throw new HttpError(403,"אפשר לשנות רק הודעה ששלחתם");
+    if(row.deleted_at)throw new HttpError(409,"ההודעה כבר נמחקה");
+    if(Date.now()-Date.parse(row.created_at)>(method==='PATCH'?15:5)*60000)throw new HttpError(409,"חלף הזמן לשינוי ההודעה");
+    if(method==='PATCH'){const body=await readJson(request),message=cleanText(body.message,1,1000,"הודעה");assertSafeChatText(message);await env.DB.prepare('UPDATE organization_chat_messages SET body=? WHERE id=?').bind(message,id).run();return json({ok:true,body:message});}
+    await env.DB.prepare("UPDATE organization_chat_messages SET body='הודעה נמחקה',media_url=NULL,metadata_json='{}',deleted_at=? WHERE id=?").bind(new Date().toISOString(),id).run();return json({ok:true});
+  }
+  return null;
+}
+
 async function getRequestParticipant(request, env, requestId, { allowAdmin = true } = {}) {
   const user = await requireUser(request, env);
+  if(isOrganizationChat(requestId))return organizationChatParticipant(env,requestId,user,allowAdmin);
   const row = await env.DB.prepare(`SELECT lr.id,lr.borrower_id,lr.status,lr.returned_at,i.id AS item_id,i.title AS item_title,o.owner_id,o.name AS org_name
     FROM loan_requests lr JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id
     WHERE lr.id = ?`).bind(requestId).first();
@@ -2677,11 +2772,12 @@ async function getRequestParticipant(request, env, requestId, { allowAdmin = tru
 async function listRequestMessages(request, env, requestId) {
   const { user, row } = await getRequestParticipant(request, env, requestId);
   const result = await env.DB.prepare(`SELECT m.id,m.body,m.created_at,m.sender_id,m.message_type,m.media_url,m.metadata_json,m.deleted_at,m.read_at,u.full_name AS sender_name
-    FROM request_messages m JOIN users u ON u.id = m.sender_id
+    FROM ${chatMessageTable(requestId)} m JOIN users u ON u.id = m.sender_id
     WHERE m.request_id = ? ORDER BY m.created_at ASC LIMIT 300`).bind(requestId).all();
-  await env.DB.prepare("UPDATE request_messages SET read_at=? WHERE request_id=? AND sender_id<>? AND read_at IS NULL")
+  await env.DB.prepare(`UPDATE ${chatMessageTable(requestId)} SET read_at=? WHERE request_id=? AND sender_id<>? AND read_at IS NULL`)
     .bind(new Date().toISOString(),requestId,user.id).run();
   return json({
+    pickup: row.chatOnly ? await organizationChatPickup(env,row,user) : null,
     request: { id: row.id, status: row.status, itemTitle: row.item_title, organizationName: row.org_name, chatWritable: !(row.returned_at && Date.now()-Date.parse(row.returned_at)>14*86400000), chatWritableUntil: row.returned_at ? new Date(Date.parse(row.returned_at)+14*86400000).toISOString() : null, chatRetainUntil: row.returned_at ? new Date(Date.parse(row.returned_at)+365*86400000).toISOString() : null },
     messages: result.results.map(message => ({ ...message, metadata:safeJsonObject(message.metadata_json),isMine: message.sender_id === user.id }))
   });
@@ -2713,13 +2809,13 @@ async function createRequestMessage(request, env, requestId) {
     const helpId=cleanText(body.helpRequestId,1,100,"בקשה"),help=await env.DB.prepare("SELECT id,title FROM help_requests WHERE id=?").bind(helpId).first();
     if(!help) throw new HttpError(404,"בקשת הקהילה לא נמצאה");message=`בקשה: ${help.title}`;metadata={helpRequestId:help.id,title:help.title};
   }
-  const recent = await env.DB.prepare(`SELECT COUNT(*) AS count FROM request_messages
+  const recent = await env.DB.prepare(`SELECT COUNT(*) AS count FROM ${chatMessageTable(requestId)}
     WHERE sender_id = ? AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 minute')`).bind(user.id).first();
   if (Number(recent?.count || 0) >= 10) throw new HttpError(429, "נשלחו יותר מדי הודעות. נסו שוב בעוד דקה");
-  const id = crypto.randomUUID(),createdAt=new Date().toISOString();
+  const id = (row.chatOnly?"gc-":"")+crypto.randomUUID(),createdAt=new Date().toISOString();
   await env.DB.batch([
-    env.DB.prepare("INSERT INTO request_messages (id,request_id,sender_id,body,message_type,metadata_json) VALUES (?,?,?,?,?,?)").bind(id, requestId, user.id, message,messageType,JSON.stringify(metadata)),
-    notificationStatement(env, recipientId, "message", `הודעה חדשה על ${row.item_title}`, `${user.full_name}: ${message.slice(0, 120)}`, requestId)
+    env.DB.prepare(`INSERT INTO ${chatMessageTable(requestId)} (id,request_id,sender_id,body,message_type,metadata_json) VALUES (?,?,?,?,?,?)`).bind(id, requestId, user.id, message,messageType,JSON.stringify(metadata)),
+    notificationStatement(env, recipientId, "message", `הודעה חדשה על ${row.item_title}`, `${user.full_name}: ${message.slice(0, 120)}`, row.chatOnly?null:requestId)
   ]);
   return json({ message: { id, request_id: requestId, sender_id: user.id, sender_name: user.full_name, body: message,message_type:messageType,metadata,isMine: true, created_at: createdAt } }, 201);
 }
@@ -2728,6 +2824,7 @@ async function uploadRequestChatAttachment(request,env,requestId){
   const {user,row,participant}=await getRequestParticipant(request,env,requestId,{allowAdmin:false});
   if(!participant)throw new HttpError(403,"רק הצדדים להשאלה יכולים לצרף קובץ");
   if(row.returned_at&&Date.now()-Date.parse(row.returned_at)>14*86400000)throw new HttpError(409,"השיחה נסגרה 14 ימים לאחר החזרת הפריט");
+  if(row.chatOnly){const block=await env.DB.prepare('SELECT 1 FROM user_blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?) LIMIT 1').bind(row.borrower_id,row.owner_id,row.owner_id,row.borrower_id).first();if(block)throw new HttpError(403,"לא ניתן לשלוח הודעות למשתמש הזה");}
   const form=await request.formData(),file=form.get("file"),kind=String(form.get("type")||"image");
   if(!(file instanceof File)||!file.size)throw new HttpError(400,"לא נבחר קובץ");
   const imageTypes=new Map([["image/jpeg","jpg"],["image/png","png"],["image/webp","webp"]]);
@@ -2738,11 +2835,11 @@ async function uploadRequestChatAttachment(request,env,requestId){
   let moderation=null;if(kind==="image"){moderation=await moderateItemImage(env,file);if(moderation.action==="block"&&moderation.confidence>=.85)throw new HttpError(400,"התמונה נחסמה בבדיקת בטיחות");}
   const key=`chat/${user.id}/${requestId}/${crypto.randomUUID()}.${ext}`;
   await env.ITEM_IMAGES.put(key,file.stream(),{httpMetadata:{contentType:file.type,cacheControl:"private, max-age=86400"}});
-  const id=crypto.randomUUID(),recipientId=row.borrower_id===user.id?row.owner_id:row.borrower_id,now=new Date().toISOString();
+  const id=(row.chatOnly?"gc-":"")+crypto.randomUUID(),recipientId=row.borrower_id===user.id?row.owner_id:row.borrower_id,now=new Date().toISOString();
   try{
     await env.DB.batch([
-      env.DB.prepare("INSERT INTO request_messages(id,request_id,sender_id,body,message_type,media_url,metadata_json) VALUES(?,?,?,?,?,?,?)").bind(id,requestId,user.id,kind==="audio"?"הודעה קולית":"תמונה",kind,"/media/"+key,JSON.stringify({contentType:file.type,size:file.size})),
-      notificationStatement(env,recipientId,"message",`הודעה חדשה על ${row.item_title}`,kind==="audio"?"נשלחה הודעה קולית":"נשלחה תמונה",requestId)
+      env.DB.prepare(`INSERT INTO ${chatMessageTable(requestId)}(id,request_id,sender_id,body,message_type,media_url,metadata_json) VALUES(?,?,?,?,?,?,?)`).bind(id,requestId,user.id,kind==="audio"?"הודעה קולית":"תמונה",kind,"/media/"+key,JSON.stringify({contentType:file.type,size:file.size})),
+      notificationStatement(env,recipientId,"message",`הודעה חדשה על ${row.item_title}`,kind==="audio"?"נשלחה הודעה קולית":"נשלחה תמונה",row.chatOnly?null:requestId)
     ]);
   }catch(e){await env.ITEM_IMAGES.delete(key);throw e}
   if(kind==="image"&&moderation&&moderation.action!=="allow"){try{await ensureFinalFeaturesSchema(env);await env.DB.prepare("INSERT INTO moderation_jobs(id,entity_type,entity_id,reason,severity,status,auto_hidden) VALUES(?,?,?,?,?,\'pending\',0)").bind(crypto.randomUUID(),"chat_image",id,moderation.reason||"Image requires review",moderation.action==="review"?"high":"normal").run()}catch{}}
@@ -3417,6 +3514,14 @@ async function createHelpOffer(request,env,helpRequestId){const user=await requi
 async function serveMedia(request, env, url) {
   if (request.method !== "GET" && request.method !== "HEAD") throw new HttpError(405, "הפעולה אינה נתמכת");
   const key = decodeURIComponent(url.pathname.slice("/media/".length));
+  if(key.startsWith("chat/")&&!key.includes("..")){
+    const parts=key.split("/"),chatId=parts[2];
+    if(!isOrganizationChat(chatId))throw new HttpError(404,"הקובץ לא נמצא");
+    await getRequestParticipant(request,env,chatId);
+    const object=await env.ITEM_IMAGES.get(key);if(!object)throw new HttpError(404,"הקובץ לא נמצא");
+    const headers=new Headers();object.writeHttpMetadata(headers);headers.set("Cache-Control","private, no-store");
+    return new Response(request.method==="HEAD"?null:object.body,{headers});
+  }
   if (!key.startsWith("items/") || key.includes("..")) throw new HttpError(404, "התמונה לא נמצאה");
   const object = await env.ITEM_IMAGES.get(key);
   if (!object) throw new HttpError(404, "התמונה לא נמצאה");

@@ -593,6 +593,8 @@ async function exportMyData(request,env){
     qall(env,"SELECT request_type,details,status,created_at,completed_at FROM user_data_requests WHERE user_id=? ORDER BY created_at",[u.id])
   ]);
   return json({
+    organizationChats:await qall(env,"SELECT c.id,c.status,c.note,c.created_at,o.name AS organization_name FROM organization_chat_requests c JOIN organizations o ON o.id=c.organization_id WHERE c.borrower_id=? OR o.owner_id=?",[u.id,u.id]),
+    organizationChatMessages:await qall(env,"SELECT m.body,m.message_type,m.created_at FROM organization_chat_messages m JOIN organization_chat_requests c ON c.id=m.request_id JOIN organizations o ON o.id=c.organization_id WHERE c.borrower_id=? OR o.owner_id=?",[u.id,u.id]),
     exportedAt:new Date().toISOString(),
     language:profile?.preferred_language||"he",
     profile,addresses,organizations:orgs,items,loans,reviews,messages,savedSearches,supportTickets,legalConsents,

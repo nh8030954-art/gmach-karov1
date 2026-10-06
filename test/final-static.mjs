@@ -243,8 +243,8 @@ assert.ok(platform.includes("2026-09-24"),"legal consent default version is not 
 
 for(const token of ["legalConsents","recentOrganizations","securityEvents","notificationPreferences","savedEntities","dataRequests"])assert.ok(platform.includes(token),token+" missing from comprehensive personal data export");
 
-assert.ok(worker.includes("EXISTS (SELECT 1 FROM items vi WHERE vi.organization_id=o.id"),"public discovery must hide gmachs without active items");
-for(const token of ["has_active_item","!r.has_active_item"])assert.ok(finalWorker.includes(token),token+" missing from organization SEO visibility guard");
+assert.ok(!worker.includes("EXISTS (SELECT 1 FROM items vi WHERE vi.organization_id=o.id"),"public discovery includes gmachs without items");
+assert.ok(!finalWorker.includes("!r.has_active_item"),"Public organization SEO does not require inventory");
 
 for(const token of ["organization_status","organization_hidden","r.status!==\"approved\"","o.status='approved'"])assert.ok(finalWorker.includes(token),token+" missing from approved-only SEO visibility");
 
