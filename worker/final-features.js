@@ -404,8 +404,8 @@ async function sitemap(env,url){
     env.DB.prepare("SELECT i.city,MAX(i.updated_at) updated_at FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.status='active' AND i.deleted_at IS NULL AND o.status='approved' AND o.is_hidden=0 AND o.deleted_at IS NULL AND i.city IS NOT NULL AND i.city<>'' GROUP BY i.city ORDER BY i.city LIMIT 2000")
   ]);
   const escXml=s=>String(s).replace(/[<>&'"]/g,c=>({"<":"&lt;",">":"&gt;","&":"&amp;","'":"&apos;",'"':"&quot;"}[c]));
-  const entries=[...orgs.results.map(x=>({loc:`${url.origin}/gmach/${x.id}`,last:x.updated_at})),...items.results.map(x=>({loc:`${url.origin}/item/${x.id}`,last:x.updated_at})),...categories.results.map(x=>({loc:`${url.origin}/category/${encodeURIComponent(x.id)}`,last:x.updated_at})),...areas.results.map(x=>({loc:`${url.origin}/area/${encodeURIComponent(x.city)}`,last:x.updated_at}))];
-  const xml='<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+entries.map(e=>`<url><loc>${escXml(e.loc)}</loc><lastmod>${new Date(e.last).toISOString()}</lastmod></url>`).join("")+"</urlset>";
+  const entries=[{loc:url.origin+"/"},...orgs.results.map(x=>({loc:`${url.origin}/gmach/${x.id}`,last:x.updated_at})),...items.results.map(x=>({loc:`${url.origin}/item/${x.id}`,last:x.updated_at})),...categories.results.map(x=>({loc:`${url.origin}/category/${encodeURIComponent(x.id)}`,last:x.updated_at})),...areas.results.map(x=>({loc:`${url.origin}/area/${encodeURIComponent(x.city)}`,last:x.updated_at}))];
+  const xml='<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+entries.map(e=>`<url><loc>${escXml(e.loc)}</loc>${e.last?`<lastmod>${new Date(e.last).toISOString()}</lastmod>`:""}</url>`).join("")+"</urlset>";
   return new Response(xml,{headers:{"Content-Type":"application/xml; charset=utf-8","Cache-Control":"public, max-age=1800"}});
 }
 async function logicalBackup(request,env){
