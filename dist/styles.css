@@ -1469,11 +1469,11 @@ html[lang="en"] .header-actions #dashboard-button{
 #gmach-contact-editor .contact-hours-row input[type=time]{box-sizing:border-box;direction:ltr;text-align:left;font-size:16px;font-weight:400;padding:8px 6px;min-height:44px;letter-spacing:normal}
 #gmach-contact-editor .contact-hours-row input[type=time]::-webkit-datetime-edit{padding:0;direction:ltr}
 
-.new-initiative-banner{display:flex;align-items:center;justify-content:space-between;gap:18px;box-sizing:border-box;width:calc(100% - 32px);max-width:1200px;margin:16px auto;padding:16px 20px;border:1px solid #83bab0;border-radius:8px;background:#edf8f4;color:#174f47;animation:initiative-glow 3s ease-in-out infinite}
+.new-initiative-banner{display:flex;align-items:center;justify-content:space-between;gap:18px;box-sizing:border-box;width:calc(100% - 32px);max-width:1200px;margin:16px auto;padding:16px 20px;border:1px solid #83bab0;border-radius:8px;background:#edf8f4;color:#174f47;animation:initiative-glow 2s ease-in-out infinite}
 .initiative-copy{min-width:0;line-height:1.6}.initiative-copy strong{font-size:1.05rem}.initiative-copy p{margin:4px 0 0;font-size:.94rem}
 .initiative-share{flex-shrink:0;padding:11px 16px;border-radius:8px;background:#197c64;color:white;text-decoration:none;font-weight:700;text-align:center}.initiative-share:hover{background:#12614e}.initiative-share:focus-visible{outline:3px solid #397eb9;outline-offset:3px}
 .new-initiative-banner .initiative-en{display:none}html[lang=en] .new-initiative-banner .initiative-he{display:none}html[lang=en] .new-initiative-banner .initiative-en{display:block}
-@keyframes initiative-glow{0%,100%{box-shadow:0 0 0 0 rgba(25,124,100,.04);background:#edf8f4}50%{box-shadow:0 0 0 4px rgba(25,124,100,.13);background:#dff3ec}}
+@keyframes initiative-glow{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(25,124,100,0);background:#edf8f4;border-color:#83bab0}50%{opacity:.72;box-shadow:0 0 0 5px rgba(25,124,100,.3);background:#bce7d8;border-color:#197c64}}
 @media(max-width:600px){.new-initiative-banner{align-items:stretch;flex-direction:column;gap:12px;padding:14px 16px}.initiative-share{align-self:flex-start}}
 @media(prefers-reduced-motion:reduce){.new-initiative-banner{animation:none}}
 html.reduce-motion .new-initiative-banner{animation:none}
