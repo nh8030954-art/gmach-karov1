@@ -399,7 +399,9 @@ export default {
         return withSecurityHeaders(response);
       }
       if (url.pathname === "/sitemap.xml") {
-        const response = await handleFinalFeatures(request, env, ctx, url);
+        const sitemapRequest = request.method === "HEAD" ? new Request(request.url, {method:"GET", headers:request.headers}) : request;
+        const response = await handleFinalFeatures(sitemapRequest, env, ctx, url);
+        if (response && request.method === "HEAD") return withSecurityHeaders(new Response(null, {status:response.status, headers:response.headers}));
         return withSecurityHeaders(response || new Response("Not found",{status:404}));
       }
       if (url.pathname === "/robots.txt") {
