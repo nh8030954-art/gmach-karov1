@@ -1454,7 +1454,9 @@ html[lang="en"] .header-actions #dashboard-button{
 [data-method=sms]>.contact-action-icon{color:#397eb9;background:#eaf3fc}
 .contact-action{display:flex;align-items:center;justify-content:center;gap:9px;min-height:66px;padding:12px;border:1px solid #dce5e6;border-radius:14px;background:white;color:inherit;text-decoration:none;font:inherit;font-size:.92rem;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
 .contact-action:hover,.contact-method-choice:hover .contact-method-tile{background:#f1f8f7;border-color:#86b7b2}
-.contact-hours-row{display:grid;grid-template-columns:20px minmax(45px,1fr) minmax(65px,1fr) auto minmax(65px,1fr);gap:6px;align-items:center;margin-block:8px}
-.contact-hours-row input[type=time]{min-width:0;width:100%;padding:6px}
+#gmach-contact-editor .contact-hours-row{display:grid;grid-template-columns:minmax(82px,.8fr) minmax(0,1.5fr);gap:10px;align-items:center;margin-block:10px}
+#gmach-contact-editor .contact-day-label{display:flex;align-items:center;gap:8px;margin:0;font-size:.9rem}
+.contact-time-range{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:6px;align-items:center}
+#gmach-contact-editor .contact-time-range select{min-width:0;width:100%;height:44px;min-height:44px;padding:8px 20px 8px 6px;border-radius:10px;font-size:.9rem;font-weight:500;direction:ltr;text-align:center;background-position:right 6px center}
 .contact-manager-notes p{white-space:pre-wrap;overflow-wrap:anywhere}
 @media(max-width:600px){.contact-method-options,.gmach-contact-actions{grid-template-columns:repeat(2,minmax(0,1fr))}#gmach-contact-editor{padding:14px}.contact-action{flex-direction:column;gap:6px;padding:12px 6px;text-align:center}}
