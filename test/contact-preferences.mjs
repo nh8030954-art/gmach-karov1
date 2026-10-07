@@ -16,7 +16,8 @@ assert.equal(ui.isContactTime({2:['18:00','20:00']},new Date('2026-10-07T15:30:0
 assert.equal(ui.isContactTime({},new Date()),true);
 const hidden=ui.markup({...settings,visible:false});assert.ok(!hidden.includes('hello@example.org'));assert.ok(!hidden.includes('mailto:'));assert.ok(!hidden.includes('wa.me'));assert.ok(hidden.includes('data-contact-chat'));assert.ok(hidden.includes('נא לפנות בערב'));
 const shown=ui.markup({...settings,visible:true,phone:'050-1234567',address:'כתובת פרטית',city:'ירושלים',notes:'<img src=x onerror=alert(1)>'});
-assert.ok(shown.includes('href="tel:+972501234567"'));assert.ok(shown.includes('href="sms:+972501234567"'));assert.ok(shown.includes('https://wa.me/972501234567'));assert.ok(shown.includes('mailto:hello%40example.org'));assert.ok(shown.includes('maps/search/'));assert.ok(shown.includes('&lt;img'));assert.ok(!shown.includes('<img'));assert.ok(shown.indexOf('wa.me')<shown.indexOf('tel:'));
-context.document.documentElement.lang='en';assert.ok(ui.markup({...settings,visible:true,phone:'050-1234567'}).includes('WhatsApp · Preferred'));
+assert.ok(shown.includes('href="tel:+972501234567"'));assert.ok(shown.includes('href="sms:+972501234567"'));assert.ok(shown.includes('https://wa.me/972501234567'));assert.ok(shown.includes('mailto:hello%40example.org'));assert.ok(shown.includes('maps/search/'));assert.ok(shown.includes('&lt;img'));assert.ok(!shown.includes('<img'));assert.ok(shown.indexOf('tel:')<shown.indexOf('wa.me'));
+context.document.documentElement.lang='en';assert.ok(ui.markup({...settings,visible:true,phone:'050-1234567'}).includes('WhatsApp'));
+assert.ok(shown.includes('<svg'));assert.ok(shown.includes('aria-hidden="true"'));assert.ok(!shown.includes('מועדף'));
 const onlyMail=ui.markup({visible:true,channels:['email'],preferred:'email',email:'hello@example.org',hours:{},notes:''});assert.ok(!onlyMail.includes('tel:'));assert.ok(!onlyMail.includes('data-contact-chat'));
-console.log('Contact validation, privacy rendering, action links, preference order and Israel time tests passed');
+console.log('Contact validation, privacy rendering, action links, contact icons and Israel time tests passed');

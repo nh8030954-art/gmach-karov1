@@ -1430,8 +1430,31 @@ html[lang="en"] .header-actions #dashboard-button{
 /* Keep the available count below the rating on narrow item cards. */
 @media(max-width:700px){.item-card-rating{top:48px;max-width:calc(100% - 16px);padding-inline:8px}.item-card-rating .rating-stars{font-size:1.2rem;gap:1px}}
 
-#gmach-contact-editor {border:1px solid var(--border,#ddd);border-radius:12px;padding:16px;display:grid;gap:12px;min-width:0}
-.contact-method-options {display:flex;gap:12px;flex-wrap:wrap}
-.contact-hours-row {display:grid;grid-template-columns:auto minmax(45px,1fr) minmax(65px,1fr) auto minmax(65px,1fr);gap:6px;align-items:center;margin-block:6px}
-.contact-hours-row input[type=time] {min-width:0;width:100%;padding:6px}
-.contact-manager-notes p {white-space:pre-wrap;overflow-wrap:anywhere}
+
+#gmach-contact-editor{border:1px solid #dce5e6;border-radius:18px;padding:18px;display:grid;gap:14px;min-width:0;background:#fbfdfd}
+#gmach-contact-editor legend{padding-inline:8px;font-weight:700}
+#gmach-contact-editor .form-note{margin:0;font-size:.85rem;line-height:1.6}
+#gmach-contact-editor [hidden]{display:none!important}
+#gmach-contact-editor .contact-setting-switch{display:flex;align-items:center;gap:10px;font-weight:600;cursor:pointer}
+#gmach-contact-editor input[type=checkbox]{width:20px!important;height:20px!important;min-height:20px!important;max-width:20px!important;padding:0!important;margin:0;flex:0 0 20px;accent-color:#197c78}
+.contact-choice-title{margin:2px 0 0;font-size:.9rem;font-weight:600}
+.contact-method-options,.gmach-contact-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+#gmach-contact-editor .contact-method-choice{display:block;position:relative;margin:0;cursor:pointer}
+#gmach-contact-editor .contact-method-choice input{position:absolute;opacity:0;width:1px!important;height:1px!important;min-height:1px!important;max-width:1px!important;pointer-events:none}
+.contact-method-tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:98px;padding:12px 6px;border:1px solid #dce5e6;border-radius:14px;background:white;text-align:center;font-size:.86rem;font-weight:600;transition:background .15s,border-color .15s,box-shadow .15s}
+.contact-method-choice input:checked+.contact-method-tile{border-color:#197c78;background:#edf8f6;box-shadow:inset 0 0 0 1px #197c78}
+.contact-choice-check{position:absolute;top:7px;inset-inline-end:7px;width:18px;height:18px;display:grid;place-items:center;border-radius:50%;background:#197c78;color:white;font-size:12px;opacity:0}
+.contact-method-choice input:checked+.contact-method-tile .contact-choice-check{opacity:1}
+.contact-method-choice input:focus-visible+.contact-method-tile,.contact-action:focus-visible{outline:3px solid #65b5cc;outline-offset:3px}
+.contact-action-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;color:#197c78;background:#edf8f6;flex-shrink:0}
+.contact-action-icon svg{display:block;width:23px;height:23px}
+[data-method=whatsapp]>.contact-action-icon{color:#168346;background:#eaf8ee}
+[data-method=email]>.contact-action-icon{color:#7562b5;background:#f0edfa}
+[data-method=address]>.contact-action-icon{color:#bc6439;background:#fff1e9}
+[data-method=sms]>.contact-action-icon{color:#397eb9;background:#eaf3fc}
+.contact-action{display:flex;align-items:center;justify-content:center;gap:9px;min-height:66px;padding:12px;border:1px solid #dce5e6;border-radius:14px;background:white;color:inherit;text-decoration:none;font:inherit;font-size:.92rem;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s}
+.contact-action:hover,.contact-method-choice:hover .contact-method-tile{background:#f1f8f7;border-color:#86b7b2}
+.contact-hours-row{display:grid;grid-template-columns:20px minmax(45px,1fr) minmax(65px,1fr) auto minmax(65px,1fr);gap:6px;align-items:center;margin-block:8px}
+.contact-hours-row input[type=time]{min-width:0;width:100%;padding:6px}
+.contact-manager-notes p{white-space:pre-wrap;overflow-wrap:anywhere}
+@media(max-width:600px){.contact-method-options,.gmach-contact-actions{grid-template-columns:repeat(2,minmax(0,1fr))}#gmach-contact-editor{padding:14px}.contact-action{flex-direction:column;gap:6px;padding:12px 6px;text-align:center}}
