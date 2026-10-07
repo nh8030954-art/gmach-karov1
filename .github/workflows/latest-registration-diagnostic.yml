@@ -1,0 +1,28 @@
+name: Latest registration diagnostic
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/latest-registration-diagnostic.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Read latest registration verification metadata
+        run: |
+          npx wrangler d1 execute DB --remote --json --command "SELECT u.created_at AS registration_at,u.updated_at,u.email_verified,u.last_login_at,(SELECT COUNT(*) FROM auth_challenges c WHERE c.user_id=u.id AND c.purpose='email_verify') AS verification_challenges,(SELECT MAX(created_at) FROM auth_challenges c WHERE c.user_id=u.id AND c.purpose='email_verify') AS latest_code_created_at,(SELECT MAX(expires_at) FROM auth_challenges c WHERE c.user_id=u.id AND c.purpose='email_verify') AS latest_code_expires_at FROM users u ORDER BY u.created_at DESC LIMIT 3"
+      - name: Read recent authentication server errors
+        run: |
+          npx wrangler d1 execute DB --remote --json --command "SELECT request_id,path,method,created_at FROM server_errors WHERE path LIKE '/api/auth/%' AND created_at >= datetime('now','-3 hours') ORDER BY created_at DESC LIMIT 10"
