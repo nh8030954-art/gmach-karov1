@@ -1,4 +1,5 @@
 window.GmachEnglish = Object.freeze({
+"גמ״ח ברגע — גמ״חים והשאלת ציוד בכל הארץ":"Gmach BeRega — Gmachs and equipment lending across Israel",
 "💙 מיזם חדש — יחד מרבים חסד!":"💙 A new initiative — spread kindness together!",
 "מכירים גמ״ח? ספרו לו על גמ״ח ברגע ושתפו את האתר, כדי שעוד אנשים ימצאו את העזרה שהם צריכים.":"Know a gmach? Tell them about Gmach BeRega and share the website so more people can find the help they need.",
 "שתפו בווטסאפ ↗":"Share on WhatsApp ↗",
