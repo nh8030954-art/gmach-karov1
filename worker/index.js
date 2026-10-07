@@ -219,10 +219,10 @@ async function serveSeoEntityPage(request,env,url){
     image=parseJsonArray(row.image_urls)[0]||null;noindex=row.status!=="active";
   }else if((m=url.pathname.match(/^\/gmach\/([^/]+)$/))){
     kind="organization";id=decodeURIComponent(m[1]);
-    row=await env.DB.prepare("SELECT o.id,o.name,o.description,o.logo_url,o.is_hidden,o.deleted_at,EXISTS(SELECT 1 FROM items i WHERE i.organization_id=o.id AND i.status='active' AND i.deleted_at IS NULL) AS has_items FROM organizations o WHERE o.id=?").bind(id).first();
+    row=await env.DB.prepare("SELECT o.id,o.name,o.description,o.logo_url,o.status,o.is_hidden,o.deleted_at FROM organizations o WHERE o.id=?").bind(id).first();
     if(!row||row.deleted_at)return null;
     title=row.name+" | גמ״ח ברגע";description=String(row.description||("עמוד "+row.name+" בגמ״ח ברגע")).slice(0,180);
-    image=row.logo_url||null;noindex=Boolean(row.is_hidden||!row.has_items);
+    image=row.logo_url||null;noindex=Boolean(row.status!=="approved"||row.is_hidden);
   }else if((m=url.pathname.match(/^\/category\/([^/]+)$/))){
     kind="category";id=decodeURIComponent(m[1]);
     row=await env.DB.prepare("SELECT id,name_he,name_en,image_url,status FROM categories WHERE id=? OR name_he=? LIMIT 1").bind(id,id).first();
