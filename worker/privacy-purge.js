@@ -39,6 +39,7 @@ async function purgeDeletedUser(env,user){
   media.push(...await allSafe(env,"SELECT id,media_url FROM organization_chat_messages WHERE sender_id=? AND media_url IS NOT NULL",[user.id]));
   for(const m of media){const key=mediaKey(m.media_url);if(key&&env.ITEM_IMAGES?.delete){try{await env.ITEM_IMAGES.delete(key);mediaDeleted++;detail.media.push(key)}catch{}}}
   const deleteOps=[
+   ["organization_contact_preferences","DELETE FROM organization_contact_preferences WHERE organization_id IN (SELECT id FROM organizations WHERE owner_id=?)"],
    ["sessions","DELETE FROM sessions WHERE user_id=?"],
    ["user_addresses","DELETE FROM user_addresses WHERE user_id=?"],
    ["push_subscriptions","DELETE FROM push_subscriptions WHERE user_id=?"],

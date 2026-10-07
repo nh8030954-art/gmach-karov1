@@ -1,3 +1,4 @@
+import { ensureContactPreferences, getContactPreferences, contactPreferencesInput, contactPreferencesStatement, contactView } from "./contact-preferences.js";
 import { ensureOrganizationChats, isOrganizationChat, chatMessageTable } from "./organization-chats.js";
 import { ensureServiceRanges, getServiceRange, serviceRangeInput, serviceRangeStatement, resolveServiceLocation, evaluateServiceRange, distanceKm } from "./service-range.js";
 import { ensureLoanCosts, loanCostProjection, loanCostInput, loanCostStatement } from "./loan-costs.js";
@@ -292,7 +293,7 @@ async function importItems(request,env){
 
 
 function publicSnapshotCacheKey(value) {
-  const url=new URL(value);url.searchParams.set('__privacy','approved-contact-chats-2026-10-06');
+  const url=new URL(value);url.searchParams.set('__privacy','contact-preferences-2026-10-07');
   return new Request(url.toString(),{method:'GET',headers:{Accept:'application/json'}});
 }
 async function invalidatePublicSnapshotRoots(origin) {
@@ -335,6 +336,7 @@ export default {
       if (url.pathname.startsWith("/api/")) {
         await ensureLoanCosts(env);
         await ensureServiceRanges(env);
+        await ensureContactPreferences(env);
         await ensureOrganizationChats(env);
         const preflight = await platformPreflight(request, env, url);
         if (preflight) return withSecurityHeaders(preflight);
@@ -711,6 +713,26 @@ async function routeApi(request, env, ctx, url) {
     });
   }
 
+  const contactSettingsRoute=path.match(/^\/api\/organizations\/([^/]+)\/contact-settings$/);
+  if(contactSettingsRoute&&["GET","PATCH"].includes(method)){
+    const user=await requireUser(request,env),id=decodeURIComponent(contactSettingsRoute[1]);
+    const owned=await env.DB.prepare("SELECT id FROM organizations WHERE id=? AND deleted_at IS NULL AND (owner_id=? OR ?='admin')").bind(id,user.id,user.role).first();
+    if(!owned)throw new HttpError(404,"הגמ״ח לא נמצא");
+    if(method==="PATCH"){const body=await readJson(request),settings=parseContactSettings(body.contactSettings,await getContactPreferences(env,id));await contactPreferencesStatement(env,id,settings).run();return json({contactSettings:settings});}
+    return json({contactSettings:await getContactPreferences(env,id)});
+  }
+  const contactRoute=path.match(/^\/api\/organizations\/([^/]+)\/contact$/);
+  if(contactRoute&&method==="GET"){
+    const id=decodeURIComponent(contactRoute[1]),org=await env.DB.prepare("SELECT id,owner_id FROM organizations WHERE id=? AND status='approved' AND is_hidden=0 AND deleted_at IS NULL").bind(id).first();
+    if(!org)throw new HttpError(404,"הגמ״ח לא נמצא");
+    const user=await currentUser(request,env);let approved=false,approvedChatId=null;
+    if(user&&user.account_status==='active'){
+      const loan=await env.DB.prepare("SELECT lr.id FROM loan_requests lr JOIN items i ON i.id=lr.item_id WHERE i.organization_id=? AND lr.borrower_id=? AND lr.status IN ('approved','collected','returned') ORDER BY lr.updated_at DESC LIMIT 1").bind(id,user.id).first();
+      const chat=await env.DB.prepare("SELECT id FROM organization_chat_requests WHERE organization_id=? AND borrower_id=? AND status='approved' LIMIT 1").bind(id,user.id).first();
+      approved=Boolean(loan||chat||org.owner_id===user.id||user.role==='admin');approvedChatId=loan?.id||chat?.id||null;
+    }
+    return json({contact:{...await contactView(env,id,{approved}),approvedChatId}});
+  }
   if (method === "POST" && path === "/api/translate/user-content") return translateUserContent(request, env, ctx);
   if (method === "POST" && path === "/api/auth/register") return register(request, env, ctx, url);
   if (method === "POST" && path === "/api/auth/verify-email") return verifyEmail(request, env, url);
@@ -803,8 +825,11 @@ async function routeApi(request, env, ctx, url) {
   if(method==="GET"&&pickupDetails){
     const {user,row}=await getRequestParticipant(request,env,decodeURIComponent(pickupDetails[1]));
     if(user.id===row.borrower_id&&user.role!=="admin"&&!["approved","collected","returned"].includes(row.status))throw new HttpError(403,"כתובת וטלפון הגמ״ח יוצגו לאחר אישור בקשת ההשאלה");
+    if(row.chatOnly){const contact=await organizationChatPickup(env,row,user);return json({pickup:contact,contact});}
     const details=await env.DB.prepare("SELECT COALESCE(b.address,o.address) AS address,COALESCE(b.city,o.city) AS city,COALESCE(NULLIF(b.phone,''),c.contact_phone) AS phone FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id LEFT JOIN organization_contacts c ON c.organization_id=o.id LEFT JOIN organization_branches b ON b.id=lr.branch_id WHERE lr.id=?").bind(row.id).first();
-    return json({pickup:details});
+    const organization=await env.DB.prepare("SELECT i.organization_id FROM loan_requests lr JOIN items i ON i.id=lr.item_id WHERE lr.id=?").bind(row.id).first();
+    const contact=await contactView(env,organization.organization_id,{approved:true,...details});
+    return json({pickup:{city:details.city,...(contact.address?{address:contact.address}:{}),...(contact.phone?{phone:contact.phone}:{}),...(contact.email?{email:contact.email}:{})},contact});
   }
   const itemAvailabilityCheck = path.match(/^\/api\/items\/([^/]+)\/availability-check$/);
   if (method === "GET" && itemAvailabilityCheck) return checkItemAvailability(env, decodeURIComponent(itemAvailabilityCheck[1]), url);
@@ -1796,7 +1821,7 @@ async function getPublicOrganization(env, id) {
   }
   const categories = categoriesResult.status === "fulfilled" ? categoriesResult.value.results : [];
   const partialSections = [["items", itemsResult], ["reviews", reviewsResult], ["categories", categoriesResult]].filter(([,result]) => result.status === "rejected").map(([section]) => section);
-  return json({ organization: { ...organization, serviceRange:await getServiceRange(env,id), verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options), categories }, items, reviews, partial: partialSections.length > 0, partialSections });
+  return json({ organization: { ...organization, contact:await contactView(env,id), serviceRange:await getServiceRange(env,id), verified_phone: Boolean(organization.verified_phone), verified_address: Boolean(organization.verified_address), hours: safeJsonObject(organization.hours_json), pickupOptions: parseJsonArray(organization.pickup_options), categories }, items, reviews, partial: partialSections.length > 0, partialSections });
 }
 
 async function toggleSavedOrganization(request, env, organizationId, save) {
@@ -1940,6 +1965,7 @@ async function organizationServiceEligibility(env,id,user) {
     return evaluateServiceRange(policy,distanceKm(homeLocation,orgLocation));
   }catch(e){throw new HttpError(e.status||503,e.message);}
 }
+function parseContactSettings(value,existing){try{return contactPreferencesInput(value,existing)}catch(e){throw new HttpError(e.status||400,e.message)}}
 function parseServiceRange(body,existing) {try{return serviceRangeInput(body,existing)}catch(e){throw new HttpError(e.status||400,e.message)}}
 
 async function createOrganization(request, env) {
@@ -1947,6 +1973,7 @@ async function createOrganization(request, env) {
   const body = await readJson(request);
   const id = crypto.randomUUID();
   const serviceRange=parseServiceRange(body);
+  const contactSettings=parseContactSettings(body.contactSettings);
   const category = cleanText(body.primaryCategory, 2, 40, "תחום");
   const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
   if (!categoryRow) throw new HttpError(400, "נא לבחור תחום תקין");
@@ -1965,6 +1992,7 @@ async function createOrganization(request, env) {
     env.DB.prepare("INSERT INTO organizations (id,owner_id,name,primary_category,city,neighborhood,description,address,website_url,service_area,hours_json,pickup_options,last_active_at,status,verified,is_hidden,organization_type) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'approved',0,0,?)")
       .bind(id, user.id, values.name, category, values.city, values.neighborhood, values.description, values.address, null, values.serviceArea, values.hoursJson, values.pickupOptions, new Date().toISOString(),["private","family","community","nonprofit","business","authority"].includes(body.organizationType)?body.organizationType:"private"),
     serviceRangeStatement(env,id,serviceRange),
+    contactPreferencesStatement(env,id,contactSettings),
     env.DB.prepare("INSERT INTO organization_contacts (organization_id,contact_phone) VALUES (?,?)").bind(id, values.phone),
     env.DB.prepare("INSERT INTO organization_serial_codes(code,organization_id) SELECT MAX(150,COALESCE(MAX(code),149)+1),? FROM organization_serial_codes").bind(id)
   ]);
@@ -1999,6 +2027,7 @@ async function updateOrganization(request, env, id) {
     serviceArea: requiredServiceArea(body.serviceArea), hoursJson: requiredHours(body.hours), pickupOptions: sanitizePickupOptions(body.pickupOptions)
   };
   const serviceRange=parseServiceRange(body,await getServiceRange(env,id));
+  const contactSettings=parseContactSettings(body.contactSettings,await getContactPreferences(env,id));
   const status = existing.status === "rejected" && user.role !== "admin" ? "rejected" : "approved";
   const now = new Date().toISOString();
   await env.DB.batch([
@@ -2006,6 +2035,7 @@ async function updateOrganization(request, env, id) {
       status = ?, verified = 0, updated_at = ? WHERE id = ?`)
       .bind(values.name, category, values.city, values.neighborhood, values.description,values.address,null,values.serviceArea,values.hoursJson,values.pickupOptions,now,["private","family","community","nonprofit","business","authority"].includes(body.organizationType)?body.organizationType:(existing.organization_type||"private"),status, now, id),
     serviceRangeStatement(env,id,serviceRange),
+    contactPreferencesStatement(env,id,contactSettings),
     env.DB.prepare("UPDATE organization_contacts SET contact_phone = ? WHERE organization_id = ?").bind(values.phone, id)
   ]);
   return json({ organization: { id, ...values, primaryCategory: category, status, hidden: Boolean(existing.is_hidden) } });
@@ -2493,7 +2523,7 @@ async function dashboard(request, env) {
   );
   const requestsResult = await safeAll(
     env.DB.prepare(`SELECT lr.id,lr.item_id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,lr.manager_note,lr.created_at,lr.quantity,lr.deposit_required_snapshot,lr.deposit_amount_agorot_snapshot,lr.workflow_status,lr.extension_status,lr.extension_until,lr.change_pending_json,lr.cancellation_undo_until,lr.branch_id,
-      i.title AS item_title,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,b.name AS branch_name,b.city AS branch_city,
+      i.title AS item_title,o.id AS organization_id,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,b.name AS branch_name,b.city AS branch_city,
       b.address AS branch_address,
       CASE WHEN lr.status IN ('approved','collected','returned') THEN COALESCE(b.address,o.address) ELSE NULL END AS pickup_address,
       CASE WHEN o.owner_id = ? THEN 'incoming' ELSE 'outgoing' END AS direction,
@@ -2505,7 +2535,7 @@ async function dashboard(request, env) {
     env.DB.prepare(`SELECT lr.id,lr.item_id,lr.status,lr.requested_from,lr.requested_until,lr.phone,lr.note,NULL AS manager_note,lr.created_at,
       COALESCE(lr.quantity,1) AS quantity,0 AS deposit_required_snapshot,0 AS deposit_amount_agorot_snapshot,NULL AS workflow_status,NULL AS extension_status,
       NULL AS extension_until,NULL AS change_pending_json,NULL AS cancellation_undo_until,NULL AS branch_id,
-      i.title AS item_title,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,NULL AS branch_name,NULL AS branch_city,NULL AS branch_address,
+      i.title AS item_title,o.id AS organization_id,o.name AS org_name,o.owner_id,u.full_name AS borrower_name,NULL AS branch_name,NULL AS branch_city,NULL AS branch_address,
       CASE WHEN o.owner_id = ? THEN 'incoming' ELSE 'outgoing' END AS direction,NULL AS contact_phone
       FROM loan_requests lr JOIN items i ON i.id = lr.item_id JOIN organizations o ON o.id = i.organization_id
       JOIN users u ON u.id = lr.borrower_id
@@ -2535,6 +2565,7 @@ async function dashboard(request, env) {
   const items = (itemsResult.results || []).map(row => ({ ...row, condition: publicProductCondition(row.condition,row.condition_detail), image_urls: parseJsonArray(row.image_urls), tags: parseJsonArray(row.tags_json), organizations: { name: row.org_name } }));
   const requests = (requestsResult.results || []).map(row => ({
     id: row.id,
+    organizationId:row.organization_id,
     status: row.status,
     requested_from: row.requested_from,
     requested_until: row.requested_until,
@@ -2559,6 +2590,13 @@ async function dashboard(request, env) {
     pickup_address:["approved","collected","returned"].includes(row.status)?(row.pickup_address||null):null,
     items: { title: row.item_title, organizations: { name: row.org_name } }
   }));
+  const preferenceCache=new Map();
+  for(const row of requests){
+    if(!preferenceCache.has(row.organizationId))preferenceCache.set(row.organizationId,await getContactPreferences(env,row.organizationId));
+    const settings=preferenceCache.get(row.organizationId);
+    if(!settings.channels.includes('address')){row.pickup_address=null;if(row.direction==='outgoing')row.branch_address=null;}
+    if(!settings.channels.some(c=>['phone','sms','whatsapp'].includes(c)))row.contact_phone=null;
+  }
   return json({
     user: publicUser(user),
     organizations,
@@ -2681,7 +2719,7 @@ async function organizationChatParticipant(env,id,user,allowAdmin=true){
 }
 async function organizationChatPickup(env,row,user){
   if(row.status!=='approved')return null;
-  return await env.DB.prepare('SELECT o.address,o.city,c.contact_phone AS phone FROM organizations o LEFT JOIN organization_contacts c ON c.organization_id=o.id WHERE o.id=? AND o.deleted_at IS NULL').bind(row.organization_id).first();
+  return contactView(env,row.organization_id,{approved:true});
 }
 async function listOrganizationChatRequests(env,user){
   const rows=await env.DB.prepare(`SELECT c.id,c.status,c.note,c.distance_exception,c.created_at,c.organization_id,o.name AS organization_name,u.full_name AS borrower_name,
@@ -2690,6 +2728,7 @@ async function listOrganizationChatRequests(env,user){
     CASE WHEN c.status='approved' THEN oc.contact_phone ELSE NULL END AS phone
     FROM organization_chat_requests c JOIN organizations o ON o.id=c.organization_id JOIN users u ON u.id=c.borrower_id LEFT JOIN organization_contacts oc ON oc.organization_id=o.id
     WHERE (c.borrower_id=? OR o.owner_id=?) AND o.deleted_at IS NULL ORDER BY c.created_at DESC LIMIT 200`).bind(user.id,user.id,user.id).all();
+  for(const row of rows.results||[]){const settings=await getContactPreferences(env,row.organization_id);if(!settings.channels.includes('address'))row.address=null;if(!settings.channels.some(c=>['phone','sms','whatsapp'].includes(c)))row.phone=null;}
   return rows.results||[];
 }
 async function routeOrganizationChats(request,env,url){

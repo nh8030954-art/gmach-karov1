@@ -1429,3 +1429,9 @@ html[lang="en"] .header-actions #dashboard-button{
 
 /* Keep the available count below the rating on narrow item cards. */
 @media(max-width:700px){.item-card-rating{top:48px;max-width:calc(100% - 16px);padding-inline:8px}.item-card-rating .rating-stars{font-size:1.2rem;gap:1px}}
+
+#gmach-contact-editor {border:1px solid var(--border,#ddd);border-radius:12px;padding:16px;display:grid;gap:12px;min-width:0}
+.contact-method-options {display:flex;gap:12px;flex-wrap:wrap}
+.contact-hours-row {display:grid;grid-template-columns:auto minmax(45px,1fr) minmax(65px,1fr) auto minmax(65px,1fr);gap:6px;align-items:center;margin-block:6px}
+.contact-hours-row input[type=time] {min-width:0;width:100%;padding:6px}
+.contact-manager-notes p {white-space:pre-wrap;overflow-wrap:anywhere}

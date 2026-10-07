@@ -479,6 +479,17 @@ try {
   assert.ok((await request('/api/discovery')).data.organizations.some(o=>o.id===chatOrgId&&o.item_count===0));
   const chatPublic=(await request(`/api/organizations/${chatOrgId}/public`)).data;
   assert.equal(chatPublic.items.length,0);assert.equal(chatPublic.organization.address,undefined);assert.equal(chatPublic.organization.contact_phone,undefined);
+  const fullContacts={showPublic:true,channels:['phone','sms','whatsapp','email','address','chat'],preferred:'whatsapp',email:'contact@example.org',hours:{3:['18:00','20:00']},notes:'נא לפנות בווטסאפ, או להתקשר בשעות הערב.'};
+  assert.equal((await request(`/api/organizations/${chatOrgId}/contact-settings`,{cookie:borrowerCookie})).response.status,404);
+  assert.equal((await request(`/api/organizations/${chatOrgId}/contact-settings`)).response.status,401);
+  assert.equal((await request(`/api/organizations/${chatOrgId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:{showPublic:'true'}}})).response.status,400);
+  result=await request(`/api/organizations/${chatOrgId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:fullContacts}});assert.equal(result.response.status,200,JSON.stringify(result.data));
+  const publishedContacts=(await request(`/api/organizations/${chatOrgId}/public`)).data.organization.contact;
+  assert.equal(publishedContacts.phone,'050-1234567');assert.equal(publishedContacts.address,serviceOrg.address);assert.equal(publishedContacts.email,'contact@example.org');assert.equal(publishedContacts.preferred,'whatsapp');assert.deepEqual(publishedContacts.hours,fullContacts.hours);
+  result=await request(`/api/organizations/${chatOrgId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:{showPublic:false}}});assert.equal(result.response.status,200);
+  const privateContact=(await request(`/api/organizations/${chatOrgId}/contact`)).data.contact;
+  assert.equal(privateContact.visible,false);assert.equal(privateContact.phone,undefined);assert.equal(privateContact.email,undefined);assert.equal(privateContact.address,undefined);assert.equal(privateContact.notes,fullContacts.notes);
+
   await seedServiceLocation('רחוב הבדיקה 12','ירושלים',31.9,35.22);
   assert.equal((await request(`/api/organizations/${chatOrgId}/chat-requests`,{method:'POST',cookie:borrowerCookie,body:{note:'מחפשת ציוד',distanceException:true,latitude:31.78,longitude:35.22}})).response.status,403);
   await db.prepare('UPDATE organization_service_ranges SET allow_exception=1 WHERE organization_id=?').bind(chatOrgId).run();
@@ -499,6 +510,16 @@ try {
   assert.equal((await request(`/api/loan-requests/${chatId}/messages`,{cookie:englishCookie})).response.status,403);
   result=await request(`/api/loan-requests/${chatId}/messages`,{cookie:borrowerCookie});
   assert.equal(result.response.status,200,JSON.stringify(result.data));assert.equal(result.data.pickup.address,serviceOrg.address);assert.equal(result.data.pickup.phone,'050-1234567');
+  assert.equal(result.data.pickup.email,'contact@example.org');
+  assert.equal((await request(`/api/organizations/${chatOrgId}/contact`,{cookie:borrowerCookie})).data.contact.approvedChatId,chatId);
+  assert.equal((await request(`/api/organizations/${chatOrgId}/contact`,{cookie:englishCookie})).data.contact.visible,false);
+  await request(`/api/organizations/${chatOrgId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:{channels:['email','chat'],preferred:'email'}}});
+  const selectedOnly=(await request(`/api/loan-requests/${chatId}/messages`,{cookie:borrowerCookie})).data.pickup;
+  assert.equal(selectedOnly.address,undefined);assert.equal(selectedOnly.phone,undefined);assert.equal(selectedOnly.email,'contact@example.org');
+  const selectedDashboard=(await request('/api/me/dashboard',{cookie:borrowerCookie})).data.chatRequests.find(c=>c.id===chatId);assert.equal(selectedDashboard.address,null);assert.equal(selectedDashboard.phone,null);
+  assert.equal((await request(`/api/loan-requests/${chatId}/pickup-details`,{cookie:borrowerCookie})).data.contact.email,'contact@example.org');
+  await request(`/api/organizations/${chatOrgId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:fullContacts}});
+
   result=await request(`/api/loan-requests/${chatId}/messages`,{method:'POST',cookie:borrowerCookie,body:{message:'שלום, אפשר לתאם?'}});
   assert.equal(result.response.status,201,JSON.stringify(result.data));const chatMessageId=result.data.message.id;
   result=await request(`/api/messages/${chatMessageId}`,{method:'PATCH',cookie:borrowerCookie,body:{message:'שלום, אשמח לתאם'}});assert.equal(result.response.status,200);
@@ -515,6 +536,12 @@ try {
   assert.equal((await request(`/api/messages/${chatMessageId}/report`,{method:'POST',cookie:adminCookie,body:{reason:'בדיקת דיווח'}})).response.status,200);
   assert.equal((await request(`/api/messages/${chatMessageId}`,{method:'DELETE',cookie:borrowerCookie})).response.status,200);
   assert.equal((await request(`/api/organizations/${organizationId}/chat-requests`,{method:'POST',cookie:borrowerCookie,body:{note:'גמ״ח עם פריטים'}})).response.status,409);
+  await request(`/api/organizations/${organizationId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:fullContacts}});
+  assert.equal((await request(`/api/organizations/${organizationId}/public`)).data.organization.contact.email,'contact@example.org');
+  assert.equal((await request(`/api/organizations/${organizationId}/contact`)).data.contact.phone,'050-1234567');
+  await request(`/api/organizations/${organizationId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:{showPublic:false,channels:['phone','address','chat'],preferred:'chat',email:'',hours:{},notes:''}}});
+
+  await request(`/api/organizations/${chatOrgId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:{showPublic:false}}});
   result=await request(`/api/organization-chat-requests/${chatId}/status`,{method:'PATCH',cookie:borrowerCookie,body:{status:'cancelled'}});assert.equal(result.response.status,200);
   assert.equal((await request(`/api/loan-requests/${chatId}/messages`,{cookie:borrowerCookie})).response.status,403);
   assert.equal((await request('/api/me/dashboard',{cookie:borrowerCookie})).data.chatRequests.find(c=>c.id===chatId).address,null);
@@ -614,6 +641,13 @@ try {
   assert.equal(approvedPickup.response.status,200);
   assert.equal(approvedPickup.data.pickup.address,expectedPickupAddress);
   assert.equal(approvedPickup.data.pickup.phone,'050-1234567');
+  await request(`/api/organizations/${organizationId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:{channels:['email','chat'],preferred:'email',email:'only@example.org'}}});
+  const limitedLoanContact=(await request(`/api/loan-requests/${requestId}/pickup-details`,{cookie:borrowerCookie})).data;
+  assert.equal(limitedLoanContact.pickup.address,undefined);assert.equal(limitedLoanContact.pickup.phone,undefined);assert.equal(limitedLoanContact.contact.email,'only@example.org');
+  const limitedLoanRow=(await request('/api/me/dashboard',{cookie:borrowerCookie})).data.requests.find(r=>r.id===requestId);assert.equal(limitedLoanRow.pickup_address,null);assert.equal(limitedLoanRow.branch_address,null);assert.equal(limitedLoanRow.contact_phone,null);
+  const limitedCalendar=await request(`/api/loan-requests/${requestId}/calendar.ics`,{cookie:borrowerCookie});assert.equal(limitedCalendar.response.status,200);assert.ok(!limitedCalendar.data.includes(expectedPickupAddress));
+  await request(`/api/organizations/${organizationId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:{showPublic:false,channels:['phone','address','chat'],preferred:'chat',email:'',hours:{},notes:''}}});
+
 
   assert.deepEqual(result.data.favorites, [itemId]);
 
