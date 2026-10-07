@@ -1,22 +1,46 @@
-deploy_sha=63abb06f212592c78077b4cee4a5fc24792da972
+deploy_sha=baa1308444e726380b16b79ff06a8e8bfc259f01
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
-> node test/item-english.mjs && node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
+> node test/contact-preferences.mjs && node test/service-range.mjs && node test/admin-gmachs.mjs && node test/item-english.mjs && node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
 
+Contact validation, privacy rendering, action links, contact icons and Israel time tests passed
+Service range policy and geocoding tests passed
+Gmach admin UI passed in Hebrew and English: complete controls, tool wiring and escaped original names.
 Stored English: cache reuse, edit invalidation, public permissions and unavailable text passed
 Final completion static release gate passed.
+Requirements expansion static release gate passed.
+Launch readiness static release gate passed.
+Distribution completion static release gate passed.
+Navigation admin static release gate passed.
+Privacy availability static release gate passed.
+Release hardening static gate passed.
+Release experience static release gate passed.
+Admin control center static release gate passed.
+Privacy purge static release gate passed.
+Community chat retention static release gate passed.
+QR scanning, structured SEO and accessibility shell gate passed.
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+Full requirements regression extensions passed.
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: single-element selector used as collection
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:167:83 {
+AssertionError [ERR_ASSERTION]: English static UI is missing translations: 💙 מיזם חדש — יחד מרבים חסד! | מכירים גמ״ח? ספרו לו על גמ״ח ברגע ושתפו את האתר, כדי שעוד אנשים ימצאו את העזרה שהם צריכים. | שתפו בווטסאפ ↗ | מיזם חדש / New initiative
+
+4 !== 0
+
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/i18n-static.mjs:33:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
+  actual: 4,
+  expected: 0,
+  operator: 'strictEqual',
   diff: 'simple'
 }
 
