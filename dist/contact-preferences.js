@@ -13,7 +13,6 @@
   const icon=key=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${icons[key]}</svg>`;
   const dayHe=['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'],dayEn=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const defaultSettings=()=>({showPublic:false,channels:['phone','address','chat'],preferred:'',email:'',hours:{},notes:''});
-  function timeOptions(selected){return Array.from({length:96},(_,i)=>{const value=String(Math.floor(i/4)).padStart(2,'0')+':'+String(i%4*15).padStart(2,'0');return `<option value="${value}" ${value===selected?'selected':''}>${value}</option>`;}).join('');}
   function fill(settings=defaultSettings()){
     let section=document.querySelector('#gmach-contact-editor');
     if(!section){section=document.createElement('fieldset');section.id='gmach-contact-editor';document.querySelector('#gmach-consent').closest('label').before(section);}
@@ -24,8 +23,7 @@
       <div class="contact-method-options">${methods.map(([key,,he,en])=>`<label class="contact-method-choice"><input type="checkbox" data-gmach-contact-method="${key}"><span class="contact-method-tile" data-method="${key}"><span class="contact-action-icon">${icon(key)}</span><span>${esc(t(he,en))}</span><span class="contact-choice-check" aria-hidden="true">✓</span></span></label>`).join('')}</div>
       <label id="gmach-contact-email-field">${esc(t('אימייל לפניות לגמ״ח','Gmach contact email'))}<input id="gmach-contact-email" type="email" maxlength="254" autocomplete="email"></label>
       <label class="contact-setting-switch"><input id="gmach-contact-scheduled" type="checkbox">${esc(t('הגדרת ימים ושעות לפנייה','Set contact days and hours'))}</label>
-      <div id="gmach-contact-hours"><p class="form-note">${esc(t('בחרו יום ושעות. שינוי שעה מסמן את היום אוטומטית.','Choose days and hours. Changing a time selects its day automatically.'))}</p>${dayHe.map((day,i)=>`<div class="contact-hours-row"><label class="contact-day-label"><input type="checkbox" data-contact-day="${i}"><span>${esc(t(day,dayEn[i]))}</span></label><div class="contact-time-range"><select dir="ltr" data-contact-start="${i}" aria-label="${esc(t('תחילת פניות ביום '+day,'Contact start on '+dayEn[i]))}">${timeOptions('09:00')}</select><span>–</span><select dir="ltr" data-contact-end="${i}" aria-label="${esc(t('סיום פניות ביום '+day,'Contact end on '+dayEn[i]))}">${timeOptions('17:00')}</select></div></div>`).join('')}</div>
-
+      <div id="gmach-contact-hours">${dayHe.map((day,i)=>`<label class="contact-hours-row"><input type="checkbox" data-contact-day="${i}"><span>${esc(t(day,dayEn[i]))}</span><input type="time" data-contact-start="${i}" value="09:00" aria-label="${esc(t('תחילת פניות ביום '+day,'Contact start on '+dayEn[i]))}"><span>–</span><input type="time" data-contact-end="${i}" value="17:00" aria-label="${esc(t('סיום פניות ביום '+day,'Contact end on '+dayEn[i]))}"></label>`).join('')}</div>
       <p class="form-note">${esc(t('שעות הפנייה לפי שעון ישראל. בצ׳אט אפשר להשאיר הודעה בכל שעה שבה האתר פתוח, בהתאם לאישור הבקשה.','Contact hours use Israel time. Messages can be left in an approved chat whenever the website is open.'))}</p>
       <label>${esc(t('הערות נוספות של בעל הגמ״ח','Additional notes from the gmach manager'))}<textarea id="gmach-contact-notes" maxlength="1000" rows="3" placeholder="${esc(t('למשל: נא להתקשר בין 18:00 ל־20:00. עדיף ווטסאפ.','For example: Please call between 18:00 and 20:00. WhatsApp is preferred.'))}"></textarea></label>
       <p class="form-note">${esc(t('ההערות והזמנים מוצגים בעמוד גם כשפרטי הקשר מוסתרים.','Notes and contact hours are shown on the page even when contact details are hidden.'))}</p>`;
@@ -35,10 +33,8 @@
     syncMethods();section.querySelector('#gmach-contact-email').value=settings.email||'';
     section.querySelector('#gmach-contact-notes').value=settings.notes||'';
     const scheduled=section.querySelector('#gmach-contact-scheduled');scheduled.checked=Object.keys(settings.hours||{}).length>0;
-    function syncHours(){section.querySelector('#gmach-contact-hours').hidden=!scheduled.checked;section.querySelectorAll('[data-contact-day]').forEach(input=>{const day=input.dataset.contactDay;for(const attr of ['start','end'])section.querySelector(`[data-contact-${attr}="${day}"]`).disabled=!scheduled.checked;});}
-    for(const [day,range] of Object.entries(settings.hours||{})){section.querySelector(`[data-contact-day="${day}"]`).checked=true;for(const [index,attr] of ['start','end'].entries()){const select=section.querySelector(`[data-contact-${attr}="${day}"]`);if(![...select.options].some(option=>option.value===range[index])){const option=document.createElement('option');option.value=range[index];option.textContent=range[index];select.append(option);}select.value=range[index];}}
-    section.querySelectorAll('[data-contact-start],[data-contact-end]').forEach(select=>{select.onchange=()=>{const day=select.dataset.contactStart??select.dataset.contactEnd;section.querySelector(`[data-contact-day="${day}"]`).checked=true;};});
-
+    function syncHours(){section.querySelector('#gmach-contact-hours').hidden=!scheduled.checked;section.querySelectorAll('[data-contact-day]').forEach(input=>{const day=input.dataset.contactDay;for(const attr of ['start','end'])section.querySelector(`[data-contact-${attr}="${day}"]`).disabled=!scheduled.checked||!input.checked;});}
+    for(const [day,range] of Object.entries(settings.hours||{})){section.querySelector(`[data-contact-day="${day}"]`).checked=true;section.querySelector(`[data-contact-start="${day}"]`).value=range[0];section.querySelector(`[data-contact-end="${day}"]`).value=range[1];}
     scheduled.onchange=syncHours;section.querySelectorAll('[data-contact-day]').forEach(input=>input.onchange=syncHours);syncHours();
   }
   function read(){
