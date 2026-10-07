@@ -1,4 +1,9 @@
 window.GmachEnglish = Object.freeze({
+"💙 מיזם חדש — יחד מרבים חסד!":"💙 A new initiative — spread kindness together!",
+"מכירים גמ״ח? ספרו לו על גמ״ח ברגע ושתפו את האתר, כדי שעוד אנשים ימצאו את העזרה שהם צריכים.":"Know a gmach? Tell them about Gmach BeRega and share the website so more people can find the help they need.",
+"שתפו בווטסאפ ↗":"Share on WhatsApp ↗",
+"מיזם חדש / New initiative":"New initiative",
+
 "כתובת וטלפון הגמ״ח יוצגו לאחר אישור בקשת ההשאלה":"The gmach address and phone are shown after your borrowing request is approved",
 "לא ניתן לבדוק את טווח השירות כרגע":"The service radius cannot be checked right now",
 
