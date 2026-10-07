@@ -1,4 +1,4 @@
-deploy_sha=baa1308444e726380b16b79ff06a8e8bfc259f01
+deploy_sha=00aff07a6e2a861edd8889d84c22896a046cef81
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -28,9 +28,9 @@ node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: English static UI is missing translations: 💙 מיזם חדש — יחד מרבים חסד! | מכירים גמ״ח? ספרו לו על גמ״ח ברגע ושתפו את האתר, כדי שעוד אנשים ימצאו את העזרה שהם צריכים. | שתפו בווטסאפ ↗ | מיזם חדש / New initiative
+AssertionError [ERR_ASSERTION]: English static UI is missing translations: גמ״ח ברגע — גמ״חים והשאלת ציוד בכל הארץ
 
-4 !== 0
+1 !== 0
 
     at file:///home/runner/work/gmach-karov1/gmach-karov1/test/i18n-static.mjs:33:8
     at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
@@ -38,7 +38,7 @@ AssertionError [ERR_ASSERTION]: English static UI is missing translations: 💙 
     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 4,
+  actual: 1,
   expected: 0,
   operator: 'strictEqual',
   diff: 'simple'
