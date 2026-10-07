@@ -3002,9 +3002,9 @@ async function getSiteSettings(env) {
 async function adminOverview(request, env) {
   await requireAdmin(request, env);
   const [users, organizations, items, requests, audit] = await env.DB.batch([
-    env.DB.prepare("SELECT COUNT(*) AS count FROM users"),
-    env.DB.prepare("SELECT COUNT(*) AS count FROM organizations"),
-    env.DB.prepare("SELECT COUNT(*) AS count FROM items"),
+    env.DB.prepare("SELECT COUNT(*) AS count FROM users WHERE deleted_at IS NULL"),
+    env.DB.prepare("SELECT COUNT(*) AS count FROM organizations WHERE deleted_at IS NULL"),
+    env.DB.prepare("SELECT COUNT(*) AS count FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.deleted_at IS NULL AND o.deleted_at IS NULL"),
     env.DB.prepare("SELECT COUNT(*) AS count FROM loan_requests"),
     env.DB.prepare("SELECT a.id,a.action,a.entity_type,a.entity_id,a.created_at,u.full_name AS actor_name FROM audit_log a LEFT JOIN users u ON u.id = a.actor_id ORDER BY a.created_at DESC LIMIT 30")
   ]);
