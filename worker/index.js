@@ -450,6 +450,8 @@ export default {
       // Schema reconciliation is intentionally daily. Running every ensure
       // function every few minutes was a large, unnecessary source of D1 reads.
       if (event.cron === "17 2 * * *") {
+        await ensurePendingRegistrations(env);
+        await env.DB.prepare("DELETE FROM pending_registrations WHERE created_at < ?").bind(new Date(Date.now()-24*60*60*1000).toISOString()).run();
         await ensureAdvancedBookingSchema(env);
         await ensureProductionHardeningSchema(env);
         await ensureCompletePlatformSchema(env);
@@ -1005,6 +1007,12 @@ async function routeApi(request, env, ctx, url) {
   throw new HttpError(404, "הכתובת לא נמצאה");
 }
 
+const pendingRegistrationSchema=new WeakMap();
+async function ensurePendingRegistrations(env){
+  if(!pendingRegistrationSchema.has(env.DB))pendingRegistrationSchema.set(env.DB,env.DB.prepare("CREATE TABLE IF NOT EXISTS pending_registrations(email TEXT PRIMARY KEY COLLATE NOCASE,id TEXT NOT NULL UNIQUE,payload_json TEXT NOT NULL,token_hash TEXT NOT NULL,expires_at TEXT NOT NULL,created_at TEXT NOT NULL)").run().catch(error=>{pendingRegistrationSchema.delete(env.DB);throw error;}));
+  await pendingRegistrationSchema.get(env.DB);
+}
+
 async function register(request, env, ctx, url) {
   const body = await readJson(request);
   if (body.termsAccepted !== true) throw new HttpError(400, "יש לאשר את תנאי השימוש ומדיניות הפרטיות");
@@ -1037,39 +1045,15 @@ async function register(request, env, ctx, url) {
   const challengeHash = await sha256(`${id}:${code}`);
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-  try {
-    const acceptedAt=new Date().toISOString();
-    await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role,phone,city,address_cipher,terms_accepted_at,privacy_accepted_at,operational_emails_accepted,community_emails_accepted,preferred_language,consent_version,account_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'suspended')")
-      .bind(id, email, passwordHash, salt, PASSWORD_ITERATIONS, fullName, role, phone, city, addressCipher, acceptedAt, acceptedAt, 1, body.communityEmailsAccepted===true?1:0,preferredLanguage,TERMS_VERSION).run();
-    await env.DB.batch([
-      env.DB.prepare("INSERT OR IGNORE INTO legal_consents(user_id,document_type,version,accepted_at,source) VALUES(?,?,?,?,?)").bind(id,"terms",TERMS_VERSION,acceptedAt,"registration"),
-      env.DB.prepare("INSERT OR IGNORE INTO legal_consents(user_id,document_type,version,accepted_at,source) VALUES(?,?,?,?,?)").bind(id,"privacy",PRIVACY_VERSION,acceptedAt,"registration")
-    ]);
-  } catch (error) {
-    const message=String(error).toLowerCase();
-    if (message.includes("unique")) throw new HttpError(409, "כבר קיים חשבון עם כתובת האימייל הזו");
-    const fallbackRole=role==="member"?"borrower":role==="borrower"?"member":null;
-    if (!fallbackRole) { console.error("Registration user write failed",error); throw new HttpError(503,"לא הצלחנו ליצור את החשבון במסד הנתונים"); }
-    try { const acceptedAt=new Date().toISOString(); await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role,phone,city,address_cipher,terms_accepted_at,privacy_accepted_at,operational_emails_accepted,community_emails_accepted,preferred_language,consent_version,account_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'suspended')").bind(id,email,passwordHash,salt,PASSWORD_ITERATIONS,fullName,fallbackRole,phone,city,addressCipher,acceptedAt,acceptedAt,1,body.communityEmailsAccepted===true?1:0,preferredLanguage,TERMS_VERSION).run(); await env.DB.batch([env.DB.prepare("INSERT OR IGNORE INTO legal_consents(user_id,document_type,version,accepted_at,source) VALUES(?,?,?,?,?)").bind(id,"terms",TERMS_VERSION,acceptedAt,"registration"),env.DB.prepare("INSERT OR IGNORE INTO legal_consents(user_id,document_type,version,accepted_at,source) VALUES(?,?,?,?,?)").bind(id,"privacy",PRIVACY_VERSION,acceptedAt,"registration")]); }
-    catch (fallbackError) { console.error("Registration user fallback failed",fallbackError); throw new HttpError(503,"לא הצלחנו ליצור את החשבון במסד הנתונים"); }
-  }
-  try {
-    await env.DB.prepare("INSERT INTO auth_challenges (token_hash,user_id,purpose,expires_at) VALUES (?,?, 'email_verify', ?)").bind(challengeHash,id,expiresAt).run();
-  } catch (error) {
-    console.error("Registration challenge write failed",error);
-    try { await env.DB.prepare("DELETE FROM users WHERE id=?").bind(id).run(); } catch {}
-    throw new HttpError(503,"לא הצלחנו ליצור קוד אימות. נסו שוב בעוד רגע");
-  }
-
-  try {
-    await sendVerificationEmail(env, email, fullName, code, preferredLanguage);
-  } catch (error) {
-    console.error("Verification email delivery failed", error);
-    try { await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(id).run(); }
-    catch (cleanupError) { console.error("Registration cleanup failed", cleanupError); }
-    throw new HttpError(503, "לא הצלחנו לשלוח את קוד האימות. שירות המייל אינו זמין כרגע");
-  }
-  await recordRegistration(env,request,id).catch(error=>console.error("Registration analytics failed",error));
+  await ensurePendingRegistrations(env);
+  const acceptedAt=new Date().toISOString();
+  const payload={id,email,passwordHash,salt,iterations:PASSWORD_ITERATIONS,fullName,role,phone,city,addressCipher,acceptedAt,communityEmailsAccepted:body.communityEmailsAccepted===true?1:0,preferredLanguage,consentVersion:TERMS_VERSION,privacyVersion:PRIVACY_VERSION};
+  await env.DB.batch([
+    env.DB.prepare("DELETE FROM pending_registrations WHERE created_at < ?").bind(new Date(Date.now()-24*60*60*1000).toISOString()),
+    env.DB.prepare("INSERT INTO pending_registrations(email,id,payload_json,token_hash,expires_at,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET id=excluded.id,payload_json=excluded.payload_json,token_hash=excluded.token_hash,expires_at=excluded.expires_at,created_at=excluded.created_at").bind(email,id,JSON.stringify(payload),challengeHash,expiresAt,acceptedAt)
+  ]);
+  try { await sendVerificationEmail(env,email,fullName,code,preferredLanguage); }
+  catch(error){console.error("Verification email delivery failed",error);await env.DB.prepare("DELETE FROM pending_registrations WHERE email=? AND id=?").bind(email,id).run();throw new HttpError(503,"לא הצלחנו לשלוח את קוד האימות. שירות המייל אינו זמין כרגע");}
   return json({ verificationRequired: true, email, expiresInSeconds: 600 }, 201);
 }
 
@@ -1078,6 +1062,24 @@ async function verifyEmail(request, env, url) {
   const email = normalizeEmail(body.email);
   const code = cleanText(body.code, 6, 6, "קוד אימות");
   if (!/^\d{6}$/.test(code)) throw new HttpError(400, "קוד האימות חייב להכיל 6 ספרות");
+  await ensurePendingRegistrations(env);
+  const pending=await env.DB.prepare("SELECT * FROM pending_registrations WHERE email=?").bind(email).first();
+  if(pending){
+    const now=new Date().toISOString(),hash=await sha256(`${pending.id}:${code}`);
+    if(pending.expires_at<=now||!constantTimeEqual(hash,pending.token_hash))throw new HttpError(400,"קוד האימות אינו נכון או שפג תוקפו");
+    const data=JSON.parse(pending.payload_json),sessionToken=randomToken(32),sessionHash=await sha256(sessionToken);
+    const statements=[
+      env.DB.prepare("INSERT INTO users(id,email,password_hash,password_salt,password_iterations,full_name,role,phone,city,address_cipher,terms_accepted_at,privacy_accepted_at,operational_emails_accepted,community_emails_accepted,preferred_language,consent_version,email_verified,account_status,last_login_at) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,1,'active',? FROM pending_registrations WHERE email=? AND id=? AND token_hash=? AND expires_at>?").bind(data.id,data.email,data.passwordHash,data.salt,data.iterations,data.fullName,data.role,data.phone,data.city,data.addressCipher,data.acceptedAt,data.acceptedAt,data.communityEmailsAccepted,data.preferredLanguage,data.consentVersion,now,email,pending.id,hash,now),
+      ...[['terms',data.consentVersion],['privacy',data.privacyVersion]].map(([kind,version])=>env.DB.prepare("INSERT INTO legal_consents(user_id,document_type,version,accepted_at,source) SELECT id,?,?,?,'registration' FROM users WHERE id=?").bind(kind,version,data.acceptedAt,data.id)),
+      env.DB.prepare("INSERT INTO sessions(token_hash,user_id,expires_at) SELECT ?,id,? FROM users WHERE id=?").bind(sessionHash,new Date(Date.now()+SESSION_SECONDS*1000).toISOString(),data.id),
+      env.DB.prepare("DELETE FROM pending_registrations WHERE email=? AND id=? AND token_hash=?").bind(email,pending.id,hash)
+    ];
+    let result;try{result=await env.DB.batch(statements);}catch(error){if(/unique/i.test(String(error)))throw new HttpError(409,"כתובת האימייל כבר אומתה");throw error;}
+    if(!result[0].meta.changes)throw new HttpError(400,"קוד האימות אינו נכון או שפג תוקפו");
+    const created=await env.DB.prepare("SELECT * FROM users WHERE id=?").bind(data.id).first();
+    await recordRegistration(env,request,data.id).catch(error=>console.error("Registration analytics failed",error));
+    return json({user:publicUser(created)},200,{"Set-Cookie":sessionCookie(sessionToken,url)});
+  }
   const user = await env.DB.prepare("SELECT * FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
   if (!user) throw new HttpError(400, "קוד האימות אינו נכון או שפג תוקפו");
   if (Number(user.email_verified || 0) === 1) throw new HttpError(409, "כתובת האימייל כבר אומתה");
@@ -1099,6 +1101,14 @@ async function resendVerification(request, env, ctx) {
   const email = normalizeEmail(body.email);
   await enforceAuthRateLimit(env, email, "register", ctx);
   assertEmailDeliveryConfigured(env);
+  await ensurePendingRegistrations(env);
+  const pending=await env.DB.prepare("SELECT * FROM pending_registrations WHERE email=? AND created_at>?").bind(email,new Date(Date.now()-24*60*60*1000).toISOString()).first();
+  if(pending){
+    const code=verificationCode(),hash=await sha256(`${pending.id}:${code}`),data=JSON.parse(pending.payload_json);
+    await env.DB.prepare("UPDATE pending_registrations SET token_hash=?,expires_at=? WHERE email=? AND id=?").bind(hash,new Date(Date.now()+10*60*1000).toISOString(),email,pending.id).run();
+    await sendVerificationEmail(env,email,data.fullName,code,data.preferredLanguage);
+    return json({ok:true});
+  }
   const user = await env.DB.prepare("SELECT id,email,full_name,email_verified,preferred_language FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
   if (!user || Number(user.email_verified || 0) === 1) return json({ ok: true });
   const code = verificationCode();
@@ -1157,7 +1167,12 @@ async function login(request, env, ctx, url) {
   const password = validatePassword(body.password);
   await enforceAuthRateLimit(env, email, "login", ctx);
   const user = await env.DB.prepare("SELECT * FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
-  if (!user) { await recordSecurityFailure(request,env,"login_failed"); throw new HttpError(401, "האימייל או הסיסמה אינם נכונים"); }
+  if(!user){
+    await ensurePendingRegistrations(env);
+    const pending=await env.DB.prepare("SELECT payload_json FROM pending_registrations WHERE email=? AND created_at>?").bind(email,new Date(Date.now()-24*60*60*1000).toISOString()).first();
+    if(pending){const data=JSON.parse(pending.payload_json),candidate=await derivePassword(password,data.salt,data.iterations);if(constantTimeEqual(candidate,data.passwordHash))return json({error:"יש לאמת את כתובת האימייל לפני הכניסה",verificationRequired:true,email},403);}
+    await recordSecurityFailure(request,env,"login_failed");throw new HttpError(401,"האימייל או הסיסמה אינם נכונים");
+  }
   const candidate = await derivePassword(password, user.password_salt, user.password_iterations);
   if (!constantTimeEqual(candidate, user.password_hash)) { await recordSecurityFailure(request,env,"login_failed"); throw new HttpError(401, "האימייל או הסיסמה אינם נכונים"); }
   if (Number(user.email_verified || 0) !== 1) return json({ error: "יש לאמת את כתובת האימייל לפני הכניסה", verificationRequired: true, email: user.email }, 403);

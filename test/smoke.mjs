@@ -117,12 +117,23 @@ try {
 
   result = await request("/api/auth/register", { method: "POST", body: { fullName: "משתמש ראשון", phone: "052-1112233", city: "ירושלים", address: "רחוב הבדיקה 9, ירושלים", email: "first@example.org", password: "FirstUserPass!456", termsAccepted: true, operationalEmailsAccepted: true } });
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
-  const pendingRegistrant = await db.prepare("SELECT email_verified,account_status FROM users WHERE email=?").bind("first@example.org").first();
-  assert.equal(pendingRegistrant.email_verified,0);
-  assert.equal(pendingRegistrant.account_status,"suspended","Registration must remain inactive until email verification");
+  const pendingRegistrant = await db.prepare("SELECT id FROM users WHERE email=?").bind("first@example.org").first();
+  assert.equal(pendingRegistrant,null,"There must be no user account before email verification");
+  const pendingAttempt=await db.prepare("SELECT id FROM pending_registrations WHERE email=?").bind("first@example.org").first();
+  assert.ok(pendingAttempt,"Only a temporary registration attempt is stored");
+  const initialCode=sentEmails.at(-1).text.match(/\b\d{6}\b/)[0];
+  result=await request("/api/auth/verify-email",{method:"POST",body:{email:"first@example.org",code:initialCode==="000000"?"111111":"000000"}});
+  assert.equal(result.response.status,400);
+  assert.equal(await db.prepare("SELECT id FROM users WHERE email=?").bind("first@example.org").first(),null,"Invalid codes cannot create a user");
   result = await request("/api/auth/login",{method:"POST",body:{email:"first@example.org",password:"FirstUserPass!456"}});
   assert.equal(result.response.status,403);
   assert.equal(result.data.verificationRequired,true,"An inactive registration must still offer email verification");
+  await db.prepare("UPDATE pending_registrations SET expires_at=? WHERE email=?").bind(new Date(Date.now()-1000).toISOString(),"first@example.org").run();
+  result=await request("/api/auth/verify-email",{method:"POST",body:{email:"first@example.org",code:initialCode}});
+  assert.equal(result.response.status,400,"Expired codes cannot create an account");
+  result=await request("/api/auth/resend-verification",{method:"POST",body:{email:"first@example.org"}});
+  assert.equal(result.response.status,200,"Temporary registrations support resending without a user account");
+  assert.equal(await db.prepare("SELECT id FROM users WHERE email=?").bind("first@example.org").first(),null);
   const firstCookie = await verifyLatestEmail("first@example.org");
   const activatedRegistrant = await db.prepare("SELECT email_verified,account_status FROM users WHERE email=?").bind("first@example.org").first();
   assert.equal(activatedRegistrant.email_verified,1);
