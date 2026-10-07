@@ -30,7 +30,7 @@ jobs:
       - name: contact_requests
         run: npx wrangler d1 execute DB --remote --json --command "SELECT status,COUNT(*) AS count FROM organization_chat_requests GROUP BY status"
       - name: today_visits
-        run: npx wrangler d1 execute DB --remote --json --command "SELECT COUNT(DISTINCT visitor_id) AS visitors,COUNT(*) AS sessions,SUM(views) AS pageviews,SUM(registered=1) AS registered_sessions FROM site_visits WHERE started_at>=strftime('%Y-%m-%dT00:00:00.000Z','now','+3 hours','start of day','-3 hours')"
+        run: npx wrangler d1 execute DB --remote --json --command "SELECT COUNT(DISTINCT visitor_id) AS visitors,COUNT(*) AS sessions,SUM(views) AS pageviews,SUM(registered=1) AS registered_sessions FROM site_visits WHERE started_at>=strftime('%Y-%m-%dT%H:%M:%fZ','now','+3 hours','start of day','-3 hours')"
       - name: visits_by_day
         run: npx wrangler d1 execute DB --remote --json --command "SELECT date(started_at,'+3 hours') AS day,COUNT(DISTINCT visitor_id) AS visitors,COUNT(*) AS sessions,SUM(views) AS pageviews FROM site_visits GROUP BY day ORDER BY day DESC LIMIT 7"
       - name: registrations_by_day
