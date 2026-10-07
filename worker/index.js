@@ -1039,7 +1039,7 @@ async function register(request, env, ctx, url) {
 
   try {
     const acceptedAt=new Date().toISOString();
-    await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role,phone,city,address_cipher,terms_accepted_at,privacy_accepted_at,operational_emails_accepted,community_emails_accepted,preferred_language,consent_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+    await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role,phone,city,address_cipher,terms_accepted_at,privacy_accepted_at,operational_emails_accepted,community_emails_accepted,preferred_language,consent_version,account_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'suspended')")
       .bind(id, email, passwordHash, salt, PASSWORD_ITERATIONS, fullName, role, phone, city, addressCipher, acceptedAt, acceptedAt, 1, body.communityEmailsAccepted===true?1:0,preferredLanguage,TERMS_VERSION).run();
     await env.DB.batch([
       env.DB.prepare("INSERT OR IGNORE INTO legal_consents(user_id,document_type,version,accepted_at,source) VALUES(?,?,?,?,?)").bind(id,"terms",TERMS_VERSION,acceptedAt,"registration"),
@@ -1050,7 +1050,7 @@ async function register(request, env, ctx, url) {
     if (message.includes("unique")) throw new HttpError(409, "כבר קיים חשבון עם כתובת האימייל הזו");
     const fallbackRole=role==="member"?"borrower":role==="borrower"?"member":null;
     if (!fallbackRole) { console.error("Registration user write failed",error); throw new HttpError(503,"לא הצלחנו ליצור את החשבון במסד הנתונים"); }
-    try { const acceptedAt=new Date().toISOString(); await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role,phone,city,address_cipher,terms_accepted_at,privacy_accepted_at,operational_emails_accepted,community_emails_accepted,preferred_language,consent_version) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(id,email,passwordHash,salt,PASSWORD_ITERATIONS,fullName,fallbackRole,phone,city,addressCipher,acceptedAt,acceptedAt,1,body.communityEmailsAccepted===true?1:0,preferredLanguage,TERMS_VERSION).run(); await env.DB.batch([env.DB.prepare("INSERT OR IGNORE INTO legal_consents(user_id,document_type,version,accepted_at,source) VALUES(?,?,?,?,?)").bind(id,"terms",TERMS_VERSION,acceptedAt,"registration"),env.DB.prepare("INSERT OR IGNORE INTO legal_consents(user_id,document_type,version,accepted_at,source) VALUES(?,?,?,?,?)").bind(id,"privacy",PRIVACY_VERSION,acceptedAt,"registration")]); }
+    try { const acceptedAt=new Date().toISOString(); await env.DB.prepare("INSERT INTO users (id,email,password_hash,password_salt,password_iterations,full_name,role,phone,city,address_cipher,terms_accepted_at,privacy_accepted_at,operational_emails_accepted,community_emails_accepted,preferred_language,consent_version,account_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'suspended')").bind(id,email,passwordHash,salt,PASSWORD_ITERATIONS,fullName,fallbackRole,phone,city,addressCipher,acceptedAt,acceptedAt,1,body.communityEmailsAccepted===true?1:0,preferredLanguage,TERMS_VERSION).run(); await env.DB.batch([env.DB.prepare("INSERT OR IGNORE INTO legal_consents(user_id,document_type,version,accepted_at,source) VALUES(?,?,?,?,?)").bind(id,"terms",TERMS_VERSION,acceptedAt,"registration"),env.DB.prepare("INSERT OR IGNORE INTO legal_consents(user_id,document_type,version,accepted_at,source) VALUES(?,?,?,?,?)").bind(id,"privacy",PRIVACY_VERSION,acceptedAt,"registration")]); }
     catch (fallbackError) { console.error("Registration user fallback failed",fallbackError); throw new HttpError(503,"לא הצלחנו ליצור את החשבון במסד הנתונים"); }
   }
   try {
@@ -1087,7 +1087,7 @@ async function verifyEmail(request, env, url) {
   if (!challenge) throw new HttpError(400, "קוד האימות אינו נכון או שפג תוקפו");
   const sessionToken = randomToken(32);
   await env.DB.batch([
-    env.DB.prepare("UPDATE users SET email_verified = 1, last_login_at = ?, updated_at = ? WHERE id = ?").bind(new Date().toISOString(), new Date().toISOString(), user.id),
+    env.DB.prepare("UPDATE users SET email_verified = 1, account_status = 'active', last_login_at = ?, updated_at = ? WHERE id = ?").bind(new Date().toISOString(), new Date().toISOString(), user.id),
     env.DB.prepare("DELETE FROM auth_challenges WHERE user_id = ? AND purpose = 'email_verify'").bind(user.id),
     env.DB.prepare("INSERT INTO sessions (token_hash,user_id,expires_at) VALUES (?,?,?)").bind(await sha256(sessionToken), user.id, new Date(Date.now() + SESSION_SECONDS * 1000).toISOString())
   ]);
@@ -1158,10 +1158,10 @@ async function login(request, env, ctx, url) {
   await enforceAuthRateLimit(env, email, "login", ctx);
   const user = await env.DB.prepare("SELECT * FROM users WHERE email = ? COLLATE NOCASE").bind(email).first();
   if (!user) { await recordSecurityFailure(request,env,"login_failed"); throw new HttpError(401, "האימייל או הסיסמה אינם נכונים"); }
-  if (user.account_status === "suspended") throw new HttpError(403, "החשבון הושעה. יש לפנות להנהלת האתר");
   const candidate = await derivePassword(password, user.password_salt, user.password_iterations);
   if (!constantTimeEqual(candidate, user.password_hash)) { await recordSecurityFailure(request,env,"login_failed"); throw new HttpError(401, "האימייל או הסיסמה אינם נכונים"); }
   if (Number(user.email_verified || 0) !== 1) return json({ error: "יש לאמת את כתובת האימייל לפני הכניסה", verificationRequired: true, email: user.email }, 403);
+  if (user.account_status === "suspended") throw new HttpError(403, "החשבון הושעה. יש לפנות להנהלת האתר");
 
   if (Number(user.totp_enabled || 0) === 1) {
     const challenge = randomToken(32);
@@ -3157,8 +3157,8 @@ async function updateAdminUser(request, env, id) {
   if (!existing) throw new HttpError(404,"המשתמש לא נמצא");
   if (body.role !== undefined && body.role !== existing.role) throw new HttpError(403,"שינוי הרשאות ניהול משתמשים אינו זמין");
   const role = existing.role;
-  const status = body.accountStatus === "suspended" ? "suspended" : "active";
   const verified = body.emailVerified === true ? 1 : 0;
+  const status = body.accountStatus === "suspended" || !verified ? "suspended" : "active";
   const result = await env.DB.prepare("UPDATE users SET role=?,account_status=?,email_verified=?,updated_at=? WHERE id=?").bind(role,status,verified,new Date().toISOString(),id).run();
   if (!result.meta.changes) throw new HttpError(404, "המשתמש לא נמצא");
   await auditStatement(env, admin.id, "user.update", "user", id, { role, status, verified }).run();

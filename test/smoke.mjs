@@ -117,7 +117,16 @@ try {
 
   result = await request("/api/auth/register", { method: "POST", body: { fullName: "משתמש ראשון", phone: "052-1112233", city: "ירושלים", address: "רחוב הבדיקה 9, ירושלים", email: "first@example.org", password: "FirstUserPass!456", termsAccepted: true, operationalEmailsAccepted: true } });
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
+  const pendingRegistrant = await db.prepare("SELECT email_verified,account_status FROM users WHERE email=?").bind("first@example.org").first();
+  assert.equal(pendingRegistrant.email_verified,0);
+  assert.equal(pendingRegistrant.account_status,"suspended","Registration must remain inactive until email verification");
+  result = await request("/api/auth/login",{method:"POST",body:{email:"first@example.org",password:"FirstUserPass!456"}});
+  assert.equal(result.response.status,403);
+  assert.equal(result.data.verificationRequired,true,"An inactive registration must still offer email verification");
   const firstCookie = await verifyLatestEmail("first@example.org");
+  const activatedRegistrant = await db.prepare("SELECT email_verified,account_status FROM users WHERE email=?").bind("first@example.org").first();
+  assert.equal(activatedRegistrant.email_verified,1);
+  assert.equal(activatedRegistrant.account_status,"active","A valid code activates the registration");
   result = await request("/api/auth/me", { cookie: firstCookie });
   assert.notEqual(result.data.user.role, "admin", "The first registrant must not become an administrator");
 
