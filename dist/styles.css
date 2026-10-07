@@ -1477,3 +1477,10 @@ html[lang="en"] .header-actions #dashboard-button{
 @media(max-width:600px){.new-initiative-banner{align-items:stretch;flex-direction:column;gap:12px;padding:14px 16px}.initiative-share{align-self:flex-start}}
 @media(prefers-reduced-motion:reduce){.new-initiative-banner{animation:none}}
 html.reduce-motion .new-initiative-banner{animation:none}
+
+/* Registration at the opposite end of the initiative banner. */
+.new-initiative-banner .initiative-copy{flex:1}
+.initiative-register{flex-shrink:0;border:1px solid #197c64;border-radius:8px;padding:11px 20px;background:#fff;color:#174f47;font:inherit;font-weight:700;cursor:pointer;white-space:nowrap}
+.initiative-register:hover{background:#dff2eb}
+.initiative-register:focus-visible{outline:3px solid #397eb9;outline-offset:3px}
+@media(max-width:600px){.new-initiative-banner{display:grid;grid-template-columns:1fr 1fr}.new-initiative-banner .initiative-copy{grid-column:1/-1;grid-row:1}.initiative-register{grid-column:1;grid-row:2}.new-initiative-banner .initiative-share{grid-column:2;grid-row:2;align-self:stretch;padding-inline:8px}}

@@ -1400,6 +1400,7 @@
     if(target) target.scrollIntoView({behavior:"auto",block:"start"});
   }
   function setupEvents() {
+    $("#initiative-register")?.addEventListener("click", () => { setAuthMode("register"); openDialog($("#auth-dialog")); });
     $("#current-year").textContent = new Date().getFullYear(); const today = new Date().toISOString().slice(0, 10); $("#date-filter").min = today; const nowLocal=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16); $("#request-start").min=nowLocal; $("#request-end").min=nowLocal; $("#request-start").addEventListener("change",()=>{$("#request-end").min=$("#request-start").value||nowLocal;checkRequestedAvailability();}); $("#request-end").addEventListener("change",checkRequestedAvailability); $("#request-quantity").addEventListener("change",checkRequestedAvailability); $("#item-deposit-required").addEventListener("change",()=>{$("#item-deposit-amount-row").hidden=!$("#item-deposit-required").checked;$("#item-deposit-amount").required=$("#item-deposit-required").checked;});
     $("#mobile-menu-button").addEventListener("click", () => { const menu = $("#mobile-menu"); menu.hidden = !menu.hidden; $("#mobile-menu-button").setAttribute("aria-expanded", String(!menu.hidden)); }); $$("#mobile-menu a, #mobile-menu button").forEach(el => el.addEventListener("click", () => { $("#mobile-menu").hidden = true; $("#mobile-menu-button").setAttribute("aria-expanded", "false"); }));
     const cleanSectionRoutes={"/catalog":"catalog","/how-it-works":"how-it-works","/gmachim":"gmachim"};
