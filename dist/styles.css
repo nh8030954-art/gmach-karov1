@@ -1484,3 +1484,14 @@ html.reduce-motion .new-initiative-banner{animation:none}
 .initiative-register:hover{background:#dff2eb}
 .initiative-register:focus-visible{outline:3px solid #397eb9;outline-offset:3px}
 @media(max-width:600px){.new-initiative-banner{display:grid;grid-template-columns:1fr 1fr}.new-initiative-banner .initiative-copy{grid-column:1/-1;grid-row:1}.initiative-register{grid-column:1;grid-row:2}.new-initiative-banner .initiative-share{grid-column:2;grid-row:2;align-self:stretch;padding-inline:8px}}
+
+/* Shared compact organization page */
+.organization-detail .gmach-contact-section{margin:24px 0;padding:0;border:0;background:transparent;text-align:start}
+.organization-detail .gmach-contact-section h3{margin:0 0 14px}
+.organization-detail .gmach-contact-actions{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0 18px}
+.organization-detail .contact-action{flex:0 1 auto;min-width:145px;flex-direction:row;padding:14px 20px;min-height:58px}
+.organization-detail .contact-manager-notes{margin:16px 0;background:#f1f7f6;border-radius:14px;padding:16px 20px}
+.organization-detail .contact-manager-notes p{margin:8px 0 0;white-space:pre-line}
+.organization-service-summary{margin:18px 0 28px;padding:16px 0;border-top:1px solid #dce5e6;border-bottom:1px solid #dce5e6}
+.organization-service-summary p{margin:6px 0}
+@media(max-width:600px){.organization-detail .contact-action{flex:1 1 140px;min-width:0}.organization-detail .gmach-contact-section{margin:20px 0}}
