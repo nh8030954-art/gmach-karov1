@@ -232,74 +232,10 @@ async function explicitGeocode(request,env,url){
   return json({results,cached:false,attribution:"© OpenStreetMap contributors"});
 }
 
-async function createFullBackup(env,backupType="manual"){
-  const id=crypto.randomUUID(),started=new Date().toISOString(),today=started.slice(0,10);
-  await env.DB.prepare("INSERT INTO backup_runs(id,backup_type,status,started_at) VALUES(?,?, 'started',?)").bind(id,backupType,started).run();
-  try{
-    const tableRows=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('auth_events','rate_limits') ORDER BY name").all();
-    const dump={version:3,createdAt:started,tables:{}},tables=[];
-    for(const row of tableRows.results||[]){
-      const t=String(row.name||"");if(!/^[A-Za-z0-9_]+$/.test(t))continue;
-      const rows=await env.DB.prepare("SELECT * FROM "+t).all();dump.tables[t]=rows.results||[];tables.push(t);
-    }
-    const objects=[];
-    if(env.ITEM_IMAGES?.list){
-      let cursor;
-      do{
-        const page=await env.ITEM_IMAGES.list({limit:1000,cursor});
-        for(const o of page.objects||[]){
-          const key=String(o.key||"");
-          if(!key||key.startsWith("_system-backups/")||key.startsWith("backups/")||key.startsWith("d1/")||key.startsWith("r2/"))continue;
-          objects.push({key,size:Number(o.size||0),etag:o.etag||null,uploaded:o.uploaded||null});
-        }
-        cursor=page.truncated?page.cursor:undefined;
-      }while(cursor);
-    }
-    const backupStorage=env.BACKUP_STORAGE||env.ITEM_IMAGES;if(!backupStorage?.put)throw new Error("Backup storage unavailable");
-    const objectCopies=[],objectPrefix=`_system-backups/objects/${today}/${id}/`;
-    for(const object of objects){
-      const source=await env.ITEM_IMAGES.get(object.key);if(!source)continue;
-      const backupKey=objectPrefix+object.key;
-      await backupStorage.put(backupKey,source.body,{httpMetadata:source.httpMetadata,customMetadata:{sourceKey:object.key,sourceEtag:object.etag||"",backupRunId:id}});
-      objectCopies.push({sourceKey:object.key,backupKey,size:object.size,etag:object.etag});
-    }
-    dump.r2Manifest=objectCopies;
-    const raw=JSON.stringify(dump),bytes=new TextEncoder().encode(raw),checksum=await hash(raw),key=`_system-backups/${backupType}/${today}-${id}.json`;
-    await backupStorage.put(key,raw,{httpMetadata:{contentType:"application/json"},customMetadata:{backupRunId:id}});
-    const rowCount=tables.reduce((sum,name)=>sum+(dump.tables[name]?.length||0),0);
-    const manifest={storageKey:key,bytes:bytes.length,checksum,tables,r2ObjectCount:objectCopies.length,objectPrefix,separateStorage:Boolean(env.BACKUP_STORAGE)};
-    await env.DB.batch([
-      env.DB.prepare("UPDATE backup_runs SET backup_key=?,status='completed',row_count=?,size_bytes=?,completed_at=?,finished_at=?,manifest_json=? WHERE id=?").bind(key,rowCount,bytes.length,new Date().toISOString(),new Date().toISOString(),JSON.stringify(manifest),id),
-      env.DB.prepare("INSERT OR REPLACE INTO backup_objects(backup_run_id,storage_key,object_type,size_bytes,checksum) VALUES(?,?,?,?,?)").bind(id,key,"database+r2-manifest",bytes.length,checksum)
-    ]);
-    return {id,status:"completed",storageKey:key,manifest,rowCount};
-  }catch(e){
-    await env.DB.prepare("UPDATE backup_runs SET status='failed',completed_at=?,finished_at=?,error=? WHERE id=?").bind(new Date().toISOString(),new Date().toISOString(),String(e?.message||e).slice(0,1000),id).run();
-    try{await env.DB.prepare("INSERT INTO system_alerts(id,alert_type,severity,details_json) VALUES(?,'backup_failed','critical',?)").bind(crypto.randomUUID(),JSON.stringify({error:String(e?.message||e),backupType})).run()}catch{}
-    throw e;
-  }
-}
-async function automaticDailyBackup(env){
-  const today=new Date().toISOString().slice(0,10);
-  const existing=await env.DB.prepare("SELECT id FROM backup_runs WHERE backup_type='scheduled' AND substr(started_at,1,10)=? AND status='completed' LIMIT 1").bind(today).first();
-  if(existing)return existing.id;
-  const result=await createFullBackup(env,"scheduled");
-  const backupStorage=env.BACKUP_STORAGE||env.ITEM_IMAGES;
-  const old=await env.DB.prepare("SELECT id,started_at,manifest_json FROM backup_runs WHERE backup_type='scheduled' AND status='completed' ORDER BY started_at DESC LIMIT -1 OFFSET 14").all();
-  for(const x of old.results||[]){
-    const m=safe(x.manifest_json,{});
-    if(m.storageKey)try{await backupStorage.delete(m.storageKey)}catch{}
-    try{let cursor;do{const page=await backupStorage.list({prefix:m.objectPrefix||`_system-backups/objects/${String(x.started_at||"").slice(0,10)}/${x.id}/`,limit:1000,cursor});for(const object of page.objects||[])await backupStorage.delete(object.key);cursor=page.truncated?page.cursor:undefined}while(cursor)}catch{}
-    await env.DB.prepare("DELETE FROM backup_runs WHERE id=?").bind(x.id).run();
-  }
-  return result.id;
-}
 async function manualFullBackup(request,env){
-  const admin=await requireAdmin(request,env),result=await createFullBackup(env,"manual-full");
-  try{await env.DB.prepare("INSERT INTO audit_log(id,actor_id,action,entity_type,entity_id,metadata_json) VALUES(?,?,?,?,?,?)").bind(crypto.randomUUID(),admin.id,"backup.full","backup_run",result.id,JSON.stringify({storageKey:result.storageKey,tables:result.manifest.tables.length,r2Objects:result.manifest.r2ObjectCount,separateStorage:result.manifest.separateStorage})).run()}catch{}
-  return json({backup:result});
+  await requireAdmin(request,env);
+  throw new RemainingError(410,"הגיבוי הפנימי הושבת. הגיבוי המלא מנוהל דרך GitHub וזמין בפאנל הגיבויים.");
 }
-
 
 async function unifiedModeration(request,env,url){
   const admin=await requireAdmin(request,env);
@@ -341,7 +277,7 @@ async function unifiedModeration(request,env,url){
 }
 
 export async function ensureRemainingFeaturesSchema(env){return ensureSchema(env)}
-export async function runRemainingMaintenance(env){await ensureSchema(env);const now=new Date().toISOString();await env.DB.prepare("UPDATE page_content SET status='published',publish_at=NULL,updated_at=? WHERE status='scheduled' AND publish_at IS NOT NULL AND publish_at<=?").bind(now,now).run();await automaticDailyBackup(env)}
+export async function runRemainingMaintenance(env){await ensureSchema(env);const now=new Date().toISOString();await env.DB.prepare("UPDATE page_content SET status='published',publish_at=NULL,updated_at=? WHERE status='scheduled' AND publish_at IS NOT NULL AND publish_at<=?").bind(now,now).run();/* Daily full backups are owned by GitHub Actions; internal automatic backups are disabled. */}
 export async function handleRemainingFeatures(request,env,ctx,url){
  const method=request.method.toUpperCase(),path=url.pathname;
  try{

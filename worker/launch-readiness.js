@@ -1,3 +1,4 @@
+import { monitorArchiveBackup } from "./archive-backup.js";
 import { adminGmachSelect } from "./admin-gmachs.js";
 
 const SESSION_COOKIE="gmach_session";
@@ -211,16 +212,15 @@ async function deleteAdminEntity(request,env,type,id){
 
 async function operationalHealth(request,env){
   await requireAdmin(request,env);const now=Date.now();
-  const [backup,drill,failedQueue,failedOutbox,critical,totals,inventoryMismatch]=await env.DB.batch([
-    env.DB.prepare("SELECT * FROM backup_runs ORDER BY COALESCE(finished_at,completed_at,created_at) DESC LIMIT 1"),
-    env.DB.prepare("SELECT * FROM restore_drills ORDER BY started_at DESC LIMIT 1"),
+  const archive=await monitorArchiveBackup(env,now);
+  const [failedQueue,failedOutbox,critical,totals,inventoryMismatch]=await env.DB.batch([
     env.DB.prepare("SELECT COUNT(*) AS count FROM notification_queue WHERE failed_at IS NOT NULL AND failed_at>=?").bind(new Date(now-86400000).toISOString()),
     env.DB.prepare("SELECT COUNT(*) AS count FROM notification_outbox WHERE status='failed' AND created_at>=?").bind(new Date(now-86400000).toISOString()),
     env.DB.prepare("SELECT * FROM system_alerts WHERE resolved_at IS NULL ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,created_at DESC LIMIT 100"),
     env.DB.prepare("SELECT (SELECT COUNT(*) FROM users WHERE deleted_at IS NULL) AS users,(SELECT COUNT(*) FROM organizations WHERE deleted_at IS NULL) AS organizations,(SELECT COUNT(*) FROM items WHERE deleted_at IS NULL) AS items,(SELECT COUNT(*) FROM loan_requests) AS loans"),
     env.DB.prepare("SELECT COUNT(*) AS count FROM items i WHERE (SELECT COUNT(*) FROM item_units u WHERE u.item_id=i.id AND u.status!=\'retired\')>i.quantity")
   ]);
-  const latest=backup.results?.[0]||null,lastBackupAt=latest?.finished_at||latest?.completed_at||latest?.created_at||null,backupAgeHours=lastBackupAt?(now-Date.parse(lastBackupAt))/3600000:null;
+  const latest=archive.latestBackup,backupAgeHours=archive.backupAgeHours;
   const services={email:Boolean(env.RESEND_API_KEY),turnstile:Boolean(env.TURNSTILE_SECRET_KEY&&env.TURNSTILE_SITE_KEY),push:Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY),encryption:Boolean(env.DATA_ENCRYPTION_KEY),separateBackupStorage:Boolean(env.BACKUP_STORAGE)};
   const warnings=[];
   if(!latest||latest.status!=="completed"||backupAgeHours===null||backupAgeHours>30)warnings.push("backup");
@@ -229,7 +229,7 @@ async function operationalHealth(request,env){
   if(!services.encryption)warnings.push("encryption");
   if(Number(inventoryMismatch.results?.[0]?.count||0)>0)warnings.push("inventory_serial_quantity_mismatch");
   const status=warnings.includes("critical_alert")||warnings.includes("encryption")?"critical":warnings.length?"warning":"healthy";
-  const payload={status,warnings,latestBackup:latest,latestRestoreDrill:drill.results?.[0]||null,failedNotifications24h:Number(failedQueue.results?.[0]?.count||0)+Number(failedOutbox.results?.[0]?.count||0),inventorySerialQuantityMismatch:Number(inventoryMismatch.results?.[0]?.count||0),alerts:critical.results||[],services,totals:totals.results?.[0]||{}};
+  const payload={status,warnings,latestBackup:latest,latestRestoreDrill:archive.latestVerification,backupSource:"github-archive",lastBackupAttempt:archive.status,failedNotifications24h:Number(failedQueue.results?.[0]?.count||0)+Number(failedOutbox.results?.[0]?.count||0),inventorySerialQuantityMismatch:Number(inventoryMismatch.results?.[0]?.count||0),alerts:critical.results||[],services,totals:totals.results?.[0]||{}};
   await env.DB.prepare("INSERT INTO operational_health_snapshots(id,status,payload_json) VALUES(?,?,?)").bind(crypto.randomUUID(),status,JSON.stringify(payload)).run().catch(()=>{});
   return json(payload);
 }
@@ -253,27 +253,8 @@ async function ensureAlert(env,type,severity,title,details){
   const existing=await env.DB.prepare("SELECT id FROM system_alerts WHERE alert_type=? AND resolved_at IS NULL AND created_at>=? LIMIT 1").bind(type,new Date(Date.now()-86400000).toISOString()).first();
   if(!existing)await queueAdminAlert(env,null,type,severity,title,details);
 }
-async function periodicRestoreDrill(env){
-  const today=new Date().toISOString().slice(0,10),done=await env.DB.prepare("SELECT id FROM restore_drills WHERE substr(started_at,1,10)=? LIMIT 1").bind(today).first();if(done)return;
-  const backup=await env.DB.prepare("SELECT * FROM backup_runs WHERE status='completed' ORDER BY COALESCE(finished_at,completed_at,created_at) DESC LIMIT 1").first();if(!backup){await ensureAlert(env,"backup_missing","critical","לא נמצא גיבוי תקין לבדיקה",{date:today});return}
-  const id=crypto.randomUUID(),started=new Date().toISOString();await env.DB.prepare("INSERT INTO restore_drills(id,backup_run_id,status,started_at) VALUES(?,?,'running',?)").bind(id,backup.id,started).run();
-  try{
-    const manifest=safe(backup.manifest_json,{}),storage=env.BACKUP_STORAGE||env.ITEM_IMAGES;
-    if(!manifest.storageKey||!manifest.checksum||!storage)throw new Error("backup manifest or storage missing");
-    const object=await storage.get(manifest.storageKey);if(!object)throw new Error("backup object missing");
-    const raw=await object.text(),checksum=await sha256(raw);if(checksum!==manifest.checksum)throw new Error("backup checksum mismatch");
-    const parsed=JSON.parse(raw);if(!parsed.tables||typeof parsed.tables!=="object"||Array.isArray(parsed.tables)||!Object.keys(parsed.tables).length)throw new Error("backup tables invalid");
-    await env.DB.prepare("UPDATE restore_drills SET status='success',notes=?,finished_at=? WHERE id=?").bind("Verified artifact, checksum and "+Object.keys(parsed.tables).length+" tables",new Date().toISOString(),id).run();
-    await env.DB.prepare("UPDATE system_alerts SET resolved_at=? WHERE alert_type IN ('backup_missing','backup_restore_failed') AND resolved_at IS NULL").bind(new Date().toISOString()).run().catch(()=>{});
-  }catch(e){
-    await env.DB.prepare("UPDATE restore_drills SET status='failed',notes=?,finished_at=? WHERE id=?").bind(String(e?.message||e).slice(0,1000),new Date().toISOString(),id).run();
-    await ensureAlert(env,"backup_restore_failed","critical","בדיקת שחזור הגיבוי נכשלה",{backupId:backup.id,error:String(e?.message||e)});
-  }
-}
 async function monitorOperations(env){
-  const last=await env.DB.prepare("SELECT * FROM backup_runs WHERE status='completed' ORDER BY COALESCE(finished_at,completed_at,created_at) DESC LIMIT 1").first();
-  const lastAt=last?.finished_at||last?.completed_at||last?.created_at;if(!lastAt||Date.now()-Date.parse(lastAt)>30*3600000)await ensureAlert(env,"backup_stale","critical","הגיבוי האוטומטי אינו עדכני",{lastBackupAt:lastAt||null});
-  else await env.DB.prepare("UPDATE system_alerts SET resolved_at=? WHERE alert_type='backup_stale' AND resolved_at IS NULL").bind(new Date().toISOString()).run().catch(()=>{});
+  await monitorArchiveBackup(env);
   const failed=await env.DB.prepare("SELECT COUNT(*) AS count FROM notification_queue WHERE failed_at IS NOT NULL AND failed_at>=?").bind(new Date(Date.now()-86400000).toISOString()).first().catch(()=>({count:0}));
   if(Number(failed?.count||0)>0)await ensureAlert(env,"notification_delivery_failed","warning","נכשלו משלוחי התראות ב-24 השעות האחרונות",{count:Number(failed.count)});
 }
@@ -321,7 +302,7 @@ async function adminExportXls(request,env,url){
 
 export async function runLaunchReadinessMaintenance(env){
   await ensureLaunchReadinessSchema(env);
-  await periodicRestoreDrill(env);
+  // GitHub verifies the full ZIP archive; do not run legacy JSON restore drills.
   await monitorOperations(env);
 }
 

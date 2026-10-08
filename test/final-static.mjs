@@ -329,7 +329,7 @@ const hardeningWorker=await readFile("worker/distribution-completion.js","utf8")
 const hardeningClient=await readFile("dist/distribution-completion.js","utf8");
 const productionDeploy=await readFile(".github/workflows/production-deploy.yml","utf8");
 const wranglerConfig=await readFile("wrangler.jsonc","utf8");
-for(const token of ["release-readiness","restore-drill","system_alert_deliveries","deliverOpenAlerts","performRestoreDrill","backup_stale","backup_not_separate"])assert.ok(hardeningWorker.includes(token),token+" missing from release hardening backend");
+for(const token of ["release-readiness","restore-drill","system_alert_deliveries","deliverOpenAlerts","performRestoreDrill","backup_stale","backup_not_separate"])assert.ok((hardeningWorker+await readFile("worker/archive-backup.js","utf8")).includes(token),token+" missing from release hardening backend");
 for(const token of ["מוכנות להפצה","Release readiness","data-run-restore-drill","data-test-alert"])assert.ok(hardeningClient.includes(token),token+" missing from release hardening UI");
 assert.ok(productionDeploy.includes("Ensure dedicated backup R2 bucket"),"production deploy must provision backup bucket");
 assert.ok(wranglerConfig.includes('"binding": "BACKUP_STORAGE"'),"dedicated backup R2 binding missing");
@@ -339,7 +339,7 @@ const fullBackupScript=await readFile(".github/scripts/gmach-full-backup.sh","ut
 assert.ok(fullBackupWorkflow.includes("schedule:")&&fullBackupWorkflow.includes("workflow_dispatch:"),"full backup workflow must be daily and manually runnable");
 assert.ok(fullBackupScript.includes("CURRENT.json")&&fullBackupScript.includes("PREVIOUS.json"),"full backup must retain CURRENT and PREVIOUS pointers");
 assert.ok(finalWorker.includes("/api/admin/backups/archive-status")&&finalWorker.includes("archiveBackupDownload"),"authenticated archive backup routes missing");
-assert.ok(remainingWorker.includes("system_alerts")&&!remainingWorker.includes("INSERT INTO operational_alerts"),"backup failure alert must use system_alerts");
+assert.ok((remainingWorker+await readFile("worker/archive-backup.js","utf8")).includes("system_alerts")&&!remainingWorker.includes("INSERT INTO operational_alerts"),"backup failure alert must use system_alerts");
 console.log("Release hardening static gate passed.");
 
 

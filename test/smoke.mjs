@@ -17,7 +17,7 @@ const mf = new Miniflare({
   // Keep the emulator date within the pinned workerd version; production keeps its newer date.
   compatibilityDate: "2026-08-06",
   d1Databases: { DB: "smoke-db" },
-  r2Buckets: ["ITEM_IMAGES"],
+  r2Buckets: ["ITEM_IMAGES","BACKUP_STORAGE"],
   bindings: { ADMIN_EMAILS: "admin@example.org", RESEND_API_KEY: "re_test", RESEND_FROM_EMAIL: "Gmach Berega <verify@example.org>", SUPPORT_EMAIL: "support@example.org", DATA_ENCRYPTION_KEY: "test-only-private-data-key-123456789" },
   serviceBindings: { RESEND_SERVICE: async request => { sentEmails.push(await request.json()); return Response.json({ id: crypto.randomUUID() }); } }
 });
@@ -322,7 +322,7 @@ try {
   const backupKey = `_system-backups/daily/test-${backupId}.json`;
   const backupText = JSON.stringify({ version: 2, tables: { users: [{ id: "example" }] }, r2Manifest: [] });
   const backupChecksum = createHash("sha256").update(backupText).digest("base64url");
-  const images = await mf.getR2Bucket("ITEM_IMAGES");
+  const images = await mf.getR2Bucket("BACKUP_STORAGE");
   await images.put(backupKey, backupText);
   await db.prepare("INSERT INTO backup_runs(id,status,backup_type,started_at,manifest_json) VALUES(?,'completed','scheduled',?,?)")
     .bind(backupId, new Date().toISOString(), JSON.stringify({ storageKey: backupKey, checksum: backupChecksum, tables: ["users"] })).run();
@@ -332,11 +332,28 @@ try {
   await images.put(backupKey, backupText + "corruption");
   result = await request(`/api/admin/backups/${backupId}/validate`, { method: "POST", cookie: adminCookie, body: {} });
   assert.notEqual(result.response.status, 200, "Corrupt backups must fail validation");
-  result = await request("/api/admin/backups", { method: "POST", cookie: adminCookie, body: {} });
-  assert.equal(result.response.status, 200, JSON.stringify(result.data));
-  result = await request(`/api/admin/backups/${result.data.backup.id}/validate`, { method: "POST", cookie: adminCookie, body: {} });
-  assert.equal(result.response.status, 200, JSON.stringify(result.data));
-  assert.equal(result.data.validation.status, "success");
+  // Archive metadata drives health even when legacy internal backups have failed.
+  const fullStorage=await mf.getR2Bucket("BACKUP_STORAGE");
+  const fullKey="backups/gmach-full-20261008T062808Z.zip",previousKey="backups/gmach-full-20261007T003000Z.zip",fullBytes="archive fixture";
+  const fullChecksum=createHash("sha256").update(fullBytes).digest("hex");
+  const pointer={key:fullKey,sha256:fullChecksum,size:fullBytes.length,updated_at:new Date().toISOString()};
+  await fullStorage.put(fullKey,fullBytes);await fullStorage.put(previousKey,fullBytes);
+  await fullStorage.put("CURRENT.json",JSON.stringify(pointer));
+  await fullStorage.put("PREVIOUS.json",JSON.stringify({...pointer,key:previousKey}));
+  await fullStorage.put("STATUS.json",JSON.stringify({status:"success",last_success_at:pointer.updated_at}));
+  await fullStorage.put("VERIFY.json",JSON.stringify({status:"success",key:fullKey,sha256:fullChecksum,verified_at:pointer.updated_at}));
+  for(const type of ["backup_failed","backup_stale","backup_restore_failed"]){await db.prepare("INSERT INTO system_alerts(id,alert_type,severity,details_json) VALUES(?,?,'critical','{}')").bind(crypto.randomUUID(),type).run()}
+  result=await request("/api/admin/operations/health",{cookie:adminCookie});
+  assert.equal(result.response.status,200,JSON.stringify(result.data));assert.equal(result.data.latestBackup.source,"github-archive");assert.equal(result.data.latestBackup.status,"completed");assert.equal(result.data.latestRestoreDrill.status,"success");assert.ok(!result.data.warnings.includes("backup"));assert.ok(!result.data.alerts.some(a=>["backup_failed","backup_stale","backup_restore_failed"].includes(a.alert_type)));
+  result=await request("/api/admin/backups/archive-status",{cookie:adminCookie});assert.equal(result.response.status,200);assert.equal(result.data.current.key,fullKey);assert.equal(result.data.previous.key,previousKey);
+  for(const slot of ["current","previous"]){result=await request("/api/admin/backups/archive/"+slot,{cookie:adminCookie});assert.equal(result.response.status,200);assert.equal(result.response.headers.get("Content-Type"),"application/zip");assert.equal(result.data,fullBytes)}
+  result=await request("/api/admin/backups/archive/current");assert.ok([401,403].includes(result.response.status),"Full archives must remain private");
+  const beforeInternalBackup=await db.prepare("SELECT COUNT(*) AS n FROM backup_runs").first();
+  for(const path of ["/api/admin/backups","/api/admin/backups/full"]){
+    result = await request(path, { method: "POST", cookie: adminCookie, body: {} });
+    assert.equal(result.response.status,410,"Internal backup creation must be disabled");
+  }
+  assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM backup_runs").first()).n,beforeInternalBackup.n,"Disabled routes must not create backup records");
 
   result = await request("/api/admin/site-settings", { cookie: adminCookie });
   assert.equal(result.response.status, 200);

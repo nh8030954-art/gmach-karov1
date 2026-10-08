@@ -1,3 +1,4 @@
+import { readArchiveBackup } from "./archive-backup.js";
 
 const SESSION_COOKIE="gmach_session";
 class DistributionError extends Error{constructor(status,message){super(message);this.status=status}}
@@ -128,14 +129,13 @@ async function performRestoreDrill(env,backupId,actorId=null){
 async function releaseReadiness(request,env){
   await requireAdmin(request,env);
   const now=Date.now();
-  const [backup,drill,validation,errors,alerts,urgent]=await Promise.all([
-    env.DB.prepare("SELECT * FROM backup_runs WHERE status='completed' ORDER BY COALESCE(finished_at,completed_at,created_at) DESC LIMIT 1").first().catch(()=>null),
-    env.DB.prepare("SELECT * FROM restore_drills ORDER BY started_at DESC LIMIT 1").first().catch(()=>null),
-    env.DB.prepare("SELECT * FROM restore_validations ORDER BY started_at DESC LIMIT 1").first().catch(()=>null),
+  const archive=await readArchiveBackup(env,now);
+  const [errors,alerts,urgent]=await Promise.all([
     env.DB.prepare("SELECT COUNT(*) AS count FROM server_errors WHERE resolved_at IS NULL AND created_at>=datetime('now','-24 hours')").first().catch(()=>({count:0})),
     env.DB.prepare("SELECT COUNT(*) AS count FROM system_alerts WHERE resolved_at IS NULL AND severity IN ('warning','critical')").first().catch(()=>({count:0})),
     env.DB.prepare("SELECT COUNT(*) AS count FROM support_tickets WHERE status!='closed' AND priority='urgent'").first().catch(()=>({count:0}))
   ]);
+  const backup=archive.latestBackup,drill=archive.latestVerification;
   const backupAgeHours=backup?Math.round((now-Date.parse(backup.finished_at||backup.completed_at||backup.created_at))/360000)/10:null;
   const checks={
     email:Boolean(env.RESEND_API_KEY),
@@ -163,7 +163,7 @@ async function releaseReadiness(request,env){
   if(checks.openAlerts>0)warnings.push("openAlerts");
   if(checks.urgentSupport>0)warnings.push("urgentSupport");
   const status=blockers.length?"blocked":warnings.length?"warning":"ready";
-  const payload={status,checks,blockers,warnings,latestBackup:backup,latestRestoreDrill:drill,latestValidation:validation,generatedAt:new Date().toISOString()};
+  const payload={status,checks,blockers,warnings,latestBackup:backup,latestRestoreDrill:drill,latestValidation:archive.latestVerification,generatedAt:new Date().toISOString()};
   await env.DB.prepare("INSERT INTO release_readiness_snapshots(id,status,payload_json) VALUES(?,?,?)").bind(crypto.randomUUID(),status,JSON.stringify(payload)).run().catch(()=>{});
   return json(payload);
 }
@@ -186,13 +186,10 @@ export async function runDistributionCompletionMaintenance(env){
   if(Number(e?.count||0)>=5)await ensureAlert(env,"server_error_spike","critical",{countLastHour:Number(e.count)});else await env.DB.prepare("UPDATE system_alerts SET resolved_at=? WHERE alert_type='server_error_spike' AND resolved_at IS NULL").bind(new Date().toISOString()).run().catch(()=>{});
   const u=await env.DB.prepare("SELECT COUNT(*) AS count FROM support_tickets WHERE priority='urgent' AND status!='closed' AND updated_at<datetime('now','-2 hours')").first().catch(()=>({count:0}));
   if(Number(u?.count||0)>0)await ensureAlert(env,"urgent_support_waiting","warning",{urgentWaiting:Number(u.count)});
-  const latestBackup=await env.DB.prepare("SELECT id,COALESCE(finished_at,completed_at,created_at) AS finished FROM backup_runs WHERE status='completed' ORDER BY finished DESC LIMIT 1").first().catch(()=>null);
-  if(!latestBackup||Date.now()-Date.parse(latestBackup.finished)>30*3600000)await ensureAlert(env,"backup_stale","critical",{latestBackup:latestBackup?.finished||null});
-  else await env.DB.prepare("UPDATE system_alerts SET resolved_at=? WHERE alert_type='backup_stale' AND resolved_at IS NULL").bind(new Date().toISOString()).run().catch(()=>{});
+  // Full-archive freshness and alerts are monitored by launch-readiness maintenance.
   if(!env.BACKUP_STORAGE)await ensureAlert(env,"backup_not_separate","warning",{message:"BACKUP_STORAGE binding is missing"});
   else await env.DB.prepare("UPDATE system_alerts SET resolved_at=? WHERE alert_type='backup_not_separate' AND resolved_at IS NULL").bind(new Date().toISOString()).run().catch(()=>{});
-  const lastDrill=await env.DB.prepare("SELECT finished_at,started_at FROM restore_drills WHERE status='success' ORDER BY COALESCE(finished_at,started_at) DESC LIMIT 1").first().catch(()=>null);
-  if(latestBackup&&(!lastDrill||Date.now()-Date.parse(lastDrill.finished_at||lastDrill.started_at)>30*86400000))try{await performRestoreDrill(env,latestBackup.id,null)}catch{}
+  // Archive verification is performed by GitHub; internal restore drills are disabled.
   await deliverOpenAlerts(env);
 }
 export async function handleDistributionCompletion(request,env,ctx,url){try{const method=request.method.toUpperCase(),path=url.pathname;let m;if(method==="GET"&&path==="/api/search/branches")return branchSearch(env,url);if(method==="GET"&&path==="/api/admin/support-tickets")return adminSupportList(request,env,url);if(method==="GET"&&path==="/api/admin/support/admins")return admins(request,env);if(method==="GET"&&(m=path.match(/^\/api\/admin\/support-tickets\/([^/]+)$/)))return adminSupportDetail(request,env,decodeURIComponent(m[1]));if(method==="POST"&&(m=path.match(/^\/api\/admin\/support-tickets\/([^/]+)\/messages$/)))return adminSupportReply(request,env,decodeURIComponent(m[1]));if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/support-tickets\/([^/]+)$/)))return adminSupportUpdate(request,env,decodeURIComponent(m[1]));if(path==="/api/admin/server-errors"&&(method==="GET"||method==="PATCH"))return serverErrors(request,env,url);if(method==="GET"&&path==="/api/admin/release-readiness")return releaseReadiness(request,env);if(method==="POST"&&(m=path.match(/^\/api\/admin\/backups\/([^/]+)\/restore-drill$/)))return runRestoreDrill(request,env,decodeURIComponent(m[1]));if(method==="POST"&&path==="/api/admin/release-readiness/test-alert")return testOperationalAlert(request,env);return null}catch(e){if(e instanceof DistributionError)return json({error:e.message},e.status);throw e}}
