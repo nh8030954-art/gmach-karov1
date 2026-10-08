@@ -1,11 +1,11 @@
-sha=e80743006272c0756cae270cd0ffceb73ff7a17e
+sha=d63ec2ab4504c71abce275a5d11935a949c425b4
 install=success
 syntax=success
 tests=success
 smoke=success
 live=success
-        at async getPublicOrganization (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:1816:56)
-        at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:402:26)
+        at async getPublicOrganization (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:1824:56)
+        at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:403:26)
   }
 }
 Public organization section unavailable {
@@ -15,13 +15,13 @@ Public organization section unavailable {
       at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:146:19)
       at async cloudflare-internal:d1-api:374:41
       ... 2 lines matching cause stack trace ...
-      at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:402:26) {
+      at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:403:26) {
     [cause]: Error: no such column: r.item_rating at offset 21: SQLITE_ERROR
         at D1DatabaseSessionAlwaysPrimary._sendOrThrow (cloudflare-internal:d1-api:147:24)
         at async cloudflare-internal:d1-api:374:41
         at async Promise.allSettled (index 1)
-        at async getPublicOrganization (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:1816:56)
-        at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:402:26)
+        at async getPublicOrganization (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:1824:56)
+        at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:403:26)
   }
 }
 Community chat retention static release gate passed.
@@ -33,8 +33,8 @@ Full requirements regression extensions passed.
 remaining-features Error: Backup checksum mismatch
     at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:175:41)
     at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:365:91)
-    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:998:37)
-    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:402:26)
+    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:1006:37)
+    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:403:26)
 Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-08T10:42:34.860Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-08T15:46:56.930Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
