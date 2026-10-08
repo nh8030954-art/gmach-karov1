@@ -97,7 +97,7 @@
     $("#gmach-subcategory-fieldset").disabled=!category;
     if(!category){host.innerHTML='<p>'+escapeHTML(pickupText("בחרו קודם קטגוריה","Choose a category first"))+'</p>';return;}
     const children=(state.categoryCatalog||[]).filter(row=>row.parent_id===parent?.id);
-    const options=[{id:"__all__",name_he:"כל הקטגוריה",name_en:"Entire category"},...children];
+    const options=[{id:"__all__",name_he:"הכל",name_en:"All"},...children];
     host.innerHTML=options.map(row=>'<label class="gmach-subcategory-choice"><input type="checkbox" value="'+escapeHTML(row.id)+'" '+(selected.includes(row.id)?'checked':'')+'><span>'+escapeHTML(document.documentElement.lang==="en"?(row.name_en||row.name_he):row.name_he)+'</span></label>').join("");
     validateGmachSubcategoryForm();
   }

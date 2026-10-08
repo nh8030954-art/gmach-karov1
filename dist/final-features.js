@@ -59,7 +59,7 @@ async function openWizard(){
     const form=$("#gmach-wizard",d);
     if(step===4){
       const primary=form.elements.primaryCategory,sub=form.elements.subcategories;
-      const populate=selected=>{const parent=categoryRows.find(c=>!c.parent_id&&(c.name_he===primary.value||c.id===primary.value));sub.disabled=!primary.value;sub.innerHTML=[{id:"__all__",name_he:"כל הקטגוריה"},...categoryRows.filter(c=>c.parent_id===parent?.id)].map(c=>`<option value="${esc(c.id)}" ${selected.includes(c.id)?"selected":""}>${esc(c.name_he)}</option>`).join("");};
+      const populate=selected=>{const parent=categoryRows.find(c=>!c.parent_id&&(c.name_he===primary.value||c.id===primary.value));sub.disabled=!primary.value;sub.innerHTML=[{id:"__all__",name_he:"הכל"},...categoryRows.filter(c=>c.parent_id===parent?.id)].map(c=>`<option value="${esc(c.id)}" ${selected.includes(c.id)?"selected":""}>${esc(c.name_he)}</option>`).join("");};
       let previous=Array.isArray(payload.subcategories)?payload.subcategories:[];populate(previous);
       primary.onchange=()=>{previous=[];populate([])};
       sub.onchange=()=>{const current=[...sub.selectedOptions].map(o=>o.value);if(current.includes("__all__")&&current.length>1){if(previous.includes("__all__"))sub.querySelector('[value="__all__"]').selected=false;else [...sub.options].forEach(o=>o.selected=o.value==="__all__");}previous=[...sub.selectedOptions].map(o=>o.value);};
