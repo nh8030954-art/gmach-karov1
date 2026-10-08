@@ -1495,3 +1495,10 @@ html.reduce-motion .new-initiative-banner{animation:none}
 .organization-service-summary{margin:18px 0 28px;padding:16px 0;border-top:1px solid #dce5e6;border-bottom:1px solid #dce5e6}
 .organization-service-summary p{margin:6px 0}
 @media(max-width:600px){.organization-detail .contact-action{flex:1 1 140px;min-width:0}.organization-detail .gmach-contact-section{margin:20px 0}}
+
+.gmach-subcategory-options{display:flex;flex-wrap:wrap;gap:10px}
+#gmach-subcategory-fieldset{border:1px solid #dce5e3;border-radius:16px;padding:16px}
+#gmach-subcategory-fieldset legend{font-weight:700;padding:0 8px}
+.gmach-subcategory-choice{display:flex!important;align-items:center;gap:8px;padding:10px 14px;border:1px solid #dce5e3;border-radius:12px;cursor:pointer;background:#fff}
+.gmach-subcategory-choice:has(input:checked){background:#eaf6f3;border-color:#237f7d;color:#185e5d}
+.gmach-subcategory-choice input{width:20px!important;height:20px!important;min-height:0;margin:0;accent-color:#237f7d}

@@ -1,4 +1,9 @@
 window.GmachEnglish = Object.freeze({
+"קטגוריות משנה (חובה)":"Subcategories (required)",
+"אפשר לבחור כמה קטגוריות משנה או כל הקטגוריה.":"Choose several subcategories or the entire category.",
+"כל הקטגוריה":"Entire category",
+"יש לבחור לפחות קטגוריית משנה אחת או כל הקטגוריה":"Choose at least one subcategory or the entire category",
+
 "איך מתאמים קבלת הפריט?":"How is item pickup arranged?",
 "ניהול בקשות ומלאי באתר":"Manage requests and stock on the site",
 "תיאום ישיר עם הגמ״ח":"Contact the gmach directly",

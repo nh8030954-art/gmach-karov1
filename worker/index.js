@@ -1,3 +1,4 @@
+import { validateOrganizationSubcategories, organizationSubcategories, organizationSubcategoriesStatement } from "./organization-subcategories.js";
 import { itemManagementMode, directItemGuard, ensureItemManagementModes } from "./item-modes.js";
 import { ensureContactPreferences, getContactPreferences, contactPreferencesInput, contactPreferencesStatement, contactView } from "./contact-preferences.js";
 import { ensureOrganizationChats, isOrganizationChat, chatMessageTable } from "./organization-chats.js";
@@ -723,6 +724,13 @@ async function routeApi(request, env, ctx, url) {
     });
   }
 
+  const subcategoriesRoute=path.match(/^\/api\/organizations\/([^/]+)\/subcategories$/);
+  if(subcategoriesRoute&&method==="GET"){
+    const user=await requireUser(request,env),id=decodeURIComponent(subcategoriesRoute[1]);
+    const org=await env.DB.prepare("SELECT o.id,c.id AS category_id FROM organizations o JOIN categories c ON (c.id=o.primary_category OR c.name_he=o.primary_category) AND c.parent_id IS NULL WHERE o.id=? AND o.deleted_at IS NULL AND (o.owner_id=? OR ?='admin')").bind(id,user.id,user.role).first();
+    if(!org)throw new HttpError(404,"הגמ״ח לא נמצא");
+    return json({subcategories:await organizationSubcategories(env,id,org.category_id)});
+  }
   const contactSettingsRoute=path.match(/^\/api\/organizations\/([^/]+)\/contact-settings$/);
   if(contactSettingsRoute&&["GET","PATCH"].includes(method)){
     const user=await requireUser(request,env),id=decodeURIComponent(contactSettingsRoute[1]);
@@ -1991,6 +1999,8 @@ async function organizationServiceEligibility(env,id,user) {
 function parseContactSettings(value,existing){try{return contactPreferencesInput(value,existing)}catch(e){throw new HttpError(e.status||400,e.message)}}
 function parseServiceRange(body,existing) {try{return serviceRangeInput(body,existing)}catch(e){throw new HttpError(e.status||400,e.message)}}
 
+async function parseOrganizationSubcategories(env,parentId,selections){try{return await validateOrganizationSubcategories(env,parentId,selections)}catch(error){throw new HttpError(error.status||500,error.message)}}
+
 async function createOrganization(request, env) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
@@ -1998,8 +2008,9 @@ async function createOrganization(request, env) {
   const serviceRange=parseServiceRange(body);
   const contactSettings=parseContactSettings(body.contactSettings);
   const category = cleanText(body.primaryCategory, 2, 40, "תחום");
-  const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
+  const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND parent_id IS NULL AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
   if (!categoryRow) throw new HttpError(400, "נא לבחור תחום תקין");
+  const subcategories=await parseOrganizationSubcategories(env,categoryRow.id,body.subcategories);
   const values = {
     name: cleanText(body.name, 2, 90, "שם הגמ״ח"),
     city: cleanText(body.city, 2, 80, "עיר"),
@@ -2016,11 +2027,12 @@ async function createOrganization(request, env) {
       .bind(id, user.id, values.name, category, values.city, values.neighborhood, values.description, values.address, null, values.serviceArea, values.hoursJson, values.pickupOptions, new Date().toISOString(),["private","family","community","nonprofit","business","authority"].includes(body.organizationType)?body.organizationType:"private"),
     serviceRangeStatement(env,id,serviceRange),
     contactPreferencesStatement(env,id,contactSettings),
+    await organizationSubcategoriesStatement(env,id,categoryRow.id,subcategories),
     env.DB.prepare("INSERT INTO organization_contacts (organization_id,contact_phone) VALUES (?,?)").bind(id, values.phone),
     env.DB.prepare("INSERT INTO organization_serial_codes(code,organization_id) SELECT MAX(150,COALESCE(MAX(code),149)+1),? FROM organization_serial_codes").bind(id)
   ]);
   const serial=await env.DB.prepare("SELECT code FROM organization_serial_codes WHERE organization_id=?").bind(id).first();
-  return json({ organization: { id, ...values, gmachCode:serial.code, primaryCategory: category, status: "approved" } }, 201);
+  return json({ organization: { id, ...values, gmachCode:serial.code, subcategories,primaryCategory: category, status: "approved" } }, 201);
 }
 
 async function updateOrganization(request, env, id) {
@@ -2038,8 +2050,9 @@ async function updateOrganization(request, env, id) {
   }
 
   const category = cleanText(body.primaryCategory, 2, 40, "תחום");
-  const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
+  const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND parent_id IS NULL AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
   if (!categoryRow) throw new HttpError(400, "נא לבחור תחום תקין");
+  const subcategories=body.subcategories===undefined?await organizationSubcategories(env,id,categoryRow.id):await parseOrganizationSubcategories(env,categoryRow.id,body.subcategories);
   const values = {
     name: cleanText(body.name, 2, 90, "שם הגמ״ח"),
     city: cleanText(body.city, 2, 80, "עיר"),
@@ -2059,9 +2072,10 @@ async function updateOrganization(request, env, id) {
       .bind(values.name, category, values.city, values.neighborhood, values.description,values.address,null,values.serviceArea,values.hoursJson,values.pickupOptions,now,["private","family","community","nonprofit","business","authority"].includes(body.organizationType)?body.organizationType:(existing.organization_type||"private"),status, now, id),
     serviceRangeStatement(env,id,serviceRange),
     contactPreferencesStatement(env,id,contactSettings),
+    await organizationSubcategoriesStatement(env,id,categoryRow.id,subcategories),
     env.DB.prepare("UPDATE organization_contacts SET contact_phone = ? WHERE organization_id = ?").bind(values.phone, id)
   ]);
-  return json({ organization: { id, ...values, primaryCategory: category, status, hidden: Boolean(existing.is_hidden) } });
+  return json({ organization: { id, ...values, subcategories,primaryCategory: category, status, hidden: Boolean(existing.is_hidden) } });
 }
 
 function positiveInt(value,fallback,min,max,label){ const n=value===""||value==null?fallback:Number(value); if(!Number.isInteger(n)||n<min||n>max) throw new HttpError(400,`${label} אינו תקין`); return n; }

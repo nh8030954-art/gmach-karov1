@@ -23,6 +23,7 @@ const mf = new Miniflare({
 });
 
 async function request(path, { method = "GET", body, cookie, form, origin = base } = {}) {
+  if(method==="POST"&&path==="/api/organizations"&&body&&!Object.hasOwn(body,"subcategories"))body={...body,subcategories:["__all__"]};
   const headers = new Headers();
   if (!["GET", "HEAD"].includes(method)) {
     headers.set("Origin", origin);
@@ -358,6 +359,22 @@ try {
   result = await request("/api/organizations", { method: "POST", cookie: adminCookie, body: { name: "גמ״ח בדיקה", primaryCategory: "אירועים", city: "ירושלים", neighborhood: "מרכז", address: "רחוב הבדיקה 1, ירושלים", serviceArea: "ירושלים והסביבה", hours: { "ראשון": "09:00–17:00", "שני": "09:00–17:00" }, description: "ציוד חינמי לאירועים קהילתיים ולשמחות משפחתיות.", phone: "050-1234567" } });
   assert.equal(result.response.status, 201);
   const organizationId = result.data.organization.id;
+  const organizationFixture={name:'בדיקת קטגוריות משנה',primaryCategory:'אירועים',city:'ירושלים',neighborhood:'מרכז',address:'רחוב הבדיקה 1, ירושלים',serviceArea:'ירושלים והסביבה',hours:{ראשון:'09:00–17:00'},description:'ציוד לאירועים קהילתיים ולשמחות משפחתיות.',phone:'050-1234567'};
+  const eventChildren=(await db.prepare("SELECT c.id FROM categories c JOIN categories p ON p.id=c.parent_id WHERE p.name_he='אירועים' AND c.status='active' ORDER BY c.id LIMIT 2").all()).results.map(row=>row.id);
+  assert.equal(eventChildren.length,2);
+  for(const subcategories of [undefined,[],['unknown'],['__all__',eventChildren[0]]])assert.equal((await request('/api/organizations',{method:'POST',cookie:adminCookie,body:{...organizationFixture,subcategories}})).response.status,400,'Missing or invalid subcategory selection is rejected');
+  let subResult=await request('/api/organizations',{method:'POST',cookie:adminCookie,body:{...organizationFixture,subcategories:eventChildren}});assert.equal(subResult.response.status,201,JSON.stringify(subResult.data));
+  const subOrgId=subResult.data.organization.id;
+  assert.deepEqual((await request(`/api/organizations/${subOrgId}/subcategories`,{cookie:adminCookie})).data.subcategories,eventChildren);
+  assert.equal((await request(`/api/organizations/${subOrgId}/subcategories`)).response.status,401,'Settings require sign-in');
+  const otherCategory=(await db.prepare("SELECT c.id FROM categories c JOIN categories p ON p.id=c.parent_id WHERE p.name_he!='אירועים' AND c.status='active' LIMIT 1").first()).id;
+  assert.equal((await request(`/api/organizations/${subOrgId}`,{method:'PATCH',cookie:adminCookie,body:{...organizationFixture,subcategories:[otherCategory]}})).response.status,400,'Subcategory must belong to the chosen parent');
+  assert.deepEqual((await request(`/api/organizations/${subOrgId}/subcategories`,{cookie:adminCookie})).data.subcategories,eventChildren,'Rejected edits do not overwrite selections');
+  assert.equal((await request(`/api/organizations/${subOrgId}`,{method:'PATCH',cookie:adminCookie,body:{...organizationFixture,subcategories:['__all__']}})).response.status,200);
+  assert.deepEqual((await request(`/api/organizations/${subOrgId}/subcategories`,{cookie:adminCookie})).data.subcategories,['__all__']);
+  await db.prepare('DELETE FROM organizations WHERE id=?').bind(subOrgId).run();
+  assert.equal((await db.prepare('SELECT COUNT(*) n FROM organization_subcategory_preferences WHERE organization_id=?').bind(subOrgId).first()).n,0,'Preference rows are deleted with the organization');
+
   const unconfirmed=await mf.dispatchFetch(base+`/api/admin/organizations/${organizationId}`,{method:'PATCH',headers:{Cookie:adminCookie,Origin:base,'Content-Type':'application/json'},body:JSON.stringify({name:'ללא אישור'})});
   assert.equal(unconfirmed.status,428,'Gmach changes expose a usable confirmation response instead of a server error');
   const tokenCounter=Buffer.alloc(8);tokenCounter.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));const tokenDigest=createHmac('sha1',Buffer.from(bytes)).update(tokenCounter).digest(),tokenOffset=tokenDigest.at(-1)&15;
