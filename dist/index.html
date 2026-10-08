@@ -28,7 +28,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=block" rel="stylesheet">
   <link rel="icon" type="image/jpeg" href="/gmach-berega-logo.jpg">
   <link rel="stylesheet" href="/styles.css?v=20261008-subcategory-refresh">
-  <link rel="stylesheet" href="/motion.css?v=20261004-names-header">
+  <link rel="stylesheet" href="/motion.css?v=20261008-gmach-visibility">
 
 
 
@@ -234,7 +234,8 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
 
       <section class="gmachim-section section-shell" id="gmachim" aria-labelledby="gmachim-title">
         <div class="section-heading"><div><span class="section-kicker">קהילה פעילה</span><h2 id="gmachim-title">גמ״חים ברחבי הארץ</h2><p>דירוגים ממשתמשים, מידע עדכני ופריטים זמינים.</p></div></div>
-        <div class="organizations-grid" id="organizations-grid"></div>
+        <div class="organizations-grid" id="organizations-grid" aria-live="polite"></div>
+        <div class="catalog-footer"><button class="button button-secondary" id="load-more-organizations-button" type="button" aria-controls="organizations-grid" hidden>טעינת גמ״חים נוספים</button></div>
       </section>
 
       <section class="steps-section" id="how-it-works" aria-labelledby="steps-title">
@@ -668,10 +669,10 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
   <script src="/account-tour.js?v=20261004-hebrew-desktop-tour" defer></script>
   <script src="/admin-gmachs.js?v=20261005-complete" defer></script>
   <script src="/contact-preferences.js?v=20261008-address-dedupe" defer></script>
-  <script src="/app.js?v=20261008-address-dedupe" defer></script>
+  <script src="/app.js?v=20261008-gmach-pagination" defer></script>
   <script src="/platform-completion.js?v=20261005-gmach-controls" defer></script>
   <script src="/final-features.js?v=20261008-subcategory-refresh" defer></script>
-  <script src="/i18n-en.js?v=20261008-subcategory-refresh" defer></script>
+  <script src="/i18n-en.js?v=20261008-gmach-pagination" defer></script>
   <script src="/i18n-errors.js?v=20261003-2710" defer></script>
   <script src="/remaining-features.js?v=20261008-direct-items" defer></script>
   <script src="/requirements-expansion.js?v=20261008-direct-items" defer></script>
@@ -683,7 +684,7 @@ html[lang="en"].route-dashboard-boot #dashboard-content:empty::before{content:"L
   <script src="/privacy-availability.js?v=20261004-names-header" defer></script>
   <script src="/admin-control-center.js?v=20261005-complete" defer></script>
   <script src="/user-content-translation.js?v=20261004-names-header" defer></script>
-  <script src="/motion.js?v=20261003-2710" defer></script>
+  <script src="/motion.js?v=20261008-gmach-visibility" defer></script>
 
 
 

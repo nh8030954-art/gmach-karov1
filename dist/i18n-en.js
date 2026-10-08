@@ -1,4 +1,5 @@
 window.GmachEnglish = Object.freeze({
+"טעינת גמ״חים נוספים":"Load more gmachs",
 "קטגוריות משנה (חובה)":"Subcategories (required)",
 "אפשר לבחור כמה קטגוריות משנה או כל הקטגוריה.":"Choose several subcategories or the entire category.",
 "כל הקטגוריה":"Entire category",

@@ -29,7 +29,7 @@
 
   const state = {
     serverAvailable: false, items: [], filteredItems: [], favorites: new Set(), user: null, selectedItem: null,
-    visibleCount: 8, activeCategory: "", compareIds: new Set(), pendingAction: null, dashboardTab: "requests", myOrganizations: [], dashboard: null, authMode: "login",
+    visibleCount: 8, visibleOrganizationCount: 6, activeCategory: "", compareIds: new Set(), pendingAction: null, dashboardTab: "requests", myOrganizations: [], dashboard: null, authMode: "login",
     editingOrganizationId: null, editingItemId: null, chatRequestId: null, chatTimer: null, notifications: [],
     customizations: new Map(), visualEditMode: false, selectedEditable: null, pendingVerificationEmail: "", supportEmail: "",
     discovery: { categories: [], cities: [], suggestions: [], organizations: [] }, categoryAliases: [], categoryCatalog: [], pendingCommunityItem: null, viewMode: "list"
@@ -321,7 +321,7 @@
     try { const data = await api("/api/public-config"); state.supportEmail = data.supportEmail || ""; } catch { /* Optional public configuration. */ }
   }
   async function loadDiscovery(query = "") {
-    try { const data = await api(`/api/discovery${query ? `?q=${encodeURIComponent(query)}` : ""}`); state.discovery = data; renderDiscovery(); state.serverAvailable = true; $("#connection-banner").hidden = true; }
+    try { const data = await api(`/api/discovery${query ? `?q=${encodeURIComponent(query)}` : ""}`); state.discovery = data; state.visibleOrganizationCount = 6; renderDiscovery(); state.serverAvailable = true; $("#connection-banner").hidden = true; }
     catch (error) { console.warn("Discovery unavailable", error); }
   }
   async function loadCategoryAliases(){
@@ -376,8 +376,14 @@
     const suggestionValues=[...new Set([...(state.discovery.suggestions||[]).filter(value=>english?/^[^\u0590-\u05ff]+$/.test(value):/[\u0590-\u05ff]/.test(value)),...suggestedCategories].filter(Boolean))].slice(0,120);
     $("#search-suggestions").innerHTML = suggestionValues.map(value => `<option value="${escapeHTML(value)}"></option>`).join("");
     $$("[data-category]").forEach(button => { const count = Number(state.discovery.categories?.find(row => row.category === button.dataset.category)?.count || 0); const small = $("small", button); if (small && button.dataset.category) small.textContent = `${count} ${english ? (count === 1 ? "item" : "items") : (count === 1 ? "פריט" : "פריטים")}`; });
-    $("#organizations-grid").innerHTML = (state.discovery.organizations || []).map(org => `<article class="organization-card">${org.rating ? `<div class="organization-card-rating">${ratingStars(org.rating,{size:"gmach-card-top",count:Number(org.review_count||0)})}</div>` : '<div class="organization-card-rating organization-card-rating-empty">חדש — ללא דירוגים</div>'}<div><h3 class="organization-name" translate="no">${window.GmachOriginalName(org.name)}</h3><p>${escapeHTML(org.description)}</p></div><ul><li>📍 ${escapeHTML(org.city)}</li><li>📦 ${Number(org.item_count || 0)} ${Number(org.item_count || 0) === 1 ? "פריט" : "פריטים"}</li></ul><button class="button button-secondary button-small" type="button" data-open-organization="${escapeHTML(org.id)}">צפייה בגמ״ח</button></article>`).join("") || '<div class="dashboard-empty"><strong>עדיין אין גמ״חים</strong><p>הקהילה נבנית בימים אלה.</p></div>';
-    $$('[data-open-organization]').forEach(button => {
+    renderHomeOrganizations();
+  }
+  function renderHomeOrganizations() {
+    $("#organizations-grid").innerHTML = (state.discovery.organizations || []).slice(0,state.visibleOrganizationCount).map(org => `<article class="organization-card">${org.rating ? `<div class="organization-card-rating">${ratingStars(org.rating,{size:"gmach-card-top",count:Number(org.review_count||0)})}</div>` : '<div class="organization-card-rating organization-card-rating-empty">חדש — ללא דירוגים</div>'}<div><h3 class="organization-name" translate="no">${window.GmachOriginalName(org.name)}</h3><p>${escapeHTML(org.description)}</p></div><ul><li>📍 ${escapeHTML(org.city)}</li><li>📦 ${Number(org.item_count || 0)} ${Number(org.item_count || 0) === 1 ? "פריט" : "פריטים"}</li></ul><button class="button button-secondary button-small" type="button" data-open-organization="${escapeHTML(org.id)}">צפייה בגמ״ח</button></article>`).join("") || '<div class="dashboard-empty"><strong>עדיין אין גמ״חים</strong><p>הקהילה נבנית בימים אלה.</p></div>';
+    const more=$("#load-more-organizations-button");
+    more.hidden=state.visibleOrganizationCount >= (state.discovery.organizations || []).length;
+    more.textContent=document.documentElement.lang==="en"?"Load more gmachs":"טעינת גמ״חים נוספים";
+    $$('#organizations-grid [data-open-organization]').forEach(button => {
       button.addEventListener("click", () => openOrganization(button.dataset.openOrganization));
       const card=button.closest(".organization-card");
       if(!card)return;
@@ -493,7 +499,7 @@
       try{const data=await api("/api/items/english-content?ids="+encodeURIComponent(pending.map(item=>item.id).join(",")));let changed=false;for(const english of data.items||[]){const row=state.items.find(item=>item.id===english.id);if(row&&english.englishStatus==="ready"){Object.assign(row,english);changed=true}}if(changed){saveCatalogCache(state.items);renderItems()}}catch{return}
     }
   }
-  window.addEventListener("gmach-language-change",()=>{renderItems();refreshCatalogEnglish()});
+  window.addEventListener("gmach-language-change",()=>{renderItems();renderHomeOrganizations();refreshCatalogEnglish()});
   function itemLoanCost(item){return (item.paymentMode||item.payment_mode)==="nominal"?(document.documentElement.lang==="en"?"Nominal fee":"תשלום סמלי"):(document.documentElement.lang==="en"?"No charge":"ללא תשלום")}
   function itemLoanCostExplanation(item){return item.costExplanation||item.cost_explanation||""}
   function syncItemLoanCostForm(){const nominal=$("#item-payment-mode").value==="nominal";$("#item-cost-explanation-row").hidden=!nominal;$("#item-cost-explanation").disabled=!nominal}
@@ -1464,7 +1470,7 @@
     ["#nav-community-board","#mobile-community-board"].forEach(selector=>$(selector).addEventListener("click",()=>openCommunityBoard(1)));
     $("#community-board-filter").addEventListener("submit",event=>{event.preventDefault();openCommunityBoard(1)});
     $("#filters-button").addEventListener("click", () => { const panel = $("#filter-panel"); panel.hidden = !panel.hidden; $("#filters-button").setAttribute("aria-expanded", String(!panel.hidden)); }); $("#clear-filters").addEventListener("click", resetFilters); $("#empty-clear-button").addEventListener("click", handleEmptyAction); $("#all-categories-button").addEventListener("click", () => { resetFilters(); $("#catalog").scrollIntoView({ behavior: "smooth" }); });
-    $$('[data-category]').forEach(button => button.addEventListener("click", () => { state.activeCategory = button.dataset.category; $("#category-filter").value = button.dataset.category; $("#hero-category-filter").value = button.dataset.category; updateCatalogSubcategories(); $$('[data-category]').forEach(other => other.classList.toggle("is-active", other === button)); applyFilters(); $("#catalog").scrollIntoView({ behavior: "smooth", block: "start" }); })); $("#load-more-button").addEventListener("click", () => { state.visibleCount += 8; renderItems(); });
+    $$('[data-category]').forEach(button => button.addEventListener("click", () => { state.activeCategory = button.dataset.category; $("#category-filter").value = button.dataset.category; $("#hero-category-filter").value = button.dataset.category; updateCatalogSubcategories(); $$('[data-category]').forEach(other => other.classList.toggle("is-active", other === button)); applyFilters(); $("#catalog").scrollIntoView({ behavior: "smooth", block: "start" }); })); $("#load-more-organizations-button").addEventListener("click", () => { state.visibleOrganizationCount += 6; renderHomeOrganizations(); }); $("#load-more-button").addEventListener("click", () => { state.visibleCount += 8; renderItems(); });
     $$('[data-close-dialog]').forEach(button => button.addEventListener("click", () => closeDialog(button.closest("dialog")))); $$("dialog").forEach(dialog => { dialog.addEventListener("click", event => { if (event.target === dialog) closeDialog(dialog); }); dialog.addEventListener("close", () => { if (dialog.id === "chat-dialog") { stopChatPolling(); state.chatRequestId = null; } if (dialog.id === "item-form-dialog") $("#item-gmach").disabled = false; if (!$("dialog[open]")) document.body.classList.remove("dialog-open"); }); }); $$('[data-auth-mode]').forEach(button => button.addEventListener("click", () => setAuthMode(button.dataset.authMode)));
 
     $("#auth-form").addEventListener("submit", async event => {

@@ -636,3 +636,6 @@ html.a11y-stop-motion .motion-reveal{opacity:1!important;transform:none!importan
   html:is([lang="en"],[lang="he"]) .header-actions{grid-column:2}
   html:is([lang="en"],[lang="he"]) .mobile-header-fill{grid-column:1 / -1;grid-row:2;justify-self:center;gap:16px!important}
 }
+
+/* Keep the full gmach list visible, including with a cached motion script. */
+#organizations-grid.motion-reveal{opacity:1;transform:none}

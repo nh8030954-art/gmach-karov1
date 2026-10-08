@@ -84,7 +84,8 @@
   const requestDraw=()=>{if(!state.raf)state.raf=requestAnimationFrame(draw)};
 
   const setupReveal=()=>{
-    const elements=[...document.querySelectorAll('.section-heading,.organizations-grid,.steps-grid,.gmach-callout')];
+    // The dynamic gmach grid can exceed the viewport; never hide it behind a reveal threshold.
+    const elements=[...document.querySelectorAll('.section-heading,.steps-grid,.gmach-callout')];
     if(stopped()){elements.forEach(el=>el.classList.add('is-visible'));return;}
     elements.forEach((el,index)=>{el.classList.add('motion-reveal');el.style.setProperty('--reveal-delay',`${Math.min(index%4,3)*55}ms`);});
     const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{
