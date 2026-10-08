@@ -680,8 +680,9 @@ try {
 
   result = await request("/api/notifications", { cookie: adminCookie });
   assert.equal(result.response.status, 200);
-  assert.equal(result.data.unread, 1);
-  assert.equal(result.data.notifications[0].request_id, requestId);
+  assert.equal(result.data.notifications.filter(n=>n.request_id===requestId&&!n.read_at).length,1);
+  assert.ok(result.data.notifications.some(n=>n.action_kind==="support"),"Admin bell includes support");
+  assert.ok(result.data.unread>=1);
 
   result = await request(`/api/loan-requests/${requestId}/messages`, { method: "POST", cookie: borrowerCookie, body: { message: "אפשר לאסוף בשעות הערב?" } });
   assert.equal(result.response.status, 201);

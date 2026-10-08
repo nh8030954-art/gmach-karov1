@@ -41,6 +41,7 @@ const sections=[
  ["backups",t("גיבויים","Backups")],
  ["exports",t("ייצוא נתונים","Data exports")]
 ];
+window.GmachAdminContentCenter=async section=>{await openCenter();document.querySelector(`[data-control-tab="${section}"]`)?.click()};
 async function openCenter(){
  const d=dialog(),tabs=$("[data-control-tabs]",d),body=$("[data-control-body]",d);
  tabs.innerHTML=sections.map(([id,label])=>'<button type="button" class="dashboard-tab" data-control-tab="'+id+'">'+esc(label)+'</button>').join("");

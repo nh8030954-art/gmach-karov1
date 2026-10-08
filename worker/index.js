@@ -1,3 +1,5 @@
+import { syncAdminBell, monitorGmachResearch } from './admin-alerts.js';
+import { handleGmachResearch } from './gmach-research.js';
 import { validateOrganizationSubcategories, organizationSubcategories, organizationSubcategoriesStatement } from "./organization-subcategories.js";
 import { itemManagementMode, directItemGuard, ensureItemManagementModes } from "./item-modes.js";
 import { ensureContactPreferences, getContactPreferences, contactPreferencesInput, contactPreferencesStatement, contactView } from "./contact-preferences.js";
@@ -466,7 +468,8 @@ export default {
         await ensureReviewBranchRatingSchema(env);
         await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env),ensureDistributionCompletionSchema(env),ensureNavigationAdminSchema(env),ensurePrivacyAvailabilitySchema(env),ensurePrivacyPurgeSchema(env),ensureCommunityChatSchema(env)]);
       }
-      await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env), runPrivacyPurgeMaintenance(env), runCommunityChatMaintenance(env)]);
+      await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), monitorGmachResearch(env),
+        runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env), runPrivacyPurgeMaintenance(env), runCommunityChatMaintenance(env)]);
     })());
   }
 };
@@ -692,6 +695,8 @@ async function routeApi(request, env, ctx, url) {
   const method = request.method.toUpperCase();
   const path = url.pathname;
   if (!["GET", "HEAD", "OPTIONS"].includes(method)) assertSameOrigin(request, url);
+  const researchResponse=await handleGmachResearch(request,env,url,requireAdmin);
+  if(researchResponse)return researchResponse;
   const orgChatResponse=await routeOrganizationChats(request,env,url);
   if(orgChatResponse)return orgChatResponse;
   if (method === "OPTIONS") return new Response(null, { status: 204 });
@@ -2972,10 +2977,12 @@ function assertSafeChatText(message){
 
 async function listNotifications(request, env) {
   const user = await requireUser(request, env);
+  const admin=user.role==="admin"&&Number(user.totp_enabled)===1;
+  if(admin)await syncAdminBell(env,user);
   const [items, unread] = await env.DB.batch([
-    env.DB.prepare(`SELECT id,type,title,body,request_id,read_at,created_at FROM notifications
-      WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`).bind(user.id),
-    env.DB.prepare("SELECT COUNT(*) AS count FROM notifications WHERE user_id = ? AND read_at IS NULL").bind(user.id)
+    env.DB.prepare(`SELECT n.id,n.type,n.title,n.body,n.request_id,n.read_at,n.created_at,l.kind AS action_kind,l.target_id AS action_target FROM notifications n LEFT JOIN admin_notification_links l ON l.notification_id=n.id
+      WHERE n.user_id = ? AND (?=1 OR l.notification_id IS NULL) ORDER BY n.created_at DESC LIMIT 50`).bind(user.id,admin?1:0),
+    env.DB.prepare("SELECT COUNT(*) AS count FROM notifications n LEFT JOIN admin_notification_links l ON l.notification_id=n.id WHERE n.user_id = ? AND n.read_at IS NULL AND (?=1 OR l.notification_id IS NULL)").bind(user.id,admin?1:0)
   ]);
   return json({ notifications: items.results, unread: Number(unread.results[0]?.count || 0) });
 }
@@ -3833,7 +3840,7 @@ async function deliverNotificationChannels(env){
     COALESCE(p.push,0) pref_push,COALESCE(p.digest,'immediate') digest,p.quiet_start,p.quiet_end
     FROM notifications n JOIN users u ON u.id=n.user_id
     LEFT JOIN notification_preferences p ON p.user_id=n.user_id AND p.notification_type=n.type
-    WHERE n.created_at>=datetime(?,'-4 days') AND u.deleted_at IS NULL
+    WHERE n.created_at>=datetime(?,'-4 days') AND n.id NOT LIKE 'admin:%' AND u.deleted_at IS NULL
       AND NOT EXISTS(SELECT 1 FROM notification_delivery_log l WHERE l.notification_id=n.id AND l.channel='email' AND l.status='sent')
     ORDER BY n.created_at LIMIT 100`).bind(nowIso).all().catch(()=>({results:[]}));
   for(const n of rows.results||[]){
@@ -3855,7 +3862,7 @@ async function deliverDailyDigests(env){
   const users=await env.DB.prepare(`SELECT DISTINCT u.id,u.email,u.preferred_language FROM users u JOIN notification_preferences p ON p.user_id=u.id WHERE p.digest='daily' AND p.email=1 AND u.deleted_at IS NULL`).all().catch(()=>({results:[]}));
   for(const user of users.results||[]){
     const done=await env.DB.prepare("SELECT id FROM notification_digests WHERE user_id=? AND digest_date=? AND status='sent'").bind(user.id,today).first();if(done)continue;
-    const items=await env.DB.prepare(`SELECT n.id,n.title,n.body,n.created_at FROM notifications n WHERE n.user_id=? AND n.created_at>=datetime('now','-4 days') AND NOT EXISTS(SELECT 1 FROM notification_delivery_log l WHERE l.notification_id=n.id AND l.channel='email' AND l.status='sent') ORDER BY n.created_at DESC LIMIT 30`).bind(user.id).all();
+    const items=await env.DB.prepare(`SELECT n.id,n.title,n.body,n.created_at FROM notifications n WHERE n.user_id=? AND n.id NOT LIKE 'admin:%' AND n.created_at>=datetime('now','-4 days') AND NOT EXISTS(SELECT 1 FROM notification_delivery_log l WHERE l.notification_id=n.id AND l.channel='email' AND l.status='sent') ORDER BY n.created_at DESC LIMIT 30`).bind(user.id).all();
     if(!(items.results||[]).length)continue;
     const en=user.preferred_language==="en",lang=en?"en":"he",accountUrl="https://gmach-berega.co.il/dashboard";
     const digestTemplate=await emailTemplateState(env,"daily_digest",lang);if(!digestTemplate||digestTemplate.enabled==null||Number(digestTemplate.enabled)!==1)continue;
