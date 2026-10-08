@@ -166,6 +166,12 @@ jobs:
       - name: Reconcile serialized unit loan states
         if: steps.targeted_reconcile.outputs.loan_states == 'true'
         run: npx wrangler d1 execute DB --remote --file migrations/0022_reconcile_loan_unit_states.sql
+      - name: Add mourning category and subcategories
+        run: |
+          if ! git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -qx "scripts/add-mourning-categories.sql"; then exit 0; fi
+          npx wrangler d1 execute DB --remote --file scripts/add-mourning-categories.sql
+          npx wrangler d1 execute DB --remote --command "SELECT id,parent_id,name_he FROM categories WHERE id='mourning' OR parent_id='mourning'" --json > mourning-categories-state.json
+          node -e "const rows=require('./mourning-categories-state.json')[0].results;if(rows.length!==9||!rows.some(r=>r.id==='mourning'&&r.parent_id===null))throw new Error('Mourning category verification failed');console.log(rows)"
       - name: Publish production Worker
         run: |
           for attempt in 1 2 3; do
