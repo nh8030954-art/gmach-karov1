@@ -1,6 +1,15 @@
 (() => {
   const t=(he,en)=>document.documentElement.lang==='en'?en:he;
   const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const formatAddress=(address,city)=>{
+    const clean=value=>String(value??'').trim().replace(/\s+/g,' ');
+    const a=clean(address),c=clean(city);
+    if(!a)return c;if(!c)return a;
+    const words=value=>value.normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/g,' ');
+    const aw=words(a),cw=words(c);
+    return cw&&(' '+aw+' ').includes(' '+cw+' ')?a:[a,c].join(', ');
+  };
+  window.GmachFormatAddress=formatAddress;
   const methods=[['phone','📞','התקשרות','Call'],['sms','💬','שליחת SMS','Send SMS'],['whatsapp','🟢','ווטסאפ','WhatsApp'],['email','✉️','אימייל','Email'],['address','📍','ניווט לכתובת','Directions'],['chat','🗨️','צ׳אט באתר','Website chat']];
   const icons={
     phone:'<path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 3.1 5.2 2 2 0 0 1 5.1 3h3a2 2 0 0 1 2 1.7l.4 2.8a2 2 0 0 1-.6 1.7L8.6 10.5a16 16 0 0 0 4.9 4.9l1.3-1.3a2 2 0 0 1 1.7-.6l2.8.4a2 2 0 0 1 1.7 2z"/>',
@@ -52,10 +61,10 @@
     if(!contact)return '';
     const channels=contact.channels||[],number=String(contact.phone||'').replace(/[^+\d]/g,''),digits=number.replace(/\D/g,''),international=digits.startsWith('0')?'972'+digits.slice(1):digits;
     const dial=digits.startsWith('0')?'+972'+digits.slice(1):digits.startsWith('972')?'+'+digits:number;
-    const links={phone:number?'tel:'+dial:null,sms:number?'sms:'+dial:null,whatsapp:digits?'https://wa.me/'+international:null,email:contact.email?'mailto:'+encodeURIComponent(contact.email):null,address:contact.address?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent([contact.address,contact.city].filter(Boolean).join(', ')):null};
+    const links={phone:number?'tel:'+dial:null,sms:number?'sms:'+dial:null,whatsapp:digits?'https://wa.me/'+international:null,email:contact.email?'mailto:'+encodeURIComponent(contact.email):null,address:contact.address?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(formatAddress(contact.address,contact.city)):null};
     const buttons=methods.filter(([key])=>channels.includes(key)&&(key==='chat'||contact.visible&&links[key])).map(([key,,he,en])=>{const content=`<span class="contact-action-icon">${icon(key)}</span><span>${esc(t(he,en))}</span>`,attrs=`class="contact-action" data-method="${key}"`;return key==='chat'?`<button type="button" ${attrs} data-contact-chat>${content}</button>`:`<a ${attrs} href="${esc(links[key])}" ${['whatsapp','address'].includes(key)?'target="_blank" rel="noopener noreferrer"':''}>${content}</a>`;}).join('');
     const hours=Object.entries(contact.hours||{}).sort(([a],[b])=>Number(a)-Number(b));
-    return `<h3>${esc(t('פנייה לגמ״ח','Contact the gmach'))}</h3><div class="gmach-contact-actions">${buttons}</div>${contact.notes?`<div class="contact-manager-notes"><strong>${esc(t('הערות בעל הגמ״ח','Manager’s notes'))}</strong><p>${esc(contact.notes)}</p></div>`:''}${hours.length?`<p><strong>${esc(t('ימי ושעות פנייה (שעון ישראל):','Contact hours (Israel time):'))}</strong> ${hours.map(([day,range])=>`${esc(t(dayHe[day],dayEn[day]))} <span dir="ltr">${esc(range.join('–'))}</span>`).join(' · ')}</p>${!isContactTime(contact.hours)?`<p role="status">${esc(t('כעת מחוץ לשעות הפנייה המועדפות.','Currently outside the preferred contact hours.'))}</p>`:''}`:''}${!contact.visible?`<p>${esc(t('פרטי הקשר יוצגו לאחר אישור בקשת השאלה או פתיחת צ׳אט.','Contact details are revealed after a borrowing or chat request is approved.'))}</p>`:''}${contact.visible&&contact.address?`<p class="contact-detail">${esc([contact.address,contact.city].filter(Boolean).join(', '))}</p>`:''}${channels.includes('chat')?`<p class="form-note">${esc(t('בצ׳אט אפשר להשאיר הודעה בכל שעה שבה האתר פתוח, בהתאם לאישור הבקשה.','Messages can be left in an approved chat whenever the website is open.'))}</p>`:''}`;
+    return `<h3>${esc(t('פנייה לגמ״ח','Contact the gmach'))}</h3><div class="gmach-contact-actions">${buttons}</div>${contact.notes?`<div class="contact-manager-notes"><strong>${esc(t('הערות בעל הגמ״ח','Manager’s notes'))}</strong><p>${esc(contact.notes)}</p></div>`:''}${hours.length?`<p><strong>${esc(t('ימי ושעות פנייה (שעון ישראל):','Contact hours (Israel time):'))}</strong> ${hours.map(([day,range])=>`${esc(t(dayHe[day],dayEn[day]))} <span dir="ltr">${esc(range.join('–'))}</span>`).join(' · ')}</p>${!isContactTime(contact.hours)?`<p role="status">${esc(t('כעת מחוץ לשעות הפנייה המועדפות.','Currently outside the preferred contact hours.'))}</p>`:''}`:''}${!contact.visible?`<p>${esc(t('פרטי הקשר יוצגו לאחר אישור בקשת השאלה או פתיחת צ׳אט.','Contact details are revealed after a borrowing or chat request is approved.'))}</p>`:''}${contact.visible&&contact.address?`<p class="contact-detail">${esc(formatAddress(contact.address,contact.city))}</p>`:''}${channels.includes('chat')?`<p class="form-note">${esc(t('בצ׳אט אפשר להשאיר הודעה בכל שעה שבה האתר פתוח, בהתאם לאישור הבקשה.','Messages can be left in an approved chat whenever the website is open.'))}</p>`:''}`;
   }
   window.GmachContacts={fill,read,markup,isContactTime,defaultSettings};
 })();

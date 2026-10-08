@@ -10,6 +10,20 @@ assert.deepEqual(contactPreferencesInput({notes:'עדכון בלבד'},settings)
 for(const value of [{showPublic:'true'},{channels:['fax']},{channels:['phone','phone']},{channels:['email'],preferred:'email',email:''},{preferred:'fax'},{email:'javascript:bad'},{hours:{7:['09:00','10:00']}},{hours:{3:['20:00','18:00']}},{hours:{3:['09:00','24:00']}},{notes:'x'.repeat(1001)}])assert.throws(()=>contactPreferencesInput(value));
 const context={window:{},document:{documentElement:{lang:'he'}},Intl,Date};vm.runInNewContext(readFileSync('dist/contact-preferences.js','utf8'),context);
 const ui=context.window.GmachContacts;
+const formatAddress=context.window.GmachFormatAddress;
+assert.equal(formatAddress('ירושלים','ירושלים'),'ירושלים');
+assert.equal(formatAddress('  ירושלים  ','ירושלים'),'ירושלים');
+assert.equal(formatAddress('רחוב יפו 10, ירושלים','ירושלים'),'רחוב יפו 10, ירושלים');
+assert.equal(formatAddress('רחוב ירושלים 10','ירושלים'),'רחוב ירושלים 10');
+assert.equal(formatAddress('ירושלים החדשה 10','ירושלים החדשה'),'ירושלים החדשה 10');
+assert.equal(formatAddress('דרך ירושלים','ירושלים החדשה'),'דרך ירושלים, ירושלים החדשה');
+assert.equal(formatAddress('יפו 10','ירושלים'),'יפו 10, ירושלים');
+assert.equal(formatAddress('','ירושלים'),'ירושלים');
+assert.equal(formatAddress('יפו 10',''),'יפו 10');
+const duplicateAddress=ui.markup({visible:true,channels:['address'],address:'ירושלים',city:'ירושלים',hours:{},notes:''});
+assert.ok(!duplicateAddress.includes('ירושלים, ירושלים'));
+assert.ok(duplicateAddress.includes('query='+encodeURIComponent('ירושלים')));
+
 assert.equal(ui.isContactTime({3:['18:00','20:00']},new Date('2026-10-07T15:30:00Z')),true);
 assert.equal(ui.isContactTime({3:['18:00','20:00']},new Date('2026-10-07T17:00:00Z')),false);
 assert.equal(ui.isContactTime({2:['18:00','20:00']},new Date('2026-10-07T15:30:00Z')),false);
