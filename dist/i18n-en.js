@@ -157,7 +157,7 @@ window.GmachEnglish = Object.freeze({
   "סגירת טופס יצירת קשר":"Close contact form","כתבו לנו כאן ונקבל את הפנייה ישירות דרך האתר.":"Write to us and we will receive your request through the site.",
   "כתובת אימייל":"Email address","נושא":"Subject","הודעה":"Message","שליחת הפנייה":"Send request","סגירת החלון":"Close dialog",
   "כניסה לגמ״ח ברגע":"Sign in to Gmach Berega","נכנסים עם אימייל וסיסמה כדי לבקש, לשמור ולנהל פריטים.":"Sign in with your email and password to request, save and manage items.",
-  "כניסה או הרשמה":"Sign in or register","כניסה":"Sign in","הרשמה":"Register","מה השם שלך?":"What is your name?",
+  "כניסה או הרשמה":"Sign in or register","כניסה":"Sign in","הרשמה":"Register","מה השם המלא שלך?":"What is your full name?",
   "עיר או יישוב":"City or locality","כתובת מלאה":"Full address","הכתובת נשמרת מוצפנת ואינה מוצגת בפרופיל הציבורי.":"Your address is encrypted and is not shown on your public profile.",
   "סיסמה":"Password","לפחות 10 תווים":"At least 10 characters","קראתי ואני מסכים/ה ל":"I have read and agree to",
   "תנאי השימוש":"the terms of use","ול":"and to","מדיניות הפרטיות":"the privacy policy",
