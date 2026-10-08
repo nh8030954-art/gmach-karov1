@@ -93,7 +93,14 @@
   function readGmachSubcategories(){return $$("#gmach-subcategory-options input:checked").map(input=>input.value);}
   function validateGmachSubcategoryForm(){const first=$("#gmach-subcategory-options input");first?.setCustomValidity(readGmachSubcategories().length?"":pickupText("יש לבחור לפחות קטגוריית משנה אחת או כל הקטגוריה","Choose at least one subcategory or the entire category"));}
   function updateGmachSubcategories(selected=[]){
-    const category=$("#gmach-category")?.value||"",parent=(state.categoryCatalog||[]).find(row=>!row.parent_id&&(row.id===category||row.name_he===category)),host=$("#gmach-subcategory-options");if(!host)return;
+    const category=$("#gmach-category")?.value||"",parent=(state.categoryCatalog||[]).find(row=>!row.parent_id&&(row.id===category||row.name_he===category));
+    let host=$("#gmach-subcategory-options");
+    if(!host){
+      const categoryField=$("#gmach-category")?.closest("label");if(!categoryField)return;
+      const field=document.createElement("fieldset");field.id="gmach-subcategory-fieldset";
+      field.innerHTML='<legend>'+escapeHTML(pickupText("קטגוריות משנה (חובה)","Subcategories (required)"))+'</legend><p class="form-hint">'+escapeHTML(pickupText("אפשר לבחור כמה קטגוריות משנה או הכל.","Choose several subcategories or all."))+'</p><div id="gmach-subcategory-options" class="gmach-subcategory-options"></div>';
+      categoryField.after(field);host=$("#gmach-subcategory-options");
+    }
     $("#gmach-subcategory-fieldset").disabled=!category;
     if(!category){host.innerHTML='<p>'+escapeHTML(pickupText("בחרו קודם קטגוריה","Choose a category first"))+'</p>';return;}
     const children=(state.categoryCatalog||[]).filter(row=>row.parent_id===parent?.id);
@@ -102,8 +109,8 @@
     validateGmachSubcategoryForm();
   }
   $("#gmach-category")?.addEventListener("change",()=>updateGmachSubcategories());
-  $("#gmach-subcategory-options")?.addEventListener("change",event=>{
-    const input=event.target;if(input.type!=="checkbox")return;
+  $("#gmach-form")?.addEventListener("change",event=>{
+    const input=event.target;if(input.type!=="checkbox"||!input.closest("#gmach-subcategory-options"))return;
     if(input.checked){if(input.value==="__all__")$$("#gmach-subcategory-options input").forEach(other=>{if(other!==input)other.checked=false});else $("#gmach-subcategory-options input[value=__all__]").checked=false;}
     validateGmachSubcategoryForm();
   });
