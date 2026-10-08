@@ -173,7 +173,9 @@ jobs:
           npx wrangler d1 execute DB --remote --command "SELECT id,parent_id,name_he FROM categories WHERE id='mourning' OR parent_id='mourning'" --json > mourning-categories-state.json
           node -e "const rows=require('./mourning-categories-state.json')[0].results;if(rows.length!==9||!rows.some(r=>r.id==='mourning'&&r.parent_id===null))throw new Error('Mourning category verification failed');console.log(rows)"
       - name: Ensure private administrator alerts and research schema
-        run: npx wrangler d1 execute DB --remote --file migrations/0048_admin_bell_research.sql
+        run: |
+          npx wrangler d1 execute DB --remote --file migrations/0048_admin_bell_research.sql
+          npx wrangler d1 execute DB --remote --file migrations/0049_notification_events.sql
       - name: Configure private gmach research ingestion
         run: node .github/scripts/provision-gmach-research.mjs
       - name: Publish production Worker

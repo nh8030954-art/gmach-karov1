@@ -782,16 +782,33 @@
     if (!state.user) return null; const data = await api("/api/me/dashboard"); state.dashboard = data; state.myOrganizations = data.organizations || []; state.favorites = new Set(data.favorites || []); renderItems(); return data;
   }
   function updateAuthUI() {
-    const label = state.user ? "האזור שלי" : "כניסה"; $("#dashboard-button").textContent = label; $$('[data-requires-auth]').forEach(button => { if (button !== $("#dashboard-button")) button.textContent = label; }); $("#dashboard-name").textContent = state.user ? (state.user.fullName || state.user.email?.split("@")[0] || "") : ""; $("#admin-tab").hidden = state.user?.role !== "admin" || !state.user.twoFactorEnabled; const notificationButton=$("#notifications-button"); notificationButton.hidden=false; notificationButton.style.visibility=state.user?"visible":"hidden"; notificationButton.disabled=!state.user; notificationButton.setAttribute("aria-hidden",state.user?"false":"true"); if (state.user?.role !== "admin" || !state.user.twoFactorEnabled) { $$('[data-admin-support-center],[data-release-readiness],[data-server-errors],[data-admin-control-center],[data-launch-admin-loans],[data-launch-health],[data-launch-entities],[data-admin-users-full],[data-privacy-retention],[data-navigation-admin],[data-gmach-research]').forEach(button=>button.remove()); if(state.dashboardTab==="admin")state.dashboardTab="profile"; } if (!state.user) { $("#notification-badge").hidden = true; state.notifications = []; }
+    const label = state.user ? "האזור שלי" : "כניסה"; $("#dashboard-button").textContent = label; $$('[data-requires-auth]').forEach(button => { if (button !== $("#dashboard-button")) button.textContent = label; }); $("#dashboard-name").textContent = state.user ? (state.user.fullName || state.user.email?.split("@")[0] || "") : ""; $("#admin-tab").hidden = state.user?.role !== "admin" || !state.user.twoFactorEnabled; const notificationButton=$("#notifications-button"); notificationButton.hidden=false; notificationButton.style.visibility=state.user?"visible":"hidden"; notificationButton.disabled=!state.user; notificationButton.setAttribute("aria-hidden",state.user?"false":"true"); if (state.user?.role !== "admin" || !state.user.twoFactorEnabled) { $$('[data-admin-support-center],[data-release-readiness],[data-server-errors],[data-admin-control-center],[data-launch-admin-loans],[data-launch-health],[data-launch-entities],[data-admin-users-full],[data-privacy-retention],[data-navigation-admin],[data-gmach-research]').forEach(button=>button.remove()); if(state.dashboardTab==="admin")state.dashboardTab="profile"; } if (!state.user) { $("#notification-badge").hidden = true; state.notifications = []; notificationUser=null; seenNotificationIds.clear(); } connectNotificationChannel();
   }
   let notificationUser = null, seenNotificationIds = new Set();
+  let notificationSocket=null, notificationSocketUser=null, notificationReconnect=null, notificationFailures=0;
+  function stopNotificationChannel(){clearTimeout(notificationReconnect);notificationReconnect=null;const old=notificationSocket;notificationSocket=null;notificationSocketUser=null;if(old)old.close();}
+  function connectNotificationChannel(){
+    if(!state.user||document.visibilityState!=="visible"||navigator.onLine===false){stopNotificationChannel();return;}
+    if(notificationSocketUser===state.user.id&&notificationSocket&&notificationSocket.readyState<2)return;
+    stopNotificationChannel();notificationSocketUser=state.user.id;
+    const url=new URL("/api/notifications/live",location.href);url.protocol=url.protocol==="https:"?"wss:":"ws:";
+    let socket;try{socket=new WebSocket(url)}catch{return;}notificationSocket=socket;
+    socket.onopen=()=>{if(notificationSocket!==socket)return;notificationFailures=0;refreshNotifications(true);};
+    socket.onmessage=event=>{if(notificationSocket!==socket)return;try{const message=JSON.parse(event.data);if(message.type==="notifications-changed")refreshNotifications(true);}catch{}};
+    socket.onclose=()=>{if(notificationSocket!==socket)return;notificationSocket=null;notificationSocketUser=null;if(state.user&&document.visibilityState==="visible"&&navigator.onLine!==false&&notificationFailures<5){const delay=Math.min(30000,1000*2**notificationFailures++);notificationReconnect=setTimeout(connectNotificationChannel,delay);}};
+  }
+  document.addEventListener("visibilitychange",connectNotificationChannel);
+  window.addEventListener("online",()=>{notificationFailures=0;connectNotificationChannel();});
+  window.addEventListener("offline",stopNotificationChannel);
+  window.addEventListener("pagehide",stopNotificationChannel);
+  window.addEventListener("pageshow",connectNotificationChannel);
   async function refreshNotifications(silent = false) {
     if (!state.user) return;
     try { const data = await api("/api/notifications"); const incoming=data.notifications||[];
       if(notificationUser!==state.user.id){notificationUser=state.user.id;seenNotificationIds=new Set(incoming.map(n=>n.id));const count=incoming.filter(n=>n.action_kind&&!n.read_at).length;if(count&&state.user.role==="admin"&&state.user.twoFactorEnabled)toast(`יש לך ${count} התראות ניהול שממתינות בפעמון`);}
-      else if(state.user.role==="admin"&&state.user.twoFactorEnabled&&document.visibilityState==="visible"){
-        const fresh=incoming.filter(n=>n.action_kind&&!n.read_at&&!seenNotificationIds.has(n.id));
-        if(fresh.length)toast(fresh.length===1?fresh[0].title:`${fresh.length} התראות ניהול חדשות בפעמון`);
+      else if(document.visibilityState==="visible"){
+        const fresh=incoming.filter(n=>!n.read_at&&!seenNotificationIds.has(n.id));
+        if(fresh.length)toast(fresh.length===1?fresh[0].title:`${fresh.length} התראות חדשות בפעמון`);
       }
       incoming.forEach(n=>seenNotificationIds.add(n.id));state.notifications=incoming;
       if($("#notifications-dialog").open)renderNotifications();
@@ -1620,7 +1637,7 @@
     }).catch(error=>console.warn("Background page hydration failed",error));
 
     window.setInterval(async()=>{if(state.serverAvailable||document.visibilityState!=="visible")return;await detectServer();if(state.serverAvailable)await Promise.allSettled([loadPublicConfig(),loadDiscovery(),loadCategoryAliases(),loadItems(),refreshUser()])},30000);
-    window.setInterval(()=>{if(state.user&&document.visibilityState==="visible")refreshNotifications(true)},30000);
+    connectNotificationChannel();
   }
   init().catch(error => { document.documentElement.classList.remove("site-copy-pending","app-booting"); console.error("App initialization failed", error); const shellReady=Boolean($("#home-view")||$("#dashboard-view")||$("#organization-page-view")); if(!shellReady) toast("אירעה תקלה בטעינת האתר. נסו לרענן את הדף.", "error"); });
 })();

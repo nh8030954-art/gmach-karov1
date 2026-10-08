@@ -41,7 +41,7 @@ export async function monitorGmachResearch(env,now=Date.now()){
   if(!installed)return;
   const metadata=await installed.json();
   const last=Date.parse(latest?.checked_at||metadata.createdAt);
-  if(!Number.isFinite(last)||now-last<6*86400000)return;
+  if(!Number.isFinite(last)||now-last<18*86400000)return;
   const open=await env.DB.prepare("SELECT id FROM system_alerts WHERE alert_type='gmach_research_stale' AND resolved_at IS NULL LIMIT 1").first();
-  if(!open)await env.DB.prepare("INSERT INTO system_alerts(id,alert_type,severity,details_json) VALUES(?,'gmach_research_stale','warning',?)").bind(crypto.randomUUID(),JSON.stringify({summary:'לא הושלמה בדיקת כל הגמ״חים במשך יותר משישה ימים. יש לבדוק את משימת המחקר.'})).run();
+  if(!open)await env.DB.prepare("INSERT INTO system_alerts(id,alert_type,severity,details_json) VALUES(?,'gmach_research_stale','warning',?)").bind(crypto.randomUUID(),JSON.stringify({summary:'לא הושלמה בדיקת כל הגמ״חים במשך יותר מ־18 ימים. יש לבדוק את משימת המחקר.'})).run();
 }

@@ -57,5 +57,21 @@
       "pattern": "www.gmach-berega.co.il",
       "custom_domain": true
     }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "NOTIFICATION_HUB",
+        "class_name": "NotificationHub"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "notification-hub-v1",
+      "new_sqlite_classes": [
+        "NotificationHub"
+      ]
+    }
   ]
 }

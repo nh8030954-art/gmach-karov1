@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import {readFile,readdir} from 'node:fs/promises';
-import {webcrypto,generateKeyPairSync} from 'node:crypto';
+import {webcrypto,generateKeyPairSync,createHash} from 'node:crypto';
 import {Miniflare} from 'miniflare';
 import {syncAdminBell,monitorGmachResearch} from '../worker/admin-alerts.js';
 import {saveResearchReport,ingestResearch,researchCandidates,handleGmachResearch} from '../worker/gmach-research.js';
+import {dispatchNotificationEvents} from '../worker/notification-events.js';
 function splitMigration(sql) {
   const statements = [];
   let buffer = "";
@@ -23,7 +24,7 @@ function splitMigration(sql) {
   return statements;
 }
 
-const mf=new Miniflare({modules:true,script:'export default {fetch(){return new Response("test")}}',compatibilityDate:'2026-08-06',d1Databases:['DB'],r2Buckets:['BACKUP_STORAGE']});
+const mf=new Miniflare({modules:true,modulesRules:[{type:'ESModule',include:['**/*.js'],fallthrough:true}],scriptPath:'worker/index.js',compatibilityDate:'2026-08-06',d1Databases:['DB'],r2Buckets:['BACKUP_STORAGE'],durableObjects:{NOTIFICATION_HUB:{className:'NotificationHub',useSQLite:true}}});
 try{
  const DB=await mf.getD1Database('DB'),BACKUP_STORAGE=await mf.getR2Bucket('BACKUP_STORAGE'),env={DB,BACKUP_STORAGE,GMACH_RESEARCH_INGEST_TOKEN:'test-secret'};
  for(const file of (await readdir('migrations')).filter(f=>/^\d+.*\.sql$/.test(f)).sort()){
@@ -56,7 +57,19 @@ try{
  await saveResearchReport(env,{...report,runId:'run-2'});await syncAdminBell(env,admin);assert.equal((await DB.prepare("SELECT COUNT(*) c FROM system_alerts WHERE alert_type='gmach_business_suspected'").first()).c,1,'Unchanged findings do not spam');
  await assert.rejects(saveResearchReport(env,{...report,runId:'bad',results:[{...report.results[0],evidence:[]}]}));await assert.rejects(saveResearchReport(env,{...report,runId:'bad2',results:[{...report.results[0],evidence:[{url:'javascript:alert(1)',title:'Bad',note:'Bad'}]}]}));
  const privateUrl=new URL('https://example.org/api/admin/gmach-research/run-1%3Aorg');await assert.rejects(handleGmachResearch(new Request(privateUrl),env,privateUrl,()=>{throw new Error('Forbidden')}));const detail=await handleGmachResearch(new Request(privateUrl),env,privateUrl,()=>admin);assert.equal((await detail.json()).result.evidence.length,1);
- await BACKUP_STORAGE.put('_system-research/public-jwk.json',JSON.stringify({createdAt:new Date(Date.now()-8*86400000).toISOString()}));await monitorGmachResearch(env,Date.now()+8*86400000);await monitorGmachResearch(env,Date.now()+8*86400000);assert.equal((await DB.prepare("SELECT COUNT(*) c FROM system_alerts WHERE alert_type='gmach_research_stale' AND resolved_at IS NULL").first()).c,1);
+ await BACKUP_STORAGE.put('_system-research/public-jwk.json',JSON.stringify({createdAt:new Date(Date.now()-8*86400000).toISOString()}));await monitorGmachResearch(env,Date.now()+20*86400000);await monitorGmachResearch(env,Date.now()+20*86400000);assert.equal((await DB.prepare("SELECT COUNT(*) c FROM system_alerts WHERE alert_type='gmach_research_stale' AND resolved_at IS NULL").first()).c,1);
  await saveResearchReport(env,{...report,runId:'clear',results:[{...report.results[0],verdict:'clear'}]});assert.equal((await DB.prepare("SELECT COUNT(*) c FROM system_alerts WHERE alert_type='gmach_research_stale' AND resolved_at IS NULL").first()).c,0);
+ env.NOTIFICATION_HUB=await mf.getDurableObjectNamespace('NOTIFICATION_HUB');await dispatchNotificationEvents(env);
+ assert.equal((await DB.prepare('SELECT COUNT(*) c FROM notification_event_outbox').first()).c,0);
+ for(const id of ['admin','member'])await DB.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').bind(createHash('sha256').update(id+'-token').digest('base64url'),id,new Date(Date.now()+3600000).toISOString()).run();
+ const connect=async(id,origin='https://example.org')=>mf.dispatchFetch('https://example.org/api/notifications/live',{headers:{Upgrade:'websocket',Origin:origin,...(id?{Cookie:'gmach_session='+id+'-token'}:{})}});
+ assert.equal((await connect()).status,401);assert.equal((await connect('member','https://evil.example')).status,403);
+ const adminConnection=await connect('admin'),memberConnection=await connect('member');assert.equal(adminConnection.status,101);assert.equal(memberConnection.status,101);
+ const adminSocket=adminConnection.webSocket,memberSocket=memberConnection.webSocket;adminSocket.accept();memberSocket.accept();const adminEvents=[],memberEvents=[];adminSocket.addEventListener('message',e=>adminEvents.push(JSON.parse(e.data)));memberSocket.addEventListener('message',e=>memberEvents.push(JSON.parse(e.data)));
+ await DB.prepare("INSERT INTO notifications(id,user_id,type,title,body) VALUES('member-event','member','system','Private update','Only member sees this')").run();await dispatchNotificationEvents(env);await new Promise(resolve=>setTimeout(resolve,100));
+ assert.equal(memberEvents.length,1);assert.equal(adminEvents.length,0,'Other users do not receive a signal');assert.equal(memberEvents[0].type,'notifications-changed');assert.ok(!JSON.stringify(memberEvents).includes('Private update'),'Socket contains no private content');
+ await dispatchNotificationEvents(env);await new Promise(resolve=>setTimeout(resolve,100));assert.equal(memberEvents.length,1,'No new notification means no update');
+ const hub=env.NOTIFICATION_HUB.get(env.NOTIFICATION_HUB.idFromName('member'));await hub.fetch('https://notification-hub/changed',{method:'POST',body:JSON.stringify({sequence:memberEvents[0].sequence})});await new Promise(resolve=>setTimeout(resolve,100));assert.equal(memberEvents.length,1,'Retries are deduplicated');
+ adminSocket.close();memberSocket.close();
  console.log('Admin isolation, source routing, read preservation, support replies, encrypted authenticated ingestion, evidence validation, deduplication and stale research monitoring passed');
 }finally{await mf.dispose()}

@@ -1,3 +1,5 @@
+import { openNotificationChannel, dispatchNotificationEvents } from './notification-events.js';
+export { NotificationHub } from './notification-events.js';
 import { syncAdminBell, monitorGmachResearch } from './admin-alerts.js';
 import { handleGmachResearch } from './gmach-research.js';
 import { validateOrganizationSubcategories, organizationSubcategories, organizationSubcategoriesStatement } from "./organization-subcategories.js";
@@ -349,7 +351,7 @@ export default {
         const expansionPreflight = await requirementsExpansionPreflight(request, env, url);
         if (expansionPreflight) return withSecurityHeaders(expansionPreflight);
         const organizationChatRoute=/^\/api\/(?:organization-chat|organizations\/[^/]+\/chat-requests|loan-requests\/gc-|messages\/gc-)/.test(url.pathname);
-        if(organizationChatRoute){const response=await routeApi(request,env,ctx,url);return withSecurityHeaders(response);}
+        if(organizationChatRoute){const response=await routeApi(request,env,ctx,url);if(response.ok&&!["GET","HEAD","OPTIONS"].includes(request.method))ctx.waitUntil(dispatchNotificationEvents(env));return withSecurityHeaders(response);}
         const directGuard = await directItemGuard(request, env, url);
         if (directGuard) return withSecurityHeaders(directGuard);
         const completionResponse = await handlePlatformCompletionApi(request, env, ctx, url);
@@ -377,6 +379,7 @@ export default {
           }
           try {
             const response = await routeApi(request, env, ctx, url);
+        if(response.ok&&(!["GET","HEAD","OPTIONS"].includes(request.method)||url.pathname==="/api/notifications"))ctx.waitUntil(dispatchNotificationEvents(env).catch(error=>console.error("Notification delivery failed",error)));
             if (response.ok) {
               const cachedAt = new Date().toISOString();
               const storedHeaders = new Headers(response.headers);
@@ -403,6 +406,7 @@ export default {
           }
         }
         const response = await routeApi(request, env, ctx, url);
+        if(response.ok&&(!["GET","HEAD","OPTIONS"].includes(request.method)||url.pathname==="/api/notifications"))ctx.waitUntil(dispatchNotificationEvents(env).catch(error=>console.error("Notification delivery failed",error)));
         if (!["GET","HEAD","OPTIONS"].includes(request.method) && response.ok) await invalidatePublicSnapshotRoots(url.origin);
         return withSecurityHeaders(response);
       }
@@ -449,7 +453,7 @@ export default {
         console.error("Request failed", { requestId, path: url.pathname, error });
         // When D1 itself is refusing writes, do not spend another failing D1
         // write trying to persist the same incident. Console observability remains.
-        if(!d1Limit)try { ctx.waitUntil(recordDistributionError(env,request,error,requestId)); } catch {}
+        if(!d1Limit)try { ctx.waitUntil(recordDistributionError(env,request,error,requestId).then(()=>dispatchNotificationEvents(env))); } catch {}
       }
       const publicMessage=d1Limit?"אירעה תקלה זמנית בשרת":(error instanceof HttpError ? error.message : "אירעה תקלה זמנית בשרת");
       return withSecurityHeaders(json({ error: publicMessage, requestId }, status, { "X-Request-Id": requestId, ...(d1Limit?{"Retry-After":"900"}:{}) }));
@@ -457,6 +461,7 @@ export default {
   },
   async scheduled(event, env, ctx) {
     ctx.waitUntil((async()=>{
+      try {
       // Schema reconciliation is intentionally daily. Running every ensure
       // function every few minutes was a large, unnecessary source of D1 reads.
       if (event.cron === "17 2 * * *") {
@@ -470,6 +475,7 @@ export default {
       }
       await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), monitorGmachResearch(env),
         runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env), runPrivacyPurgeMaintenance(env), runCommunityChatMaintenance(env)]);
+      } finally { await dispatchNotificationEvents(env); }
     })());
   }
 };
@@ -958,6 +964,7 @@ async function routeApi(request, env, ctx, url) {
   const helpOffer = path.match(/^\/api\/help-offers\/([^/]+)$/);
   if (method === "PATCH" && helpOffer) return updateHelpOffer(request, env, decodeURIComponent(helpOffer[1]));
 
+  if (method === "GET" && path === "/api/notifications/live") return openNotificationChannel(request,env,await requireUser(request,env));
   if (method === "GET" && path === "/api/notifications") return listNotifications(request, env);
   if (method === "POST" && path === "/api/notifications/read-all") return markNotificationsRead(request, env);
   if (method === "POST" && path === "/api/reports") return createReport(request, env);
@@ -4298,9 +4305,9 @@ function withSecurityHeaders(response) {
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("Permissions-Policy", "camera=(self), microphone=(self), geolocation=(self), payment=()");
   headers.set("X-Frame-Options", "DENY");
-  headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org; connect-src 'self' https://challenges.cloudflare.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org; frame-src https://challenges.cloudflare.com https://www.openstreetmap.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+  headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://tile.openstreetmap.org https://*.tile.openstreetmap.org; connect-src 'self' wss://gmach-berega.co.il wss://www.gmach-berega.co.il https://challenges.cloudflare.com https://tile.openstreetmap.org https://*.tile.openstreetmap.org; frame-src https://challenges.cloudflare.com https://www.openstreetmap.org; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
   headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   headers.set("Cross-Origin-Opener-Policy", "same-origin");
   headers.set("Cross-Origin-Resource-Policy", "same-origin");
-  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers, ...(response.webSocket?{webSocket:response.webSocket}:{}) });
 }
