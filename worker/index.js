@@ -1,4 +1,4 @@
-import { itemManagementMode, directItemGuard } from "./item-modes.js";
+import { itemManagementMode, directItemGuard, ensureItemManagementModes } from "./item-modes.js";
 import { ensureContactPreferences, getContactPreferences, contactPreferencesInput, contactPreferencesStatement, contactView } from "./contact-preferences.js";
 import { ensureOrganizationChats, isOrganizationChat, chatMessageTable } from "./organization-chats.js";
 import { ensureServiceRanges, getServiceRange, serviceRangeInput, serviceRangeStatement, resolveServiceLocation, evaluateServiceRange, distanceKm } from "./service-range.js";
@@ -336,6 +336,7 @@ export default {
         }
       }
       if (url.pathname.startsWith("/api/")) {
+        await ensureItemManagementModes(env);
         await ensureLoanCosts(env);
         await ensureServiceRanges(env);
         await ensureContactPreferences(env);

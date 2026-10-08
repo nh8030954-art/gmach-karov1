@@ -87,6 +87,12 @@ try {
     await db.batch(statements.map(statement => db.prepare(statement)));
   }
 
+  // Simulate the production schema being ahead of its old migration ledger.
+  await db.batch([db.prepare('DROP TRIGGER direct_items_no_loans'),db.prepare('DROP TRIGGER item_mode_preserves_active_loans'),db.prepare('ALTER TABLE items DROP COLUMN management_mode')]);
+  assert.equal((await request('/api/items')).response.status,200,'Runtime independently reconciles the new item mode');
+  assert.ok((await db.prepare('PRAGMA table_info(items)').all()).results.some(column=>column.name==='management_mode'));
+  assert.equal((await db.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE type='trigger' AND name IN ('direct_items_no_loans','item_mode_preserves_active_loans')").first()).n,2);
+
   const authOnlyRows=(await db.prepare("SELECT template_key,enabled FROM email_templates").all()).results;
   assert.ok(authOnlyRows.length>=24);
   for(const row of authOnlyRows)assert.equal(Number(row.enabled),["verification","password_reset"].includes(row.template_key)?1:0,"Only auth emails enabled after rollout");
