@@ -318,13 +318,13 @@
   }
   async function openAdvancedGmachSearch(){
     let d=$("#advanced-gmach-dialog");if(!d){d=document.createElement("dialog");d.id="advanced-gmach-dialog";d.className="modal modal-wide";document.body.append(d)}
-    const categories=[...new Set((state.discovery.categories||[]).map(row=>row.category).filter(Boolean))];
+    const categories=(state.categoryCatalog||[]).filter(row=>!row.parent_id&&row.name_he);
     const cities=[...new Set((state.discovery.cities||[]).map(row=>row.city).filter(Boolean))];
     d.innerHTML=`<button class="dialog-close" type="button" aria-label="סגירה">×</button><h2>חיפוש גמ״חים מתקדם</h2>
       <form id="advanced-gmach-form" class="form-grid">
         <label class="wide">שם, תיאור או עיר<input name="query" type="search" maxlength="100" autocomplete="off"></label>
-        <label>עיר<select name="city"><option value="">כל הארץ</option>${cities.map(value=>`<option value="${escapeHTML(value)}">${escapeHTML(value)}</option>`).join("")}</select></label>
-        <label>קטגוריה<select name="category"><option value="">כל הקטגוריות</option>${categories.map(value=>`<option value="${escapeHTML(value)}">${escapeHTML(value)}</option>`).join("")}</select></label>
+        <label>עיר<input name="city" type="text" list="advanced-gmach-cities" maxlength="80" placeholder="כל הארץ" autocomplete="off"><datalist id="advanced-gmach-cities">${cities.map(value=>`<option value="${escapeHTML(value)}"></option>`).join("")}</datalist></label>
+        <label>קטגוריה<select name="category"><option value="">כל הקטגוריות</option>${categories.map(row=>`<option value="${escapeHTML(row.name_he)}">${escapeHTML(document.documentElement.lang==="en"?(row.name_en||row.name_he):row.name_he)}</option>`).join("")}</select></label>
         <label>דירוג מינימלי<select name="rating"><option value="0">ללא סינון</option><option value="3">3+</option><option value="4">4+</option><option value="4.5">4.5+</option></select></label>
         <label class="check"><input name="available" type="checkbox">רק גמ״חים עם פריט זמין</label>
         <button class="button button-primary" type="submit">חיפוש</button>
