@@ -1,4 +1,12 @@
 window.GmachEnglish = Object.freeze({
+"איך מתאמים קבלת הפריט?":"How is item pickup arranged?",
+"ניהול בקשות ומלאי באתר":"Manage requests and stock on the site",
+"תיאום ישיר עם הגמ״ח":"Contact the gmach directly",
+"יש לסיים את הבקשות וההשאלות הפעילות לפני מעבר לתיאום ישיר":"Finish active requests and loans before switching to direct contact",
+"מנהל הגמ״ח לא בחר לקבל פניות בצ׳אט":"The gmach manager does not accept chat requests",
+"יש לבחור ניהול בקשות באתר או תיאום ישיר":"Choose managed requests or direct contact",
+"פריט זה מוצע בתיאום ישיר. אפשר לפנות לגמ״ח דרך פרטי הקשר בעמוד הפריט.":"This item is available by direct contact. Use the contact details on the item page.",
+
 "גמ״ח ברגע — גמ״חים והשאלת ציוד בכל הארץ":"Gmach BeRega — Gmachs and equipment lending across Israel",
 "💙 מיזם חדש — יחד מרבים חסד!":"💙 A new initiative — spread kindness together!",
 "מכירים גמ״ח? ספרו לו על גמ״ח ברגע ושתפו את האתר, כדי שעוד אנשים ימצאו את העזרה שהם צריכים.":"Know a gmach? Tell them about Gmach BeRega and share the website so more people can find the help they need.",

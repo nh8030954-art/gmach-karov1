@@ -42,7 +42,9 @@ export async function getContactPreferences(env,id){
 export function contactPreferencesStatement(env,id,p){return env.DB.prepare(`INSERT INTO organization_contact_preferences(organization_id,show_public,channels_json,preferred,email,hours_json,notes) VALUES(?,?,?,?,?,?,?)
  ON CONFLICT(organization_id) DO UPDATE SET show_public=excluded.show_public,channels_json=excluded.channels_json,preferred=excluded.preferred,email=excluded.email,hours_json=excluded.hours_json,notes=excluded.notes,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')`).bind(id,p.showPublic?1:0,JSON.stringify(p.channels),p.preferred,p.email||null,JSON.stringify(p.hours),p.notes)}
 export async function contactView(env,id,{approved=false,phone,address,city}={}){
- const settings=await getContactPreferences(env,id),visible=settings.showPublic||approved;
+ const settings=await getContactPreferences(env,id);
+ const direct=await env.DB.prepare("SELECT 1 AS ok FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.organization_id=? AND i.management_mode='direct' AND i.status='active' AND i.deleted_at IS NULL AND o.status='approved' AND o.is_hidden=0 AND o.deleted_at IS NULL LIMIT 1").bind(id).first();
+ const visible=settings.showPublic||approved||Boolean(direct);
  const data={showPublic:settings.showPublic,channels:settings.channels,preferred:settings.preferred,hours:settings.hours,notes:settings.notes,visible};
  if(!visible)return data;
  const row=await env.DB.prepare('SELECT o.address,o.city,c.contact_phone AS phone FROM organizations o LEFT JOIN organization_contacts c ON c.organization_id=o.id WHERE o.id=? AND o.deleted_at IS NULL').bind(id).first();

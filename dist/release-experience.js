@@ -11,7 +11,7 @@ function moneyAgorot(v){return (Number(v||0)/100).toLocaleString(isEn()?"en-IL":
 
 async function enrichItemPolicy(){
  const host=$("#item-dialog-content"),itemId=host?.dataset.itemId;
- if(!host||!itemId||host.querySelector("[data-release-policy]"))return;
+ if(!host||host.dataset.managementMode==="direct"||!itemId||host.querySelector("[data-release-policy]"))return;
  try{
   const {item}=await api("/api/items/"+encodeURIComponent(itemId));if(!item)return;
   const copy=$(".item-detail-copy",host);if(!copy)return;

@@ -6,6 +6,8 @@ import miniflare from "miniflare";
 const { FormData: WorkerFormData, Miniflare } = miniflare;
 
 const base = "http://local.test";
+const fixtureStart=new Date();fixtureStart.setUTCHours(12,0,0,0);fixtureStart.setUTCDate(fixtureStart.getUTCDate()+7+((4-fixtureStart.getUTCDay()+7)%7));
+function fixtureDate(value){return new Date(fixtureStart.getTime()+Date.parse(value+'T12:00:00Z')-Date.parse('2026-10-08T12:00:00Z')).toISOString().slice(0,10)}
 const sentEmails = [];
 let adminSessionCookie = null;
 const mf = new Miniflare({
@@ -455,6 +457,27 @@ try {
   assert.equal(result.response.status, 201);
   assert.equal(result.data.verificationRequired, true);
   const borrowerCookie = await verifyLatestEmail("borrower@example.com");
+  // Direct items expose only selected contact fields even when showPublic is false.
+  const savedContacts=(await request(`/api/organizations/${organizationId}/contact-settings`,{cookie:adminCookie})).data.contactSettings;
+  assert.equal((await request(`/api/organizations/${organizationId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:{showPublic:false,channels:['phone'],preferred:'phone'}}})).response.status,200);
+  const directBody={organizationId,title:'פריט לתיאום ישיר',category:'אירועים',condition:'מצב טוב',description:'פריט לתיאום ישיר ללא ניהול מלאי ובקשות באתר.',managementMode:'direct',freeConfirmed:true};
+  result=await request('/api/items',{method:'POST',cookie:adminCookie,body:directBody});assert.equal(result.response.status,201,JSON.stringify(result.data));
+  const directId=result.data.item.id;
+  const directDetail=(await request(`/api/items/${directId}`)).data.item;
+  assert.equal(directDetail.managementMode,'direct');assert.equal(directDetail.contact.visible,true);assert.ok(directDetail.contact.phone);assert.equal(directDetail.contact.address,undefined);assert.equal(directDetail.contact.email,undefined);assert.deepEqual(directDetail.contact.channels,['phone']);
+  assert.equal((await request(`/api/organizations/${organizationId}/public`)).data.organization.contact.visible,true,'Direct item contacts are public on the organization page too');
+  assert.equal((await request(`/api/items/${itemId}`)).data.item.managementMode,'managed');
+  assert.equal((await request(`/api/items/${itemId}`)).data.item.contact,undefined);
+  assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM item_units WHERE item_id=?').bind(directId).first()).n,0,'Direct item creates no stock units');
+  for(const path of [`/api/items/${directId}/inventory`,`/api/items/${directId}/units`,`/api/items/${directId}/availability-check`,`/api/items/${directId}/availability-calendar`])assert.equal((await request(path,{cookie:adminCookie})).response.status,409,path);
+  for(const path of ['/api/loan-requests',`/api/items/${directId}/multi-range-request`,`/api/items/${directId}/waitlist`])assert.equal((await request(path,{method:'POST',cookie:borrowerCookie,body:{itemId:directId}})).response.status,409,path);
+  assert.equal((await request(`/api/items/${directId}`,{method:'PATCH',cookie:adminCookie,body:{...directBody,managementMode:'invalid'}})).response.status,400);
+  assert.equal((await request(`/api/items/${directId}`,{method:'PATCH',cookie:adminCookie,body:{...directBody,managementMode:'managed',quantity:2}})).response.status,200);
+  assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM item_units WHERE item_id=?').bind(directId).first()).n,2,'Switch to managed creates stock');
+  assert.equal((await request(`/api/organizations/${organizationId}/public`)).data.organization.contact.visible,false,'Managed-only organization retains contact privacy');
+  await db.prepare('DELETE FROM items WHERE id=?').bind(directId).run();
+  await request(`/api/organizations/${organizationId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:savedContacts}});
+
   result = await request("/api/me/profile", { method:"PATCH", cookie:borrowerCookie, body:{fullName:"שואלת ציוד",phone:"052-7654321",city:"ירושלים",preferredLanguage:"en",operationalEmails:true} });
   assert.equal(result.response.status,200,JSON.stringify(result.data));
   result = await request(`/api/organizations/${organizationId}/invitations`,{method:"POST",cookie:adminCookie,body:{email:"borrower@example.com",role:"reports"}});
@@ -574,14 +597,14 @@ try {
   const denied=await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:{itemId,distanceException:true,latitude:31.78,longitude:35.22}});
   assert.equal(denied.response.status,403,JSON.stringify(denied.data));
   assert.ok(denied.data.error.includes('5'));
-  const multiRangeDenied=await request(`/api/items/${itemId}/multi-range-request`,{method:'POST',cookie:borrowerCookie,body:{ranges:[{from:'2026-10-08T10:00',until:'2026-10-09T12:00'}],phone:'052-7654321',distanceException:true}});
+  const multiRangeDenied=await request(`/api/items/${itemId}/multi-range-request`,{method:'POST',cookie:borrowerCookie,body:{ranges:[{from:`${fixtureDate("2026-10-08")}T10:00`,until:`${fixtureDate("2026-10-09")}T12:00`}],phone:'052-7654321',distanceException:true}});
   assert.equal(multiRangeDenied.response.status,403,'Multi-range API must enforce the organization service radius too');
 
   assert.equal((await request(`/api/organizations/${organizationId}/public`)).response.status,200,'Public items remain visible outside range');
   await db.prepare('UPDATE organization_service_ranges SET allow_exception=1 WHERE organization_id=?').bind(organizationId).run();
   assert.equal((await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:{itemId}})).response.status,403,'Exception requires an explicit request');
   await db.prepare("UPDATE items SET approval_mode='automatic' WHERE id=?").bind(itemId).run();
-  result = await request("/api/loan-requests", { method: "POST", cookie: borrowerCookie, body: { itemId, requestedFrom: "2026-10-08T10:00", requestedUntil: "2026-10-09T12:00", quantity: 1, depositAccepted: true, phone: "052-7654321", note: "לאירוע משפחתי",distanceException:true } });
+  result = await request("/api/loan-requests", { method: "POST", cookie: borrowerCookie, body: { itemId, requestedFrom: `${fixtureDate("2026-10-08")}T10:00`, requestedUntil: `${fixtureDate("2026-10-09")}T12:00`, quantity: 1, depositAccepted: true, phone: "052-7654321", note: "לאירוע משפחתי",distanceException:true } });
   assert.equal(result.response.status, 201);
   assert.equal(result.data.request.status,'pending','Distance exceptions must never be automatically approved');
   const exceptionRow=await db.prepare('SELECT note FROM loan_requests WHERE id=?').bind(result.data.request.id).first();
@@ -590,6 +613,8 @@ try {
   await db.prepare("UPDATE items SET approval_mode='manual' WHERE id=?").bind(itemId).run();
   await db.prepare('DELETE FROM user_addresses WHERE id=?').bind(savedHome.data.address.id).run();
   const requestId = result.data.request.id;
+  assert.equal((await request(`/api/items/${itemId}`,{method:'PATCH',cookie:adminCookie,body:{...costBody,managementMode:'direct'}})).response.status,409,'Active loans prevent mode changes');
+  await assert.rejects(()=>db.prepare("UPDATE items SET management_mode='direct' WHERE id=?").bind(itemId).run(),/Finish active loans/,'Database trigger protects concurrent changes');
   assert.equal((await request(`/api/loan-requests/${requestId}/pickup-details`,{cookie:borrowerCookie})).response.status,403,'Pending borrower cannot reveal pickup details');
   assert.equal((await request(`/api/loan-requests/${requestId}/pickup-details`,{cookie:englishCookie})).response.status,403,'Another user cannot reveal pickup details');
   const pendingDashboard=(await request('/api/me/dashboard',{cookie:borrowerCookie})).data.requests.find(x=>x.id===requestId);
@@ -600,16 +625,16 @@ try {
   assert.equal(pendingCalendar.response.status,200);
   assert.ok(!pendingCalendar.data.includes(serviceOrg.address),'Pending calendar cannot reveal the gmach address');
 
-  result = await request(`/api/loan-requests/${requestId}/pickup-proposals`, { method:"POST",cookie:adminCookie,body:{startsAt:"2026-10-08T18:00:00Z",endsAt:"2026-10-08T19:00:00Z"} });
+  result = await request(`/api/loan-requests/${requestId}/pickup-proposals`, { method:"POST",cookie:adminCookie,body:{startsAt:`${fixtureDate("2026-10-08")}T18:00:00Z`,endsAt:`${fixtureDate("2026-10-08")}T19:00:00Z`} });
   assert.equal(result.response.status,201,JSON.stringify(result.data));
   result = await request(`/api/loan-requests/${requestId}/timeline`, { cookie:borrowerCookie });
   assert.equal(result.response.status,200);
   assert.equal(result.data.proposals.length,1);
-  result = await request(`/api/items/${itemId}/availability-check?from=2026-10-09T18%3A00&until=2026-10-11T10%3A00`);
+  result = await request(`/api/items/${itemId}/availability-check?from=${fixtureDate("2026-10-09")}T18%3A00&until=${fixtureDate("2026-10-11")}T10%3A00`);
   assert.equal(result.response.status, 400);
-  result = await request(`/api/items/${itemId}/availability-check?from=2026-10-10T19%3A00&until=2026-10-11T10%3A00`);
+  result = await request(`/api/items/${itemId}/availability-check?from=${fixtureDate("2026-10-10")}T19%3A00&until=${fixtureDate("2026-10-11")}T10%3A00`);
   assert.equal(result.response.status, 400);
-  result = await request(`/api/items/${itemId}/availability-check?from=2026-10-10T21%3A00&until=2026-10-11T10%3A00`);
+  result = await request(`/api/items/${itemId}/availability-check?from=${fixtureDate("2026-10-10")}T21%3A00&until=${fixtureDate("2026-10-11")}T10%3A00`);
   assert.equal(result.response.status, 200);
   assert.equal(result.data.available, true);
 
@@ -644,7 +669,7 @@ try {
   assert.match(String(result.data), /BEGIN:VCALENDAR/);
   assert.match(String(result.data), /איסוף/);
   assert.match(String(result.data), /החזרה/);
-  result = await request(`/api/items/${itemId}/availability-calendar?from=2026-10-08&days=7`);
+  result = await request(`/api/items/${itemId}/availability-calendar?from=${fixtureDate("2026-10-08")}&days=7`);
   assert.equal(result.response.status, 200, JSON.stringify(result.data));
   assert.equal(result.data.days.length, 7);
   assert.equal(result.data.days[0].available, 1,"one of two units remains available during the approved quantity-1 loan");
@@ -681,7 +706,7 @@ try {
   result = await request("/api/items", { method: "POST", cookie: adminCookie, body: { organizationId, title: "פריט בדיקת אי הגעה", category: "אירועים", condition: "מצב טוב", quantity: 1, description: "פריט ייעודי לבדיקת זרימת אי הגעה במערכת.", loanConditions: "איסוף עצמי", freeConfirmed: true } });
   assert.equal(result.response.status, 201, JSON.stringify(result.data));
   const noShowItemId=result.data.item.id;
-  result = await request("/api/loan-requests", { method:"POST",cookie:borrowerCookie,body:{itemId:noShowItemId,requestedFrom:"2026-11-12T10:00",requestedUntil:"2026-11-13T10:00",quantity:1,depositAccepted:true,phone:"052-7654321",note:"בדיקת אי הגעה"} });
+  result = await request("/api/loan-requests", { method:"POST",cookie:borrowerCookie,body:{itemId:noShowItemId,requestedFrom:`${fixtureDate("2026-11-12")}T10:00`,requestedUntil:`${fixtureDate("2026-11-13")}T10:00`,quantity:1,depositAccepted:true,phone:"052-7654321",note:"בדיקת אי הגעה"} });
   assert.equal(result.response.status,201,JSON.stringify(result.data));
   const noShowRequestId=result.data.request.id;
   result = await request(`/api/loan-requests/${noShowRequestId}/status`,{method:"PATCH",cookie:adminCookie,body:{status:"approved"}});
@@ -706,7 +731,7 @@ try {
   assert.ok(result.data.includes("ערכת קישוטים לבדיקה"));
   result = await request(`/api/loan-requests/${requestId}/messages`, { cookie: secondCookie });
   assert.equal(result.response.status, 403);
-  result = await request("/api/loan-requests", { method: "POST", cookie: secondCookie, body: { itemId, requestedFrom: "2026-10-09T10:00", requestedUntil: "2026-10-11T10:00", quantity: 1, depositAccepted: true, phone: "054-1112233", note: "צריך לאירוע נוסף" } });
+  result = await request("/api/loan-requests", { method: "POST", cookie: secondCookie, body: { itemId, requestedFrom: `${fixtureDate("2026-10-09")}T10:00`, requestedUntil: `${fixtureDate("2026-10-11")}T10:00`, quantity: 1, depositAccepted: true, phone: "054-1112233", note: "צריך לאירוע נוסף" } });
   assert.ok([201,409].includes(result.response.status), "An overlapping second request must either reserve another available unit or return a clean inventory conflict");
 
   result = await request("/api/reports", { method: "POST", cookie: borrowerCookie, body: { itemId, reason: "incorrect", details: "בדיקת זרימת הדיווח" } });
@@ -823,13 +848,13 @@ try {
   const publicDiscovery=(await request('/api/discovery')).data.organizations;
   for(const org of publicDiscovery)for(const key of ['address','phone','latitude','longitude'])assert.equal(Object.hasOwn(org,key),false,`Discovery leaks ${key}`);
 
-  const pickupBody={itemId,requestedFrom:'2026-10-15T10:00',requestedUntil:'2026-10-16T12:00',quantity:1,depositAccepted:true,phone:'052-7654321'};
+  const pickupBody={itemId,requestedFrom:`${fixtureDate("2026-10-15")}T10:00`,requestedUntil:`${fixtureDate("2026-10-16")}T12:00`,quantity:1,depositAccepted:true,phone:'052-7654321'};
   result=await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:pickupBody});assert.equal(result.response.status,400,'Multiple branches require an explicit choice');
   result=await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:{...pickupBody,branchId:'foreign'}});assert.equal(result.response.status,400,'Reject unrelated branch');
   result=await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:{...pickupBody,branchId}});assert.equal(result.response.status,201,JSON.stringify(result.data));
   const pickupLoan=result.data.request.id;assert.equal((await db.prepare('SELECT branch_id FROM loan_requests WHERE id=?').bind(pickupLoan).first()).branch_id,branchId);
   result=await request('/api/loan-requests',{method:'POST',cookie:borrowerCookie,body:{...pickupBody,branchId}});assert.equal(result.response.status,409,'Full branch must not borrow stock from another branch');
-  result=await request(`/api/items/${itemId}/availability-check?from=2026-10-15T10%3A00&until=2026-10-16T12%3A00&branchId=pickup-second`);assert.equal(result.response.status,200,JSON.stringify(result.data));assert.equal(result.data.availableQuantity,1);
+  result=await request(`/api/items/${itemId}/availability-check?from=${fixtureDate("2026-10-15")}T10%3A00&until=${fixtureDate("2026-10-16")}T12%3A00&branchId=pickup-second`);assert.equal(result.response.status,200,JSON.stringify(result.data));assert.equal(result.data.availableQuantity,1);
   await db.prepare("UPDATE loan_requests SET status='approved' WHERE id=?").bind(pickupLoan).run();
   result=await request(`/api/loan-requests/${pickupLoan}/assign-units`,{method:'POST',cookie:adminCookie,body:{unitIds:[branchUnits[1].id]}});assert.equal(result.response.status,409,'Pickup assignment cannot silently change the selected branch');
 

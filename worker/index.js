@@ -1,3 +1,4 @@
+import { itemManagementMode, directItemGuard } from "./item-modes.js";
 import { ensureContactPreferences, getContactPreferences, contactPreferencesInput, contactPreferencesStatement, contactView } from "./contact-preferences.js";
 import { ensureOrganizationChats, isOrganizationChat, chatMessageTable } from "./organization-chats.js";
 import { ensureServiceRanges, getServiceRange, serviceRangeInput, serviceRangeStatement, resolveServiceLocation, evaluateServiceRange, distanceKm } from "./service-range.js";
@@ -267,7 +268,8 @@ async function bulkInventoryAction(request,env,organizationId){
   const allowed=new Set(["activate","deactivate","availability","quantity","category"]);if(!allowed.has(body.action))throw new HttpError(400,"פעולת המלאי אינה תקינה");
   let affected=0;
   for(const id of ids){
-    const item=await env.DB.prepare("SELECT id FROM items WHERE id=? AND organization_id=? AND deleted_at IS NULL").bind(id,organizationId).first();if(!item)continue;
+    const item=await env.DB.prepare("SELECT id,management_mode FROM items WHERE id=? AND organization_id=? AND deleted_at IS NULL").bind(id,organizationId).first();if(!item)continue;
+    if(item.management_mode==="direct"&&["quantity","availability"].includes(body.action))continue;
     if(body.action==="activate")affected+=(await env.DB.prepare("UPDATE items SET status='active',updated_at=? WHERE id=?").bind(new Date().toISOString(),id).run()).meta.changes||0;
     else if(body.action==="deactivate")affected+=(await env.DB.prepare("UPDATE items SET status='pending',updated_at=? WHERE id=?").bind(new Date().toISOString(),id).run()).meta.changes||0;
     else if(body.action==="availability"){const v=body.availability==="unavailable"?"unavailable":"available";affected+=(await env.DB.prepare("UPDATE items SET availability_status=?,updated_at=? WHERE id=?").bind(v,new Date().toISOString(),id).run()).meta.changes||0;}
@@ -344,6 +346,8 @@ export default {
         if (expansionPreflight) return withSecurityHeaders(expansionPreflight);
         const organizationChatRoute=/^\/api\/(?:organization-chat|organizations\/[^/]+\/chat-requests|loan-requests\/gc-|messages\/gc-)/.test(url.pathname);
         if(organizationChatRoute){const response=await routeApi(request,env,ctx,url);return withSecurityHeaders(response);}
+        const directGuard = await directItemGuard(request, env, url);
+        if (directGuard) return withSecurityHeaders(directGuard);
         const completionResponse = await handlePlatformCompletionApi(request, env, ctx, url);
         if (completionResponse) {
           if (!["GET","HEAD","OPTIONS"].includes(request.method) && completionResponse.ok) await invalidatePublicSnapshotRoots(url.origin);
@@ -612,6 +616,7 @@ async function ensureAdvancedBookingSchema(env) {
   const itemInfo=await env.DB.prepare("PRAGMA table_info(items)").all();
   const itemColumns=new Set((itemInfo.results||[]).map(row=>row.name));
   const itemAdds=[
+    ["management_mode","TEXT NOT NULL DEFAULT 'managed' CHECK (management_mode IN ('managed','direct'))"],
     ["min_loan_minutes","INTEGER NOT NULL DEFAULT 60 CHECK (min_loan_minutes >= 1)"],
     ["max_loan_minutes","INTEGER NOT NULL DEFAULT 10080 CHECK (max_loan_minutes >= 1)"],
     ["booking_notice_minutes","INTEGER NOT NULL DEFAULT 0 CHECK (booking_notice_minutes >= 0)"],
@@ -1746,7 +1751,7 @@ async function getItem(env, id, ctx) {
   `).bind(id).first();
   if (!row) throw new HttpError(404, "הפריט לא נמצא");
   await attachItemEnglish(env,[row],ctx);
-  return json({ item: {...mapItem(row),titleEnglish:row.titleEnglish,descriptionEnglish:row.descriptionEnglish,englishStatus:row.englishStatus} });
+  return json({ item: {...mapItem(row),contact:row.management_mode==="direct"?await contactView(env,row.org_id,{approved:true}):undefined,titleEnglish:row.titleEnglish,descriptionEnglish:row.descriptionEnglish,englishStatus:row.englishStatus} });
 }
 
 async function discovery(env, url) {
@@ -2063,6 +2068,8 @@ function moneyAgorot(value){ const n=Number(value); if(!Number.isFinite(n)||n<0|
 
 async function notifyMatchingSavedSearches(env,item){const rows=await env.DB.prepare("SELECT id,user_id,name,filters_json FROM saved_searches WHERE notify=1").all();for(const row of rows.results||[]){const f=safeJsonObject(row.filters_json),q=String(f.query||"").trim().toLowerCase(),matchesQuery=!q||[item.title,item.description,item.organizationName].some(v=>String(v||"").toLowerCase().includes(q)),matchesCity=!f.city||String(f.city)===String(item.city),matchesCategory=!f.category||String(f.category)===String(item.category),matchesSubcategory=!f.subcategory||String(f.subcategory)===String(item.subcategory||""),matchesCondition=!f.condition||String(f.condition)===String(item.condition);if(matchesQuery&&matchesCity&&matchesCategory&&matchesSubcategory&&matchesCondition)await notificationStatement(env,row.user_id,"status","פריט חדש מתאים לחיפוש שמור",`${item.title} נוסף ומתאים לחיפוש "${row.name}".`,null).run()}}
 
+function parseItemManagementMode(value,fallback="managed"){try{return itemManagementMode(value,fallback)}catch(e){throw new HttpError(e.status||400,e.message)}}
+
 async function createItem(request, env, ctx) {
   const user = await requireUser(request, env);
   const body = await readJson(request);
@@ -2077,7 +2084,8 @@ async function createItem(request, env, ctx) {
   const condition = conditionInfo.base;
   const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
   if (!categoryRow) throw new HttpError(400, "נא לבחור קטגוריה תקינה");
-  const quantity = Number(body.quantity);
+  const managementMode=parseItemManagementMode(body.managementMode);
+  const quantity = managementMode==="direct"?1:Number(body.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw new HttpError(400, "כמות הפריטים אינה תקינה");
   const title = cleanText(body.title, 2, 120, "שם הפריט");
   const minLoanMinutes=positiveInt(body.minLoanMinutes,60,1,525600,"משך מינימלי");
@@ -2088,8 +2096,8 @@ async function createItem(request, env, ctx) {
   const itemInsert=env.DB.prepare(`
     INSERT INTO items (id,organization_id,title,category,description,condition,condition_detail,quantity,loan_conditions,city,neighborhood,item_type,subcategory,tags_json,pickup_method,inventory_updated_at,
       min_loan_minutes,max_loan_minutes,booking_notice_minutes,turnaround_minutes,booking_horizon_days,approval_mode,deposit_required,deposit_amount_agorot,
-      publish_at,max_per_user,preparation_minutes,max_loan_days,service_radius_km,status,availability_status,is_free,icon,cover_color)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active','available',1,'box','#e6f2ef')
+      publish_at,max_per_user,preparation_minutes,max_loan_days,service_radius_km,management_mode,status,availability_status,is_free,icon,cover_color)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'active','available',1,'box','#e6f2ef')
   `).bind(
     id,
     organizationId,
@@ -2111,7 +2119,7 @@ async function createItem(request, env, ctx) {
     body.maxPerUser?positiveInt(body.maxPerUser,1,1,999,"מגבלה למשתמש"):null,
     positiveInt(body.preparationMinutes,0,0,10080,"זמן הכנה"),
     body.maxLoanDays?positiveInt(body.maxLoanDays,1,1,3650,"ימי השאלה מרביים"):null,
-    body.serviceRadiusKm?Math.max(0.1,Math.min(500,Number(body.serviceRadiusKm))):null
+    body.serviceRadiusKm?Math.max(0.1,Math.min(500,Number(body.serviceRadiusKm))):null,managementMode
   );
   await env.DB.batch([itemInsert,...(loanCost.mode==="nominal"?[loanCostStatement(env,id,loanCost)]:[])]);
   if(body.bookingHorizonMinutes!==undefined)await env.DB.prepare("UPDATE items SET booking_horizon_minutes=? WHERE id=?").bind(positiveInt(body.bookingHorizonMinutes,525600,1,1576800,"טווח הזמנה"),id).run();
@@ -2120,7 +2128,7 @@ async function createItem(request, env, ctx) {
   if(publishStatus!=="active") await env.DB.prepare("UPDATE items SET status='pending' WHERE id=?").bind(id).run();
   else await env.DB.prepare("UPDATE organizations SET is_hidden=0,updated_at=? WHERE id=?").bind(new Date().toISOString(),organizationId).run();
   await env.DB.prepare("INSERT INTO organization_onboarding(organization_id,first_item_added) VALUES(?,1) ON CONFLICT(organization_id) DO UPDATE SET first_item_added=1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')").bind(organizationId).run().catch(()=>{});
-  await syncItemUnitsToQuantity(env,id,quantity);
+  if(managementMode==="managed")await syncItemUnitsToQuantity(env,id,quantity);
   if(publishStatus==="active"){await notifyMatchingSavedSearches(env,{id,title,description:body.description,organizationName:organization.name,city:organization.city,category,condition});await notifySavedFollowers(env,{itemId:id,organizationId,category,title,event:"created"});}
   ctx?.waitUntil(prepareSavedItemEnglish(env,id,ctx).catch(()=>{}));
   return json({ item: { id, status: publishStatus,publishAt } }, 201);
@@ -2151,7 +2159,12 @@ async function updateItem(request, env, id, ctx) {
   const condition = conditionInfo.base;
   const categoryRow=await env.DB.prepare("SELECT id FROM categories WHERE status='active' AND (name_he=? OR id=?) LIMIT 1").bind(category,category).first();
   if (!categoryRow) throw new HttpError(400, "נא לבחור קטגוריה תקינה");
-  const quantity = Number(body.quantity);
+  const managementMode=parseItemManagementMode(body.managementMode,existing.management_mode||"managed");
+  if(managementMode==="direct"&&existing.management_mode!=="direct"){
+    const active=await env.DB.prepare("SELECT id FROM loan_requests WHERE item_id=? AND status IN ('pending','approved','collected') LIMIT 1").bind(id).first();
+    if(active)throw new HttpError(409,"יש לסיים את הבקשות וההשאלות הפעילות לפני מעבר לתיאום ישיר");
+  }
+  const quantity = managementMode==="direct"?Number(existing.quantity||1):Number(body.quantity);
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) throw new HttpError(400, "כמות הפריטים אינה תקינה");
   const existingUnits=await env.DB.prepare("SELECT COUNT(*) AS count FROM item_units WHERE item_id=? AND status!='retired'").bind(id).first();
   if(Number(existingUnits?.count||0)>quantity){
@@ -2173,9 +2186,9 @@ async function updateItem(request, env, id, ctx) {
     return String(next??"")!==String(existing[key]??"");
   });
   const costChanged=loanCost.mode!==(existing.payment_mode||'free')||loanCost.explanation!==(existing.cost_explanation||'');
-  const itemUpdate=env.DB.prepare(`UPDATE items SET title = ?, category = ?, description = ?, condition = ?, condition_detail=?, quantity = ?, loan_conditions = ?,item_type=?,pickup_method=?,subcategory=?,tags_json=?,inventory_updated_at=?,
+  const itemUpdate=env.DB.prepare(`UPDATE items SET management_mode=?,title = ?, category = ?, description = ?, condition = ?, condition_detail=?, quantity = ?, loan_conditions = ?,item_type=?,pickup_method=?,subcategory=?,tags_json=?,inventory_updated_at=?,
     city = ?, neighborhood = ?, status = ?, material_version=material_version+?,last_material_change_at=CASE WHEN ? THEN ? ELSE last_material_change_at END, updated_at = ? WHERE id = ?`).bind(
-    values.title, category, values.description, condition, conditionInfo.detail, quantity, values.loanConditions,values.itemType,values.pickupMethod,values.subcategory,values.tagsJson,new Date().toISOString(),
+    managementMode,values.title, category, values.description, condition, conditionInfo.detail, quantity, values.loanConditions,values.itemType,values.pickupMethod,values.subcategory,values.tagsJson,new Date().toISOString(),
     existing.org_city, existing.org_neighborhood, status, (materialChange||costChanged)?1:0,(materialChange||costChanged)?1:0,new Date().toISOString(),new Date().toISOString(), id
   );
   await env.DB.batch([itemUpdate,loanCostStatement(env,id,loanCost)]);
@@ -2202,7 +2215,8 @@ async function updateItem(request, env, id, ctx) {
     positiveInt(body.bookingHorizonDays,Number(existing.booking_horizon_days||365),1,1095,"טווח הזמנה"),
     body.approvalMode==="automatic"?"automatic":"manual",body.depositRequired?1:0,body.depositRequired?moneyAgorot(body.depositAmount):0,publishAt,maxPerUser,preparationMinutes,maxLoanDays,serviceRadiusKm,nextStatus,id).run();
   if(body.bookingHorizonMinutes!==undefined)await env.DB.prepare("UPDATE items SET booking_horizon_minutes=? WHERE id=?").bind(positiveInt(body.bookingHorizonMinutes,Number(existing.booking_horizon_minutes||existing.booking_horizon_days*1440),1,1576800,"טווח הזמנה"),id).run();
-  await syncItemUnitsToQuantity(env,id,quantity);
+  if(managementMode==="managed")await syncItemUnitsToQuantity(env,id,quantity);
+  else await env.DB.prepare("UPDATE waitlist_entries SET status='cancelled' WHERE item_id=? AND status IN ('waiting','notified')").bind(id).run();
   ctx?.waitUntil(prepareSavedItemEnglish(env,id,ctx).catch(()=>{}));
   return json({ item: { id, status:nextStatus,publishAt,maxPerUser,preparationMinutes,maxLoanDays,serviceRadiusKm } });
 }
@@ -2760,7 +2774,10 @@ async function routeOrganizationChats(request,env,url){
     if(existing)return json({chatRequest:existing});
     if(org.temporarily_closed)throw new HttpError(409,"הגמ״ח סגור זמנית");
     const item=await env.DB.prepare("SELECT id FROM items WHERE organization_id=? AND status='active' AND deleted_at IS NULL LIMIT 1").bind(orgId).first();
-    if(item)throw new HttpError(409,"בגמ״ח זה יש לבחור פריט ולשלוח בקשת השאלה");
+    const directItem=await env.DB.prepare("SELECT id FROM items WHERE organization_id=? AND management_mode='direct' AND status='active' AND deleted_at IS NULL LIMIT 1").bind(orgId).first();
+    if(item&&!directItem)throw new HttpError(409,"בגמ״ח זה יש לבחור פריט ולשלוח בקשת השאלה");
+    const contactSettings=await getContactPreferences(env,orgId);
+    if(!contactSettings.channels.includes('chat'))throw new HttpError(403,"מנהל הגמ״ח לא בחר לקבל פניות בצ׳אט");
     const blocked=await env.DB.prepare('SELECT 1 FROM user_blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?) LIMIT 1').bind(user.id,org.owner_id,org.owner_id,user.id).first();
     if(blocked)throw new HttpError(403,"לא ניתן לשלוח בקשה למשתמש הזה");
     const eligibility=await organizationServiceEligibility(env,orgId,user),exception=eligibility.outside&&eligibility.exceptionAvailable&&body.distanceException===true;
@@ -3461,8 +3478,9 @@ async function createAutomaticItemUnit(env,item,condition){
   return {id,serialNumber:serial};
 }
 async function syncItemUnitsToQuantity(env,itemId,desiredQuantity){
-  const item=await env.DB.prepare("SELECT id,organization_id,title,serial_prefix,condition,condition_detail,quantity FROM items WHERE id=?").bind(itemId).first();
+  const item=await env.DB.prepare("SELECT id,organization_id,title,serial_prefix,condition,condition_detail,quantity,management_mode FROM items WHERE id=?").bind(itemId).first();
   if(!item)throw new HttpError(404,"הפריט לא נמצא");
+  if(item.management_mode==="direct")return {created:[],retired:[]};
   const desired=Math.max(1,Number(desiredQuantity||item.quantity||1));
   const rows=await env.DB.prepare("SELECT id,serial_number,status FROM item_units WHERE item_id=? AND status!='retired' ORDER BY created_at,id").bind(itemId).all();
   const active=rows.results||[],created=[],retired=[];
@@ -3921,6 +3939,8 @@ function publicUser(user) {
 
 function mapItem(row) {
   return {
+    managementMode: row.management_mode || "managed",
+    management_mode: row.management_mode || "managed",
     id: row.id,
     title: row.title,
     paymentMode:row.payment_mode||"free",

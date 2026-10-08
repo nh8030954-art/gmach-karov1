@@ -21,7 +21,7 @@ async function openMultiRange(itemId){
  d.showModal();
 }
 function installItemMultiRange(){
- const host=$("#item-dialog-content"),itemId=host?.dataset.itemId;if(!host||!itemId||host.querySelector("[data-multi-range]"))return;
+ const host=$("#item-dialog-content"),itemId=host?.dataset.itemId;if(!host||host.dataset.managementMode==="direct"||!itemId||host.querySelector("[data-multi-range]"))return;
  const actions=$(".detail-actions",host);if(!actions)return;const b=document.createElement("button");b.type="button";b.className="button button-secondary";b.dataset.multiRange="1";b.textContent=tr("כמה טווחים","Multiple periods");b.onclick=()=>openMultiRange(itemId);actions.append(b);
 }
 
