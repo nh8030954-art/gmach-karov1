@@ -29,7 +29,7 @@
 
   const state = {
     serverAvailable: false, items: [], filteredItems: [], favorites: new Set(), user: null, selectedItem: null,
-    visibleCount: 8, visibleOrganizationCount: 6, activeCategory: "", compareIds: new Set(), pendingAction: null, dashboardTab: "requests", myOrganizations: [], dashboard: null, authMode: "login",
+    visibleCount: 6, visibleOrganizationCount: 6, activeCategory: "", compareIds: new Set(), pendingAction: null, dashboardTab: "requests", myOrganizations: [], dashboard: null, authMode: "login",
     editingOrganizationId: null, editingItemId: null, chatRequestId: null, chatTimer: null, notifications: [],
     customizations: new Map(), visualEditMode: false, selectedEditable: null, pendingVerificationEmail: "", supportEmail: "",
     discovery: { categories: [], cities: [], suggestions: [], organizations: [] }, categoryAliases: [], categoryCatalog: [], pendingCommunityItem: null, viewMode: "list"
@@ -469,7 +469,7 @@
     return score;
   }
   function applyFilters({ resetVisible = true } = {}) {
-    if (resetVisible) state.visibleCount = 8;
+    if (resetVisible) state.visibleCount = 6;
     const query = normalize($("#search-input").value), city = $("#city-filter").value, category = $("#category-filter").value, subcategory = $("#subcategory-filter")?.value||"", condition = $("#condition-filter").value, availableOnly = $("#available-only").checked, type = $("#type-filter").value, pickup = "";
     const dynamicAliases=state.categoryAliases.flatMap(row=>{const values=[row.nameHe,row.nameEn,...row.synonyms].filter(Boolean);return values.some(value=>query.includes(normalize(value))||normalize(value).includes(query))?values:[];});
     const translatedAliases=(window.GmachSearchAliases?.()||[]).filter(([he,en])=>{const value=normalize(en);return query.length>=3&&(value.includes(query)||query.includes(value))}).map(([he])=>he);
@@ -1470,7 +1470,7 @@
     ["#nav-community-board","#mobile-community-board"].forEach(selector=>$(selector).addEventListener("click",()=>openCommunityBoard(1)));
     $("#community-board-filter").addEventListener("submit",event=>{event.preventDefault();openCommunityBoard(1)});
     $("#filters-button").addEventListener("click", () => { const panel = $("#filter-panel"); panel.hidden = !panel.hidden; $("#filters-button").setAttribute("aria-expanded", String(!panel.hidden)); }); $("#clear-filters").addEventListener("click", resetFilters); $("#empty-clear-button").addEventListener("click", handleEmptyAction); $("#all-categories-button").addEventListener("click", () => { resetFilters(); $("#catalog").scrollIntoView({ behavior: "smooth" }); });
-    $$('[data-category]').forEach(button => button.addEventListener("click", () => { state.activeCategory = button.dataset.category; $("#category-filter").value = button.dataset.category; $("#hero-category-filter").value = button.dataset.category; updateCatalogSubcategories(); $$('[data-category]').forEach(other => other.classList.toggle("is-active", other === button)); applyFilters(); $("#catalog").scrollIntoView({ behavior: "smooth", block: "start" }); })); $("#load-more-organizations-button").addEventListener("click", () => { state.visibleOrganizationCount += 6; renderHomeOrganizations(); }); $("#load-more-button").addEventListener("click", () => { state.visibleCount += 8; renderItems(); });
+    $$('[data-category]').forEach(button => button.addEventListener("click", () => { state.activeCategory = button.dataset.category; $("#category-filter").value = button.dataset.category; $("#hero-category-filter").value = button.dataset.category; updateCatalogSubcategories(); $$('[data-category]').forEach(other => other.classList.toggle("is-active", other === button)); applyFilters(); $("#catalog").scrollIntoView({ behavior: "smooth", block: "start" }); })); $("#load-more-organizations-button").addEventListener("click", () => { state.visibleOrganizationCount += 6; renderHomeOrganizations(); }); $("#load-more-button").addEventListener("click", () => { state.visibleCount += 6; renderItems(); });
     $$('[data-close-dialog]').forEach(button => button.addEventListener("click", () => closeDialog(button.closest("dialog")))); $$("dialog").forEach(dialog => { dialog.addEventListener("click", event => { if (event.target === dialog) closeDialog(dialog); }); dialog.addEventListener("close", () => { if (dialog.id === "chat-dialog") { stopChatPolling(); state.chatRequestId = null; } if (dialog.id === "item-form-dialog") $("#item-gmach").disabled = false; if (!$("dialog[open]")) document.body.classList.remove("dialog-open"); }); }); $$('[data-auth-mode]').forEach(button => button.addEventListener("click", () => setAuthMode(button.dataset.authMode)));
 
     $("#auth-form").addEventListener("submit", async event => {
