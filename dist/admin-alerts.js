@@ -18,4 +18,34 @@ window.addEventListener('gmach:admin-notification',async e=>{if(document.querySe
 });
 function install(){const admin=document.querySelector('#admin-tab'),actions=document.querySelector('#dashboard-view .dashboard-actions');if(!admin||admin.hidden||!actions||actions.querySelector('[data-gmach-research]'))return;const b=document.createElement('button');b.type='button';b.className='button button-secondary';b.dataset.gmachResearch='1';b.textContent=t('בדיקות גמ״חים','Gmach checks');b.onclick=()=>openResearch();actions.append(b)}
 new MutationObserver(install).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']});install();
+function installDashboardSummary(){
+ const dashboard=document.querySelector('#dashboard-view'),admin=document.querySelector('#admin-tab'),personal=dashboard?.querySelector('.dashboard-stats'),name=document.querySelector('#dashboard-name');
+ if(!dashboard||!admin||!personal)return;
+ const section=document.createElement('section');section.id='admin-dashboard-summary';section.hidden=true;section.setAttribute('aria-live','polite');personal.before(section);
+ let activeKey=null,generation=0,stats=null;
+ const eligible=()=>!dashboard.hidden&&!admin.hidden;
+ const render=()=>{
+  section.innerHTML=`<h2 style="font-size:1.1rem;margin:16px 0 8px">${t('סיכום האתר','Site overview')}</h2><div class="stats-grid dashboard-stats" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">${[['users','משתמשים','Users'],['organizations','גמ״חים','Gmachs'],['items','פריטים','Items'],['requests','בקשות השאלה','Loan requests']].map(([key,he,en])=>`<article><div><strong>${new Intl.NumberFormat(document.documentElement.lang==='en'?'en-GB':'he-IL').format(stats[key])}</strong><span>${t(he,en)}</span></div></article>`).join('')}</div>`;
+ };
+ const update=async()=>{
+  if(!eligible()){activeKey=null;generation++;stats=null;section.hidden=true;section.replaceChildren();return;}
+  const key=name?.textContent||'admin';section.hidden=false;
+  if(activeKey===key){if(stats)render();return;}
+  activeKey=key;stats=null;const requestGeneration=++generation;
+  section.textContent=t('טוענים את סיכום האתר…','Loading site overview…');
+  try{
+   const result=await api('/api/admin/overview');
+   if(requestGeneration!==generation||!eligible())return;
+   const values=result.stats;
+   if(!values||['users','organizations','items','requests'].some(k=>!Number.isSafeInteger(values[k])||values[k]<0))throw new Error(t('נתוני הסיכום אינם זמינים כרגע','Overview data is unavailable'));
+   stats=values;render();
+  }catch(error){if(requestGeneration===generation&&eligible())section.textContent=error.message;}
+ };
+ const observer=new MutationObserver(update);
+ observer.observe(dashboard,{attributes:true,attributeFilter:['hidden']});observer.observe(admin,{attributes:true,attributeFilter:['hidden']});
+ if(name)observer.observe(name,{childList:true,characterData:true,subtree:true});
+ new MutationObserver(()=>{if(eligible()&&stats)render();}).observe(document.documentElement,{attributes:true,attributeFilter:['lang']});
+ update();
+}
+installDashboardSummary();
 })();
