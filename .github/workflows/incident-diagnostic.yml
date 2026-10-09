@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          RAW="$(npx wrangler d1 execute DB --remote --json --command "SELECT path,method,message,created_at FROM server_errors WHERE resolved_at IS NULL AND created_at>=datetime('now','-24 hours') ORDER BY created_at DESC LIMIT 60" 2>/dev/null)"
+          RAW="$(npx wrangler d1 execute DB --remote --json --command "SELECT 'diagnostic' AS path,'READ' AS method,json_object('incident',(SELECT json_object('path',path,'method',method,'message',message,'created_at',created_at) FROM server_errors WHERE request_id='179152232947094391' LIMIT 1),'health',(SELECT json(payload_json) FROM operational_health_snapshots ORDER BY created_at DESC LIMIT 1),'alerts',(SELECT json_group_array(json_object('type',alert_type,'severity',severity,'details',details_json,'created_at',created_at)) FROM system_alerts WHERE resolved_at IS NULL)) AS message,datetime('now') AS created_at" 2>/dev/null)"
           export RAW
           node --input-type=module <<'NODE'
           const raw=JSON.parse(process.env.RAW||"[]");
