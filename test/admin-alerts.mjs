@@ -42,6 +42,15 @@ await dispatchNotificationEvents(pausedEnv);
 assert.deepEqual(pauseReads,[],'All background notification reads stop; pending events remain stored until expiry');
 const jobs=[];await worker.scheduled({cron:'*/15 * * * *'},pausedEnv,{waitUntil(promise){jobs.push(promise)}});await Promise.all(jobs);
 assert.equal(pauseReads.length,0,'Scheduled tasks perform zero D1 reads during the pause');
+const idleJobs=[];await worker.scheduled({cron:'*/15 * * * *'},{DB:{prepare(){throw new Error('No periodic D1 work is allowed')}}},{waitUntil(p){idleJobs.push(p)}});await Promise.all(idleJobs);
+assert.deepEqual(idleJobs,[],'Scheduled handler stays disabled after the temporary pause expires');
+const workerSource=await readFile('worker/index.js','utf8');
+const bellSource=workerSource.slice(workerSource.indexOf('async function listNotifications('),workerSource.indexOf('async function markNotificationsRead('));
+assert.ok(!bellSource.includes('syncAdminBell('),'Opening the bell never scans source history');
+const config=JSON.parse(await readFile('wrangler.jsonc','utf8'));
+assert.equal(config.vars.D1_CONSERVE_UNTIL,'','Interactive site operations are restored');
+assert.deepEqual(config.triggers.crons,[],'No site cron triggers remain');
+
 for(const [path,method,status] of [['/api/admin/overview','GET',503],['/api/admin/operations/health','GET',503],['/api/notifications','GET',503],['/api/notifications/live','GET',503],['/api/loan-requests/example/messages','GET',503],['/api/performance','POST',202],['/api/analytics/visit','POST',202]]){
   const response=await worker.fetch(new Request('https://gmach-berega.co.il'+path,{method}),pausedEnv,{waitUntil(){}});
   assert.equal(response.status,status,path);assert.equal(pauseReads.length,0,path+' must be paused before authentication, schema and closure queries');

@@ -1,3 +1,4 @@
+import {reconcileItemDeadlines} from './loan-deadlines.js';
 import {deferNonessentialD1} from './d1-conservation.js';
 import { openNotificationChannel, dispatchNotificationEvents } from './notification-events.js';
 export { NotificationHub } from './notification-events.js';
@@ -398,7 +399,7 @@ export default {
           }
           try {
             const response = await routeApi(request, env, ctx, url);
-        if(response.ok&&(!["GET","HEAD","OPTIONS"].includes(request.method)||url.pathname==="/api/notifications"))ctx.waitUntil(dispatchNotificationEvents(env).catch(error=>console.error("Notification delivery failed",error)));
+        if(response.ok&&(!["GET","HEAD","OPTIONS"].includes(request.method)))ctx.waitUntil(dispatchNotificationEvents(env).catch(error=>console.error("Notification delivery failed",error)));
             if (response.ok) {
               const cachedAt = new Date().toISOString();
               const storedHeaders = new Headers(response.headers);
@@ -425,7 +426,7 @@ export default {
           }
         }
         const response = await routeApi(request, env, ctx, url);
-        if(response.ok&&(!["GET","HEAD","OPTIONS"].includes(request.method)||url.pathname==="/api/notifications"))ctx.waitUntil(dispatchNotificationEvents(env).catch(error=>console.error("Notification delivery failed",error)));
+        if(response.ok&&(!["GET","HEAD","OPTIONS"].includes(request.method)))ctx.waitUntil(dispatchNotificationEvents(env).catch(error=>console.error("Notification delivery failed",error)));
         if (!["GET","HEAD","OPTIONS"].includes(request.method) && response.ok) await invalidatePublicSnapshotRoots(url.origin);
         return withSecurityHeaders(response);
       }
@@ -478,28 +479,9 @@ export default {
       return withSecurityHeaders(json({ error: publicMessage, requestId }, status, { "X-Request-Id": requestId, ...(d1Limit?{"Retry-After":"900"}:{}) }));
     }
   },
-  async scheduled(event, env, ctx) {
-    ctx.waitUntil((async()=>{
-      try {
-      if(deferNonessentialD1(env)){
-        // Operator requested only basic interactive site actions until this evening.
-        return;
-      }
-      // Schema reconciliation is intentionally daily. Running every ensure
-      // function every few minutes was a large, unnecessary source of D1 reads.
-      if (event.cron === "17 2 * * *") {
-        await ensurePendingRegistrations(env);
-        await env.DB.prepare("DELETE FROM pending_registrations WHERE created_at < ?").bind(new Date(Date.now()-24*60*60*1000).toISOString()).run();
-        await ensureAdvancedBookingSchema(env);
-        await ensureProductionHardeningSchema(env);
-        await ensureCompletePlatformSchema(env);
-        await ensureReviewBranchRatingSchema(env);
-        await Promise.all([ensurePlatformCompletionSchema(env),ensureFinalFeaturesSchema(env),ensureRemainingFeaturesSchema(env),ensureRequirementsExpansionSchema(env),ensureLaunchReadinessSchema(env),ensureDistributionCompletionSchema(env),ensureNavigationAdminSchema(env),ensurePrivacyAvailabilitySchema(env),ensurePrivacyPurgeSchema(env),ensureCommunityChatSchema(env)]);
-      }
-      await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), monitorGmachResearch(env),
-        runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env), runPrivacyPurgeMaintenance(env), runCommunityChatMaintenance(env)]);
-      } finally { if(!deferNonessentialD1(env))await dispatchNotificationEvents(env); }
-    })());
+  async scheduled() {
+    // Periodic site scans are disabled. Real mutations dispatch their own notifications.
+    return;
   }
 };
 
@@ -1787,6 +1769,8 @@ async function listItems(env, url, ctx) {
 }
 
 async function getItem(env, id, ctx) {
+  const deadlineChanges=await reconcileItemDeadlines(env,id);
+  if(deadlineChanges.length&&ctx)ctx.waitUntil(dispatchNotificationEvents(env));
   await ensureReviewBranchRatingSchema(env).catch(error => console.error("Review relation repair unavailable", error));
   const row = await env.DB.prepare(`
     SELECT i.*,${loanCostProjection}, o.id AS org_id, o.name AS org_name,
@@ -2375,6 +2359,7 @@ function assertAllowedPickupReturnTime(value, label) {
   }
 }
 async function availableQuantityForRange(env,itemId,from,until,turnaroundMinutes=0,excludeRequestId=null) {
+  await reconcileItemDeadlines(env,itemId);
   await reconcileSerializedQuantity(env,itemId);
   const item = await env.DB.prepare(`SELECT i.quantity,(SELECT COUNT(*) FROM item_units u WHERE u.item_id=i.id AND u.status!='retired') AS tracked_count,(SELECT COUNT(*) FROM item_units u WHERE u.item_id=i.id AND u.status IN ('available','held','loaned')) AS usable_tracked FROM items i WHERE i.id=?`).bind(itemId).first();
   if (!item) return 0;
@@ -3017,7 +3002,7 @@ async function listNotifications(request, env) {
   const user = await requireUser(request, env);
   const admin=user.role==="admin"&&Number(user.totp_enabled)===1;
   if(admin&&deferNonessentialD1(env))return json({error:'עיבוד התראות המנהל הושהה עד 20:00 לחיסכון במכסה.',deferredUntil:env.D1_CONSERVE_UNTIL},503);
-  if(admin)await syncAdminBell(env,user);
+  // Private source notifications are synchronized only by a real source event.
   const [items, unread] = await env.DB.batch([
     env.DB.prepare(`SELECT n.id,n.type,n.title,n.body,n.request_id,n.read_at,n.created_at,l.kind AS action_kind,l.target_id AS action_target FROM notifications n LEFT JOIN admin_notification_links l ON l.notification_id=n.id
       WHERE n.user_id = ? AND (?=1 OR l.notification_id IS NULL) ORDER BY n.created_at DESC LIMIT 50`).bind(user.id,admin?1:0),
@@ -3593,7 +3578,8 @@ async function reportReviewContent(request,env,reviewId){const user=await requir
 
 async function loanAccess(request,env,requestId){
   const user=await requireUser(request,env);const loan=await env.DB.prepare(`SELECT lr.*,i.organization_id,o.owner_id FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id LEFT JOIN organization_members m ON m.organization_id=o.id AND m.user_id=? WHERE lr.id=? AND (lr.borrower_id=? OR o.owner_id=? OR m.user_id IS NOT NULL OR ?='admin')`).bind(user.id,requestId,user.id,user.id,user.role).first();
-  if(!loan)throw new HttpError(404,"ההשאלה לא נמצאה או שאין הרשאה לצפות בה");return {user,loan};
+  if(!loan)throw new HttpError(404,"ההשאלה לא נמצאה או שאין הרשאה לצפות בה");
+  const changes=await reconcileItemDeadlines(env,loan.item_id);Object.assign(loan,changes.find(x=>x.id===loan.id)||{});return {user,loan};
 }
 
 async function manageLoanUnits(request,env,requestId,write=false){

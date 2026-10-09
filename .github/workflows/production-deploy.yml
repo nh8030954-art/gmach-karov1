@@ -111,7 +111,7 @@ jobs:
           if-no-files-found: error
 
       - name: Apply pending production database migrations
-        if: steps.migration_changes.outputs.changed == 'true' || steps.quota_guard.outputs.active != 'true'
+        if: steps.migration_changes.outputs.changed == 'true'
         run: |
           set +e
           OUTPUT="$(npx wrangler d1 migrations apply DB --remote 2>&1)"
@@ -126,7 +126,7 @@ jobs:
             fi
           fi
       - name: Ensure visitor analytics and reversible admin schema
-        if: steps.migration_changes.outputs.changed == 'true' || steps.quota_guard.outputs.active != 'true'
+        if: steps.migration_changes.outputs.changed == 'true'
         run: |
           npx wrangler d1 execute DB --remote --file migrations/0036_visitor_analytics.sql
           npx wrangler d1 execute DB --remote --file migrations/0037_admin_recycle_bin.sql
@@ -136,14 +136,14 @@ jobs:
           if ! git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -qx "migrations/0040_organization_chats.sql"; then exit 0; fi
           npx wrangler d1 execute DB --remote --file migrations/0040_organization_chats.sql
       - name: Ensure saved item English content schema
-        if: steps.migration_changes.outputs.changed == 'true' || steps.quota_guard.outputs.active != 'true'
+        if: steps.migration_changes.outputs.changed == 'true'
         run: npx wrangler d1 execute DB --remote --file migrations/0035_item_english_content.sql
       - name: Assign missing gmach serial numbers without renumbering
         run: |
           if ! git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -qx "scripts/ensure-gmach-serials.sql"; then exit 0; fi
           npx wrangler d1 execute DB --remote --file scripts/ensure-gmach-serials.sql
       - name: Ensure free or nominal loan pricing schema
-        if: steps.migration_changes.outputs.changed == 'true' || steps.quota_guard.outputs.active != 'true'
+        if: steps.migration_changes.outputs.changed == 'true'
         run: npx wrangler d1 execute DB --remote --file scripts/ensure-loan-costs.sql
       - name: Apply administrator email delivery choice
         run: |
@@ -182,7 +182,7 @@ jobs:
           npx wrangler d1 execute DB --remote --command "SELECT id,parent_id,name_he FROM categories WHERE id='mourning' OR parent_id='mourning'" --json > mourning-categories-state.json
           node -e "const rows=require('./mourning-categories-state.json')[0].results;if(rows.length!==9||!rows.some(r=>r.id==='mourning'&&r.parent_id===null))throw new Error('Mourning category verification failed');console.log(rows)"
       - name: Ensure private administrator alerts and research schema
-        if: steps.migration_changes.outputs.changed == 'true' || steps.quota_guard.outputs.active != 'true'
+        if: steps.migration_changes.outputs.changed == 'true'
         run: |
           npx wrangler d1 execute DB --remote --file migrations/0048_admin_bell_research.sql
           npx wrangler d1 execute DB --remote --file migrations/0049_notification_events.sql

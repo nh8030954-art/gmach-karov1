@@ -42,12 +42,9 @@
   "observability": {
     "enabled": true
   },
-  "vars": {"D1_CONSERVE_UNTIL": "2026-10-09T17:00:00Z"},
+  "vars": {"D1_CONSERVE_UNTIL": ""},
   "triggers": {
-    "crons": [
-      "*/15 * * * *",
-      "17 2 * * *"
-    ]
+    "crons": []
   },
   "routes": [
     {

@@ -1,3 +1,4 @@
+import {reconcileItemDeadlines} from '../worker/loan-deadlines.js';
 import assert from 'node:assert/strict';
 import {readArchiveBackup,monitorArchiveBackup,LEGACY_BACKUP_ALERTS} from '../worker/archive-backup.js';
 import {runPlatformCompletionMaintenance,handlePlatformCompletionApi} from '../worker/platform-completion.js';
@@ -30,3 +31,15 @@ assert.ok(!platformWrites.some(sql=>sql.includes('backup_runs')||sql.includes('b
 const blocked=await handlePlatformCompletionApi(new Request('https://example.test/api/admin/backups/run',{method:'POST',headers:{Cookie:'gmach_session=test'}}),platformEnv,{},new URL('https://example.test/api/admin/backups/run'));
 assert.equal(blocked.status,410,'Legacy manual endpoint cannot start an internal backup');
 console.log('Platform internal backups and periodic saved-search reads/writes disabled; legacy backup endpoint rejected');
+
+const deadlineRows=[{id:'expired',status:'pending',workflow_status:'inventory_held',borrower_id:'borrower',owner_id:'owner',title:'Example'},{id:'missed',status:'approved',workflow_status:'approved_ready_for_pickup',borrower_id:'borrower',owner_id:'owner',title:'Example'},{id:'late',status:'collected',workflow_status:'awaiting_return',borrower_id:'borrower',owner_id:'owner',title:'Example'}];
+const deadlineWrites=[],updated=new Set();
+const deadlineDB={prepare(sql){let args=[];return {bind(...a){args=a;return this},async all(){assert.equal(args[0],'item-target','Only the requested item is inspected');return {results:deadlineRows}},async run(){deadlineWrites.push(sql);if(sql.startsWith('UPDATE loan_requests')){const id=args[5];if(updated.has(id))return {meta:{changes:0}};updated.add(id)}return {meta:{changes:1}}}}},async batch(statements){return Promise.all(statements.map(x=>x.run()))}};
+const deadlineChanges=await reconcileItemDeadlines({DB:deadlineDB},'item-target');
+assert.deepEqual(deadlineChanges.map(x=>x.workflow_status),['hold_expired','pickup_expired','overdue']);
+assert.equal(deadlineChanges[0].status,'cancelled');
+assert.ok(deadlineWrites.some(sql=>sql.startsWith('UPDATE inventory_holds')));
+assert.ok(deadlineWrites.some(sql=>sql.startsWith('UPDATE item_units')));
+const noticeCount=()=>deadlineWrites.filter(sql=>sql.startsWith('INSERT INTO notifications')).length;
+assert.equal(noticeCount(),6);assert.deepEqual(await reconcileItemDeadlines({DB:deadlineDB},'item-target'),[]);assert.equal(noticeCount(),6,'Repeated item access does not repeat expiry notices');
+console.log('Item-triggered hold release, pickup expiry, overdue status and duplicate suppression passed');

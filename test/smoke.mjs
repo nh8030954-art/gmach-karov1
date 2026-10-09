@@ -19,6 +19,7 @@ const mf = new Miniflare({
   // Keep the emulator date within the pinned workerd version; production keeps its newer date.
   compatibilityDate: "2026-08-06",
   d1Databases: { DB: "smoke-db" },
+  durableObjects: { NOTIFICATION_HUB: { className:"NotificationHub",useSQLite:true } },
   r2Buckets: ["ITEM_IMAGES","BACKUP_STORAGE"],
   bindings: { ADMIN_EMAILS: "admin@example.org", RESEND_API_KEY: "re_test", RESEND_FROM_EMAIL: "Gmach Berega <verify@example.org>", SUPPORT_EMAIL: "support@example.org", DATA_ENCRYPTION_KEY: "test-only-private-data-key-123456789" },
   serviceBindings: { RESEND_SERVICE: async request => { sentEmails.push(await request.json()); return Response.json({ id: crypto.randomUUID() }); } }
