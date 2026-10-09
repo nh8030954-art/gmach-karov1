@@ -1,0 +1,50 @@
+name: Read-only D1 quota audit
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/d1-quota-audit.yml"
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - name: Read Analytics without executing D1 SQL
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const {randomBytes,createCipheriv,publicEncrypt,constants}=await import('node:crypto');
+          const publicKey="-----BEGIN PUBLIC KEY-----\nMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAnBR8b1e76XZoU+DDa+ss\nzXZL3BsonRUV3JJsgA1QOF6kjQWeIZgMleNyQHNzYPg7ciMk89EiszX7lrrkQgrY\n6Sikfva1eYcF+2DQxTkzK9ByvDYrpOGdBg35vDwLzeSUu0tRRdPw0RV4+6O8P+cA\n6vzzFFZM9gFkLB9Kp8w2kwL0VL3FmGTbrEjC0ruj4JawD1ouy53arkshXipR2GQo\n0QiKRznGgjUXUczAZZDgO4ui0wAHKIIWbmO/eGK9Y9nnCzytkdW2X0XD+Fwiw21D\n7UNc5aL/wiqMlg3WNSkaG6hlfLIrVpTw0/WntNWa7MD50RUPpFs+VPnfzzDYcBfz\nkumTyLmyGtgBMJxC3B2eNSaFCspzyrStaOmYVavyNwR3oochGtcSyvg3GOW6xVjX\nlOZ8rQ4l6TFf9ZquNRsOUQItq6lPmgXIZLvwRACjRHDoFi+kqmFFFs7TSV1L4xX0\nsxmF8lipmMVVdLOp3jLPaG8npDdJ/Y0tbjR9QeD7TFCHAgMBAAE=\n-----END PUBLIC KEY-----\n";
+          const now=new Date(),today=now.toISOString().slice(0,10),yesterday=new Date(now.getTime()-86400000).toISOString().slice(0,10);
+          const accountTag=process.env.CLOUDFLARE_ACCOUNT_ID,databaseId='787e7f13-62da-41c6-bf6a-edf5214e8823';
+          const report={at:now.toISOString(),utcDay:today,todayFrom:today+'T00:00:00Z',yesterday,requests:[]};
+          async function analytics(label,field,filter,selection,order=''){
+           const query=`query Usage($accountTag: string, $filter: ZoneWorkersRequestsFilter_InputObject) { viewer { accounts(filter: {accountTag: $accountTag}) { ${field}(limit: 1000, filter: $filter${order?', orderBy: ['+order+']':''}) { ${selection} } } } }`;
+           const response=await fetch('https://api.cloudflare.com/client/v4/graphql',{method:'POST',headers:{Authorization:'Bearer '+process.env.CLOUDFLARE_API_TOKEN,'Content-Type':'application/json'},body:JSON.stringify({query,variables:{accountTag,filter}})});
+           let result;try{result=await response.json()}catch{result={errors:[{message:'Non-JSON Analytics response'}]}}
+           const errors=result.errors?.map(e=>({message:String(e.message||'').replaceAll(accountTag||'__missing__','[account]').slice(0,600)}))||[];
+           report.requests.push({label,status:response.status,errors,rows:result.data?.viewer?.accounts?.[0]?.[field]||[]});
+           return !errors.length&&response.ok;
+          }
+          const dateFilter={date_geq:yesterday,date_leq:today};
+          const ok=await analytics('account_daily','d1AnalyticsAdaptiveGroups',dateFilter,'sum {rowsRead rowsWritten readQueries writeQueries} dimensions {date}');
+          if(ok){
+           await analytics('database_hourly','d1AnalyticsAdaptiveGroups',{datetimeHour_geq:yesterday+'T00:00:00Z',datetimeHour_leq:now.toISOString(),databaseId},'sum {rowsRead rowsWritten readQueries writeQueries} dimensions {datetimeHour}');
+           for(const [label,start,end] of [['today',today+'T00:00:00Z',now.toISOString()],['yesterday',yesterday+'T00:00:00Z',today+'T00:00:00Z']]){
+            for(const [metric,order] of [['reads','sum_rowsRead_DESC'],['writes','sum_rowsWritten_DESC']]){
+             await analytics(label+'_top_'+metric,'d1QueriesAdaptiveGroups',{datetimeHour_geq:start,datetimeHour_lt:end,databaseId},'sum {rowsRead rowsWritten queryDurationMs} count dimensions {query}',order);
+            }
+           }
+          }
+          const key=randomBytes(32),iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key,iv),body=Buffer.concat([cipher.update(JSON.stringify(report),'utf8'),cipher.final()]);
+          console.log('PRIVATE_QUOTA_AUDIT:'+JSON.stringify({key:publicEncrypt({key:publicKey,oaepHash:'sha256',padding:constants.RSA_PKCS1_OAEP_PADDING},key).toString('base64'),iv:iv.toString('base64'),tag:cipher.getAuthTag().toString('base64'),body:body.toString('base64')}));
+          console.log(JSON.stringify({analyticsOnly:true,d1SqlQueriesExecuted:0,requests:report.requests.map(r=>({label:r.label,status:r.status,errorCount:r.errors.length,rowCount:r.rows.length}))}));
+          NODE
