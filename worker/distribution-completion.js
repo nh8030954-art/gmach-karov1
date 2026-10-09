@@ -139,7 +139,7 @@ async function releaseReadiness(request,env){
   const backupAgeHours=backup?Math.round((now-Date.parse(backup.finished_at||backup.completed_at||backup.created_at))/360000)/10:null;
   const checks={
     email:Boolean(env.RESEND_API_KEY),
-    encryption:Boolean(env.DATA_ENCRYPTION_KEY),
+    encryption:String(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY||"").length>=24,
     turnstile:Boolean(env.TURNSTILE_SECRET_KEY&&env.TURNSTILE_SITE_KEY),
     push:Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY),
     aiModeration:Boolean(env.AI),

@@ -3,6 +3,8 @@ import vm from "node:vm";
 import { createHash, createHmac } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import miniflare from "miniflare";
+import { handleLaunchReadiness } from "../worker/launch-readiness.js";
+import { handleDistributionCompletion } from "../worker/distribution-completion.js";
 const { FormData: WorkerFormData, Miniflare } = miniflare;
 
 const base = "http://local.test";
@@ -345,6 +347,17 @@ try {
   for(const type of ["backup_failed","backup_stale","backup_restore_failed"]){await db.prepare("INSERT INTO system_alerts(id,alert_type,severity,details_json) VALUES(?,?,'critical','{}')").bind(crypto.randomUUID(),type).run()}
   result=await request("/api/admin/operations/health",{cookie:adminCookie});
   assert.equal(result.response.status,200,JSON.stringify(result.data));assert.equal(result.data.latestBackup.source,"github-archive");assert.equal(result.data.latestBackup.status,"completed");assert.equal(result.data.latestRestoreDrill.status,"success");assert.ok(!result.data.warnings.includes("backup"));assert.ok(!result.data.alerts.some(a=>["backup_failed","backup_stale","backup_restore_failed"].includes(a.alert_type)));
+  // Health and readiness must use the same effective key as private data encryption.
+  for(const [keyEnv,expected] of [[{RESEND_API_KEY:"fallback-private-data-key-long-enough"},true],[{},false],[{DATA_ENCRYPTION_KEY:"short",RESEND_API_KEY:"fallback-private-data-key-long-enough"},false]]){
+    const env={DB:db,BACKUP_STORAGE:fullStorage,...keyEnv};
+    for(const [path,handler,field] of [["/api/admin/operations/health",handleLaunchReadiness,"services"],["/api/admin/release-readiness",handleDistributionCompletion,"checks"]]){
+      const req=new Request(base+path,{headers:{Cookie:adminCookie}});
+      const response=await handler(req,env,{},new URL(req.url));
+      assert.equal(response.status,200);const health=await response.json();
+      assert.equal(health[field].encryption,expected,"Encryption readiness must match the key used by encryption");
+      if(expected)assert.ok(!(health.warnings||health.blockers||[]).includes("encryption"));
+    }
+  }
   result=await request("/api/admin/backups/archive-status",{cookie:adminCookie});assert.equal(result.response.status,200);assert.equal(result.data.current.key,fullKey);assert.equal(result.data.previous.key,previousKey);
   for(const slot of ["current","previous"]){result=await request("/api/admin/backups/archive/"+slot,{cookie:adminCookie});assert.equal(result.response.status,200);assert.equal(result.response.headers.get("Content-Type"),"application/zip");assert.equal(result.data,fullBytes)}
   result=await request("/api/admin/backups/archive/current");assert.ok([401,403].includes(result.response.status),"Full archives must remain private");

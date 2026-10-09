@@ -221,7 +221,7 @@ async function operationalHealth(request,env){
     env.DB.prepare("SELECT COUNT(*) AS count FROM items i WHERE (SELECT COUNT(*) FROM item_units u WHERE u.item_id=i.id AND u.status!=\'retired\')>i.quantity")
   ]);
   const latest=archive.latestBackup,backupAgeHours=archive.backupAgeHours;
-  const services={email:Boolean(env.RESEND_API_KEY),turnstile:Boolean(env.TURNSTILE_SECRET_KEY&&env.TURNSTILE_SITE_KEY),push:Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY),encryption:Boolean(env.DATA_ENCRYPTION_KEY),separateBackupStorage:Boolean(env.BACKUP_STORAGE)};
+  const services={email:Boolean(env.RESEND_API_KEY),turnstile:Boolean(env.TURNSTILE_SECRET_KEY&&env.TURNSTILE_SITE_KEY),push:Boolean(env.VAPID_PUBLIC_KEY&&env.VAPID_PRIVATE_KEY),encryption:String(env.DATA_ENCRYPTION_KEY||env.RESEND_API_KEY||"").length>=24,separateBackupStorage:Boolean(env.BACKUP_STORAGE)};
   const warnings=[];
   if(!latest||latest.status!=="completed"||backupAgeHours===null||backupAgeHours>30)warnings.push("backup");
   if(Number(failedQueue.results?.[0]?.count||0)+Number(failedOutbox.results?.[0]?.count||0)>0)warnings.push("notification_delivery");

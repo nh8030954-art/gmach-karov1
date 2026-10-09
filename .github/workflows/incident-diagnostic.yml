@@ -28,26 +28,26 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          RAW="$(npx wrangler d1 execute DB --remote --json --command "SELECT request_id,path,method,message,created_at FROM server_errors WHERE method!='CLIENT' ORDER BY created_at DESC LIMIT 60" 2>/dev/null)"
+          RAW="$(npx wrangler d1 execute DB --remote --json --command "SELECT method,message,created_at FROM server_errors WHERE resolved_at IS NULL AND created_at>=datetime('now','-24 hours') ORDER BY created_at DESC LIMIT 60" 2>/dev/null)"
           export RAW
           node <<'NODE'
           const raw=JSON.parse(process.env.RAW||"[]");
           const rows=Array.isArray(raw)?raw.flatMap(x=>x.results||[]):[];
-          const sanitizePath=p=>String(p||"").replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/ig,":id").replace(/\b\d{12,}\b/g,":num");
-          const sanitizeMessage=m=>{
+          const classify=m=>{
             const s=String(m||"");
-            const d1=s.match(/D1_ERROR:\s*([^\n]+)/i)?.[1]||s;
-            return d1
-              .replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/ig,":id")
-              .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g,":email")
-              .replace(/\b05\d[- ]?\d{7}\b/g,":phone")
-              .slice(0,500);
+            if(/7500|daily.*limit|quota|rows read limit/i.test(s))return "d1_daily_quota";
+            if(/no such column/i.test(s))return "missing_database_column";
+            if(/no such table/i.test(s))return "missing_database_table";
+            if(/fetch|network|load failed|failed to load/i.test(s))return "network_request_failure";
+            if(/SQLITE_AUTH|access.*prohibited/i.test(s))return "database_access_denied";
+            return "other";
           };
-          for(const r of rows) console.log(JSON.stringify({
-            requestId:r.request_id,
-            path:sanitizePath(r.path),
-            method:r.method,
-            error:sanitizeMessage(r.message),
-            createdAt:r.created_at
-          }));
+          const groups=new Map();
+          for(const r of rows){
+            const category=classify(r.message),origin=r.method==="CLIENT"?"browser":"server",key=origin+":"+category;
+            const g=groups.get(key)||{origin,category,count:0,oldest:r.created_at,newest:r.created_at};
+            g.count++;if(r.created_at<g.oldest)g.oldest=r.created_at;if(r.created_at>g.newest)g.newest=r.created_at;
+            groups.set(key,g);
+          }
+          console.log(JSON.stringify({openRecordsLast24h:rows.length,truncated:rows.length===60,groups:[...groups.values()]}));
           NODE
