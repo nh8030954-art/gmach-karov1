@@ -289,7 +289,48 @@ assert.ok(finalWorker.includes('new Set(["LCP","CLS","INP","PAGE_LOAD","JS_ERROR
 const distributionWorker=await readFile("worker/distribution-completion.js","utf8");
 const distributionClient=await readFile("dist/distribution-completion.js","utf8");
 const distributionMigration=await readFile("migrations/0021_distribution_completion.sql","utf8");
-for(const token of ["/api/search/branches","/api/admin/support-tickets","/messages","/api/admin/server-errors","recordDistributionError","runDistributionCompletionMaintenance"]) assert.ok(distributionWorker.includes(token),to…1298 tokens truncated…d4","Release readiness","verify-full-backup.yml","data-test-alert"])assert.ok(hardeningClient.includes(token),token+" missing from release hardening UI");
+for(const token of ["/api/search/branches","/api/admin/support-tickets","/messages","/api/admin/server-errors","recordDistributionError","runDistributionCompletionMaintenance"]) assert.ok(distributionWorker.includes(token),token+" missing from distribution completion backend");
+for(const token of ["חיפוש סניפים ונקודות איסוף","מרכז תמיכה","תקלות שרת","data-use-location","data-admin-ticket"]) assert.ok(distributionClient.includes(token),token+" missing from distribution completion UI");
+for(const token of ["server_errors","priority","assigned_to","last_staff_reply_at"]) assert.ok(distributionMigration.includes(token),token+" missing from distribution completion migration");
+assert.ok(worker.includes("handleDistributionCompletion"),"distribution completion handler not wired");
+assert.ok(worker.includes("recordDistributionError"),"server error recording not wired");
+assert.ok(indexHtml.includes("/distribution-completion.js"),"distribution completion client not loaded");
+console.log("Distribution completion static release gate passed.");
+
+for(const token of ["/api/admin/entities","patchAdminEntity","branchManagement"])assert.ok(launchWorker.includes(token),token+" missing from admin entity controls and branch editing");
+for(const token of ["מרכז ישויות","openAdminEntities","openBranchEdit","dataset.branchEdit"])assert.ok(launchClient.includes(token),token+" missing from admin entity controls and branch editing UI");
+for(const token of ["entities|support-tickets|server-errors"])assert.ok(platform.includes(token),token+" missing from sensitive admin step-up coverage");
+
+
+const navigationWorker=await readFile("worker/navigation-admin.js","utf8");
+const navigationClient=await readFile("dist/navigation-admin.js","utf8");
+const navigationMigration=await readFile("migrations/0022_navigation_admin.sql","utf8");
+for(const token of ["/api/navigation-links","/api/admin/navigation-links","navigation.create","navigation.update","navigation.delete"]) assert.ok(navigationWorker.includes(token),token+" missing from navigation admin backend");
+for(const token of ["ניהול קישורים ותפריטים","applyPublicLinks","data-navigation-admin","#action:support"]) assert.ok(navigationClient.includes(token),token+" missing from navigation admin UI");
+for(const token of ["navigation_links","footer_find","footer_share","footer_info"]) assert.ok(navigationMigration.includes(token),token+" missing from navigation migration");
+assert.ok(worker.includes("handleNavigationAdmin"),"navigation admin handler not wired");
+assert.ok(indexHtml.includes("/navigation-admin.js"),"navigation admin client not loaded");
+console.log("Navigation admin static release gate passed.");
+
+
+const privacyAvailabilityWorker=await readFile("worker/privacy-availability.js","utf8");
+const privacyAvailabilityClient=await readFile("dist/privacy-availability.js","utf8");
+const privacyAvailabilityMigration=await readFile("migrations/0023_privacy_availability.sql","utf8");
+for(const token of ["/availability-rules","/api/admin/data-requests","checkAvailabilityRules","weekly_window","advance_limit"]) assert.ok(privacyAvailabilityWorker.includes(token),token+" missing from privacy/availability backend");
+for(const token of ["ניהול זמינות מתקדם","בקשות פרטיות","data-privacy-save","data-rule-toggle"]) assert.ok(privacyAvailabilityClient.includes(token),token+" missing from privacy/availability UI");
+for(const token of ["admin_note","assigned_to","due_at","availability_rules_scope_idx"]) assert.ok(privacyAvailabilityMigration.includes(token),token+" missing from privacy/availability migration");
+assert.ok(worker.includes("handlePrivacyAvailability"),"privacy/availability handler not wired");
+assert.ok(worker.includes("checkAvailabilityRules(env,itemId,from,until"),"availability rules not enforced for loan requests");
+assert.ok(indexHtml.includes("/privacy-availability.js"),"privacy/availability client not loaded");
+console.log("Privacy availability static release gate passed.");
+
+
+const hardeningWorker=await readFile("worker/distribution-completion.js","utf8");
+const hardeningClient=await readFile("dist/distribution-completion.js","utf8");
+const productionDeploy=await readFile(".github/workflows/production-deploy.yml","utf8");
+const wranglerConfig=await readFile("wrangler.jsonc","utf8");
+for(const token of ["release-readiness","restore-drill","system_alert_deliveries","deliverOpenAlerts","performRestoreDrill","backup_stale","backup_not_separate"])assert.ok((hardeningWorker+await readFile("worker/archive-backup.js","utf8")).includes(token),token+" missing from release hardening backend");
+for(const token of ["מוכנות להפצה","Release readiness","verify-full-backup.yml","data-test-alert"])assert.ok(hardeningClient.includes(token),token+" missing from release hardening UI");
 assert.ok(productionDeploy.includes("Ensure dedicated backup R2 bucket"),"production deploy must provision backup bucket");
 assert.ok(wranglerConfig.includes('"binding": "BACKUP_STORAGE"'),"dedicated backup R2 binding missing");
 for(const backupFile of [".github/workflows/full-production-backup.yml",".github/workflows/verify-full-backup.yml",".github/scripts/gmach-full-backup.sh","BACKUP-RESTORE.md"]) await access(backupFile);
