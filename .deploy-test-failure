@@ -1,30 +1,22 @@
-deploy_sha=4ec0decb1efa62c58546a115dab909ebfd845af0
+deploy_sha=34d5bd93a44cb5fb18da092d58b4aca9afeb4f53
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
-> node test/contact-preferences.mjs && node test/service-range.mjs && node test/admin-gmachs.mjs && node test/item-english.mjs && node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
+> node test/admin-alerts.mjs && node test/archive-backup.mjs && node test/contact-preferences.mjs && node test/service-range.mjs && node test/admin-gmachs.mjs && node test/item-english.mjs && node test/final-static.mjs && node test/i18n-static.mjs && node test/content-translation.mjs && node test/smoke.mjs && node test/synthetic-load.mjs
 
+Admin isolation, source routing, read preservation, support replies, encrypted authenticated ingestion, evidence validation, deduplication and stale research monitoring passed
+Full archive status, failed/stale/missing alerts, verification matching, historical alert retirement and disabled internal scheduler passed
 Contact validation, privacy rendering, action links, contact icons and Israel time tests passed
 Service range policy and geocoding tests passed
 Gmach admin UI passed in Hebrew and English: complete controls, tool wiring and escaped original names.
 Stored English: cache reuse, edit invalidation, public permissions and unavailable text passed
 Final completion static release gate passed.
-Requirements expansion static release gate passed.
-Launch readiness static release gate passed.
-Distribution completion static release gate passed.
-Navigation admin static release gate passed.
-Privacy availability static release gate passed.
-Release hardening static gate passed.
-Release experience static release gate passed.
-Admin control center static release gate passed.
-Privacy purge static release gate passed.
-Community chat retention static release gate passed.
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: service worker cache version not updated
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:422:8 {
+AssertionError [ERR_ASSERTION]: condition taxonomy missing: חדש
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:77:87 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
   actual: false,
