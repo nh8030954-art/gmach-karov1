@@ -1,3 +1,4 @@
+import { refreshServerErrorAlert } from "./distribution-completion.js";
 import { monitorArchiveBackup } from "./archive-backup.js";
 import { adminGmachSelect } from "./admin-gmachs.js";
 
@@ -213,6 +214,7 @@ async function deleteAdminEntity(request,env,type,id){
 async function operationalHealth(request,env){
   await requireAdmin(request,env);const now=Date.now();
   const archive=await monitorArchiveBackup(env,now);
+  await refreshServerErrorAlert(env);
   const [failedQueue,failedOutbox,critical,totals,inventoryMismatch]=await env.DB.batch([
     env.DB.prepare("SELECT COUNT(*) AS count FROM notification_queue WHERE failed_at IS NOT NULL AND failed_at>=?").bind(new Date(now-86400000).toISOString()),
     env.DB.prepare("SELECT COUNT(*) AS count FROM notification_outbox WHERE status='failed' AND created_at>=?").bind(new Date(now-86400000).toISOString()),
@@ -319,8 +321,8 @@ export async function handleLaunchReadiness(request,env,ctx,url){
     if(method==="GET"&&path==="/api/admin/export.xls")return adminExportXls(request,env,url);
     if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/entities\/(users|organizations|items|support)\/([^/]+)$/)))return await patchAdminEntity(request,env,m[1],decodeURIComponent(m[2]));
     if(method==="DELETE"&&(m=path.match(/^\/api\/admin\/entities\/(users|organizations)\/([^/]+)$/)))return await deleteAdminEntity(request,env,m[1],decodeURIComponent(m[2]));
-    if(method==="GET"&&path==="/api/admin/operations/health")return operationalHealth(request,env);
-    if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/operations\/alerts\/([^/]+)\/resolve$/)))return resolveAlert(request,env,decodeURIComponent(m[1]));
+    if(method==="GET"&&path==="/api/admin/operations/health")return await operationalHealth(request,env);
+    if(method==="PATCH"&&(m=path.match(/^\/api\/admin\/operations\/alerts\/([^/]+)\/resolve$/)))return await resolveAlert(request,env,decodeURIComponent(m[1]));
     return null;
   }catch(e){if(e instanceof LaunchError)return json({error:e.message},e.status);console.error("Launch readiness route failed",{method:request.method,path:url.pathname,error:String(e?.message||e),stack:String(e?.stack||"")});return json({error:"פעולת הניהול נכשלה: "+String(e?.message||e).slice(0,300)},500)}
 }

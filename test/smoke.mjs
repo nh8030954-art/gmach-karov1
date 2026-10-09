@@ -4,7 +4,7 @@ import { createHash, createHmac } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import miniflare from "miniflare";
 import { handleLaunchReadiness } from "../worker/launch-readiness.js";
-import { handleDistributionCompletion } from "../worker/distribution-completion.js";
+import { refreshServerErrorAlert, handleDistributionCompletion } from "../worker/distribution-completion.js";
 const { FormData: WorkerFormData, Miniflare } = miniflare;
 
 const base = "http://local.test";
@@ -347,6 +347,29 @@ try {
   for(const type of ["backup_failed","backup_stale","backup_restore_failed"]){await db.prepare("INSERT INTO system_alerts(id,alert_type,severity,details_json) VALUES(?,?,'critical','{}')").bind(crypto.randomUUID(),type).run()}
   result=await request("/api/admin/operations/health",{cookie:adminCookie});
   assert.equal(result.response.status,200,JSON.stringify(result.data));assert.equal(result.data.latestBackup.source,"github-archive");assert.equal(result.data.latestBackup.status,"completed");assert.equal(result.data.latestRestoreDrill.status,"success");assert.ok(!result.data.warnings.includes("backup"));assert.ok(!result.data.alerts.some(a=>["backup_failed","backup_stale","backup_restore_failed"].includes(a.alert_type)));
+  // Validation responses and browser incidents must not become critical server alerts.
+  const expectedIncidentIds=[];
+  for(let i=0;i<6;i++)for(const [method,message,age] of [["PATCH","נדרש קוד אישור נוסף לפעולה רגישה",0],["CLIENT","Failed to fetch",0],["GET","Old server failure",90*60000]]){
+    const id=crypto.randomUUID();expectedIncidentIds.push(id);
+    await db.prepare("INSERT INTO server_errors(id,request_id,path,method,message,created_at) VALUES(?,?,?,?,?,?)").bind(id,id,"/test/health",method,message,new Date(Date.now()-age).toISOString()).run();
+  }
+  await refreshServerErrorAlert({DB:db});
+  assert.equal(await db.prepare("SELECT id FROM system_alerts WHERE alert_type='server_error_spike' AND resolved_at IS NULL").first(),null,"Only real server failures within one hour should trigger a spike");
+  for(let i=0;i<5;i++){
+    const id=crypto.randomUUID();expectedIncidentIds.push(id);
+    await db.prepare("INSERT INTO server_errors(id,request_id,path,method,message,created_at) VALUES(?,?,?,?,?,?)").bind(id,id,"/test/health","GET","Actual server failure",new Date().toISOString()).run();
+  }
+  await refreshServerErrorAlert({DB:db});
+  const spike=await db.prepare("SELECT id FROM system_alerts WHERE alert_type='server_error_spike' AND resolved_at IS NULL").first();assert.ok(spike,"Actual failures must still alert the admin");
+  const resolvePath="/api/admin/operations/alerts/"+spike.id+"/resolve";
+  result=await request(resolvePath,{method:"PATCH",body:{}});assert.equal(result.response.status,401,"Anonymous users cannot resolve alerts");
+  result=await request(resolvePath,{method:"PATCH",cookie:adminCookie,body:{}});assert.equal(result.response.status,200,"Logged-in admin can resolve an alert without another confirmation code");
+  assert.ok((await db.prepare("SELECT resolved_at FROM system_alerts WHERE id=?").bind(spike.id).first()).resolved_at);
+  for(const id of expectedIncidentIds)await db.prepare("DELETE FROM server_errors WHERE id=?").bind(id).run();
+  const incidentCountBefore=(await db.prepare("SELECT COUNT(*) AS n FROM server_errors").first()).n;
+  const guarded=await mf.dispatchFetch(base+"/api/admin/users/"+crypto.randomUUID(),{method:"PATCH",headers:{Cookie:adminCookie,Origin:base,"Content-Type":"application/json"},body:"{}"});
+  assert.equal(guarded.status,428,"Other sensitive admin actions still require confirmation and return a usable status");
+  assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM server_errors").first()).n,incidentCountBefore,"Confirmation requirements are not server incidents");
   // Health and readiness must use the same effective key as private data encryption.
   for(const [keyEnv,expected] of [[{RESEND_API_KEY:"fallback-private-data-key-long-enough"},true],[{},false],[{DATA_ENCRYPTION_KEY:"short",RESEND_API_KEY:"fallback-private-data-key-long-enough"},false]]){
     const env={DB:db,BACKUP_STORAGE:fullStorage,...keyEnv};
