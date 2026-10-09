@@ -28,9 +28,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          RAW="$(npx wrangler d1 execute DB --remote --json --command "SELECT method,message,created_at FROM server_errors WHERE resolved_at IS NULL AND created_at>=datetime('now','-24 hours') ORDER BY created_at DESC LIMIT 60" 2>/dev/null)"
+          RAW="$(npx wrangler d1 execute DB --remote --json --command "SELECT path,method,message,created_at FROM server_errors WHERE resolved_at IS NULL AND created_at>=datetime('now','-24 hours') ORDER BY created_at DESC LIMIT 60" 2>/dev/null)"
           export RAW
-          node <<'NODE'
+          node --input-type=module <<'NODE'
           const raw=JSON.parse(process.env.RAW||"[]");
           const rows=Array.isArray(raw)?raw.flatMap(x=>x.results||[]):[];
           const classify=m=>{
@@ -50,4 +50,10 @@ jobs:
             groups.set(key,g);
           }
           console.log(JSON.stringify({openRecordsLast24h:rows.length,truncated:rows.length===60,groups:[...groups.values()]}));
+          // Details remain encrypted in public workflow logs; only the local diagnostic key can open them.
+          const {randomBytes,createCipheriv,publicEncrypt,constants}=await import("node:crypto");
+          const publicKey="-----BEGIN PUBLIC KEY-----\nMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAxfZndT+9GfQH4/LfVIfH\nSgq3sVcMr7LR6PjZewBHcjigtxDrL85IVN/wDsiSz62b7839HVVKO7k/8FoQgW0h\nUTJCMxS8nFbN5KIun5jhMwWy08T62fmpdT1eyATnnElpAdnx7TnztRgWeBzWhFBM\nrf9gGeStK47rX4KziCEz9m9Nf4k8jPaUdpdStKKm6ERp1Au7+L6chU5DEfI1s7if\nJuxMKmwisbltigQkdUqwZP0xxXWY6OQ4pH52GfoSza+PuX7kCD77sZTEhUzMr5mp\nzrs+q6XFx7rBwwCE5AmEcxbY1FLgwlKPQGSXelg5uZcj5jBP7I06cxJ6plCzJsZu\nCRFWN6w9rfDYfK6VkL2RSrAk5xi52sWSscXEVGMt37QLM89Iwwa+C75Ur30TyrWa\ne3S8jQTsWqYId3JxSlcggFyZFszWFwV6Zoq+XESVf++o/sP0G0580DX5Ifhps1Lo\n+YI7AavNPgpCDCacJP84gNfkZkJlxsWaz86eyaxamHLrAgMBAAE=\n-----END PUBLIC KEY-----\n";
+          const key=randomBytes(32),iv=randomBytes(12),cipher=createCipheriv("aes-256-gcm",key,iv);
+          const body=Buffer.concat([cipher.update(JSON.stringify(rows),"utf8"),cipher.final()]);
+          console.log("PRIVATE_DIAGNOSTIC:"+JSON.stringify({key:publicEncrypt({key:publicKey,oaepHash:"sha256",padding:constants.RSA_PKCS1_OAEP_PADDING},key).toString("base64"),iv:iv.toString("base64"),tag:cipher.getAuthTag().toString("base64"),body:body.toString("base64")}));
           NODE
