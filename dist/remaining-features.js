@@ -595,7 +595,7 @@ async function geocodeGmachOrganizations(rows){
      try{
        const data=await api("/api/geocode?q="+encodeURIComponent(query));
        const first=data.results?.[0];
-       const point=first?{lat:Number(first.lat),lon:Number(first.lon)}:null;
+       const point=first?{lat:Number(first.lat),lon:Number(first.lon),type:first.type}:null;
        cache.set(query,point);
        if(data.cached===false)await sleep(1200);
        return point;
@@ -610,10 +610,11 @@ async function geocodeGmachOrganizations(rows){
    return null;
  };
  for(const row of rows||[]){
-   const city=String(row.city||"").trim(),full=city;
+   const city=String(row.city||"").trim(),address=String(row.navigation_address||"").trim(),full=address?(window.GmachFormatAddress?.(address,city)||[address,city].filter(Boolean).join(", ")):city;
    let point=await geocode(full||city);
-   if(!point&&city&&city!==full)point=await geocode(city);
-   if(point&&Number.isFinite(point.lat)&&Number.isFinite(point.lon))resolved.push({...row,...point});
+   let precise=Boolean(address&&point?.type&&!['administrative','city','town','village','municipality','suburb','neighbourhood','country','residential','road','pedestrian','primary','secondary','tertiary'].includes(point.type));
+   if((!point||address&&!precise)&&city&&city!==full){point=await geocode(city);precise=false;}
+   if(point&&Number.isFinite(point.lat)&&Number.isFinite(point.lon))resolved.push({...row,...point,precise});
  }
  return resolved;
 }
@@ -630,10 +631,12 @@ async function showAddressMap(){
  const focusPoint=(lat,lon,label)=>{if(!map)return;map.setFocus(lat,lon);results.insertAdjacentHTML("beforeend",`<div class="platform-note"><strong>${esc(label||"יעד")}</strong>${navigationLinks(lat,lon,label)}</div>`)};
  try{
    map=createInteractiveOsmMap(canvas);
-   const discovery=await api("/api/discovery"),organizations=discovery.organizations||[];
+   const [discovery,publicLocations]=await Promise.all([api("/api/discovery"),api("/api/maps/gmachs").catch(()=>({locations:[]}))]);
+   const addresses=new Map((publicLocations.locations||[]).map(row=>[String(row.id),row.navigation_address]));
+   const organizations=(discovery.organizations||[]).map(row=>({...row,navigation_address:addresses.get(String(row.id))||null}));
    const points=await geocodeGmachOrganizations(organizations);
    points.forEach(org=>{
-     {const rating=Math.max(0,Math.min(5,Number(org.rating)||0)),filled=Math.max(0,Math.min(5,Math.round(rating))),stars="★".repeat(filled)+"☆".repeat(5-filled),reviewCount=Number(org.review_count||0);org.popupHtml=`<div dir="${lang==="en"?"ltr":"rtl"}"><strong class="organization-name" translate="no" style="font-size:16px">${window.GmachOriginalName(org.name)}</strong><div style="margin-top:5px">📍 ${esc([org.city,org.neighborhood].filter(Boolean).join(" · "))}</div><div style="margin-top:6px;font-weight:700"><span aria-label="${lang==="en"?"Gmach rating":"דירוג הגמ״ח"} ${rating.toFixed(1)} ${lang==="en"?"out of 5":"מתוך 5"}" style="color:#b07b2f;letter-spacing:1px">${stars}</span> <span>${rating?rating.toFixed(1):"—"}/5</span> <small>(${reviewCount} ${lang==="en"?(reviewCount===1?"review":"reviews"):"דירוגים"})</small></div><div style="margin-top:5px">📦 ${Number(org.item_count||0)} ${lang==="en"?"items":"פריטים"} · ✅ ${Number(org.available_items||0)} ${lang==="en"?"available":"זמינים"}</div>${org.description?`<p style="margin:7px 0">${esc(org.description)}</p>`:""}<button type="button" class="button button-primary button-small" data-map-open-org="${esc(org.id)}">${lang==="en"?"View gmach":"לפרטי הגמ״ח"}</button><p>${lang==="en"?"Approximate area only. Pickup details appear after approval.":"אזור משוער בלבד. פרטי האיסוף יוצגו לאחר אישור."}</p></div>`;}
+     {const rating=Math.max(0,Math.min(5,Number(org.rating)||0)),filled=Math.max(0,Math.min(5,Math.round(rating))),stars="★".repeat(filled)+"☆".repeat(5-filled),reviewCount=Number(org.review_count||0);org.popupHtml=`<div dir="${lang==="en"?"ltr":"rtl"}"><strong class="organization-name" translate="no" style="font-size:16px">${window.GmachOriginalName(org.name)}</strong><div style="margin-top:5px">📍 ${esc(org.precise?(window.GmachFormatAddress?.(org.navigation_address,org.city)||org.navigation_address):[org.city,org.neighborhood].filter(Boolean).join(" · "))}</div><div style="margin-top:6px;font-weight:700"><span aria-label="${lang==="en"?"Gmach rating":"דירוג הגמ״ח"} ${rating.toFixed(1)} ${lang==="en"?"out of 5":"מתוך 5"}" style="color:#b07b2f;letter-spacing:1px">${stars}</span> <span>${rating?rating.toFixed(1):"—"}/5</span> <small>(${reviewCount} ${lang==="en"?(reviewCount===1?"review":"reviews"):"דירוגים"})</small></div><div style="margin-top:5px">📦 ${Number(org.item_count||0)} ${lang==="en"?"items":"פריטים"} · ✅ ${Number(org.available_items||0)} ${lang==="en"?"available":"זמינים"}</div>${org.description?`<p style="margin:7px 0">${esc(org.description)}</p>`:""}<button type="button" class="button button-primary button-small" data-map-open-org="${esc(org.id)}">${lang==="en"?"View gmach":"לפרטי הגמ״ח"}</button>${org.precise?navigationLinks(org.lat,org.lon,window.GmachFormatAddress?.(org.navigation_address,org.city)||org.navigation_address):`<p>${lang==="en"?"Approximate area only. Pickup details appear after approval.":"אזור משוער בלבד. פרטי האיסוף יוצגו לאחר אישור."}</p>`}</div>`;}
    });
    map.setPoints(points);map.showCountry();
    canvas.addEventListener("click",e=>{const button=e.target.closest?.("[data-map-open-org]");if(!button)return;d.close();window.dispatchEvent(new CustomEvent("gmach:open-organization",{detail:{id:button.dataset.mapOpenOrg}}))});

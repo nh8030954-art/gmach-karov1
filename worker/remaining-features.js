@@ -1,3 +1,4 @@
+import { publicMapLocations } from "./contact-preferences.js";
 const SESSION_COOKIE="gmach_session";
 class RemainingError extends Error{constructor(status,message){super(message);this.status=status}}
 const json=(data,status=200,headers={})=>new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store",...headers}});
@@ -281,6 +282,7 @@ export async function runRemainingMaintenance(env){await ensureSchema(env);const
 export async function handleRemainingFeatures(request,env,ctx,url){
  const method=request.method.toUpperCase(),path=url.pathname;
  try{
+  if(path==="/api/maps/gmachs"&&method==="GET")return json({locations:await publicMapLocations(env)});
   let m=path.match(/^\/api\/maps\/tiles\/(\d+)\/(\d+)\/(\d+)\.png$/);if(m&&method==="GET")return await mapTile(url,m[1],m[2],m[3]);
   if(path==="/api/maps/geocode"&&method==="GET"){await ensureMapSchema(env);return await explicitGeocode(request,env,url)}
   m=path.match(/^\/api\/items\/([^/]+)\/image-edits$/);if(m&&(method==="GET"||method==="PUT"))return await imageEdits(request,env,decodeURIComponent(m[1]));

@@ -31,7 +31,24 @@ assert.equal(ui.isContactTime({},new Date()),true);
 const hidden=ui.markup({...settings,visible:false});assert.ok(!hidden.includes('hello@example.org'));assert.ok(!hidden.includes('mailto:'));assert.ok(!hidden.includes('wa.me'));assert.ok(hidden.includes('data-contact-chat'));assert.ok(hidden.includes('נא לפנות בערב'));
 const shown=ui.markup({...settings,visible:true,phone:'050-1234567',address:'כתובת פרטית',city:'ירושלים',notes:'<img src=x onerror=alert(1)>'});
 assert.ok(shown.includes('href="tel:+972501234567"'));assert.ok(shown.includes('href="sms:+972501234567"'));assert.ok(shown.includes('https://wa.me/972501234567'));assert.ok(shown.includes('mailto:hello%40example.org'));assert.ok(shown.includes('maps/search/'));assert.ok(shown.includes('&lt;img'));assert.ok(!shown.includes('<img'));assert.ok(shown.indexOf('tel:')<shown.indexOf('wa.me'));
+const noNavigation=ui.markup({visible:true,channels:['phone','chat'],phone:'050-1234567',address:'כתובת שאסור להציג',city:'ירושלים',hours:{},notes:''});
+assert.ok(!noNavigation.includes('כתובת שאסור להציג'),'Unselected address navigation must also hide the address text');
+assert.ok(!noNavigation.includes('contact-detail'));assert.ok(!noNavigation.includes('maps/search/'));assert.ok(noNavigation.includes('tel:'));assert.ok(noNavigation.includes('data-contact-chat'));
 context.document.documentElement.lang='en';assert.ok(ui.markup({...settings,visible:true,phone:'050-1234567'}).includes('WhatsApp'));
 assert.ok(shown.includes('<svg'));assert.ok(shown.includes('aria-hidden="true"'));assert.ok(!shown.includes('מועדף'));
 const onlyMail=ui.markup({visible:true,channels:['email'],preferred:'email',email:'hello@example.org',hours:{},notes:''});assert.ok(!onlyMail.includes('tel:'));assert.ok(!onlyMail.includes('data-contact-chat'));
 console.log('Contact validation, privacy rendering, action links, contact icons and Israel time tests passed');
+
+// Map markers must use the authorized street address, with an honest city fallback.
+const mapSource=readFileSync('dist/remaining-features.js','utf8');
+const mapFunction=mapSource.slice(mapSource.indexOf('async function geocodeGmachOrganizations('),mapSource.indexOf('async function showAddressMap('));
+const queries=[];
+const mapContext={window:{GmachFormatAddress:formatAddress},console,setTimeout,api:async url=>{
+ const query=new URL(url,'https://local.test').searchParams.get('q');queries.push(query);
+ return {cached:true,results:[query.includes('10')?{lat:31.81,lon:35.21,type:'house'}:{lat:31.77,lon:35.22,type:'city'}]};
+}};
+vm.runInNewContext(mapFunction,mapContext);
+let points=await mapContext.geocodeGmachOrganizations([{id:'selected',city:'ירושלים',navigation_address:'יפו 10'},{id:'private',city:'ירושלים'}]);
+assert.equal(points[0].precise,true);assert.equal(points[0].lat,31.81);assert.equal(points[1].precise,false);assert.equal(points[1].lat,31.77);assert.deepEqual(queries,['יפו 10, ירושלים','ירושלים']);
+points=await mapContext.geocodeGmachOrganizations([{id:'unresolved',city:'ירושלים',navigation_address:'כתובת לא מזוהה'}]);assert.equal(points[0].precise,false,'A city-level result cannot be presented as an exact address');
+console.log('Navigation opt-in address rendering and precise versus approximate map locations passed');

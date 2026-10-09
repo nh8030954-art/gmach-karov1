@@ -598,6 +598,7 @@ try {
   assert.ok((await request('/api/discovery')).data.organizations.some(o=>o.id===chatOrgId&&o.item_count===0));
   const chatPublic=(await request(`/api/organizations/${chatOrgId}/public`)).data;
   assert.equal(chatPublic.items.length,0);assert.equal(chatPublic.organization.address,undefined);assert.equal(chatPublic.organization.contact_phone,undefined);
+  assert.ok(!(await request('/api/maps/gmachs')).data.locations.some(o=>o.id===chatOrgId),'Private no-item gmachs must not expose an exact map address');
   const fullContacts={showPublic:true,channels:['phone','sms','whatsapp','email','address','chat'],preferred:'whatsapp',email:'contact@example.org',hours:{3:['18:00','20:00']},notes:'נא לפנות בווטסאפ, או להתקשר בשעות הערב.'};
   assert.equal((await request(`/api/organizations/${chatOrgId}/contact-settings`,{cookie:borrowerCookie})).response.status,404);
   assert.equal((await request(`/api/organizations/${chatOrgId}/contact-settings`)).response.status,401);
@@ -605,6 +606,11 @@ try {
   result=await request(`/api/organizations/${chatOrgId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:fullContacts}});assert.equal(result.response.status,200,JSON.stringify(result.data));
   const publishedContacts=(await request(`/api/organizations/${chatOrgId}/public`)).data.organization.contact;
   assert.equal(publishedContacts.phone,'050-1234567');assert.equal(publishedContacts.address,serviceOrg.address);assert.equal(publishedContacts.email,'contact@example.org');assert.equal(publishedContacts.preferred,'whatsapp');assert.deepEqual(publishedContacts.hours,fullContacts.hours);
+  assert.equal((await request('/api/maps/gmachs')).data.locations.find(o=>o.id===chatOrgId)?.navigation_address,serviceOrg.address,'Selected public navigation exposes the full address for mapping');
+  await request(`/api/organizations/${chatOrgId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:{channels:['phone','chat'],preferred:'phone'}}});
+  assert.ok(!(await request('/api/maps/gmachs')).data.locations.some(o=>o.id===chatOrgId),'Unselected navigation must not expose an exact map address');
+  assert.equal((await request(`/api/organizations/${chatOrgId}/public`)).data.organization.contact.address,undefined);
+  await request(`/api/organizations/${chatOrgId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:fullContacts}});
   result=await request(`/api/organizations/${chatOrgId}/contact-settings`,{method:'PATCH',cookie:adminCookie,body:{contactSettings:{showPublic:false}}});assert.equal(result.response.status,200);
   const privateContact=(await request(`/api/organizations/${chatOrgId}/contact`)).data.contact;
   assert.equal(privateContact.visible,false);assert.equal(privateContact.phone,undefined);assert.equal(privateContact.email,undefined);assert.equal(privateContact.address,undefined);assert.equal(privateContact.notes,fullContacts.notes);

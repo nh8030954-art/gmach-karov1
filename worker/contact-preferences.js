@@ -54,3 +54,15 @@ export async function contactView(env,id,{approved=false,phone,address,city}={})
  if(settings.channels.includes('email'))data.email=settings.email;
  return data;
 }
+
+// Only addresses already permitted in the public contact section may be mapped precisely.
+export async function publicMapLocations(env){
+ await ensureContactPreferences(env);
+ const rows=await env.DB.prepare(`SELECT o.id,o.address AS navigation_address
+ FROM organizations o JOIN organization_contact_preferences cp ON cp.organization_id=o.id
+ WHERE o.status='approved' AND o.is_hidden=0 AND o.deleted_at IS NULL
+ AND json_valid(cp.channels_json) AND EXISTS(SELECT 1 FROM json_each(cp.channels_json) WHERE value='address')
+ AND (cp.show_public=1 OR EXISTS(SELECT 1 FROM items i WHERE i.organization_id=o.id AND i.management_mode='direct' AND i.status='active' AND i.deleted_at IS NULL))
+ ORDER BY o.id LIMIT 1000`).all();
+ return rows.results||[];
+}
