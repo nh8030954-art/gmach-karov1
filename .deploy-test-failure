@@ -1,4 +1,4 @@
-deploy_sha=34d5bd93a44cb5fb18da092d58b4aca9afeb4f53
+deploy_sha=899164f388b7617564901ab8efdcc764beb04d92
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -10,19 +10,20 @@ Contact validation, privacy rendering, action links, contact icons and Israel ti
 Service range policy and geocoding tests passed
 Gmach admin UI passed in Hebrew and English: complete controls, tool wiring and escaped original names.
 Stored English: cache reuse, edit invalidation, public permissions and unavailable text passed
-Final completion static release gate passed.
-node:internal/modules/run_main:107
-    triggerUncaughtException(
-    ^
+file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:292
+for(const token of ["/api/search/branches","/api/admin/support-tickets","/messages","/api/admin/server-errors","recordDistributionError","runDistributionCompletionMaintenance"]) assert.ok(distributionWorker.includes(token),to…1298 tokens truncated…d4","Release readiness","verify-full-backup.yml","data-test-alert"])assert.ok(hardeningClient.includes(token),token+" missing from release hardening UI");
+                                                                                                                                                                                                                               ^^
 
-AssertionError [ERR_ASSERTION]: condition taxonomy missing: חדש
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:77:87 {
-  generatedMessage: false,
-  code: 'ERR_ASSERTION',
-  actual: false,
-  expected: true,
-  operator: '==',
-  diff: 'simple'
-}
+SyntaxError: missing ) after argument list
+    at compileSourceTextModule (node:internal/modules/esm/utils:319:16)
+    at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:89:18)
+    at #translate (node:internal/modules/esm/loader:438:20)
+    at afterLoad (node:internal/modules/esm/loader:506:29)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:511:12)
+    at #getOrCreateModuleJobAfterResolve (node:internal/modules/esm/loader:564:36)
+    at afterResolve (node:internal/modules/esm/loader:611:52)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:617:12)
+    at node:internal/modules/esm/loader:636:32
+    at TracingChannel.tracePromise (node:diagnostics_channel:362:14)
 
 Node.js v24.21.0
