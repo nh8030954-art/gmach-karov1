@@ -7,6 +7,7 @@ import {saveResearchReport,ingestResearch,researchCandidates,handleGmachResearch
 import {dispatchNotificationEvents} from '../worker/notification-events.js';
 import {deferNonessentialD1} from '../worker/d1-conservation.js';
 import {runPrivacyPurgeMaintenance} from '../worker/privacy-purge.js';
+import worker from '../worker/index.js';
 function splitMigration(sql) {
   const statements = [];
   let buffer = "";
@@ -38,7 +39,14 @@ await monitorGmachResearch(pausedEnv);
 assert.equal((await runPrivacyPurgeMaintenance(pausedEnv)).deferred,true);
 assert.equal(pauseReads.length,0,'Paused retention and admin history synchronization execute no D1 SQL');
 await dispatchNotificationEvents(pausedEnv);
-assert.deepEqual(pauseReads,['SELECT sequence,user_id FROM notification_event_outbox ORDER BY sequence LIMIT 90'],'Existing user notification delivery stays active without reading/clearing admin dirty state');
+assert.deepEqual(pauseReads,[],'All background notification reads stop; pending events remain stored until expiry');
+const jobs=[];await worker.scheduled({cron:'*/15 * * * *'},pausedEnv,{waitUntil(promise){jobs.push(promise)}});await Promise.all(jobs);
+assert.equal(pauseReads.length,0,'Scheduled tasks perform zero D1 reads during the pause');
+for(const [path,method,status] of [['/api/admin/overview','GET',503],['/api/admin/operations/health','GET',503],['/api/notifications','GET',503],['/api/notifications/live','GET',503],['/api/loan-requests/example/messages','GET',503],['/api/performance','POST',202],['/api/analytics/visit','POST',202]]){
+  const response=await worker.fetch(new Request('https://gmach-berega.co.il'+path,{method}),pausedEnv,{waitUntil(){}});
+  assert.equal(response.status,status,path);assert.equal(pauseReads.length,0,path+' must be paused before authentication, schema and closure queries');
+}
+
 
 const mf=new Miniflare({modules:true,modulesRules:[{type:'ESModule',include:['**/*.js'],fallthrough:true}],scriptPath:'worker/index.js',compatibilityDate:'2026-08-06',d1Databases:['DB'],r2Buckets:['BACKUP_STORAGE'],durableObjects:{NOTIFICATION_HUB:{className:'NotificationHub',useSQLite:true}}});
 try{

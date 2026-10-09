@@ -323,6 +323,11 @@ export default {
       return new Response(null, { status: 308, headers: { Location: target.toString(), "Cache-Control": "public, max-age=3600" } });
     }
     try {
+      // Optional background/report endpoints return before any D1 access.
+      if(deferNonessentialD1(env)){
+        if(request.method==='GET'&&(/^\/api\/admin(?:\/|$)/.test(url.pathname)||/^\/api\/research(?:\/|$)/.test(url.pathname)||/^\/api\/notifications(?:\/|$)/.test(url.pathname)||/\/messages(?:\/|$)/.test(url.pathname)))return withSecurityHeaders(json({error:'פעולה זו הושהתה עד 20:00. הפעולות הבסיסיות באתר נשארו זמינות.',deferredUntil:env.D1_CONSERVE_UNTIL},503));
+        if(request.method==='POST'&&['/api/performance','/api/analytics/visit','/api/analytics/event'].includes(url.pathname))return withSecurityHeaders(json({ok:true,deferred:true},202));
+      }
       const closureAsset = url.pathname === "/gmach-berega-logo.jpg";
       if (url.pathname !== "/api/health" && !closureAsset) {
         const shabbat = israelShabbatState(new Date());
@@ -344,6 +349,7 @@ export default {
       if (url.pathname.startsWith("/api/")) {
         // Stop optional telemetry and reports before any schema/bootstrap reads.
         if(deferNonessentialD1(env)){
+          if(request.method==='GET'&&(/^\/api\/admin(?:\/|$)/.test(url.pathname)||/^\/api\/research(?:\/|$)/.test(url.pathname)||/^\/api\/notifications(?:\/|$)/.test(url.pathname)||/\/messages(?:\/|$)/.test(url.pathname)))return withSecurityHeaders(json({error:'פעולה זו הושהתה עד 20:00. הפעולות הבסיסיות באתר נשארו זמינות.',deferredUntil:env.D1_CONSERVE_UNTIL},503));
           if(request.method==='POST'&&['/api/performance','/api/analytics/visit','/api/analytics/event'].includes(url.pathname))return withSecurityHeaders(json({ok:true,deferred:true},202));
           if(request.method==='GET'&&(/^\/api\/admin\/(analytics|performance)(\/|$)/.test(url.pathname)||['/api/admin/overview','/api/admin/operations/health','/api/admin/release-readiness'].includes(url.pathname))){
             await requireAdmin(request,env);
@@ -476,8 +482,7 @@ export default {
     ctx.waitUntil((async()=>{
       try {
       if(deferNonessentialD1(env)){
-        // Keep only time-sensitive loans, inventory, waitlists and user controls.
-        await Promise.all([runScheduledMaintenance(env),runPlatformCompletionMaintenance(env),runFinalMaintenance(env),runRequirementsExpansionMaintenance(env)]);
+        // Operator requested only basic interactive site actions until this evening.
         return;
       }
       // Schema reconciliation is intentionally daily. Running every ensure
@@ -493,7 +498,7 @@ export default {
       }
       await Promise.all([runScheduledMaintenance(env), runPlatformCompletionMaintenance(env), runFinalMaintenance(env), runRemainingMaintenance(env), runRequirementsExpansionMaintenance(env), monitorGmachResearch(env),
         runLaunchReadinessMaintenance(env), runDistributionCompletionMaintenance(env), runPrivacyPurgeMaintenance(env), runCommunityChatMaintenance(env)]);
-      } finally { await dispatchNotificationEvents(env); }
+      } finally { if(!deferNonessentialD1(env))await dispatchNotificationEvents(env); }
     })());
   }
 };

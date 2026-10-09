@@ -43,6 +43,7 @@ export async function openNotificationChannel(request,env,user){
 }
 
 export async function dispatchNotificationEvents(env){
+  if(deferNonessentialD1(env))return;
   if(!env.NOTIFICATION_HUB)return;
   const dirty=deferNonessentialD1(env)?null:await env.DB.prepare('SELECT version FROM admin_bell_dirty WHERE id=1').first();
   if(dirty){
