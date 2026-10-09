@@ -1,3 +1,4 @@
+import {deferNonessentialD1} from './d1-conservation.js';
 import { getContactPreferences } from "./contact-preferences.js";
 import { verifyTotp } from "./totp.js";
 import qrcode from "./vendor/qrcode-generator.mjs";
@@ -308,7 +309,7 @@ export async function runPlatformCompletionMaintenance(env){
     ]);
   }
   await processWaitlist(env,now);
-  await processDeletionLifecycle(env,now);
+  if(!deferNonessentialD1(env))await processDeletionLifecycle(env,now);
   // New-item saved-search notices are emitted on publication; never rescan the catalog on a timer.
   await processNotificationQueue(env,now);
   // Full production backups are owned by GitHub Actions; never start an internal copy here.

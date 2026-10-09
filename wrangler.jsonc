@@ -42,6 +42,7 @@
   "observability": {
     "enabled": true
   },
+  "vars": {"D1_CONSERVE_UNTIL": "2026-10-09T17:00:00Z"},
   "triggers": {
     "crons": [
       "*/15 * * * *",

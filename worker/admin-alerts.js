@@ -1,3 +1,4 @@
+import {deferNonessentialD1} from './d1-conservation.js';
 // All private bell sources pass through the authenticated super-administrator path.
 const labels = {
   archive_backup_failed:'הגיבוי המלא נכשל', archive_backup_stale:'הגיבוי המלא אינו עדכני',
@@ -6,6 +7,7 @@ const labels = {
   gmach_research_stale:'בדיקת הגמ״חים לא הושלמה בזמן'
 };
 export async function syncAdminBell(env, user) {
+  if(deferNonessentialD1(env))return;
   if(user.role!=='admin'||Number(user.totp_enabled)!==1)return;
   const sources = [
     ['alert', `SELECT a.id,a.alert_type,a.details_json,a.created_at FROM system_alerts a WHERE a.resolved_at IS NULL AND a.severity IN ('warning','critical') AND NOT EXISTS(SELECT 1 FROM notifications n WHERE n.id='admin:'||?||':alert:'||a.id) ORDER BY a.created_at DESC LIMIT 20`],
@@ -36,6 +38,7 @@ export async function syncAdminBell(env, user) {
 }
 
 export async function monitorGmachResearch(env,now=Date.now()){
+  if(deferNonessentialD1(env,now))return;
   const latest=await env.DB.prepare('SELECT checked_at FROM gmach_research_runs WHERE checked_count=candidate_count ORDER BY checked_at DESC LIMIT 1').first();
   const installed=await env.BACKUP_STORAGE?.get('_system-research/public-jwk.json');
   if(!installed)return;

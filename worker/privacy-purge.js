@@ -1,3 +1,4 @@
+import {deferNonessentialD1} from './d1-conservation.js';
 
 const SESSION_COOKIE="gmach_session";
 class PrivacyPurgeError extends Error{constructor(status,message){super(message);this.status=status}}
@@ -106,6 +107,7 @@ async function applyRetention(env){
  return out;
 }
 async function runAll(env){
+ if(deferNonessentialD1(env))return {deferred:true,deferredUntil:env.D1_CONSERVE_UNTIL};
  await ensurePrivacyPurgeSchema(env);
  const deleted=await allSafe(env,"SELECT id,deleted_at FROM users WHERE deleted_at IS NOT NULL ORDER BY deleted_at LIMIT 100");
  const purges=[];for(const u of deleted)purges.push(await purgeDeletedUser(env,u));

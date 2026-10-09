@@ -1,3 +1,4 @@
+import {deferNonessentialD1} from './d1-conservation.js';
 import { openNotificationChannel, dispatchNotificationEvents } from './notification-events.js';
 export { NotificationHub } from './notification-events.js';
 import { syncAdminBell, monitorGmachResearch } from './admin-alerts.js';
@@ -341,6 +342,18 @@ export default {
         }
       }
       if (url.pathname.startsWith("/api/")) {
+        // Stop optional telemetry and reports before any schema/bootstrap reads.
+        if(deferNonessentialD1(env)){
+          if(request.method==='POST'&&['/api/performance','/api/analytics/visit','/api/analytics/event'].includes(url.pathname))return withSecurityHeaders(json({ok:true,deferred:true},202));
+          if(request.method==='GET'&&(/^\/api\/admin\/(analytics|performance)(\/|$)/.test(url.pathname)||['/api/admin/overview','/api/admin/operations/health','/api/admin/release-readiness'].includes(url.pathname))){
+            await requireAdmin(request,env);
+            return withSecurityHeaders(json({error:'הדוחות והסריקות הושהו זמנית לחיסכון במכסת הנתונים עד 20:00.',deferredUntil:env.D1_CONSERVE_UNTIL},503));
+          }
+          if(request.method==='GET'&&url.pathname==='/api/notifications'){
+            const user=await requireUser(request,env);
+            if(user.role==='admin'&&Number(user.totp_enabled)===1)return withSecurityHeaders(json({error:'עיבוד התראות המנהל הושהה עד 20:00 לחיסכון במכסה.',deferredUntil:env.D1_CONSERVE_UNTIL},503));
+          }
+        }
         await ensureItemManagementModes(env);
         await ensureLoanCosts(env);
         await ensureServiceRanges(env);
@@ -462,6 +475,11 @@ export default {
   async scheduled(event, env, ctx) {
     ctx.waitUntil((async()=>{
       try {
+      if(deferNonessentialD1(env)){
+        // Keep only time-sensitive loans, inventory, waitlists and user controls.
+        await Promise.all([runScheduledMaintenance(env),runPlatformCompletionMaintenance(env),runFinalMaintenance(env),runRequirementsExpansionMaintenance(env)]);
+        return;
+      }
       // Schema reconciliation is intentionally daily. Running every ensure
       // function every few minutes was a large, unnecessary source of D1 reads.
       if (event.cron === "17 2 * * *") {
@@ -698,6 +716,14 @@ async function ensureCompletePlatformSchema(env) {
 }
 
 async function routeApi(request, env, ctx, url) {
+  if(deferNonessentialD1(env)){
+    if(request.method==='POST'&&['/api/performance','/api/analytics/visit','/api/analytics/event'].includes(url.pathname))return json({ok:true,deferred:true},202);
+    if(request.method==='GET'&&(/^\/api\/admin\/(analytics|performance)(\/|$)/.test(url.pathname)||['/api/admin/overview','/api/admin/operations/health','/api/admin/release-readiness'].includes(url.pathname))){
+      await requireAdmin(request,env);
+      return json({error:'הדוחות והסריקות הושהו זמנית לחיסכון במכסת הנתונים עד 20:00.',deferredUntil:env.D1_CONSERVE_UNTIL},503,{'Retry-After':String(Math.max(1,Math.ceil((Date.parse(env.D1_CONSERVE_UNTIL)-Date.now())/1000)))});
+    }
+  }
+
   const method = request.method.toUpperCase();
   const path = url.pathname;
   if (!["GET", "HEAD", "OPTIONS"].includes(method)) assertSameOrigin(request, url);
@@ -2985,6 +3011,7 @@ function assertSafeChatText(message){
 async function listNotifications(request, env) {
   const user = await requireUser(request, env);
   const admin=user.role==="admin"&&Number(user.totp_enabled)===1;
+  if(admin&&deferNonessentialD1(env))return json({error:'עיבוד התראות המנהל הושהה עד 20:00 לחיסכון במכסה.',deferredUntil:env.D1_CONSERVE_UNTIL},503);
   if(admin)await syncAdminBell(env,user);
   const [items, unread] = await env.DB.batch([
     env.DB.prepare(`SELECT n.id,n.type,n.title,n.body,n.request_id,n.read_at,n.created_at,l.kind AS action_kind,l.target_id AS action_target FROM notifications n LEFT JOIN admin_notification_links l ON l.notification_id=n.id
@@ -3882,9 +3909,10 @@ async function deliverDailyDigests(env){
   }
 }
 async function runScheduledMaintenance(env) {
-  await ensureProductionHardeningSchema(env);
+  const conserve=deferNonessentialD1(env);
+  if(!conserve)await ensureProductionHardeningSchema(env);
   const now = new Date().toISOString();
-  const deletionReminderUsers=await env.DB.prepare(`SELECT id FROM users WHERE deletion_requested_at IS NOT NULL AND deleted_at IS NULL AND deletion_requested_at<=datetime(?,'-5 days') AND deletion_requested_at>datetime(?,'-7 days') AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.user_id=users.id AND n.title='תזכורת לפני מחיקת החשבון' AND n.created_at>=datetime(?,'-2 days'))`).bind(now,now,now).all();
+  const deletionReminderUsers=conserve?{results:[]}:await env.DB.prepare(`SELECT id FROM users WHERE deletion_requested_at IS NOT NULL AND deleted_at IS NULL AND deletion_requested_at<=datetime(?,'-5 days') AND deletion_requested_at>datetime(?,'-7 days') AND NOT EXISTS (SELECT 1 FROM notifications n WHERE n.user_id=users.id AND n.title='תזכורת לפני מחיקת החשבון' AND n.created_at>=datetime(?,'-2 days'))`).bind(now,now,now).all();
   for(const row of deletionReminderUsers.results||[]) await notificationStatement(env,row.id,"system","תזכורת לפני מחיקת החשבון","בקשת מחיקת החשבון עדיין פעילה. ניתן לבטל אותה באזור האישי לפני תום שבעת הימים.",null).run();
   const scheduledItems=await env.DB.prepare(`SELECT i.id,i.title,i.description,i.city,i.category,i.condition,o.name organization_name FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.status='pending' AND i.publish_at IS NOT NULL AND i.publish_at<=?`).bind(now).all();
   for(const item of scheduledItems.results||[]){await env.DB.prepare("UPDATE items SET status='active',updated_at=? WHERE id=? AND status='pending'").bind(now,item.id).run();await notifyMatchingSavedSearches(env,{id:item.id,title:item.title,description:item.description,organizationName:item.organization_name,city:item.city,category:item.category,condition:item.condition})}
@@ -3892,18 +3920,18 @@ async function runScheduledMaintenance(env) {
   const expiredHolds=await env.DB.prepare(`SELECT h.id,h.request_id,h.item_id,lr.borrower_id,i.title,o.owner_id FROM inventory_holds h JOIN loan_requests lr ON lr.id=h.request_id JOIN items i ON i.id=h.item_id JOIN organizations o ON o.id=i.organization_id WHERE h.status='active' AND h.expires_at<=? AND lr.status='pending'`).bind(now).all();
   const missedPickups=await env.DB.prepare(`SELECT lr.id,lr.item_id,lr.borrower_id,i.title,o.owner_id FROM loan_requests lr JOIN items i ON i.id=lr.item_id JOIN organizations o ON o.id=i.organization_id WHERE lr.status='approved' AND lr.pickup_expires_at IS NOT NULL AND lr.pickup_expires_at<=? AND lr.workflow_status='approved_ready_for_pickup'`).bind(now).all();
   await env.DB.batch([
-    env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now),
-    env.DB.prepare("DELETE FROM auth_challenges WHERE expires_at <= ?").bind(now),
-    env.DB.prepare("DELETE FROM auth_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')"),
-    env.DB.prepare("DELETE FROM abuse_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')"),
+    ...(!conserve?[env.DB.prepare("DELETE FROM sessions WHERE expires_at <= ?").bind(now)]:[]),
+    ...(!conserve?[env.DB.prepare("DELETE FROM auth_challenges WHERE expires_at <= ?").bind(now)]:[]),
+    ...(!conserve?[env.DB.prepare("DELETE FROM auth_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')")]:[]),
+    ...(!conserve?[env.DB.prepare("DELETE FROM abuse_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-2 days')")]:[]),
     env.DB.prepare("UPDATE waitlist_entries SET status='expired' WHERE status IN ('waiting','notified') AND requested_until < ?").bind(now.slice(0,16)),
     env.DB.prepare("UPDATE waitlist_offers SET declined_at=? WHERE accepted_at IS NULL AND declined_at IS NULL AND expires_at<=?").bind(now,now),
     env.DB.prepare("UPDATE loan_requests SET workflow_status='overdue' WHERE status='collected' AND requested_until<? AND workflow_status!='overdue'").bind(now),
-    env.DB.prepare("UPDATE request_messages SET body='הודעה שנמחקה בהתאם למדיניות השמירה',media_url=NULL,deleted_at=? WHERE created_at<datetime(?,'-1 year') AND deleted_at IS NULL").bind(now,now),
-    env.DB.prepare("DELETE FROM notifications WHERE read_at IS NOT NULL AND created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-180 days')"),
-    env.DB.prepare("DELETE FROM site_visits WHERE started_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-395 days')"),
-    env.DB.prepare("DELETE FROM analytics_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-395 days')"),
-    env.DB.prepare("INSERT INTO operational_state(key,value,updated_at) VALUES ('last_maintenance_at',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(now,now)
+    ...(!conserve?[env.DB.prepare("UPDATE request_messages SET body='הודעה שנמחקה בהתאם למדיניות השמירה',media_url=NULL,deleted_at=? WHERE created_at<datetime(?,'-1 year') AND deleted_at IS NULL").bind(now,now)]:[]),
+    ...(!conserve?[env.DB.prepare("DELETE FROM notifications WHERE read_at IS NOT NULL AND created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-180 days')")]:[]),
+    ...(!conserve?[env.DB.prepare("DELETE FROM site_visits WHERE started_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-395 days')")]:[]),
+    ...(!conserve?[env.DB.prepare("DELETE FROM analytics_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-395 days')")]:[]),
+    ...(!conserve?[env.DB.prepare("INSERT INTO operational_state(key,value,updated_at) VALUES ('last_maintenance_at',?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at").bind(now,now)]:[]),
   ]);
   for(const row of newlyOverdue.results||[]) await env.DB.batch([
     notificationStatement(env,row.borrower_id,"status","ההשאלה באיחור",`מועד ההחזרה של ${row.title} עבר. החזירו את הפריט בהקדם או בקשו הארכה מהאזור האישי.`,row.id),
@@ -3927,7 +3955,6 @@ async function runScheduledMaintenance(env) {
   await deliverDailyDigests(env);
 
 }
-
 async function compatibleMemberRole(env) {
   // Early deployments used borrower/gmach_manager while the current schema
   // uses member/admin. Inspect the live table definition so registrations keep

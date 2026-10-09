@@ -5,6 +5,8 @@ import {Miniflare} from 'miniflare';
 import {syncAdminBell,monitorGmachResearch} from '../worker/admin-alerts.js';
 import {saveResearchReport,ingestResearch,researchCandidates,handleGmachResearch} from '../worker/gmach-research.js';
 import {dispatchNotificationEvents} from '../worker/notification-events.js';
+import {deferNonessentialD1} from '../worker/d1-conservation.js';
+import {runPrivacyPurgeMaintenance} from '../worker/privacy-purge.js';
 function splitMigration(sql) {
   const statements = [];
   let buffer = "";
@@ -23,6 +25,20 @@ function splitMigration(sql) {
   if (buffer.trim()) statements.push(buffer.trim());
   return statements;
 }
+
+// Temporary pause performs no history/retention queries and preserves pending admin sources.
+const pauseUntil=new Date(Date.now()+86400000).toISOString();
+assert.equal(deferNonessentialD1({D1_CONSERVE_UNTIL:pauseUntil}),true);
+assert.equal(deferNonessentialD1({D1_CONSERVE_UNTIL:pauseUntil},Date.parse(pauseUntil)),false);
+assert.equal(deferNonessentialD1({D1_CONSERVE_UNTIL:'invalid'}),false);
+const pauseReads=[];
+const pausedEnv={D1_CONSERVE_UNTIL:pauseUntil,DB:{prepare(sql){pauseReads.push(sql);return {async all(){return {results:[]}},async first(){throw new Error('No history/retention/dirty-source read during pause')}}}},NOTIFICATION_HUB:{}};
+await syncAdminBell(pausedEnv,{id:'admin',role:'admin',totp_enabled:1});
+await monitorGmachResearch(pausedEnv);
+assert.equal((await runPrivacyPurgeMaintenance(pausedEnv)).deferred,true);
+assert.equal(pauseReads.length,0,'Paused retention and admin history synchronization execute no D1 SQL');
+await dispatchNotificationEvents(pausedEnv);
+assert.deepEqual(pauseReads,['SELECT sequence,user_id FROM notification_event_outbox ORDER BY sequence LIMIT 90'],'Existing user notification delivery stays active without reading/clearing admin dirty state');
 
 const mf=new Miniflare({modules:true,modulesRules:[{type:'ESModule',include:['**/*.js'],fallthrough:true}],scriptPath:'worker/index.js',compatibilityDate:'2026-08-06',d1Databases:['DB'],r2Buckets:['BACKUP_STORAGE'],durableObjects:{NOTIFICATION_HUB:{className:'NotificationHub',useSQLite:true}}});
 try{

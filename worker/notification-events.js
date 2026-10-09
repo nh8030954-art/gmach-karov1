@@ -1,3 +1,4 @@
+import {deferNonessentialD1} from './d1-conservation.js';
 import {syncAdminBell} from './admin-alerts.js';
 
 // One hibernating channel per authenticated user. No timers, polling or private message content.
@@ -43,7 +44,7 @@ export async function openNotificationChannel(request,env,user){
 
 export async function dispatchNotificationEvents(env){
   if(!env.NOTIFICATION_HUB)return;
-  const dirty=await env.DB.prepare('SELECT version FROM admin_bell_dirty WHERE id=1').first();
+  const dirty=deferNonessentialD1(env)?null:await env.DB.prepare('SELECT version FROM admin_bell_dirty WHERE id=1').first();
   if(dirty){
     const admins=await env.DB.prepare("SELECT id,role,totp_enabled FROM users WHERE role='admin' AND totp_enabled=1 AND deleted_at IS NULL AND account_status='active'").all();
     for(const admin of admins.results||[])await syncAdminBell(env,admin);
