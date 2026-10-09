@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {readArchiveBackup,monitorArchiveBackup,LEGACY_BACKUP_ALERTS} from '../worker/archive-backup.js';
+import {runPlatformCompletionMaintenance,handlePlatformCompletionApi} from '../worker/platform-completion.js';
 import {runRemainingMaintenance} from '../worker/remaining-features.js';
 const now=Date.parse('2026-10-08T19:10:00Z');
 const current={key:'backups/gmach-full-20261008T062808Z.zip',size:1234,sha256:'a'.repeat(64),updated_at:'2026-10-08T06:28:08Z'};
@@ -18,3 +19,14 @@ objects.set('VERIFY.json',{status:'success',key:'old.zip',sha256:'b'.repeat(64)}
 env.BACKUP_STORAGE.head=async()=>null;await monitorArchiveBackup(env,now);assert.ok(alerts.some(a=>a.alert_type==='archive_backup_missing'&&!a.resolved_at));
 const reads=objects.size;await runRemainingMaintenance(env);assert.equal(objects.size,reads);assert.ok(!statements.some(s=>s.includes('sqlite_master')||s.startsWith('INSERT INTO backup_runs')),'Routine maintenance must not create internal backups');
 console.log('Full archive status, failed/stale/missing alerts, verification matching, historical alert retirement and disabled internal scheduler passed');
+
+// Both maintenance layers must avoid internal exports and periodic saved-search scans.
+const platformReads=[],platformWrites=[];
+const platformDB={prepare(sql){let args=[];return {bind(...values){args=values;return this},async all(){platformReads.push(sql);return {results:[]}},async first(){platformReads.push(sql);return sql.includes('FROM sessions s JOIN users')?{id:'admin-1',role:'admin',totp_enabled:1}:null},async run(){platformWrites.push(sql);return {meta:{changes:0}}}}},async batch(statements){return Promise.all(statements.map(s=>s.run()))}};
+const platformEnv={DB:platformDB,BACKUP_STORAGE:{async put(){throw new Error('Internal archive must never be created')}},ITEM_IMAGES:{async list(){throw new Error('Internal media copy must never run')}}};
+await runPlatformCompletionMaintenance(platformEnv);await runPlatformCompletionMaintenance(platformEnv);
+assert.ok(!platformReads.some(sql=>sql.includes('backup_runs')||sql.includes('saved_searches')||sql.includes('SELECT * FROM users')),'Repeated maintenance does not inspect internal backups, rescan saved searches or export tables');
+assert.ok(!platformWrites.some(sql=>sql.includes('backup_runs')||sql.includes('backup_objects')||sql.includes('saved_searches')),'Repeated maintenance does not write internal backup or saved-search rows');
+const blocked=await handlePlatformCompletionApi(new Request('https://example.test/api/admin/backups/run',{method:'POST',headers:{Cookie:'gmach_session=test'}}),platformEnv,{},new URL('https://example.test/api/admin/backups/run'));
+assert.equal(blocked.status,410,'Legacy manual endpoint cannot start an internal backup');
+console.log('Platform internal backups and periodic saved-search reads/writes disabled; legacy backup endpoint rejected');
