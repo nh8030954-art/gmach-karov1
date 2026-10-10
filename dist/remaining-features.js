@@ -516,7 +516,7 @@ function osmEmbed(lat,lon){
 }
 function createInteractiveOsmMap(canvas){
   const state={center:{lat:31.55,lon:34.85},zoom:7,points:[],focus:null,popup:null,drag:null};
-  canvas.innerHTML='<div class="gmach-osm-map" style="position:relative;width:100%;height:100%;overflow:hidden;background:#e9efed;touch-action:auto;user-select:none"><div data-osm-tiles style="position:absolute;inset:0;z-index:1;touch-action:none"></div><div data-osm-pins style="position:absolute;inset:0;pointer-events:none;z-index:3"></div><div data-osm-controls style="position:absolute;top:12px;left:12px;z-index:6;display:grid;gap:6px"><button type="button" class="button button-secondary button-small" data-osm-zoom="in" aria-label="התקרבות">+</button><button type="button" class="button button-secondary button-small" data-osm-zoom="out" aria-label="התרחקות">−</button></div></div>';
+  canvas.innerHTML='<div class="gmach-osm-map" style="position:relative;width:100%;height:100%;overflow:hidden;background:#e9efed;touch-action:none;user-select:none"><div data-osm-tiles style="position:absolute;inset:0;z-index:1"></div><div data-osm-pins style="position:absolute;inset:0;pointer-events:none;z-index:3"></div><div data-osm-controls style="position:absolute;top:12px;left:12px;z-index:6;display:grid;gap:6px"><button type="button" class="button button-secondary button-small" data-osm-zoom="in" aria-label="התקרבות">+</button><button type="button" class="button button-secondary button-small" data-osm-zoom="out" aria-label="התרחקות">−</button></div></div>';
   const root=canvas.firstElementChild,tiles=root.querySelector("[data-osm-tiles]"),pins=root.querySelector("[data-osm-pins]");
   const clampLat=lat=>Math.max(-85.05112878,Math.min(85.05112878,Number(lat)||0));
   const world=(lat,lon,z)=>{
@@ -544,43 +544,35 @@ function createInteractiveOsmMap(canvas){
       tiles.append(img);
     }
     pins.innerHTML="";
-    const groups=[];
+    const placed=[];
     for(const p of state.points){
       const lat=Number(p.lat),lon=Number(p.lon);
       if(!Number.isFinite(lat)||!Number.isFinite(lon))continue;
-      const wp=world(lat,lon,z),screenX=wp.x-left,screenY=wp.y-top;
+      const wp=world(lat,lon,z);let screenX=wp.x-left,screenY=wp.y-top;
       if(screenX<-30||screenY<-30||screenX>w+30||screenY>h+30)continue;
-      groups.push({x:screenX,y:screenY,points:[p]});
-    }
-    // Merge markers that would overlap at this zoom; keep original coordinates intact.
-    let merged=true;
-    while(merged){
-      merged=false;
-      outer:for(let i=0;i<groups.length;i++)for(let j=i+1;j<groups.length;j++){
-        const a=groups[i],b=groups[j];
-        if(Math.hypot(a.x-b.x,a.y-b.y)>=40)continue;
-        const count=a.points.length+b.points.length;
-        a.x=(a.x*a.points.length+b.x*b.points.length)/count;
-        a.y=(a.y*a.points.length+b.y*b.points.length)/count;
-        a.points.push(...b.points);groups.splice(j,1);merged=true;break outer;
+      // Space only the visible buttons; keep each gmach's geographic point unchanged.
+      const anchorX=screenX,anchorY=screenY;
+      const free=(x,y)=>x>=14&&y>=14&&x<=w-14&&y<=h-14&&placed.every(point=>Math.hypot(point.x-x,point.y-y)>=30);
+      if(!free(screenX,screenY)){
+        let found=false;
+        const maxRing=Math.ceil(Math.hypot(w,h)/30);
+        for(let ring=1;ring<=maxRing&&!found;ring++){
+          for(let step=0;step<6*ring;step++){
+            const angle=step*Math.PI/(3*ring),x=anchorX+30*ring*Math.cos(angle),y=anchorY+30*ring*Math.sin(angle);
+            if(!free(x,y))continue;
+            screenX=x;screenY=y;found=true;break;
+          }
+        }
       }
-    }
-    for(const group of groups){
-      const count=group.points.length,p=group.points[0],screenX=group.x,screenY=group.y;
+      placed.push({x:screenX,y:screenY});
       const marker=document.createElement("button");
-      marker.type="button";marker.dataset.mapOrg=count===1?p.id||"":"";
-      marker.dataset.mapCount=String(count);
-      marker.title=count>1?(lang==="en"?count+" gmachs":count+" גמ״חים"):(p.name||"גמ״ח");
-      marker.setAttribute("aria-label",marker.title);
-      marker.textContent=count>1?String(count):"";
-      const size=count>1?36:28;
-      marker.style.cssText="pointer-events:auto;position:absolute;left:"+(screenX-size/2)+"px;top:"+(screenY-size/2)+"px;width:"+size+"px;height:"+size+"px;border-radius:50%;border:4px solid white;background:#0f766e;color:white;font-size:16px;font-weight:700;display:grid;place-items:center;box-shadow:0 3px 12px #0006;cursor:pointer;padding:0;z-index:4";
+      marker.type="button";marker.dataset.mapOrg=p.id||"";marker.title=p.name||"גמ״ח";
+      marker.style.cssText="pointer-events:auto;position:absolute;left:"+(screenX-14)+"px;top:"+(screenY-14)+"px;width:28px;height:28px;border-radius:50%;border:4px solid white;background:#0f766e;box-shadow:0 3px 12px #0006;cursor:pointer;padding:0;z-index:4";
       marker.onclick=e=>{
         e.stopPropagation();removePopup();
-        const pop=document.createElement("div");pop.dir=lang==="en"?"ltr":"rtl";pop.dataset.osmPopup="";
-        pop.style.cssText="pointer-events:auto;position:absolute;z-index:5;min-width:230px;max-width:320px;max-height:"+Math.min(360,h-32)+"px;overflow-y:auto;user-select:text;background:white;border:1px solid #ccd7d3;border-radius:14px;box-shadow:0 12px 35px #0003;padding:12px;left:"+Math.max(8,Math.min(w-250,screenX-115))+"px;top:"+Math.max(8,Math.min(h-Math.min(360,h-32)-16,screenY+20))+"px";
-        const details=point=>point.popupHtml||"<strong>"+esc(point.name||"גמ״ח")+"</strong>";
-        pop.innerHTML=count===1?details(p):"<strong>"+esc(marker.title)+"</strong>"+group.points.map(point=>'<article style="border-top:1px solid #e5e7eb;margin-top:10px;padding-top:10px">'+details(point)+"</article>").join("");
+        const pop=document.createElement("div");pop.dir=lang==="en"?"ltr":"rtl";
+        pop.style.cssText="pointer-events:auto;position:absolute;z-index:5;min-width:230px;max-width:320px;background:white;border:1px solid #ccd7d3;border-radius:14px;box-shadow:0 12px 35px #0003;padding:12px;left:"+Math.max(8,Math.min(w-250,screenX-115))+"px;top:"+Math.max(8,Math.min(h-210,screenY+20))+"px";
+        pop.innerHTML=p.popupHtml||"<strong>"+esc(p.name||"גמ״ח")+"</strong>";
         pins.append(pop);state.popup=pop;
       };
       pins.append(marker);
@@ -597,11 +589,11 @@ function createInteractiveOsmMap(canvas){
   const setView=(lat,lon,zoom=state.zoom)=>{state.center={lat:Number(lat),lon:Number(lon)};state.zoom=Math.max(5,Math.min(18,Math.round(zoom)));removePopup();render()};
   root.querySelector('[data-osm-zoom="in"]').onclick=e=>{e.stopPropagation();state.zoom=Math.min(18,state.zoom+1);render()};
   root.querySelector('[data-osm-zoom="out"]').onclick=e=>{e.stopPropagation();state.zoom=Math.max(5,state.zoom-1);render()};
-  root.onpointerdown=e=>{if(e.target.closest("button,[data-osm-popup]"))return;state.drag={x:e.clientX,y:e.clientY,center:world(state.center.lat,state.center.lon,state.zoom)};root.setPointerCapture?.(e.pointerId)};
+  root.onpointerdown=e=>{if(e.target.closest("button"))return;state.drag={x:e.clientX,y:e.clientY,center:world(state.center.lat,state.center.lon,state.zoom)};root.setPointerCapture?.(e.pointerId)};
   root.onpointermove=e=>{if(!state.drag)return;const dx=e.clientX-state.drag.x,dy=e.clientY-state.drag.y,p=inv(state.drag.center.x-dx,state.drag.center.y-dy,state.zoom);state.center=p;render()};
   root.onpointerup=root.onpointercancel=()=>{state.drag=null};
-  root.onwheel=e=>{if(e.target.closest("[data-osm-popup]"))return;e.preventDefault();state.zoom=Math.max(5,Math.min(18,state.zoom+(e.deltaY<0?1:-1)));render()};
-  root.onclick=e=>{if(!e.target.closest("button,[data-osm-popup]"))removePopup()};
+  root.onwheel=e=>{e.preventDefault();state.zoom=Math.max(5,Math.min(18,state.zoom+(e.deltaY<0?1:-1)));render()};
+  root.onclick=e=>{if(!e.target.closest("button"))removePopup()};
   const ro=new ResizeObserver(()=>render());ro.observe(root);render();
   return{
     setPoints(points){state.points=Array.isArray(points)?points:[];render()},
@@ -653,7 +645,7 @@ async function geocodeGmachOrganizations(rows){
 async function showAddressMap(){
  const d=dialog("map-dialog",lang==="en"?"Gmach map":"מפת הגמ״חים"),b=$(".remaining-body",d);
  let navPref=localStorage.getItem("gmach-navigation-app")||"google";try{const pref=await api("/api/me/navigation-preferences");navPref=pref.preferences?.preferred_app||navPref}catch{}
- b.innerHTML=`<section aria-labelledby="gmach-map-title"><div style="display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px"><div><h3 id="gmach-map-title" style="margin:0">${lang==="en"?"Gmachs near you":"גמ״חים על המפה"}</h3><p class="platform-note" style="margin:4px 0 0">${lang==="en"?"Numbers show how many gmachs are grouped. Click to see all of them.":"מספר על הסמן מציין כמה גמ״חים יש בקבוצה. לחצו כדי לראות את כולם."}</p></div><label class="map-nav-pref-label" style="min-width:220px;display:grid;gap:6px">${lang==="en"?"Preferred navigation app":"אפליקציית ניווט מועדפת"}<select id="map-nav-pref"><option value="google" ${navPref==="google"?"selected":""}>Google Maps</option><option value="waze" ${navPref==="waze"?"selected":""}>Waze</option><option value="apple" ${navPref==="apple"?"selected":""}>Apple Maps</option></select></label></div><div id="gmach-map-canvas" style="width:100%;height:min(62vh,560px);min-height:430px;border:1px solid #d8dfdc;border-radius:18px;overflow:hidden;background:#eef3f1" aria-label="${lang==="en"?"Interactive gmach map":"מפת גמ״חים אינטראקטיבית"}"></div><div id="gmach-map-status" role="status" aria-live="polite" class="platform-note" style="margin-top:8px">${lang==="en"?"Loading gmachs…":"טוענים גמ״חים על המפה…"}</div></section><hr style="margin:18px 0;border:0;border-top:1px solid #e5e7eb"><details><summary style="cursor:pointer;font-weight:700">${lang==="en"?"Search another address":"חיפוש כתובת אחרת"}</summary><form id="map-search" autocomplete="off" style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px"><input name="q" type="search" autocomplete="off" minlength="3" aria-label="כתובת לחיפוש" placeholder="עיר, רחוב ומספר" required><button class="button button-primary">${lang==="en"?"Search":"חיפוש"}</button></form><button type="button" class="button button-secondary" id="map-current" style="margin-top:8px">${lang==="en"?"My current location":"המיקום הנוכחי"}</button><div id="map-results" role="status" aria-live="polite" style="display:grid;gap:8px;margin-top:12px"></div></details><small style="display:block;margin-top:12px">© OpenStreetMap contributors</small>`;
+ b.innerHTML=`<section aria-labelledby="gmach-map-title"><div style="display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px"><div><h3 id="gmach-map-title" style="margin:0">${lang==="en"?"Gmachs near you":"גמ״חים על המפה"}</h3><p class="platform-note" style="margin:4px 0 0">${lang==="en"?"Click a marker to see gmach details.":"לחצו על נקודת ציון כדי לראות פרטי גמ״ח."}</p></div><label class="map-nav-pref-label" style="min-width:220px;display:grid;gap:6px">${lang==="en"?"Preferred navigation app":"אפליקציית ניווט מועדפת"}<select id="map-nav-pref"><option value="google" ${navPref==="google"?"selected":""}>Google Maps</option><option value="waze" ${navPref==="waze"?"selected":""}>Waze</option><option value="apple" ${navPref==="apple"?"selected":""}>Apple Maps</option></select></label></div><div id="gmach-map-canvas" style="width:100%;height:min(62vh,560px);min-height:430px;border:1px solid #d8dfdc;border-radius:18px;overflow:hidden;background:#eef3f1" aria-label="${lang==="en"?"Interactive gmach map":"מפת גמ״חים אינטראקטיבית"}"></div><div id="gmach-map-status" role="status" aria-live="polite" class="platform-note" style="margin-top:8px">${lang==="en"?"Loading gmachs…":"טוענים גמ״חים על המפה…"}</div></section><hr style="margin:18px 0;border:0;border-top:1px solid #e5e7eb"><details><summary style="cursor:pointer;font-weight:700">${lang==="en"?"Search another address":"חיפוש כתובת אחרת"}</summary><form id="map-search" autocomplete="off" style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px"><input name="q" type="search" autocomplete="off" minlength="3" aria-label="כתובת לחיפוש" placeholder="עיר, רחוב ומספר" required><button class="button button-primary">${lang==="en"?"Search":"חיפוש"}</button></form><button type="button" class="button button-secondary" id="map-current" style="margin-top:8px">${lang==="en"?"My current location":"המיקום הנוכחי"}</button><div id="map-results" role="status" aria-live="polite" style="display:grid;gap:8px;margin-top:12px"></div></details><small style="display:block;margin-top:12px">© OpenStreetMap contributors</small>`;
  d.showModal();
  const form=$("#map-search",d),results=$("#map-results",d),status=$("#gmach-map-status",d),canvas=$("#gmach-map-canvas",d);
  $("#map-nav-pref",d).onchange=async e=>{navPref=e.target.value;localStorage.setItem("gmach-navigation-app",navPref);try{await api("/api/me/navigation-preferences",{method:"PUT",body:{preferredApp:navPref}})}catch{};toast(lang==="en"?"Navigation preference saved":"העדפת הניווט נשמרה")};

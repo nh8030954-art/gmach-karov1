@@ -79,6 +79,7 @@ assert.equal(cityContext.mapGeocodeResult({type:'house',address:{city:'ירוש�
 
 assert.equal(cityContext.mapGeocodeResult({type:'administrative',addresstype:'city',address:{city:'ירושלים | القدس'}},'ירושלים','city'),true);
 
+
 const mapRenderSource=mapSource.slice(mapSource.indexOf('function createInteractiveOsmMap('),mapSource.indexOf('async function geocodeGmachOrganizations('));
 class MapTestElement{
   constructor(){this.children=[];this.dataset={};this.style={};this.attributes={};this.clientWidth=800;this.clientHeight=500;}
@@ -94,21 +95,28 @@ mapRoot.querySelector=selector=>selector==='[data-osm-pins]'?mapPins:selector===
 const renderContext={lang:'he',esc:value=>String(value),document:{createElement:()=>new MapTestElement()},ResizeObserver:class{observe(){}disconnect(){}}};
 vm.runInNewContext(mapRenderSource,renderContext);
 const renderedMap=renderContext.createInteractiveOsmMap({firstElementChild:mapRoot});
-const organizations=Array.from({length:4},(_,i)=>({id:'org-'+i,name:'גמח '+i,lat:31.7788,lon:35.2258,popupHtml:'<a href="/organizations/org-'+i+'">גמח '+i+'</a>'}));
-renderedMap.setPoints(organizations);
-assert.equal(mapPins.children.length,1);
-assert.equal(mapPins.children[0].textContent,'4');
-assert.equal(mapPins.children[0].attributes['aria-label'],'4 גמ״חים');
-mapPins.children[0].onclick({stopPropagation(){}});
-assert.ok(organizations.every(org=>mapPins.children[1].innerHTML.includes(org.popupHtml)),'Every overlapping gmach must remain accessible in the group popup');
-mapRoot.onclick({target:{closest:()=>mapPins.children[1]}});
-assert.equal(mapPins.children.length,2,'Clicks inside the group popup must not dismiss it');
+const organizations=Array.from({length:20},(_,i)=>({id:'org-'+i,name:'גמח '+i,lat:31.7788,lon:35.2258,popupHtml:'<a href="/organizations/org-'+i+'">גמח '+i+'</a>'}));
 const snapshot=JSON.stringify(organizations);
-renderedMap.setPoints([...organizations,{id:'nearby',name:'Nearby',lat:31.785,lon:35.232},{id:'far',name:'Far away',lat:32.5,lon:34.6}]);
-assert.equal(mapPins.children.length,2);
-assert.equal(mapPins.children[0].dataset.mapCount,'5','Nearby markers must be grouped at country zoom');
-assert.equal(JSON.stringify(organizations),snapshot,'Grouping must not change geographic locations');
+renderedMap.setPoints(organizations);
+assert.equal(mapPins.children.length,20,'Every gmach must have its own marker even at identical coordinates');
+assert.equal(new Set(mapPins.children.map(marker=>marker.dataset.mapOrg)).size,20);
+function assertSeparateMarkers(){
+  const buttons=mapPins.children.filter(marker=>marker.dataset.mapOrg);
+  const positions=buttons.map(marker=>({x:Number(marker.style.cssText.match(/left:([-0-9.]+)px/)[1]),y:Number(marker.style.cssText.match(/top:([-0-9.]+)px/)[1])}));
+  for(let i=0;i<positions.length;i++)for(let j=i+1;j<positions.length;j++){
+    assert.ok(Math.hypot(positions[i].x-positions[j].x,positions[i].y-positions[j].y)>=29.99,'Markers must not cover each other');
+  }
+  assert.ok(buttons.every(marker=>!marker.dataset.mapCount&&!marker.textContent),'Individual markers must not become counted groups');
+}
+assertSeparateMarkers();
+mapPins.children[7].onclick({stopPropagation(){}});
+assert.equal(mapPins.children[20].innerHTML,organizations[7].popupHtml,'Each button must open only its own gmach');
 renderedMap.setFocus(31.7788,35.2258);
-assert.deepEqual(mapPins.children.filter(x=>x.dataset.mapCount).map(x=>x.dataset.mapCount).sort(),['1','4'],'Nearby distinct points must separate as zoom increases');
+assert.equal(mapPins.children.filter(marker=>marker.dataset.mapOrg).length,20);
+assertSeparateMarkers();
+assert.equal(JSON.stringify(organizations),snapshot,'Visual spacing must not change geographic coordinates');
+renderedMap.setPoints([{id:'west',name:'West',lat:31.7788,lon:35.2258},{id:'east',name:'East',lat:31.7788,lon:35.24}]);
+const positions=mapPins.children.filter(marker=>marker.dataset.mapOrg).map(marker=>Number(marker.style.cssText.match(/left:([-0-9.]+)px/)[1]));
+assert.ok(Math.abs((positions[1]-positions[0])-(35.24-35.2258)/360*2**14*256)<0.01,'Non-overlapping markers must stay at their original projected locations');
 renderedMap.destroy();
-console.log('Map counted groups, access to every gmach, popup interaction and zoom separation passed');
+console.log('Separate clickable map markers, overlap spacing and unchanged geographic locations passed');
