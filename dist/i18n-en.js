@@ -1,4 +1,5 @@
 window.GmachEnglish = Object.freeze({
+"כדי שהגמ״ח יופיע באתר, חייבים לפתוח עמוד גמ״ח לאחר אימות המייל. הרשמה לחשבון בלבד אינה מספיקה. אפשר להציג פרטי קשר בלבד או גם להוסיף פריטים ולנהל בקשות השאלה.":"To appear on the site, you must create a gmach page after verifying your email. Registering an account alone is not enough. You can show contact details only or also add items and manage loan requests.",
 "טעינת גמ״חים נוספים":"Load more gmachs",
 "קטגוריות משנה (חובה)":"Subcategories (required)",
 "אפשר לבחור כמה קטגוריות משנה או כל הקטגוריה.":"Choose several subcategories or the entire category.",

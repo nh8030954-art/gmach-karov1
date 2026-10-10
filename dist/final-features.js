@@ -35,14 +35,7 @@ async function openOrganizationOnboardingPreview(orgId){
   $(".platform-dialog-close",d).onclick=()=>d.close();d.showModal();
 }
 async function showOrganizationOnboarding(org){
-  const orgId=org?.id;if(!orgId)return;
-  const data=await api("/api/organizations/"+encodeURIComponent(orgId)+"/onboarding").catch(()=>({onboarding:{},readiness:{}})),state=data.onboarding||{},readiness=data.readiness||{};
-  const missing=(readiness.missing||[]),labels={name:"שם",description:"תיאור",city:"עיר",address:"כתובת",phone:"טלפון",category:"קטגוריה",first_active_item:"מוצר פעיל ראשון"};
-  const d=modal("הגמ״ח נוצר - משלימים את ההקמה",`<div class="platform-list"><div class="platform-note"><strong>${window.GmachOriginalName(org.name||"הגמ״ח")}</strong><p>${readiness.publiclyVisible?"העמוד כבר מוכן לפרסום.":"העמוד נשמר. הוא יוצג בחיפוש אחרי השלמת כל דרישות הפרסום."}</p>${missing.length?`<p>נשאר להשלים: ${missing.map(x=>esc(labels[x]||x)).join(", ")}</p>`:""}</div><div class="platform-row-actions"><button class="platform-action" id="onboarding-first-item">הוספת המוצר הראשון</button><button class="platform-action secondary" id="onboarding-preview">תצוגה מקדימה</button><button class="platform-action secondary" id="onboarding-manage">מעבר לניהול הגמ"ח</button></div><section id="onboarding-tips" ${state.tips_dismissed?"hidden":""}><h3>שלושה דברים שכדאי לעשות עכשיו</h3><ol><li>להוסיף לפחות מוצר פעיל אחד כדי להופיע בחיפוש.</li><li>לבדוק שעות פעילות, כתובת ודרך האיסוף.</li><li>להוסיף קטגוריות וסניפים לפי הצורך.</li></ol><button class="platform-action secondary" id="onboarding-dismiss-tips">הבנתי, לא להציג שוב</button></section></div>`);
-  $("#onboarding-first-item",d).onclick=async()=>{d.close();location.hash="#/dashboard";setTimeout(()=>$("#add-item-button")?.click(),80)};
-  $("#onboarding-preview",d).onclick=()=>openOrganizationOnboardingPreview(orgId).catch(e=>notice(e.message,true));
-  $("#onboarding-manage",d).onclick=async()=>{await api("/api/organizations/"+encodeURIComponent(orgId)+"/onboarding",{method:"PATCH",body:{managementTourDone:true}}).catch(()=>{});d.close();location.hash="#/dashboard";setTimeout(()=>document.querySelector('[data-dashboard-tab="gmachim"]')?.click(),80)};
-  $("#onboarding-dismiss-tips",d)?.addEventListener("click",async()=>{await api("/api/organizations/"+encodeURIComponent(orgId)+"/onboarding",{method:"PATCH",body:{tipsDismissed:true}}).catch(()=>{});$("#onboarding-tips",d).hidden=true});
+  window.GmachShowCreatedOrganization?.(org);
 }
 async function openWizard(){
   const categoryRows=(await api("/api/categories")).categories||[];
@@ -72,7 +65,7 @@ async function openWizard(){
       const created=await api("/api/organizations",{method:"POST",body:{name:payload.name,organizationType:payload.organizationType,city:payload.city,address:payload.address,phone:payload.phone,description:payload.description,serviceArea:payload.serviceArea||payload.city,primaryCategory:payload.primaryCategory,subcategories:payload.subcategories,hours:{text:payload.hours||""},pickupOptions:["pickup"]}});
       if(payload.categories?.length){try{const cats=await api("/api/categories");const ids=(cats.categories||[]).filter(c=>payload.categories.some(x=>x===c.name_he||x===c.name_en)).map(c=>c.id);if(ids.length)await api("/api/organizations/"+created.organization.id+"/categories",{method:"PUT",body:{categoryIds:ids}})}catch{}}
       if(draft)await api("/api/me/organization-drafts/"+draft.id,{method:"DELETE"});
-      d.close();notice("הגמ״ח נוצר. השלב הבא: הוספת מוצר ראשון כדי לפרסם אותו בחיפוש.");location.hash="#/dashboard";setTimeout(()=>showOrganizationOnboarding(created.organization).catch(e=>notice(e.message,true)),120);
+      d.close();notice("הגמ״ח נוצר. מומלץ להוסיף פריטים כדי להציג מה הוא מציע ולהופיע בחיפוש ממוקד; אפשר גם להציג פרטי קשר בלבד.");location.hash="#/dashboard";setTimeout(()=>showOrganizationOnboarding(created.organization).catch(e=>notice(e.message,true)),120);
     };
   };show();
 }
