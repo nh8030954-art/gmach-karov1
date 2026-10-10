@@ -1,4 +1,4 @@
-deploy_sha=8654b22b0354ebace43c4a3780fcec1d77bb1786
+deploy_sha=c04288afc73a893b93eb12c0cb78c73e8b77e467
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -10,6 +10,7 @@ Platform internal backups and periodic saved-search reads/writes disabled; legac
 Item-triggered hold release, pickup expiry, overdue status and duplicate suppression passed
 Contact validation, privacy rendering, action links, contact icons and Israel time tests passed
 Navigation opt-in address rendering and precise versus approximate map locations passed
+Map city-first lookup, wrong-city rejection and private address protection passed
 Service range exact-address, city fallback, cache, failure and policy tests passed
 Gmach admin UI passed in Hebrew and English: complete controls, tool wiring and escaped original names.
 Stored English: cache reuse, edit invalidation, public permissions and unavailable text passed
@@ -29,27 +30,17 @@ Excel export and QR image scanner gate passed.
 Voice message recording gate passed.
 Excel export, accessible admin status and QR image scanning gate passed.
 Full requirements regression extensions passed.
-Static English interface coverage 100.0% (485/485)
-remaining-features Error: Backup checksum mismatch
-    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:176:41)
-    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:303:91)
-    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:1031:37)
-    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:428:26)
 node:internal/modules/run_main:107
     triggerUncaughtException(
     ^
 
-AssertionError [ERR_ASSERTION]: Missing address must not bypass service range
-
-200 !== 400
-
-    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:585:10
-    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+AssertionError [ERR_ASSERTION]: gmach map geocoding must retry throttled requests and fall back to city
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:616:8 {
   generatedMessage: false,
   code: 'ERR_ASSERTION',
-  actual: 200,
-  expected: 400,
-  operator: 'strictEqual',
+  actual: false,
+  expected: true,
+  operator: '==',
   diff: 'simple'
 }
 
