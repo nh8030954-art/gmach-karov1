@@ -1,0 +1,30 @@
+name: Add childbirth subcategory
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/add-births-category-20261010.yml"]
+permissions:
+  contents: read
+jobs:
+  add-category:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Add only childbirth under Babies and verify
+        run: |
+          npx wrangler d1 execute DB --remote --yes --json --command "INSERT INTO categories (id,parent_id,name_he,name_en,icon,status,sort_order) SELECT 'babies-births','babies','לידות','Childbirth','baby','active',90 WHERE EXISTS (SELECT 1 FROM categories WHERE id='babies' AND parent_id IS NULL AND status='active') AND NOT EXISTS (SELECT 1 FROM categories WHERE parent_id='babies' AND name_he='לידות'); SELECT id,parent_id,name_he,status FROM categories WHERE parent_id='babies' AND name_he='לידות';" > category-result.json
+          node - <<'NODE'
+          const result=require('./category-result.json');
+          const rows=result.flatMap(x=>x.results||[]);
+          if(!rows.some(x=>x.parent_id==='babies'&&x.name_he==='לידות'&&x.status==='active'))throw new Error('Childbirth category verification failed');
+          console.log('Verified active childbirth subcategory under Babies.');
+          NODE
