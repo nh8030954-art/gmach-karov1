@@ -582,7 +582,15 @@ try {
   await db.prepare("INSERT OR REPLACE INTO organization_service_ranges(organization_id,radius_km,allow_exception) VALUES(?,5,0)").bind(organizationId).run();
   const rangeBorrower=await db.prepare('SELECT id,address_cipher FROM users WHERE email=?').bind('borrower@example.com').first();
   await db.prepare('UPDATE users SET address_cipher=NULL WHERE id=?').bind(rangeBorrower.id).run();
-  assert.equal((await request(`/api/organizations/${organizationId}/service-eligibility`,{cookie:borrowerCookie})).response.status,400,'Missing address must not bypass service range');
+  const fallbackCityHash=createHash('sha256').update('city:ירושלים').digest('hex');
+  await db.prepare('INSERT OR REPLACE INTO service_location_cache(address_hash,latitude,longitude,expires_at) VALUES(?,?,?,?)').bind(fallbackCityHash,31.78,35.22,new Date(Date.now()+86400000).toISOString()).run();
+  const fallbackOrg=await db.prepare('SELECT address,city FROM organizations WHERE id=?').bind(organizationId).first();
+  await seedServiceLocation(fallbackOrg.address,fallbackOrg.city,31.78,35.22);
+  const cityEligibility=await request(`/api/organizations/${organizationId}/service-eligibility`,{cookie:borrowerCookie});
+  assert.equal(cityEligibility.response.status,200,'Missing full address falls back to the saved city');
+  assert.equal(cityEligibility.data.allowed,true);
+  await db.prepare('UPDATE service_location_cache SET latitude=32.5 WHERE address_hash=?').bind(fallbackCityHash).run();
+  assert.equal((await request(`/api/organizations/${organizationId}/service-eligibility`,{cookie:borrowerCookie})).data.allowed,false,'City fallback must still enforce the service radius');
   await db.prepare('UPDATE users SET address_cipher=? WHERE id=?').bind(rangeBorrower.address_cipher,rangeBorrower.id).run();
   const savedHome=await request('/api/me/addresses',{method:'POST',cookie:borrowerCookie,body:{label:'בית',city:'ירושלים',address:'רחוב הבדיקה 12',isDefault:true,latitude:0,longitude:0}});
   assert.equal(savedHome.response.status,201,JSON.stringify(savedHome.data));
