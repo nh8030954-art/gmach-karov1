@@ -78,3 +78,37 @@ console.log('Map city-first lookup, wrong-city rejection and private address pro
 assert.equal(cityContext.mapGeocodeResult({type:'house',address:{city:'ירושלים',house_number:'12'}},'ירושלים','address','יפו 10'),false);
 
 assert.equal(cityContext.mapGeocodeResult({type:'administrative',addresstype:'city',address:{city:'ירושלים | القدس'}},'ירושלים','city'),true);
+
+const mapRenderSource=mapSource.slice(mapSource.indexOf('function createInteractiveOsmMap('),mapSource.indexOf('async function geocodeGmachOrganizations('));
+class MapTestElement{
+  constructor(){this.children=[];this.dataset={};this.style={};this.attributes={};this.clientWidth=800;this.clientHeight=500;}
+  set innerHTML(value){this.html=value;this.children=[];}
+  get innerHTML(){return this.html;}
+  append(element){this.children.push(element);element.parent=this;}
+  remove(){if(this.parent)this.parent.children=this.parent.children.filter(child=>child!==this);}
+  setAttribute(name,value){this.attributes[name]=value;}
+}
+const mapPins=new MapTestElement(),mapTiles=new MapTestElement(),mapRoot=new MapTestElement();
+const mapControls={'[data-osm-zoom="in"]':new MapTestElement(),'[data-osm-zoom="out"]':new MapTestElement()};
+mapRoot.querySelector=selector=>selector==='[data-osm-pins]'?mapPins:selector==='[data-osm-tiles]'?mapTiles:mapControls[selector];
+const renderContext={lang:'he',esc:value=>String(value),document:{createElement:()=>new MapTestElement()},ResizeObserver:class{observe(){}disconnect(){}}};
+vm.runInNewContext(mapRenderSource,renderContext);
+const renderedMap=renderContext.createInteractiveOsmMap({firstElementChild:mapRoot});
+const organizations=Array.from({length:4},(_,i)=>({id:'org-'+i,name:'גמח '+i,lat:31.7788,lon:35.2258,popupHtml:'<a href="/organizations/org-'+i+'">גמח '+i+'</a>'}));
+renderedMap.setPoints(organizations);
+assert.equal(mapPins.children.length,1);
+assert.equal(mapPins.children[0].textContent,'4');
+assert.equal(mapPins.children[0].attributes['aria-label'],'4 גמ״חים');
+mapPins.children[0].onclick({stopPropagation(){}});
+assert.ok(organizations.every(org=>mapPins.children[1].innerHTML.includes(org.popupHtml)),'Every overlapping gmach must remain accessible in the group popup');
+mapRoot.onclick({target:{closest:()=>mapPins.children[1]}});
+assert.equal(mapPins.children.length,2,'Clicks inside the group popup must not dismiss it');
+const snapshot=JSON.stringify(organizations);
+renderedMap.setPoints([...organizations,{id:'nearby',name:'Nearby',lat:31.785,lon:35.232},{id:'far',name:'Far away',lat:32.5,lon:34.6}]);
+assert.equal(mapPins.children.length,2);
+assert.equal(mapPins.children[0].dataset.mapCount,'5','Nearby markers must be grouped at country zoom');
+assert.equal(JSON.stringify(organizations),snapshot,'Grouping must not change geographic locations');
+renderedMap.setFocus(31.7788,35.2258);
+assert.deepEqual(mapPins.children.filter(x=>x.dataset.mapCount).map(x=>x.dataset.mapCount).sort(),['1','4'],'Nearby distinct points must separate as zoom increases');
+renderedMap.destroy();
+console.log('Map counted groups, access to every gmach, popup interaction and zoom separation passed');
