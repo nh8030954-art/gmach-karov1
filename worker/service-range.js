@@ -36,9 +36,17 @@ export function evaluateServiceRange(policy,distance) {
   return {...policy,allowed:!outside,outside,exceptionAvailable:outside&&policy.allowException,distanceKm:Math.round(distance*10)/10,message:outside?`גמ״ח זה נותן שירות לתושבים ברדיוס של עד ${policy.radiusKm} ק״מ ממיקומו.`:''};
 }
 export async function resolveServiceLocation(env,address,city='') {
-  if(!address||address.trim().length<5)throw invalid('כדי לבדוק את טווח השירות יש לשמור כתובת מלאה באזור האישי');
+  try { return await resolveLocation(env,address,city); }
+  catch(error) {
+    // Only address-resolution failures fall back; provider outages still fail closed.
+    if(error.status!==400||!city.trim())throw error;
+    return {...await resolveLocation(env,city.trim(),'',true),approximate:true};
+  }
+}
+async function resolveLocation(env,address,city='',cityOnly=false) {
+  if(!address||address.trim().length<(cityOnly?2:5))throw invalid('כדי לבדוק את טווח השירות יש לשמור כתובת מלאה באזור האישי');
   const query=[address.trim(),city.trim()].filter(Boolean).join(', ');
-  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(query.toLowerCase()))),x=>x.toString(16).padStart(2,'0')).join('');
+  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode((cityOnly?'city:':'')+query.toLowerCase()))),x=>x.toString(16).padStart(2,'0')).join('');
   const cached=await env.DB.prepare('SELECT latitude,longitude FROM service_location_cache WHERE address_hash=? AND expires_at>?').bind(hash,new Date().toISOString()).first();
   if(cached)return cached;
   // The existing geocoding throttle prevents requests from overwhelming the provider.
@@ -53,12 +61,12 @@ export async function resolveServiceLocation(env,address,city='') {
   }
   if(!reservation.meta?.changes)throw invalid('בדיקת הכתובת בעיצומה. נסו שוב בעוד מספר שניות',429);
   const url=new URL('https://nominatim.openstreetmap.org/search');
-  for(const [k,v] of Object.entries({format:'jsonv2',limit:'2',countrycodes:'il',addressdetails:'1',q:query}))url.searchParams.set(k,v);
+  for(const [k,v] of Object.entries({format:'jsonv2',limit:'2',countrycodes:cityOnly?'il,ps':'il',addressdetails:'1',...(cityOnly?{city:query}:{q:query})}))url.searchParams.set(k,v);
   let response;
   try{response=await (env.SERVICE_RANGE_GEOCODER?env.SERVICE_RANGE_GEOCODER.fetch(new Request(url)):fetch(url,{headers:{'User-Agent':'GmachBerega/1.0 (+https://gmach-berega.co.il)','Accept-Language':'he,en'},signal:AbortSignal.timeout(8000)}));}catch{throw invalid('לא ניתן לבדוק את הכתובת כרגע. נסו שוב מאוחר יותר',503);}
   if(!response.ok)throw invalid('לא ניתן לבדוק את הכתובת כרגע. נסו שוב מאוחר יותר',503);
-  const results=await response.json(),first=Array.isArray(results)?results[0]:null;
-  if(!first||['administrative','city','town','village','municipality','suburb','neighbourhood','country'].includes(first.type)||first.lat==null||first.lon==null)throw invalid('לא נמצא מיקום מדויק לכתובת. יש לוודא שהכתובת כוללת רחוב, מספר בית ויישוב');
+  const results=await response.json(),first=Array.isArray(results)?(cityOnly?results.find(row=>['administrative','city','town','village','municipality'].includes(row.type)):results[0]):null;
+  if(!first||(cityOnly?!['administrative','city','town','village','municipality'].includes(first.type):['administrative','city','town','village','municipality','suburb','neighbourhood','country'].includes(first.type))||first.lat==null||first.lon==null)throw invalid('לא נמצא מיקום מדויק לכתובת. יש לוודא שהכתובת כוללת רחוב, מספר בית ויישוב');
   const location={latitude:Number(first.lat),longitude:Number(first.lon)};
   if(!Number.isFinite(location.latitude)||!Number.isFinite(location.longitude)||Math.abs(location.latitude)>90||Math.abs(location.longitude)>180)throw invalid('לא נמצא מיקום תקין לכתובת');
   await env.DB.prepare('INSERT OR REPLACE INTO service_location_cache(address_hash,latitude,longitude,expires_at) VALUES(?,?,?,?)').bind(hash,location.latitude,location.longitude,new Date(Date.now()+30*86400000).toISOString()).run();
