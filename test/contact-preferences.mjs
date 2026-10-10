@@ -44,7 +44,8 @@ const mapSource=readFileSync('dist/remaining-features.js','utf8');
 const mapFunction=mapSource.slice(mapSource.indexOf('async function geocodeGmachOrganizations('),mapSource.indexOf('async function showAddressMap('));
 const queries=[];
 const mapContext={window:{GmachFormatAddress:formatAddress},console,setTimeout,URLSearchParams,api:async url=>{
- const params=new URL(url,'https://local.test').searchParams,query=params.get('q');queries.push(query);
+ assert.equal(new URL(url,'https://local.test').pathname,'/api/maps/geocode');
+  const params=new URL(url,'https://local.test').searchParams,query=params.get('q');queries.push(query);
   assert.ok(['city','address'].includes(params.get('mode')));
   assert.equal(params.get('city'),'ירושלים');
  return {cached:true,results:[params.get('mode')==='address'?(query.includes('10')?{lat:31.81,lon:35.21,type:'house'}:null):{lat:31.77,lon:35.22,type:'city'}]};

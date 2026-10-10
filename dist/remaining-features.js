@@ -594,7 +594,7 @@ async function geocodeGmachOrganizations(rows){
     if(cache.has(key))return cache.get(key);
     for(let attempt=0;attempt<4;attempt++){
       try{
-        const data=await api("/api/geocode?"+new URLSearchParams({q:query,city,mode}));
+        const data=await api("/api/maps/geocode?"+new URLSearchParams({q:query,city,mode}));
         const first=data.results?.[0];
         const point=first?{lat:Number(first.lat),lon:Number(first.lon),type:first.type}:null;
         cache.set(key,point);
