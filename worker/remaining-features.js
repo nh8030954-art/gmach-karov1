@@ -214,21 +214,47 @@ async function mapTile(url,zText,xText,yText){
   return new Response(response.body,{status:200,headers});
 }
 
+function mapSettlementName(value){
+  return String(value||"").normalize("NFKC").replace(/[\u0591-\u05c7]/g,"").replace(/תקוה/g,"תקווה").replace(/[^\p{L}\p{N}]/gu,"").toLowerCase();
+}
+function mapResultInCity(result,city){
+  const address=result.address||{};
+  const locality=address.hamlet||address.village||address.town||address.city||address.municipality;
+  return Boolean(locality&&mapSettlementName(locality)===mapSettlementName(city));
+}
+function mapGeocodeResult(result,city,mode,query){
+  if(!mapResultInCity(result,city))return false;
+  if(mode==="city"){
+    return ["administrative","city","town","village","municipality","hamlet"].includes(result.type)&&
+      ["city","town","village","municipality","hamlet"].includes(result.addresstype||result.type);
+  }
+  const requestedNumber=String(query||"").match(/\d+[א-תa-zA-Z]?\s*$/u)?.[0]?.trim();
+  return Boolean(requestedNumber&&mapSettlementName(result.address?.house_number)===mapSettlementName(requestedNumber))&&
+    !["administrative","city","town","village","municipality","suburb","neighbourhood","country","residential","road","pedestrian","primary","secondary","tertiary"].includes(result.type);
+}
+
 async function explicitGeocode(request,env,url){
-  const q=clean(url.searchParams.get("q"),3,180,"כתובת"),key=(await hash(q.toLowerCase())).slice(0,40),now=new Date();
+  const q=clean(url.searchParams.get("q"),2,180,"כתובת");
+  const mode=url.searchParams.get("mode"),mapMode=mode==="city"||mode==="address";
+  const city=mapMode?clean(url.searchParams.get("city"),2,100,"עיר"):"";
+  const key=(await hash(mapMode?JSON.stringify(["map-city-v1",mode,q.toLowerCase(),mapSettlementName(city)]):q.toLowerCase())).slice(0,40),now=new Date();
   const cached=await env.DB.prepare("SELECT result_json FROM geocode_cache WHERE query_key=? AND expires_at>?").bind(key,now.toISOString()).first();
   if(cached)return json({results:safe(cached.result_json,[]),cached:true,attribution:"© OpenStreetMap contributors"});
   const reserved=await env.DB.prepare("UPDATE geocode_throttle SET last_request_at=? WHERE id=1 AND (last_request_at IS NULL OR last_request_at<=?)")
     .bind(now.toISOString(),new Date(now.getTime()-1100).toISOString()).run();
   if(!reserved.meta?.changes)throw new RemainingError(429,"נא להמתין שנייה לפני חיפוש כתובת נוסף");
   const target=new URL("https://nominatim.openstreetmap.org/search");
-  target.searchParams.set("format","jsonv2");target.searchParams.set("limit","5");target.searchParams.set("countrycodes","il");target.searchParams.set("addressdetails","1");target.searchParams.set("q",q);
+  target.searchParams.set("format","jsonv2");target.searchParams.set("limit","5");target.searchParams.set("countrycodes",mapMode?"il,ps":"il");target.searchParams.set("addressdetails","1");
+  if(mapMode){
+    target.searchParams.set("city",city);
+    if(mode==="address")target.searchParams.set("street",q);
+  }else target.searchParams.set("q",q);
   const contact=String(env.SUPPORT_EMAIL||"").trim();
   let response;
   try{response=await fetch(target.toString(),{headers:{"User-Agent":`GmachBerega/1.0 (+https://gmach-karov1.nh8030954.workers.dev${contact?`; contact: ${contact}`:""})`,"Accept-Language":"he,en"},signal:AbortSignal.timeout(8000)})}
   catch{throw new RemainingError(503,"שירות חיפוש הכתובות אינו זמין כרגע")}
   if(!response.ok)throw new RemainingError(503,"שירות חיפוש הכתובות אינו זמין כרגע");
-  const raw=await response.json(),results=(Array.isArray(raw)?raw:[]).map(x=>({displayName:x.display_name,lat:Number(x.lat),lon:Number(x.lon),type:x.type,importance:Number(x.importance||0)})).filter(x=>Number.isFinite(x.lat)&&Number.isFinite(x.lon));
+  const raw=await response.json(),results=(Array.isArray(raw)?raw:[]).filter(x=>!mapMode||mapGeocodeResult(x,city,mode,q)).map(x=>({displayName:x.display_name,lat:Number(x.lat),lon:Number(x.lon),type:x.type,importance:Number(x.importance||0)})).filter(x=>Number.isFinite(x.lat)&&Number.isFinite(x.lon));
   await env.DB.prepare("INSERT OR REPLACE INTO geocode_cache(query_key,query_text,result_json,expires_at) VALUES(?,?,?,?)").bind(key,q,JSON.stringify(results),new Date(Date.now()+30*86400000).toISOString()).run();
   return json({results,cached:false,attribution:"© OpenStreetMap contributors"});
 }

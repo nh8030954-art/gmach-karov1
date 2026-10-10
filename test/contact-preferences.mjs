@@ -43,12 +43,35 @@ console.log('Contact validation, privacy rendering, action links, contact icons 
 const mapSource=readFileSync('dist/remaining-features.js','utf8');
 const mapFunction=mapSource.slice(mapSource.indexOf('async function geocodeGmachOrganizations('),mapSource.indexOf('async function showAddressMap('));
 const queries=[];
-const mapContext={window:{GmachFormatAddress:formatAddress},console,setTimeout,api:async url=>{
- const query=new URL(url,'https://local.test').searchParams.get('q');queries.push(query);
- return {cached:true,results:[query.includes('10')?{lat:31.81,lon:35.21,type:'house'}:{lat:31.77,lon:35.22,type:'city'}]};
+const mapContext={window:{GmachFormatAddress:formatAddress},console,setTimeout,URLSearchParams,api:async url=>{
+ const params=new URL(url,'https://local.test').searchParams,query=params.get('q');queries.push(query);
+  assert.ok(['city','address'].includes(params.get('mode')));
+  assert.equal(params.get('city'),'ירושלים');
+ return {cached:true,results:[params.get('mode')==='address'?(query.includes('10')?{lat:31.81,lon:35.21,type:'house'}:null):{lat:31.77,lon:35.22,type:'city'}]};
 }};
 vm.runInNewContext(mapFunction,mapContext);
 let points=await mapContext.geocodeGmachOrganizations([{id:'selected',city:'ירושלים',navigation_address:'יפו 10'},{id:'private',city:'ירושלים'}]);
-assert.equal(points[0].precise,true);assert.equal(points[0].lat,31.81);assert.equal(points[1].precise,false);assert.equal(points[1].lat,31.77);assert.deepEqual(queries,['יפו 10, ירושלים','ירושלים']);
+assert.equal(points[0].precise,true);assert.equal(points[0].lat,31.81);assert.equal(points[1].precise,false);assert.equal(points[1].lat,31.77);assert.deepEqual(queries,['ירושלים','יפו 10']);
 points=await mapContext.geocodeGmachOrganizations([{id:'unresolved',city:'ירושלים',navigation_address:'כתובת לא מזוהה'}]);assert.equal(points[0].precise,false,'A city-level result cannot be presented as an exact address');
 console.log('Navigation opt-in address rendering and precise versus approximate map locations passed');
+
+const workerMapSource=readFileSync('worker/remaining-features.js','utf8');
+const mapHelpers=workerMapSource.slice(workerMapSource.indexOf('function mapSettlementName('),workerMapSource.indexOf('async function explicitGeocode('));
+const cityContext={};vm.runInNewContext(mapHelpers,cityContext);
+assert.equal(cityContext.mapGeocodeResult({type:'residential',addresstype:'road',address:{road:'עלי',city:'אשקלון'}},'עלי','city'),false);
+assert.equal(cityContext.mapGeocodeResult({type:'tertiary',addresstype:'road',address:{road:'כוכב השחר',city:'אשדוד'}},'כוכב השחר','city'),false);
+assert.equal(cityContext.mapGeocodeResult({type:'village',addresstype:'village',address:{village:'עלי',city:'מועצה אזורית מטה בנימין'}},'עלי','city'),true);
+assert.equal(cityContext.mapGeocodeResult({type:'administrative',addresstype:'city',address:{city:'פתח תקוה'}},'פתח תקווה','city'),true);
+assert.equal(cityContext.mapGeocodeResult({type:'house',address:{city:'חיפה',house_number:'10'}},'ירושלים','address','יפו 10'),false);
+assert.equal(cityContext.mapGeocodeResult({type:'house',address:{city:'ירושלים',house_number:'10'}},'ירושלים','address','יפו 10'),true);
+assert.equal(cityContext.mapGeocodeResult({type:'road',address:{city:'ירושלים'}},'ירושלים','address','יפו 10'),false);
+const requestContext={window:{},console,setTimeout,URLSearchParams,api:async url=>{
+  const params=new URL(url,'https://local.test').searchParams;
+  assert.equal(params.get('q'),'עלי');assert.equal(params.get('city'),'עלי');assert.equal(params.get('mode'),'city');
+  return {cached:true,results:[{lat:32.0695,lon:35.2625,type:'village'}]};
+}};
+vm.runInNewContext(mapFunction,requestContext);
+const privatePoints=await requestContext.geocodeGmachOrganizations([{id:'private-village',city:'עלי',address:'כתובת פרטית שאסור לחפש'}]);
+assert.equal(privatePoints[0].precise,false);
+console.log('Map city-first lookup, wrong-city rejection and private address protection passed');
+assert.equal(cityContext.mapGeocodeResult({type:'house',address:{city:'ירושלים',house_number:'12'}},'ירושלים','address','יפו 10'),false);

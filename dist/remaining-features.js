@@ -587,37 +587,45 @@ function createInteractiveOsmMap(canvas){
   };
 }
 async function geocodeGmachOrganizations(rows){
- const cache=new Map(),resolved=[],sleep=ms=>new Promise(r=>setTimeout(r,ms));
- const geocode=async query=>{
-   if(!query)return null;
-   if(cache.has(query))return cache.get(query);
-   for(let attempt=0;attempt<4;attempt++){
-     try{
-       const data=await api("/api/geocode?q="+encodeURIComponent(query));
-       const first=data.results?.[0];
-       const point=first?{lat:Number(first.lat),lon:Number(first.lon),type:first.type}:null;
-       cache.set(query,point);
-       if(data.cached===false)await sleep(1200);
-       return point;
-     }catch(error){
-       const msg=String(error?.message||"");
-       if((msg.includes("שנייה")||msg.includes("429"))&&attempt<3){await sleep(1250);continue}
-       console.warn("Gmach geocoding failed",query,error);
-       cache.set(query,null);
-       return null;
-     }
-   }
-   return null;
- };
- for(const row of rows||[]){
-   const city=String(row.city||"").trim(),address=String(row.navigation_address||"").trim(),full=address?(window.GmachFormatAddress?.(address,city)||[address,city].filter(Boolean).join(", ")):city;
-   let point=await geocode(full||city);
-   let precise=Boolean(address&&point?.type&&!['administrative','city','town','village','municipality','suburb','neighbourhood','country','residential','road','pedestrian','primary','secondary','tertiary'].includes(point.type));
-   if((!point||address&&!precise)&&city&&city!==full){point=await geocode(city);precise=false;}
-   if(point&&Number.isFinite(point.lat)&&Number.isFinite(point.lon))resolved.push({...row,...point,precise});
- }
- return resolved;
+  const cache=new Map(),resolved=[],sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const geocode=async(query,city,mode)=>{
+    if(!query||!city)return null;
+    const key=JSON.stringify([mode,query,city]);
+    if(cache.has(key))return cache.get(key);
+    for(let attempt=0;attempt<4;attempt++){
+      try{
+        const data=await api("/api/geocode?"+new URLSearchParams({q:query,city,mode}));
+        const first=data.results?.[0];
+        const point=first?{lat:Number(first.lat),lon:Number(first.lon),type:first.type}:null;
+        cache.set(key,point);
+        if(data.cached===false)await sleep(1200);
+        return point;
+      }catch(error){
+        const msg=String(error?.message||"");
+        if((msg.includes("שנייה")||msg.includes("429"))&&attempt<3){await sleep(1250);continue}
+        console.warn("Gmach geocoding failed",query,error);
+        cache.set(key,null);
+        return null;
+      }
+    }
+    return null;
+  };
+  for(const row of rows||[]){
+    const city=String(row.city||"").trim(),address=String(row.navigation_address||"").trim();
+    // Resolve the manager's settlement first; never treat its name as a street.
+    const cityPoint=await geocode(city,city,"city");
+    if(!cityPoint)continue;
+    let point=cityPoint,precise=false;
+    if(address){
+      const street=address.split(",")[0].replace(/\s+פ["״']ת\s*$/u,"").trim();
+      const addressPoint=await geocode(street,city,"address");
+      if(addressPoint){point=addressPoint;precise=true;}
+    }
+    if(Number.isFinite(point.lat)&&Number.isFinite(point.lon))resolved.push({...row,...point,precise});
+  }
+  return resolved;
 }
+
 async function showAddressMap(){
  const d=dialog("map-dialog",lang==="en"?"Gmach map":"מפת הגמ״חים"),b=$(".remaining-body",d);
  let navPref=localStorage.getItem("gmach-navigation-app")||"google";try{const pref=await api("/api/me/navigation-preferences");navPref=pref.preferences?.preferred_app||navPref}catch{}
