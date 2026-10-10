@@ -1,4 +1,4 @@
-deploy_sha=899164f388b7617564901ab8efdcc764beb04d92
+deploy_sha=8654b22b0354ebace43c4a3780fcec1d77bb1786
 deploy_tests=failure
 
 > gmach-karov@1.0.0 test
@@ -6,24 +6,51 @@ deploy_tests=failure
 
 Admin isolation, source routing, read preservation, support replies, encrypted authenticated ingestion, evidence validation, deduplication and stale research monitoring passed
 Full archive status, failed/stale/missing alerts, verification matching, historical alert retirement and disabled internal scheduler passed
+Platform internal backups and periodic saved-search reads/writes disabled; legacy backup endpoint rejected
+Item-triggered hold release, pickup expiry, overdue status and duplicate suppression passed
 Contact validation, privacy rendering, action links, contact icons and Israel time tests passed
-Service range policy and geocoding tests passed
+Navigation opt-in address rendering and precise versus approximate map locations passed
+Service range exact-address, city fallback, cache, failure and policy tests passed
 Gmach admin UI passed in Hebrew and English: complete controls, tool wiring and escaped original names.
 Stored English: cache reuse, edit invalidation, public permissions and unavailable text passed
-file:///home/runner/work/gmach-karov1/gmach-karov1/test/final-static.mjs:292
-for(const token of ["/api/search/branches","/api/admin/support-tickets","/messages","/api/admin/server-errors","recordDistributionError","runDistributionCompletionMaintenance"]) assert.ok(distributionWorker.includes(token),to…1298 tokens truncated…d4","Release readiness","verify-full-backup.yml","data-test-alert"])assert.ok(hardeningClient.includes(token),token+" missing from release hardening UI");
-                                                                                                                                                                                                                               ^^
+Final completion static release gate passed.
+Requirements expansion static release gate passed.
+Launch readiness static release gate passed.
+Distribution completion static release gate passed.
+Navigation admin static release gate passed.
+Privacy availability static release gate passed.
+Release hardening static gate passed.
+Release experience static release gate passed.
+Admin control center static release gate passed.
+Privacy purge static release gate passed.
+Community chat retention static release gate passed.
+QR scanning, structured SEO and accessibility shell gate passed.
+Excel export and QR image scanner gate passed.
+Voice message recording gate passed.
+Excel export, accessible admin status and QR image scanning gate passed.
+Full requirements regression extensions passed.
+Static English interface coverage 100.0% (485/485)
+remaining-features Error: Backup checksum mismatch
+    at validateBackup (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:176:41)
+    at async handleRemainingFeatures (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/remaining-features.js:303:91)
+    at async routeApi (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:1031:37)
+    at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:428:26)
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
 
-SyntaxError: missing ) after argument list
-    at compileSourceTextModule (node:internal/modules/esm/utils:319:16)
-    at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:89:18)
-    at #translate (node:internal/modules/esm/loader:438:20)
-    at afterLoad (node:internal/modules/esm/loader:506:29)
-    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:511:12)
-    at #getOrCreateModuleJobAfterResolve (node:internal/modules/esm/loader:564:36)
-    at afterResolve (node:internal/modules/esm/loader:611:52)
-    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:617:12)
-    at node:internal/modules/esm/loader:636:32
-    at TracingChannel.tracePromise (node:diagnostics_channel:362:14)
+AssertionError [ERR_ASSERTION]: Missing address must not bypass service range
+
+200 !== 400
+
+    at file:///home/runner/work/gmach-karov1/gmach-karov1/test/smoke.mjs:585:10
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 200,
+  expected: 400,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
 
 Node.js v24.21.0
