@@ -613,7 +613,7 @@ assert.ok(css.includes("Keep the English desktop links visible")&&css.includes("
 assert.ok(remainingClient.includes('/api/maps/gmachs')&&remainingClient.includes('row.navigation_address')&&!remainingClient.includes('storedLat'),"Public gmach map receives precise locations through the consent-controlled endpoint");
 assert.ok(remainingClient.includes('pointer-events:none;z-index:3'),"gmach marker layer must stay above the map frame");
 
-assert.ok(remainingClient.includes("attempt<4")&&remainingClient.includes("city!==full")&&remainingClient.includes("await sleep(1250)"),"gmach map geocoding must retry throttled requests and fall back to city");
+assert.ok(remainingClient.includes("attempt<4")&&remainingClient.includes('geocode(city,city,"city")')&&remainingClient.includes("point=cityPoint,precise=false")&&remainingClient.includes("await sleep(1250)"),"gmach map geocoding must retry throttled requests and fall back to city");
 
 assert.ok(remainingClient.includes("screenX=wp.x-left")&&remainingClient.includes("screenY=wp.y-top"),"gmach markers must be positioned from Web Mercator coordinates on every render");
 
