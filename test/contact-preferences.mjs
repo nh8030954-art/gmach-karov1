@@ -75,3 +75,5 @@ const privatePoints=await requestContext.geocodeGmachOrganizations([{id:'private
 assert.equal(privatePoints[0].precise,false);
 console.log('Map city-first lookup, wrong-city rejection and private address protection passed');
 assert.equal(cityContext.mapGeocodeResult({type:'house',address:{city:'ירושלים',house_number:'12'}},'ירושלים','address','יפו 10'),false);
+
+assert.equal(cityContext.mapGeocodeResult({type:'administrative',addresstype:'city',address:{city:'ירושלים | القدس'}},'ירושלים','city'),true);

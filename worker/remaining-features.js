@@ -220,7 +220,7 @@ function mapSettlementName(value){
 function mapResultInCity(result,city){
   const address=result.address||{};
   const locality=address.hamlet||address.village||address.town||address.city||address.municipality;
-  return Boolean(locality&&mapSettlementName(locality)===mapSettlementName(city));
+  return Boolean(locality&&String(locality).split("|").some(name=>mapSettlementName(name)===mapSettlementName(city)));
 }
 function mapGeocodeResult(result,city,mode,query){
   if(!mapResultInCity(result,city))return false;
