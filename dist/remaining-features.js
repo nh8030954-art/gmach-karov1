@@ -544,27 +544,11 @@ function createInteractiveOsmMap(canvas){
       tiles.append(img);
     }
     pins.innerHTML="";
-    const placed=[];
     for(const p of state.points){
       const lat=Number(p.lat),lon=Number(p.lon);
       if(!Number.isFinite(lat)||!Number.isFinite(lon))continue;
-      const wp=world(lat,lon,z);let screenX=wp.x-left,screenY=wp.y-top;
+      const wp=world(lat,lon,z),screenX=wp.x-left,screenY=wp.y-top;
       if(screenX<-30||screenY<-30||screenX>w+30||screenY>h+30)continue;
-      // Space only the visible buttons; keep each gmach's geographic point unchanged.
-      const anchorX=screenX,anchorY=screenY;
-      const free=(x,y)=>x>=14&&y>=14&&x<=w-14&&y<=h-14&&placed.every(point=>Math.hypot(point.x-x,point.y-y)>=30);
-      if(!free(screenX,screenY)){
-        let found=false;
-        const maxRing=Math.ceil(Math.hypot(w,h)/30);
-        for(let ring=1;ring<=maxRing&&!found;ring++){
-          for(let step=0;step<6*ring;step++){
-            const angle=step*Math.PI/(3*ring),x=anchorX+30*ring*Math.cos(angle),y=anchorY+30*ring*Math.sin(angle);
-            if(!free(x,y))continue;
-            screenX=x;screenY=y;found=true;break;
-          }
-        }
-      }
-      placed.push({x:screenX,y:screenY});
       const marker=document.createElement("button");
       marker.type="button";marker.dataset.mapOrg=p.id||"";marker.title=p.name||"גמ״ח";
       marker.style.cssText="pointer-events:auto;position:absolute;left:"+(screenX-14)+"px;top:"+(screenY-14)+"px;width:28px;height:28px;border-radius:50%;border:4px solid white;background:#0f766e;box-shadow:0 3px 12px #0006;cursor:pointer;padding:0;z-index:4";
@@ -645,7 +629,7 @@ async function geocodeGmachOrganizations(rows){
 async function showAddressMap(){
  const d=dialog("map-dialog",lang==="en"?"Gmach map":"מפת הגמ״חים"),b=$(".remaining-body",d);
  let navPref=localStorage.getItem("gmach-navigation-app")||"google";try{const pref=await api("/api/me/navigation-preferences");navPref=pref.preferences?.preferred_app||navPref}catch{}
- b.innerHTML=`<section aria-labelledby="gmach-map-title"><div style="display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px"><div><h3 id="gmach-map-title" style="margin:0">${lang==="en"?"Gmachs near you":"גמ״חים על המפה"}</h3><p class="platform-note" style="margin:4px 0 0">${lang==="en"?"Click a marker to see gmach details.":"לחצו על נקודת ציון כדי לראות פרטי גמ״ח."}</p></div><label class="map-nav-pref-label" style="min-width:220px;display:grid;gap:6px">${lang==="en"?"Preferred navigation app":"אפליקציית ניווט מועדפת"}<select id="map-nav-pref"><option value="google" ${navPref==="google"?"selected":""}>Google Maps</option><option value="waze" ${navPref==="waze"?"selected":""}>Waze</option><option value="apple" ${navPref==="apple"?"selected":""}>Apple Maps</option></select></label></div><div id="gmach-map-canvas" style="width:100%;height:min(62vh,560px);min-height:430px;border:1px solid #d8dfdc;border-radius:18px;overflow:hidden;background:#eef3f1" aria-label="${lang==="en"?"Interactive gmach map":"מפת גמ״חים אינטראקטיבית"}"></div><div id="gmach-map-status" role="status" aria-live="polite" class="platform-note" style="margin-top:8px">${lang==="en"?"Loading gmachs…":"טוענים גמ״חים על המפה…"}</div></section><hr style="margin:18px 0;border:0;border-top:1px solid #e5e7eb"><details><summary style="cursor:pointer;font-weight:700">${lang==="en"?"Search another address":"חיפוש כתובת אחרת"}</summary><form id="map-search" autocomplete="off" style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px"><input name="q" type="search" autocomplete="off" minlength="3" aria-label="כתובת לחיפוש" placeholder="עיר, רחוב ומספר" required><button class="button button-primary">${lang==="en"?"Search":"חיפוש"}</button></form><button type="button" class="button button-secondary" id="map-current" style="margin-top:8px">${lang==="en"?"My current location":"המיקום הנוכחי"}</button><div id="map-results" role="status" aria-live="polite" style="display:grid;gap:8px;margin-top:12px"></div></details><small style="display:block;margin-top:12px">© OpenStreetMap contributors</small>`;
+ b.innerHTML=`<section aria-labelledby="gmach-map-title"><div style="display:flex;align-items:end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px"><div><h3 id="gmach-map-title" style="margin:0">${lang==="en"?"Gmachs near you":"גמ״חים על המפה"}</h3><p class="platform-note" style="margin:4px 0 0">${lang==="en"?"Click a large marker to see gmach details.":"לחצו על נקודת ציון כדי לראות פרטי גמ״ח."}</p></div><label class="map-nav-pref-label" style="min-width:220px;display:grid;gap:6px">${lang==="en"?"Preferred navigation app":"אפליקציית ניווט מועדפת"}<select id="map-nav-pref"><option value="google" ${navPref==="google"?"selected":""}>Google Maps</option><option value="waze" ${navPref==="waze"?"selected":""}>Waze</option><option value="apple" ${navPref==="apple"?"selected":""}>Apple Maps</option></select></label></div><div id="gmach-map-canvas" style="width:100%;height:min(62vh,560px);min-height:430px;border:1px solid #d8dfdc;border-radius:18px;overflow:hidden;background:#eef3f1" aria-label="${lang==="en"?"Interactive gmach map":"מפת גמ״חים אינטראקטיבית"}"></div><div id="gmach-map-status" role="status" aria-live="polite" class="platform-note" style="margin-top:8px">${lang==="en"?"Loading gmachs…":"טוענים גמ״חים על המפה…"}</div></section><hr style="margin:18px 0;border:0;border-top:1px solid #e5e7eb"><details><summary style="cursor:pointer;font-weight:700">${lang==="en"?"Search another address":"חיפוש כתובת אחרת"}</summary><form id="map-search" autocomplete="off" style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:12px"><input name="q" type="search" autocomplete="off" minlength="3" aria-label="כתובת לחיפוש" placeholder="עיר, רחוב ומספר" required><button class="button button-primary">${lang==="en"?"Search":"חיפוש"}</button></form><button type="button" class="button button-secondary" id="map-current" style="margin-top:8px">${lang==="en"?"My current location":"המיקום הנוכחי"}</button><div id="map-results" role="status" aria-live="polite" style="display:grid;gap:8px;margin-top:12px"></div></details><small style="display:block;margin-top:12px">© OpenStreetMap contributors</small>`;
  d.showModal();
  const form=$("#map-search",d),results=$("#map-results",d),status=$("#gmach-map-status",d),canvas=$("#gmach-map-canvas",d);
  $("#map-nav-pref",d).onchange=async e=>{navPref=e.target.value;localStorage.setItem("gmach-navigation-app",navPref);try{await api("/api/me/navigation-preferences",{method:"PUT",body:{preferredApp:navPref}})}catch{};toast(lang==="en"?"Navigation preference saved":"העדפת הניווט נשמרה")};
