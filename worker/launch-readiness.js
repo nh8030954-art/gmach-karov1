@@ -194,8 +194,12 @@ async function deleteAdminEntity(request,env,type,id){
     const old=await env.DB.prepare("SELECT id,email,deleted_at FROM users WHERE id=?").bind(id).first();
     if(!old||old.deleted_at)throw new LaunchError(404,"המשתמש לא נמצא");
     if(String(old.email||"").toLowerCase()==="netanelhirsh@gmail.com")throw new LaunchError(403,"אי אפשר למחוק את מנהל-העל הראשי");
-    const result=await env.DB.prepare("UPDATE users SET deleted_at=?,updated_at=? WHERE id=? AND deleted_at IS NULL").bind(now,now,id).run();
-    if(!result.success)throw new LaunchError(500,"מחיקת המשתמש נכשלה");
+    const results=await env.DB.batch([
+      env.DB.prepare("UPDATE users SET deleted_at=?,updated_at=?,email='deleted-'||id||'@invalid.local',account_status='suspended' WHERE id=? AND deleted_at IS NULL").bind(now,now,id),
+      env.DB.prepare("DELETE FROM sessions WHERE user_id=?").bind(id),
+      env.DB.prepare("DELETE FROM auth_challenges WHERE user_id=?").bind(id)
+    ]);
+    if(results.some(result=>!result.success))throw new LaunchError(500,"מחיקת המשתמש נכשלה");
     return json({ok:true,deleted:true});
   }
   if(type==="organizations"){

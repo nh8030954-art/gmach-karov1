@@ -987,6 +987,36 @@ try {
   assert.equal((await db.prepare('SELECT COUNT(*) n FROM items WHERE organization_id=? AND deleted_at IS NULL').bind(organizationId).first()).n,0);
   // Simulate an older deletion that left active, undeleted child items behind.
   await db.prepare('UPDATE items SET deleted_at=NULL,status=\'active\' WHERE organization_id=?').bind(organizationId).run();await assertPublicCategoryCounts();
+
+  // Deletion immediately frees the address while keeping old account data isolated.
+  const reusableEmail='reusable@example.org';
+  const reusableBody={fullName:'חשבון למחיקה',phone:'052-1112244',city:'ירושלים',address:'רחוב בדיקה 20, ירושלים',email:reusableEmail,password:'ReusableUserPass!456',termsAccepted:true,operationalEmailsAccepted:true};
+  assert.equal((await request('/api/auth/register',{method:'POST',body:reusableBody})).response.status,201);
+  const oldReusableCookie=await verifyLatestEmail(reusableEmail);
+  const oldReusableUser=(await request('/api/auth/me',{cookie:oldReusableCookie})).data.user;
+  await db.prepare("INSERT INTO user_tours(user_id,tour_key,completed_at) VALUES(?,?,?)").bind(oldReusableUser.id,'old-account-only',new Date().toISOString()).run();
+  assert.equal((await request('/api/auth/register',{method:'POST',body:reusableBody})).response.status,409,'A live account must still reserve its email');
+  assert.equal((await request('/api/admin/entities/users/'+oldReusableUser.id,{method:'DELETE',cookie:adminCookie})).response.status,200);
+  const deletedReusableUser=await db.prepare('SELECT email,deleted_at,account_status FROM users WHERE id=?').bind(oldReusableUser.id).first();
+  assert.equal(deletedReusableUser.email,'deleted-'+oldReusableUser.id+'@invalid.local');
+  assert.ok(deletedReusableUser.deleted_at);assert.equal(deletedReusableUser.account_status,'suspended');
+  assert.equal((await db.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id=?').bind(oldReusableUser.id).first()).n,0);
+  assert.equal((await db.prepare('SELECT COUNT(*) n FROM auth_challenges WHERE user_id=?').bind(oldReusableUser.id).first()).n,0);
+  assert.equal((await request('/api/auth/me',{cookie:oldReusableCookie})).data.user,null);
+  assert.equal((await request('/api/auth/register',{method:'POST',body:{...reusableBody,email:reusableEmail.toUpperCase(),fullName:'חשבון חדש'}})).response.status,201,'Deleted email must be reusable immediately');
+  const newReusableCookie=await verifyLatestEmail(reusableEmail);
+  const newReusableUser=(await request('/api/auth/me',{cookie:newReusableCookie})).data.user;
+  assert.notEqual(newReusableUser.id,oldReusableUser.id,'Re-registration must create a fresh identity');
+  assert.equal(newReusableUser.email,reusableEmail);
+  assert.equal((await db.prepare('SELECT COUNT(*) n FROM user_tours WHERE user_id=?').bind(newReusableUser.id).first()).n,0,'The new account must not inherit old personal data');
+  const legacyDeletedId=crypto.randomUUID();
+  await db.prepare("INSERT INTO users(id,email,password_hash,password_salt,password_iterations,full_name,role,email_verified,account_status,deleted_at) SELECT ?,'legacy-deleted@example.org',password_hash,password_salt,password_iterations,'מחיקה ישנה','member',1,'active',? FROM users WHERE id=?").bind(legacyDeletedId,new Date().toISOString(),newReusableUser.id).run();
+  const releaseDeletedEmails=await readFile('migrations/0050_deleted_account_email_reuse.sql','utf8');
+  await db.batch(splitMigration(releaseDeletedEmails).map(sql=>db.prepare(sql)));
+  await db.batch(splitMigration(releaseDeletedEmails).map(sql=>db.prepare(sql)));
+  assert.equal((await db.prepare('SELECT COUNT(*) n FROM users WHERE email=?').bind('legacy-deleted@example.org').first()).n,0,'Backfill must release previously deleted addresses');
+  assert.equal((await db.prepare('SELECT email FROM users WHERE id=?').bind(newReusableUser.id).first()).email,reusableEmail,'Backfill must preserve active accounts');
+  console.log('Deleted-email reuse, fresh account isolation, session revocation and legacy backfill passed');
   console.log("Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.");
 } finally {
   await mf.dispose();
