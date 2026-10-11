@@ -1,0 +1,42 @@
+name: Requested account cleanup 20261011
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/requested-account-cleanup-20261011.yml"]
+permissions:
+  contents: read
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Inspect only requested accounts without exposing email addresses
+        run: |
+          node <<'NODE'
+          const {execFileSync}=require('node:child_process');
+          const {createHash}=require('node:crypto');
+          const targets=["669f378e01e5f8670ab3594c6cd4d486c65013f6548ae6def9a9d62cb42094be","e539e87dcc095a123fa0327dc1944b5c56b2608afad28e76635a61bed9d83415","4a8bd9d512e6817dcf67fd464cd268d272cd8c553b4ecb05f0688dd6caae5d57","71f8520de2824072d729ab5608e83b659ea4e08bd753583cce7ec73e1f44d35e","7f2b6f8700574d6bb64ab7227599578537ee43eebe7b4c3b1afda8c0d4a2960e","5c608c0fdefc90d15d427aa3fdb00f42c40b869dd225f75a51821391c0615ddd"];
+          function query(sql){
+            const raw=execFileSync('npx',['wrangler','d1','execute','DB','--remote','--json','--command',sql],{encoding:'utf8',maxBuffer:8*1024*1024});
+            const data=JSON.parse(raw);
+            if(!Array.isArray(data)||data.some(result=>result.success===false))throw new Error('D1 query failed');
+            return data.flatMap(result=>result.results||[]);
+          }
+          const users=query("SELECT u.id,u.email,u.role,u.deleted_at,(SELECT COUNT(*) FROM organizations o WHERE o.owner_id=u.id AND o.deleted_at IS NULL) AS owned_organizations,(SELECT COUNT(*) FROM loan_requests l WHERE l.borrower_id=u.id AND l.status IN ('pending','approved','collected')) AS active_loans FROM users u");
+          for(let index=0;index<targets.length;index++){
+            const matches=users.filter(user=>createHash('sha256').update(String(user.email).trim().toLowerCase()).digest('hex')===targets[index]);
+            if(matches.length>1)throw new Error('Ambiguous account '+(index+1));
+            const user=matches[0];
+            console.log('REQUESTED_ACCOUNT '+JSON.stringify({index:index+1,found:Boolean(user),role:user?.role,deleted:Boolean(user?.deleted_at),ownedOrganizations:Number(user?.owned_organizations||0),activeLoans:Number(user?.active_loans||0)}));
+          }
+          
+          NODE
