@@ -19,7 +19,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Inspect only requested accounts without exposing email addresses
+      - name: Delete and verify only the six requested eligible accounts
         run: |
           node <<'NODE'
           const {execFileSync}=require('node:child_process');
@@ -38,5 +38,18 @@ jobs:
             const user=matches[0];
             console.log('REQUESTED_ACCOUNT '+JSON.stringify({index:index+1,found:Boolean(user),role:user?.role,deleted:Boolean(user?.deleted_at),ownedOrganizations:Number(user?.owned_organizations||0),activeLoans:Number(user?.active_loans||0)}));
           }
+          
+          const selected=targets.map((hash,index)=>{
+            const user=users.find(user=>createHash('sha256').update(String(user.email).trim().toLowerCase()).digest('hex')===hash);
+            if(!user||user.deleted_at||user.role!=='member'||Number(user.owned_organizations)||Number(user.active_loans))throw new Error('Account is not eligible: '+(index+1));
+            if(!/^[0-9a-f-]{36}$/i.test(user.id))throw new Error('Invalid account ID');
+            return user;
+          });
+          const ids=selected.map(user=>"'"+user.id+"'").join(',');
+          const now=new Date().toISOString();
+          query("UPDATE users SET deleted_at='"+now+"',updated_at='"+now+"' WHERE id IN ("+ids+") AND role='member' AND deleted_at IS NULL AND NOT EXISTS(SELECT 1 FROM organizations o WHERE o.owner_id=users.id AND o.deleted_at IS NULL) AND NOT EXISTS(SELECT 1 FROM loan_requests l WHERE l.borrower_id=users.id AND l.status IN ('pending','approved','collected')); DELETE FROM sessions WHERE user_id IN (SELECT id FROM users WHERE id IN ("+ids+") AND deleted_at='"+now+"');");
+          const verified=query("SELECT id,deleted_at,(SELECT COUNT(*) FROM sessions s WHERE s.user_id=u.id) AS sessions FROM users u WHERE id IN ("+ids+")");
+          if(verified.length!==6||verified.some(user=>!user.deleted_at||Number(user.sessions)!==0))throw new Error('Account cleanup verification failed');
+          for(let index=0;index<selected.length;index++)console.log('DELETED_ACCOUNT '+JSON.stringify({index:index+1,deleted:true,sessions:0}));
           
           NODE
