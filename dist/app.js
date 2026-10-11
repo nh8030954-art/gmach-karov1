@@ -772,9 +772,10 @@
   }
   function adoptAccountLanguage(user){if(!user?.preferredLanguage||localStorage.getItem("gmach-language"))return;localStorage.setItem("gmach-language",user.preferredLanguage);if(user.preferredLanguage==="en"){document.documentElement.lang="en";document.documentElement.dir="ltr";window.dispatchEvent(new Event("gmach-language-change"))}}
   async function finishAuthentication(user, form = null) {
+    ownerSetupPrompted = false;
     state.user = user;
     if(sessionStorage.getItem("gmach-registration-intent")==="owner"&&user?.id&&sessionStorage.getItem("gmach-registration-email")===user.email?.trim().toLowerCase()){try{localStorage.setItem("gmach-owner-setup:"+user.id,"1")}catch{}}
-    sessionStorage.removeItem("gmach-registration-intent"); sessionStorage.removeItem("gmach-registration-email"); state.pendingVerificationEmail = ""; adoptAccountLanguage(user); updateAuthUI(); await refreshAccountSnapshot(); await refreshNotifications(true); form?.reset(); closeDialog($("#auth-dialog")); const action = state.pendingAction; state.pendingAction = null; if (needsOwnerSetup()) { openGmachForm(); } else action?.();
+    sessionStorage.removeItem("gmach-registration-intent"); sessionStorage.removeItem("gmach-registration-email"); state.pendingVerificationEmail = ""; adoptAccountLanguage(user); updateAuthUI(); await refreshAccountSnapshot(); await refreshNotifications(true); form?.reset(); closeDialog($("#auth-dialog")); const action = state.pendingAction; state.pendingAction = null; if (!resumeOwnerSetup()) action?.();
   }
   async function refreshUser(hydrate=true) {
     try { const data = await api("/api/auth/me"); state.user = data.user; adoptAccountLanguage(state.user); updateAuthUI(); if (state.user && hydrate) { await refreshAccountSnapshot(); await refreshNotifications(true); } return state.user; }
@@ -785,7 +786,15 @@
   }
   function needsOwnerSetup(){
     if(!state.user||state.myOrganizations.length)return false;
+    if(state.dashboard?.user?.id===state.user.id&&state.dashboard.registrationIntent==="owner")return true;
     try{return localStorage.getItem("gmach-owner-setup:"+state.user.id)==="1"}catch{return false}
+  }
+  let ownerSetupPrompted = false;
+  function resumeOwnerSetup(){
+    if(!needsOwnerSetup()||ownerSetupPrompted||$("dialog[open]"))return false;
+    ownerSetupPrompted=true;
+    openGmachForm();
+    return true;
   }
   function updateOwnerSetupNotice(){
     $("#owner-setup-notice")?.remove();
@@ -1636,8 +1645,8 @@
 
     const routeAfterAuth=async()=>{
       await authReady;
-      if(path==="/dashboard"){ if(state.user) showDashboard(); else requireAuth(()=>showDashboard()); }
-      else if(state.user){ Promise.allSettled([refreshAccountSnapshot(),refreshNotifications(true)]); }
+      if(path==="/dashboard"){ if(state.user) { await showDashboard(); resumeOwnerSetup(); } else requireAuth(()=>showDashboard()); }
+      else if(state.user){ await refreshAccountSnapshot(); resumeOwnerSetup(); refreshNotifications(true); }
       const inviteMatch=path.match(/^\/invite\/([^/?]+)/);
       if(inviteMatch){
         if(!state.user){openAuth("login");toast("יש להתחבר כדי לקבל את הזמנת הניהול");return}

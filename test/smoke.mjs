@@ -1017,6 +1017,16 @@ try {
   assert.equal((await db.prepare('SELECT COUNT(*) n FROM users WHERE email=?').bind('legacy-deleted@example.org').first()).n,0,'Backfill must release previously deleted addresses');
   assert.equal((await db.prepare('SELECT email FROM users WHERE id=?').bind(newReusableUser.id).first()).email,reusableEmail,'Backfill must preserve active accounts');
   console.log('Deleted-email reuse, fresh account isolation, session revocation and legacy backfill passed');
+  // Owner intent survives verification and a fresh session without browser storage.
+  const ownerSignup={...reusableBody,email:'onboarding-owner@example.org',registrationIntent:'owner'};
+  assert.equal((await request('/api/auth/register',{method:'POST',body:ownerSignup})).response.status,201);
+  const ownerSignupCookie=await verifyLatestEmail(ownerSignup.email);
+  assert.equal((await request('/api/me/dashboard',{cookie:ownerSignupCookie})).data.registrationIntent,'owner');
+  const ownerLogin=await request('/api/auth/login',{method:'POST',body:{email:ownerSignup.email,password:ownerSignup.password}});
+  assert.equal(ownerLogin.response.status,200);
+  const freshOwnerCookie=ownerLogin.response.headers.get('set-cookie').split(';',1)[0];
+  assert.equal((await request('/api/me/dashboard',{cookie:freshOwnerCookie})).data.registrationIntent,'owner','New sessions must retain the choice to create a gmach');
+  assert.equal((await request('/api/me/dashboard',{cookie:newReusableCookie})).data.registrationIntent,'user','Ordinary registration must not open owner setup');
   console.log("Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.");
 } finally {
   await mf.dispose();

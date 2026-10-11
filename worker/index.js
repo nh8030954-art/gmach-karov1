@@ -1048,6 +1048,12 @@ async function routeApi(request, env, ctx, url) {
   throw new HttpError(404, "הכתובת לא נמצאה");
 }
 
+const registrationIntentSchema=new WeakMap();
+async function ensureRegistrationIntents(env){
+  if(!registrationIntentSchema.has(env.DB))registrationIntentSchema.set(env.DB,env.DB.prepare("CREATE TABLE IF NOT EXISTS account_registration_intents(user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,intent TEXT NOT NULL CHECK(intent IN ('user','owner')))").run().catch(error=>{registrationIntentSchema.delete(env.DB);throw error}));
+  await registrationIntentSchema.get(env.DB);
+}
+
 const pendingRegistrationSchema=new WeakMap();
 async function ensurePendingRegistrations(env){
   if(!pendingRegistrationSchema.has(env.DB))pendingRegistrationSchema.set(env.DB,env.DB.prepare("CREATE TABLE IF NOT EXISTS pending_registrations(email TEXT PRIMARY KEY COLLATE NOCASE,id TEXT NOT NULL UNIQUE,payload_json TEXT NOT NULL,token_hash TEXT NOT NULL,expires_at TEXT NOT NULL,created_at TEXT NOT NULL)").run().catch(error=>{pendingRegistrationSchema.delete(env.DB);throw error;}));
@@ -1088,7 +1094,7 @@ async function register(request, env, ctx, url) {
 
   await ensurePendingRegistrations(env);
   const acceptedAt=new Date().toISOString();
-  const payload={id,email,passwordHash,salt,iterations:PASSWORD_ITERATIONS,fullName,role,phone,city,addressCipher,acceptedAt,communityEmailsAccepted:body.communityEmailsAccepted===true?1:0,preferredLanguage,consentVersion:TERMS_VERSION,privacyVersion:PRIVACY_VERSION};
+  const payload={registrationIntent:body.registrationIntent==='owner'?'owner':'user',id,email,passwordHash,salt,iterations:PASSWORD_ITERATIONS,fullName,role,phone,city,addressCipher,acceptedAt,communityEmailsAccepted:body.communityEmailsAccepted===true?1:0,preferredLanguage,consentVersion:TERMS_VERSION,privacyVersion:PRIVACY_VERSION};
   await env.DB.batch([
     env.DB.prepare("DELETE FROM pending_registrations WHERE created_at < ?").bind(new Date(Date.now()-24*60*60*1000).toISOString()),
     env.DB.prepare("INSERT INTO pending_registrations(email,id,payload_json,token_hash,expires_at,created_at) VALUES(?,?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET id=excluded.id,payload_json=excluded.payload_json,token_hash=excluded.token_hash,expires_at=excluded.expires_at,created_at=excluded.created_at").bind(email,id,JSON.stringify(payload),challengeHash,expiresAt,acceptedAt)
@@ -1106,11 +1112,13 @@ async function verifyEmail(request, env, url) {
   await ensurePendingRegistrations(env);
   const pending=await env.DB.prepare("SELECT * FROM pending_registrations WHERE email=?").bind(email).first();
   if(pending){
+    await ensureRegistrationIntents(env);
     const now=new Date().toISOString(),hash=await sha256(`${pending.id}:${code}`);
     if(pending.expires_at<=now||!constantTimeEqual(hash,pending.token_hash))throw new HttpError(400,"קוד האימות אינו נכון או שפג תוקפו");
     const data=JSON.parse(pending.payload_json),sessionToken=randomToken(32),sessionHash=await sha256(sessionToken);
     const statements=[
       env.DB.prepare("INSERT INTO users(id,email,password_hash,password_salt,password_iterations,full_name,role,phone,city,address_cipher,terms_accepted_at,privacy_accepted_at,operational_emails_accepted,community_emails_accepted,preferred_language,consent_version,email_verified,account_status,last_login_at) SELECT ?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,1,'active',? FROM pending_registrations WHERE email=? AND id=? AND token_hash=? AND expires_at>?").bind(data.id,data.email,data.passwordHash,data.salt,data.iterations,data.fullName,data.role,data.phone,data.city,data.addressCipher,data.acceptedAt,data.acceptedAt,data.communityEmailsAccepted,data.preferredLanguage,data.consentVersion,now,email,pending.id,hash,now),
+      env.DB.prepare("INSERT INTO account_registration_intents(user_id,intent) SELECT id,? FROM users WHERE id=?").bind(data.registrationIntent==='owner'?'owner':'user',data.id),
       ...[['terms',data.consentVersion],['privacy',data.privacyVersion]].map(([kind,version])=>env.DB.prepare("INSERT INTO legal_consents(user_id,document_type,version,accepted_at,source) SELECT id,?,?,?,'registration' FROM users WHERE id=?").bind(kind,version,data.acceptedAt,data.id)),
       env.DB.prepare("INSERT INTO sessions(token_hash,user_id,expires_at) SELECT ?,id,? FROM users WHERE id=?").bind(sessionHash,new Date(Date.now()+SESSION_SECONDS*1000).toISOString(),data.id),
       env.DB.prepare("DELETE FROM pending_registrations WHERE email=? AND id=? AND token_hash=?").bind(email,pending.id,hash)
@@ -2561,6 +2569,8 @@ async function createLoanRequest(request, env) {
 
 async function dashboard(request, env) {
   const user = await requireUser(request, env);
+  await ensureRegistrationIntents(env);
+  const registrationIntent=(await env.DB.prepare('SELECT intent FROM account_registration_intents WHERE user_id=?').bind(user.id).first())?.intent || 'user';
   const safeAll = async (primary, fallback = null, label = "dashboard") => {
     try { return await primary.all(); }
     catch (error) {
@@ -2673,6 +2683,7 @@ async function dashboard(request, env) {
   }
   return json({
     user: publicUser(user),
+    registrationIntent,
     organizations,
     items,
     requests,
