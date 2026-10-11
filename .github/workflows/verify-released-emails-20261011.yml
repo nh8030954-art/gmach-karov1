@@ -19,6 +19,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Apply only the idempotent deleted email release backfill
+        run: npx wrangler d1 execute DB --remote --yes --file migrations/0050_deleted_account_email_reuse.sql
       - name: Verify all six requested email addresses are unreserved
         run: |
           node <<'NODE'
