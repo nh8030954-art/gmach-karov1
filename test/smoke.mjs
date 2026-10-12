@@ -11,6 +11,7 @@ const base = "http://local.test";
 const fixtureStart=new Date();fixtureStart.setUTCHours(12,0,0,0);fixtureStart.setUTCDate(fixtureStart.getUTCDate()+7+((4-fixtureStart.getUTCDay()+7)%7));
 function fixtureDate(value){return new Date(fixtureStart.getTime()+Date.parse(value+'T12:00:00Z')-Date.parse('2026-10-08T12:00:00Z')).toISOString().slice(0,10)}
 const sentEmails = [];
+const seoShell = await readFile("dist/index.html","utf8");
 let adminSessionCookie = null;
 const mf = new Miniflare({
   modules: true,
@@ -22,7 +23,7 @@ const mf = new Miniflare({
   durableObjects: { NOTIFICATION_HUB: { className:"NotificationHub",useSQLite:true } },
   r2Buckets: ["ITEM_IMAGES","BACKUP_STORAGE"],
   bindings: { ADMIN_EMAILS: "admin@example.org", RESEND_API_KEY: "re_test", RESEND_FROM_EMAIL: "Gmach Berega <verify@example.org>", SUPPORT_EMAIL: "support@example.org", DATA_ENCRYPTION_KEY: "test-only-private-data-key-123456789" },
-  serviceBindings: { RESEND_SERVICE: async request => { sentEmails.push(await request.json()); return Response.json({ id: crypto.randomUUID() }); } }
+  serviceBindings: { ASSETS: async request => new URL(request.url).pathname==="/" ? new Response(seoShell,{headers:{"Content-Type":"text/html; charset=utf-8"}}) : new Response("Not found",{status:404}), RESEND_SERVICE: async request => { sentEmails.push(await request.json()); return Response.json({ id: crypto.randomUUID() }); } }
 });
 
 async function request(path, { method = "GET", body, cookie, form, origin = base } = {}) {
@@ -1027,6 +1028,30 @@ try {
   const freshOwnerCookie=ownerLogin.response.headers.get('set-cookie').split(';',1)[0];
   assert.equal((await request('/api/me/dashboard',{cookie:freshOwnerCookie})).data.registrationIntent,'owner','New sessions must retain the choice to create a gmach');
   assert.equal((await request('/api/me/dashboard',{cookie:newReusableCookie})).data.registrationIntent,'user','Ordinary registration must not open owner setup');
+
+  // SEO uses real D1 data and excludes private/deleted entries.
+  const seoOrgId=crypto.randomUUID(),seoItemId=crypto.randomUUID(),seoCity='עיר בדיקת אינדקס';
+  const seoCategoryId=(await db.prepare("SELECT id FROM categories WHERE name_he='אירועים' AND status='active'").first()).id;
+  await db.prepare("INSERT INTO organizations(id,owner_id,name,primary_category,city,description,status,is_hidden) VALUES(?,?,?,?,?,?,'approved',0)").bind(seoOrgId,newReusableUser.id,'גמ״ח אינדקס','אירועים',seoCity,'גמ״ח ייעודי לבדיקת אינדקס').run();
+  await db.prepare("INSERT INTO items(id,organization_id,title,category,description,condition,city,status) VALUES(?,?,?,?,?,'מצוין',?,'active')").bind(seoItemId,seoOrgId,'פריט אינדקס','אירועים','פריט ייעודי לבדיקת אינדקס',seoCity).run();
+  const sitemapTest=await request('/sitemap.xml');
+  assert.equal(sitemapTest.response.status,200,JSON.stringify(sitemapTest.data));
+  for(const path of ['/','/catalog','/gmachim','/how-it-works','/community','/gmach/'+seoOrgId,'/item/'+seoItemId,'/category/'+encodeURIComponent(seoCategoryId),'/area/'+encodeURIComponent(seoCity)])assert.ok(sitemapTest.data.includes(base+path),'Sitemap missing '+path);
+  assert.equal((await db.prepare('SELECT COUNT(*) n FROM item_categories WHERE item_id=?').bind(seoItemId).first()).n,0,'Fixture proves primary category works without optional category mappings');
+  const seoPage=await request('/item/'+seoItemId);
+  assert.equal(seoPage.response.status,200);
+  assert.ok(seoPage.data.includes('<title>פריט אינדקס | גמ״ח ברגע</title>'));
+  const seoHead=await request('/item/'+seoItemId,{method:'HEAD'});
+  assert.equal(seoHead.response.status,200);assert.equal(seoHead.data,'');
+  assert.equal((await request('/item/not-a-real-item')).response.status,404);
+  assert.equal((await request('/gmach/not-a-real-gmach')).response.status,404);
+  assert.equal((await request('/category/not-a-real-category')).response.status,404);
+  await db.prepare('UPDATE organizations SET is_hidden=1 WHERE id=?').bind(seoOrgId).run();
+  assert.match((await request('/item/'+seoItemId)).response.headers.get('X-Robots-Tag'),/noindex/);
+  assert.ok(!(await request('/sitemap.xml')).data.includes(seoOrgId),'Hidden gmach must disappear from sitemap');
+  await db.prepare('UPDATE organizations SET is_hidden=0,deleted_at=? WHERE id=?').bind(new Date().toISOString(),seoOrgId).run();
+  assert.equal((await request('/item/'+seoItemId)).response.status,404,'A deleted parent must not leave its item indexable');
+  console.log('Public sitemap completeness, category mapping fallback and entity visibility passed');
   console.log("Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.");
 } finally {
   await mf.dispose();

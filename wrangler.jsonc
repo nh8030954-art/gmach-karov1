@@ -6,7 +6,7 @@
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
-    "not_found_handling": "single-page-application",
+    "not_found_handling": "404-page",
     "run_worker_first": [
       "/api/*",
       "/media/*",
@@ -15,7 +15,15 @@
       "/gmach/*",
       "/item/*",
       "/category/*",
-      "/area/*"
+      "/area/*",
+      "/",
+      "/index.html",
+      "/catalog",
+      "/gmachim",
+      "/how-it-works",
+      "/community",
+      "/dashboard",
+      "/invite/*"
     ]
   },
   "d1_databases": [
@@ -42,7 +50,9 @@
   "observability": {
     "enabled": true
   },
-  "vars": {"D1_CONSERVE_UNTIL": ""},
+  "vars": {
+    "D1_CONSERVE_UNTIL": ""
+  },
   "triggers": {
     "crons": []
   },

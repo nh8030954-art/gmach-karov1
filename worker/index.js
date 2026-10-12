@@ -1,3 +1,4 @@
+import { PUBLIC_PAGES, publicPageHtml, notFoundResponse, robotsResponse, publicClosureResponse } from "./seo-pages.js";
 import {reconcileItemDeadlines} from './loan-deadlines.js';
 import {deferNonessentialD1} from './d1-conservation.js';
 import { openNotificationChannel, dispatchNotificationEvents } from './notification-events.js';
@@ -221,26 +222,27 @@ async function serveSeoEntityPage(request,env,url){
   let m=url.pathname.match(/^\/item\/([^/]+)$/);
   if(m){
     kind="item";id=decodeURIComponent(m[1]);
-    row=await env.DB.prepare("SELECT i.id,i.title,i.description,i.image_urls,i.status,i.deleted_at,o.name AS organization_name FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.id=?").bind(id).first();
-    if(!row||row.deleted_at) return null;
+    row=await env.DB.prepare("SELECT i.id,i.title,i.description,i.image_urls,i.status,i.deleted_at,o.name AS organization_name,o.status AS organization_status,o.is_hidden AS organization_hidden,o.deleted_at AS organization_deleted_at FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.id=?").bind(id).first();
+    if(!row||row.deleted_at||row.organization_deleted_at) return notFoundResponse(request.method==="HEAD");
     title=row.title+" | גמ״ח ברגע";description=String(row.description||("השאלת "+row.title+" בחינם דרך "+row.organization_name)).slice(0,180);
-    image=parseJsonArray(row.image_urls)[0]||null;noindex=row.status!=="active";
+    image=parseJsonArray(row.image_urls)[0]||null;noindex=row.status!=="active"||row.organization_status!=="approved"||Boolean(row.organization_hidden);
   }else if((m=url.pathname.match(/^\/gmach\/([^/]+)$/))){
     kind="organization";id=decodeURIComponent(m[1]);
     row=await env.DB.prepare("SELECT o.id,o.name,o.description,o.logo_url,o.status,o.is_hidden,o.deleted_at FROM organizations o WHERE o.id=?").bind(id).first();
-    if(!row||row.deleted_at)return null;
+    if(!row||row.deleted_at)return notFoundResponse(request.method==="HEAD");
     title=row.name+" | גמ״ח ברגע";description=String(row.description||("עמוד "+row.name+" בגמ״ח ברגע")).slice(0,180);
     image=row.logo_url||null;noindex=Boolean(row.status!=="approved"||row.is_hidden);
   }else if((m=url.pathname.match(/^\/category\/([^/]+)$/))){
     kind="category";id=decodeURIComponent(m[1]);
     row=await env.DB.prepare("SELECT id,name_he,name_en,image_url,status FROM categories WHERE id=? OR name_he=? LIMIT 1").bind(id,id).first();
-    if(!row)return null;
+    if(!row)return notFoundResponse(request.method==="HEAD");
+    id=row.id;
     title=(row.name_he||id)+" להשאלה ללא תשלום או בתשלום סמלי | גמ״ח ברגע";description="מצאו "+(row.name_he||id)+" להשאלה ללא תשלום או בתשלום סמלי מגמ״חים ואנשים טובים ברחבי ישראל.";
     image=row.image_url||null;noindex=row.status!=="active";
   }else if((m=url.pathname.match(/^\/area\/([^/]+)$/))){
     kind="area";id=decodeURIComponent(m[1]);
-    const exists=await env.DB.prepare("SELECT COUNT(*) AS count FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.status='active' AND i.deleted_at IS NULL AND o.is_hidden=0 AND o.deleted_at IS NULL AND (i.city=? OR o.city=?)").bind(id,id).first();
-    if(!Number(exists?.count||0))return null;
+    const exists=await env.DB.prepare("SELECT COUNT(*) AS count FROM organizations o WHERE o.status='approved' AND o.is_hidden=0 AND o.deleted_at IS NULL AND (o.city=? OR EXISTS(SELECT 1 FROM items i WHERE i.organization_id=o.id AND i.status='active' AND i.deleted_at IS NULL AND i.city=?))").bind(id,id).first();
+    if(!Number(exists?.count||0))return notFoundResponse(request.method==="HEAD");
     title="גמ״חים וציוד להשאלה ב"+id+" | גמ״ח ברגע";description="מצאו ציוד להשאלה ללא תשלום או בתשלום סמלי וגמ״חים פעילים ב"+id+".";
     image=null;noindex=false;
   }else return null;
@@ -264,7 +266,7 @@ async function serveSeoEntityPage(request,env,url){
   ].filter(Boolean).join("\n");
   html=html.replace("<head>","<head>\n"+meta);
   html=html.replace("<body","<body data-seo-route=\""+kind+":"+escapeMeta(id)+"\"");
-  return new Response(html,{status:200,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"public, max-age=300, stale-while-revalidate=600"}});
+  return new Response(request.method==="HEAD"?null:html,{status:200,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"public, max-age=300, stale-while-revalidate=600",...(noindex?{"X-Robots-Tag":"noindex,nofollow"}:{})}});
 }
 
 async function bulkInventoryAction(request,env,organizationId){
@@ -324,6 +326,14 @@ export default {
       return new Response(null, { status: 308, headers: { Location: target.toString(), "Cache-Control": "public, max-age=3600" } });
     }
     try {
+      // Discovery files remain available during temporary site closures.
+      if (url.pathname === "/robots.txt") return withSecurityHeaders(robotsResponse(url.origin,request.method==="HEAD"));
+      if (url.pathname === "/sitemap.xml") {
+        const sitemapRequest = request.method === "HEAD" ? new Request(request.url, {method:"GET", headers:request.headers}) : request;
+        const response = await handleFinalFeatures(sitemapRequest, env, ctx, url);
+        if (response && request.method === "HEAD") return withSecurityHeaders(new Response(null, {status:response.status, headers:response.headers}));
+        return withSecurityHeaders(response || new Response("Not found",{status:404}));
+      }
       // Optional background/report endpoints return before any D1 access.
       if(deferNonessentialD1(env)){
         if(request.method==='GET'&&(/^\/api\/admin(?:\/|$)/.test(url.pathname)||/^\/api\/research(?:\/|$)/.test(url.pathname)||/^\/api\/notifications(?:\/|$)/.test(url.pathname)||/\/messages(?:\/|$)/.test(url.pathname)))return withSecurityHeaders(json({error:'פעולה זו הושהתה עד 20:00. הפעולות הבסיסיות באתר נשארו זמינות.',deferredUntil:env.D1_CONSERVE_UNTIL},503));
@@ -334,12 +344,12 @@ export default {
         const shabbat = israelShabbatState(new Date());
         if (shabbat.closed) {
           if (url.pathname.startsWith("/api/")) return withSecurityHeaders(json({ error:"האתר סגור כעת לכבוד השבת. שבת שלום.", shabbat:true },503));
-          return withSecurityHeaders(shabbatClosedPage(shabbat));
+          return withSecurityHeaders(await publicClosureResponse(request,env,{title:"שבת שלום",message:"גמ״ח ברגע סגור כעת לכבוד השבת."},shabbatClosedPage(shabbat)));
         }
         const holiday = israelHolidayState(new Date());
         if (holiday.closed) {
           if (url.pathname.startsWith("/api/")) return withSecurityHeaders(json({ error:`האתר סגור כעת לכבוד ${holiday.title}. חג שמח.`, holiday:true, reopensAt:holiday.reopensAt },503));
-          return withSecurityHeaders(platformClosedPage({message:`חג שמח — גמ״ח ברגע סגור כעת לכבוד ${holiday.title}`,endsAt:holiday.reopensAt}));
+          return withSecurityHeaders(await publicClosureResponse(request,env,{title:"חג שמח",message:`גמ״ח ברגע סגור כעת לכבוד ${holiday.title}.`},platformClosedPage({message:`חג שמח — גמ״ח ברגע סגור כעת לכבוד ${holiday.title}`,endsAt:holiday.reopensAt})));
         }
         const closure = await activePlatformClosure(env, new Date());
         if (closure) {
@@ -430,16 +440,6 @@ export default {
         if (!["GET","HEAD","OPTIONS"].includes(request.method) && response.ok) await invalidatePublicSnapshotRoots(url.origin);
         return withSecurityHeaders(response);
       }
-      if (url.pathname === "/sitemap.xml") {
-        const sitemapRequest = request.method === "HEAD" ? new Request(request.url, {method:"GET", headers:request.headers}) : request;
-        const response = await handleFinalFeatures(sitemapRequest, env, ctx, url);
-        if (response && request.method === "HEAD") return withSecurityHeaders(new Response(null, {status:response.status, headers:response.headers}));
-        return withSecurityHeaders(response || new Response("Not found",{status:404}));
-      }
-      if (url.pathname === "/robots.txt") {
-        const body="User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /dashboard\nDisallow: /admin\nSitemap: "+url.origin+"/sitemap.xml\n";
-        return withSecurityHeaders(new Response(body,{headers:{"Content-Type":"text/plain; charset=utf-8","Cache-Control":"public, max-age=3600"}}));
-      }
       if (url.pathname.startsWith("/media/")) {
         const response = await serveMedia(request, env, url);
         return withSecurityHeaders(response);
@@ -447,16 +447,20 @@ export default {
       if (request.method === "GET" || request.method === "HEAD") {
         const seoEntity = await serveSeoEntityPage(request, env, url);
         if (seoEntity) return withSecurityHeaders(seoEntity);
-        const cleanAppRoute = ["/catalog","/dashboard","/community","/how-it-works","/gmachim"].includes(url.pathname) || /^\/invite\/[^/]+$/.test(url.pathname);
+        const cleanAppRoute = Boolean(PUBLIC_PAGES[url.pathname]) || url.pathname==="/dashboard" || /^\/invite\/[^/]+$/.test(url.pathname);
         if (cleanAppRoute) {
           const shellUrl = new URL("/", url.origin);
-          const shellResponse = await env.ASSETS.fetch(new Request(shellUrl.toString(), { method:request.method, headers:request.headers }));
+          const shellResponse = await env.ASSETS.fetch(new Request(shellUrl.toString(), { method:"GET", headers:request.headers }));
           const headers = new Headers(shellResponse.headers);
           headers.set("Cache-Control","no-store, max-age=0");
           headers.set("Pragma","no-cache");
-          return withSecurityHeaders(new Response(shellResponse.body,{status:shellResponse.status,statusText:shellResponse.statusText,headers}));
+          if (!PUBLIC_PAGES[url.pathname]) headers.set("X-Robots-Tag","noindex,nofollow");
+          const html=await shellResponse.text();
+          const body=PUBLIC_PAGES[url.pathname]&&shellResponse.ok?publicPageHtml(html,url):html;
+          return withSecurityHeaders(new Response(request.method==="HEAD"?null:body,{status:shellResponse.status,statusText:shellResponse.statusText,headers}));
         }
       }
+      if(url.pathname==="/index.html")return withSecurityHeaders(new Response(null,{status:308,headers:{Location:url.origin+"/"+url.search,"Cache-Control":"public, max-age=3600"}}));
       const response = await env.ASSETS.fetch(request);
       if ((response.headers.get("Content-Type")||"").includes("text/html")) {
         const headers=new Headers(response.headers);
@@ -589,7 +593,7 @@ function israelHolidayState(now){
 }
 function shabbatClosedPage(state){
   const reopens=new Intl.DateTimeFormat("he-IL",{timeZone:"Asia/Jerusalem",dateStyle:"full",timeStyle:"short"}).format(new Date(state.reopensAt));
-  const html=`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>גמ״ח ברגע - שבת שלום</title><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=block" rel="stylesheet"></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#fff;font-family:Assistant,sans-serif;color:#123c46;text-align:center"><main style="max-width:680px;padding:40px 24px"><img src="/gmach-berega-logo.jpg" alt="גמ״ח ברגע" style="max-width:260px;width:70%;height:auto"><h1 style="font-size:42px;margin:20px 0">שבת שלום</h1><p style="font-size:22px;line-height:1.7">גמ״ח ברגע סגור כעת לכבוד השבת.</p><p style="font-size:18px;line-height:1.7">האתר ישוב לפעילות בעזרת ה׳ בצאת השבת, ב-${escapeHtml(reopens)}.</p><p style="line-height:1.7">כל המידע, הבקשות וההשאלות שכבר נשמרו נשארים שמורים בזמן הסגירה.</p><p><a href="mailto:${escapeHtml(DEFAULT_SUPPORT_EMAIL)}" style="color:#123c46;font-weight:700">פנייה לתמיכה</a></p></main></body></html>`;
+  const html=`<!doctype html><html lang="he" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>גמ״ח ברגע - שבת שלום</title><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;500;600;700;800&display=block" rel="stylesheet"></head><body style="margin:0;min-height:100vh;display:grid;place-items:center;background:#fff;font-family:Assistant,sans-serif;color:#123c46;text-align:center"><main style="max-width:680px;padding:40px 24px"><img src="/gmach-berega-logo.jpg" alt="גמ״ח ברגע" style="max-width:260px;width:70%;height:auto"><h1 style="font-size:42px;margin:20px 0">שבת שלום</h1><p style="font-size:22px;line-height:1.7">גמ״ח ברגע סגור כעת לכבוד השבת.</p><p style="font-size:18px;line-height:1.7">האתר ישוב לפעילות בעזרת ה׳ בצאת השבת, ב-${escapeHtml(reopens)}.</p><p style="line-height:1.7">כל המידע, הבקשות וההשאלות שכבר נשמרו נשארים שמורים בזמן הסגירה.</p><p><a href="mailto:${escapeHtml(DEFAULT_SUPPORT_EMAIL)}" style="color:#123c46;font-weight:700">פנייה לתמיכה</a></p></main></body></html>`;
   return new Response(html,{status:503,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Retry-After":"900"}});
 }
 

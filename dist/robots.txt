@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /invite/
+Sitemap: https://gmach-berega.co.il/sitemap.xml
