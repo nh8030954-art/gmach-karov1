@@ -1,4 +1,4 @@
-sha=bea0f3ab15f1e7e26d5b662459a6825050297d21
+sha=3aa5c02d24cafbed2918544f44753fa38de268a2
 install=success
 syntax=success
 tests=success
@@ -36,5 +36,5 @@ remaining-features Error: Backup checksum mismatch
     at async Object.fetch (file:///home/runner/work/gmach-karov1/gmach-karov1/worker/index.js:428:26)
 Deleted-email reuse, fresh account isolation, session revocation and legacy backfill passed
 Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.
-{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-11T11:21:54.145Z"}
+{"ok":true,"release":"complete-platform-2026-09-27.15","database":"D1","storage":"R2","email":true,"privateDataEncryption":true,"deep":true,"catalog":true,"categories":true,"timestamp":"2026-10-12T05:21:21.565Z"}
 platform_features={"release":"complete-platform-2026-09-27.10","turnstileEnabled":false,"turnstileSiteKey":null,"pushConfigured":true,"vapidPublicKey":"BCmNMGvUY2bIRLw1ugVkKDGl4ex1erugMf99RQOZSB5lir2kuXI2jURAMk6zf6zmh5mQNdt9HrYRtpxS-x2VEUE","geocoding":true,"backups":true,"calendar":true,"chatMedia":true}
