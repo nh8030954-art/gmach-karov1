@@ -1,0 +1,28 @@
+name: Verify search discovery
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/verify-search-discovery-20261012.yml"]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Inspect live discovery files
+        run: |
+          python3 - <<'PY'
+          import subprocess, json, xml.etree.ElementTree as ET
+          base='https://gmach-berega.co.il'
+          for path in ['/robots.txt','/sitemap.xml','/gmachim','/item/not-a-real-item']:
+            result=subprocess.run(['curl','--silent','--show-error','--max-time','25','--write-out','\n%{http_code}',base+path],capture_output=True,text=True)
+            body,_,status=result.stdout.rpartition('\n')
+            record={'path':path,'status':status,'curlExit':result.returncode}
+            if path=='/robots.txt': record.update(hasSitemap='Sitemap: '+base+'/sitemap.xml' in body,hasPrivateBlock='Disallow: /dashboard' in body)
+            if path=='/sitemap.xml' and status=='200':
+              root=ET.fromstring(body); urls=[e.text for e in root.findall('{http://www.sitemaps.org/schemas/sitemap/0.9}url/{http://www.sitemaps.org/schemas/sitemap/0.9}loc')]
+              record.update(urlCount=len(urls),uniqueCount=len(set(urls)),gmachs=sum('/gmach/' in u for u in urls),items=sum('/item/' in u for u in urls),categories=sum('/category/' in u for u in urls),areas=sum('/area/' in u for u in urls),includesMainPages=all(base+p in urls for p in ['/','/gmachim','/catalog','/how-it-works','/community']))
+            if path=='/gmachim':record['canonicalPresent']='rel="canonical" href="'+base+'/gmachim"' in body
+            print(json.dumps(record),flush=True)
+          PY
