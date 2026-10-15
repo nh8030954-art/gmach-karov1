@@ -1,0 +1,39 @@
+name: Inspect crawler access
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/inspect-crawler-access-20261015.yml"]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - name: Read current zone crawler controls
+        run: |
+          python3 - <<'PY'
+          import os,json,urllib.request,urllib.error
+          token=os.environ['CLOUDFLARE_API_TOKEN']
+          def api(path):
+            req=urllib.request.Request('https://api.cloudflare.com/client/v4/'+path,headers={'Authorization':'Bearer '+token,'Content-Type':'application/json'})
+            try:
+              with urllib.request.urlopen(req,timeout=20) as response: data=json.load(response)
+            except urllib.error.HTTPError as e:
+              print(json.dumps({'endpoint':path.split('?')[0].split('/')[-1],'status':e.code,'access':'unavailable'}),flush=True)
+              return None
+            if not data.get('success'): print(json.dumps({'endpoint':path.split('/')[-1],'errors':data.get('errors',[])}),flush=True);return None
+            return data.get('result')
+          zones=api('zones?name=gmach-berega.co.il')
+          if not zones: raise SystemExit(0)
+          zone=zones[0]['id']
+          for name in ['browser_check','security_level']:
+            value=api('zones/'+zone+'/settings/'+name)
+            if value: print(json.dumps({'setting':name,'value':value.get('value')}),flush=True)
+          bots=api('zones/'+zone+'/bot_management')
+          if bots: print(json.dumps({'botSettings':bots}),flush=True)
+          rules=api('zones/'+zone+'/rulesets/phases/http_request_firewall_custom/entrypoint')
+          if rules: print(json.dumps({'customRules':[{k:r.get(k) for k in ['id','description','expression','action','enabled','action_parameters']} for r in rules.get('rules',[])]}),flush=True)
+          PY
