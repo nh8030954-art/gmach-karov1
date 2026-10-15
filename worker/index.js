@@ -239,7 +239,7 @@ async function serveSeoEntityPage(request,env,url){
     image=row.image_url||null;noindex=row.status!=="active";
   }else if((m=url.pathname.match(/^\/area\/([^/]+)$/))){
     kind="area";id=decodeURIComponent(m[1]);
-    const exists=await env.DB.prepare("SELECT COUNT(*) AS count FROM items i JOIN organizations o ON o.id=i.organization_id WHERE i.status='active' AND i.deleted_at IS NULL AND o.is_hidden=0 AND o.deleted_at IS NULL AND (i.city=? OR o.city=?)").bind(id,id).first();
+    const exists=await env.DB.prepare("SELECT COUNT(*) AS count FROM organizations o WHERE o.status='approved' AND o.is_hidden=0 AND o.deleted_at IS NULL AND (o.city=? OR EXISTS(SELECT 1 FROM items i WHERE i.organization_id=o.id AND i.status='active' AND i.deleted_at IS NULL AND i.city=?))").bind(id,id).first();
     if(!Number(exists?.count||0))return null;
     title="גמ״חים וציוד להשאלה ב"+id+" | גמ״ח ברגע";description="מצאו ציוד להשאלה ללא תשלום או בתשלום סמלי וגמ״חים פעילים ב"+id+".";
     image=null;noindex=false;
@@ -324,6 +324,17 @@ export default {
       return new Response(null, { status: 308, headers: { Location: target.toString(), "Cache-Control": "public, max-age=3600" } });
     }
     try {
+      // Search discovery files remain available during temporary closures.
+      if (url.pathname === "/sitemap.xml") {
+        const sitemapRequest = request.method === "HEAD" ? new Request(request.url, {method:"GET", headers:request.headers}) : request;
+        const response = await handleFinalFeatures(sitemapRequest, env, ctx, url);
+        if (response && request.method === "HEAD") return withSecurityHeaders(new Response(null, {status:response.status, headers:response.headers}));
+        return withSecurityHeaders(response || new Response("Not found",{status:404}));
+      }
+      if (url.pathname === "/robots.txt") {
+        const body="User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /dashboard\nDisallow: /admin\nDisallow: /invite/\nSitemap: "+url.origin+"/sitemap.xml\n";
+        return withSecurityHeaders(new Response(request.method==="HEAD"?null:body,{headers:{"Content-Type":"text/plain; charset=utf-8","Cache-Control":"public, max-age=3600"}}));
+      }
       // Optional background/report endpoints return before any D1 access.
       if(deferNonessentialD1(env)){
         if(request.method==='GET'&&(/^\/api\/admin(?:\/|$)/.test(url.pathname)||/^\/api\/research(?:\/|$)/.test(url.pathname)||/^\/api\/notifications(?:\/|$)/.test(url.pathname)||/\/messages(?:\/|$)/.test(url.pathname)))return withSecurityHeaders(json({error:'פעולה זו הושהתה עד 20:00. הפעולות הבסיסיות באתר נשארו זמינות.',deferredUntil:env.D1_CONSERVE_UNTIL},503));
@@ -429,16 +440,6 @@ export default {
         if(response.ok&&(!["GET","HEAD","OPTIONS"].includes(request.method)))ctx.waitUntil(dispatchNotificationEvents(env).catch(error=>console.error("Notification delivery failed",error)));
         if (!["GET","HEAD","OPTIONS"].includes(request.method) && response.ok) await invalidatePublicSnapshotRoots(url.origin);
         return withSecurityHeaders(response);
-      }
-      if (url.pathname === "/sitemap.xml") {
-        const sitemapRequest = request.method === "HEAD" ? new Request(request.url, {method:"GET", headers:request.headers}) : request;
-        const response = await handleFinalFeatures(sitemapRequest, env, ctx, url);
-        if (response && request.method === "HEAD") return withSecurityHeaders(new Response(null, {status:response.status, headers:response.headers}));
-        return withSecurityHeaders(response || new Response("Not found",{status:404}));
-      }
-      if (url.pathname === "/robots.txt") {
-        const body="User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /dashboard\nDisallow: /admin\nSitemap: "+url.origin+"/sitemap.xml\n";
-        return withSecurityHeaders(new Response(body,{headers:{"Content-Type":"text/plain; charset=utf-8","Cache-Control":"public, max-age=3600"}}));
       }
       if (url.pathname.startsWith("/media/")) {
         const response = await serveMedia(request, env, url);

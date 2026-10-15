@@ -83,6 +83,28 @@ function splitMigration(sql) {
 }
 
 try {
+
+  // Discovery files must stay readable during closure without opening visitor pages.
+  const discoveryWorkerSource=await readFile('worker/index.js','utf8');
+  const discoveryStart=discoveryWorkerSource.indexOf('export default {'),discoveryEnd=discoveryWorkerSource.indexOf('\n};',discoveryStart);
+  const discoveryContext=vm.createContext({URL,Request,Response,Headers,Date,console,
+    withSecurityHeaders:r=>r,deferNonessentialD1:()=>false,
+    israelShabbatState:()=>({closed:true,reopensAt:'2026-10-17T17:00:00Z'}),
+    handleFinalFeatures:async()=>new Response('<urlset/>',{headers:{'Content-Type':'application/xml'}}),
+    shabbatClosedPage:()=>new Response('closed',{status:503,headers:{'Retry-After':'900'}})});
+  vm.runInContext(discoveryWorkerSource.slice(discoveryStart,discoveryEnd+3).replace('export default','globalThis.worker ='),discoveryContext);
+  const discoveryEnv={DB:{prepare(){throw Error('Discovery files must not query closure settings')}}};
+  const fetchClosedDiscovery=(path,method='GET')=>discoveryContext.worker.fetch(new Request(base+path,{method}),discoveryEnv,{waitUntil(){}});
+  assert.equal((await fetchClosedDiscovery('/robots.txt')).status,200);
+  assert.match(await (await fetchClosedDiscovery('/robots.txt')).text(),/Sitemap: http:\/\/local.test\/sitemap.xml/);
+  assert.equal(await (await fetchClosedDiscovery('/robots.txt','HEAD')).text(),'');
+  assert.equal((await fetchClosedDiscovery('/sitemap.xml')).status,200);
+  assert.equal(await (await fetchClosedDiscovery('/sitemap.xml','HEAD')).text(),'');
+  assert.equal((await fetchClosedDiscovery('/gmach/test')).status,503,'Ordinary pages must remain closed on Shabbat');
+  const discoveryConfig=JSON.parse(await readFile('wrangler.jsonc','utf8'));
+  assert.ok(!discoveryConfig.assets.run_worker_first.includes('/'),'Preserve the homepage font/style loading path');
+  assert.equal(discoveryConfig.assets.not_found_handling,'single-page-application','Preserve existing visitor routing');
+
   const db = await mf.getD1Database("DB");
   // Exercise the same schema as production, including migrations added after this test.
   for (const filename of (await readdir("migrations")).filter(name => /^\d+.*\.sql$/.test(name)).sort()) {
@@ -1027,6 +1049,27 @@ try {
   const freshOwnerCookie=ownerLogin.response.headers.get('set-cookie').split(';',1)[0];
   assert.equal((await request('/api/me/dashboard',{cookie:freshOwnerCookie})).data.registrationIntent,'owner','New sessions must retain the choice to create a gmach');
   assert.equal((await request('/api/me/dashboard',{cookie:newReusableCookie})).data.registrationIntent,'user','Ordinary registration must not open owner setup');
+
+  // Real D1 sitemap coverage, including primary categories without optional mappings.
+  const discoveryOrg=crypto.randomUUID(),discoveryItem=crypto.randomUUID(),discoveryEmptyOrg=crypto.randomUUID();
+  const discoveryCity='עיר בדיקת אינדקס',discoveryEmptyCity='עיר גמח בלי פריטים';
+  const discoveryCategory=(await db.prepare("SELECT id FROM categories WHERE name_he='אירועים' AND status='active'").first()).id;
+  for(const [id,city] of [[discoveryOrg,discoveryCity],[discoveryEmptyOrg,discoveryEmptyCity]])await db.prepare("INSERT INTO organizations(id,owner_id,name,primary_category,city,description,status,is_hidden) VALUES(?,?,?,?,?,?,'approved',0)").bind(id,newReusableUser.id,'גמ״ח אינדקס','אירועים',city,'גמ״ח ייעודי לבדיקת אינדקס').run();
+  await db.prepare("INSERT INTO items(id,organization_id,title,category,description,condition,city,status) VALUES(?,?,?,?,?,'מצוין',?,'active')").bind(discoveryItem,discoveryOrg,'פריט אינדקס','אירועים','פריט ייעודי לבדיקת אינדקס',discoveryCity).run();
+  const publicSitemap=await request('/sitemap.xml');
+  assert.equal(publicSitemap.response.status,200,JSON.stringify(publicSitemap.data));
+  assert.match(publicSitemap.response.headers.get('content-type'),/application\/xml/);
+  for(const path of ['/','/catalog','/gmachim','/how-it-works','/community','/gmach/'+discoveryOrg,'/gmach/'+discoveryEmptyOrg,'/item/'+discoveryItem,'/category/'+encodeURIComponent(discoveryCategory),'/area/'+encodeURIComponent(discoveryCity),'/area/'+encodeURIComponent(discoveryEmptyCity)])assert.ok(publicSitemap.data.includes(base+path),'Sitemap missing '+path);
+  assert.equal((await db.prepare('SELECT COUNT(*) n FROM item_categories WHERE item_id=?').bind(discoveryItem).first()).n,0,'Primary category discovery cannot require optional mapping rows');
+  const sitemapLocations=[...publicSitemap.data.matchAll(/<loc>([^<]+)<\/loc>/g)].map(m=>m[1]);
+  assert.equal(new Set(sitemapLocations).size,sitemapLocations.length,'Sitemap must not duplicate URLs');
+  assert.ok(!sitemapLocations.some(url=>/\/(dashboard|api|admin)(?:\/|$)/.test(url)),'Only public pages belong in sitemap');
+  await db.prepare('UPDATE organizations SET is_hidden=1 WHERE id=?').bind(discoveryOrg).run();
+  const hiddenSitemap=(await request('/sitemap.xml')).data;
+  assert.ok(!hiddenSitemap.includes(discoveryOrg)&&!hiddenSitemap.includes(discoveryItem),'Hidden gmachs and items must be excluded');
+  await db.prepare("UPDATE organizations SET status='pending' WHERE id=?").bind(discoveryEmptyOrg).run();
+  assert.ok(!(await request('/sitemap.xml')).data.includes(discoveryEmptyOrg),'Unapproved gmachs must be excluded');
+  console.log('Search discovery completeness, privacy, closure access and unchanged homepage routing passed');
   console.log("Cloudflare smoke test passed: auth, D1, R2, inventory, chat, notifications, reports, moderation and permissions.");
 } finally {
   await mf.dispose();

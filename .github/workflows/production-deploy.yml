@@ -229,6 +229,26 @@ jobs:
             sleep 5
           done
           exit 1
+      - name: Verify search discovery
+        if: steps.quota_guard.outputs.active != 'true'
+        run: |
+          python3 - <<'PY'
+          import subprocess, json, xml.etree.ElementTree as ET
+          origin='https://gmach-berega.co.il'
+          def get(path):
+              result=subprocess.run(['curl','--fail','--silent','--show-error','--max-time','30',origin+path],capture_output=True,text=True,check=True)
+              return result.stdout
+          robots=get('/robots.txt')
+          assert 'Sitemap: '+origin+'/sitemap.xml' in robots, 'Live robots.txt must advertise sitemap'
+          assert 'Disallow: /dashboard' in robots, 'Keep private routes excluded'
+          root=ET.fromstring(get('/sitemap.xml'))
+          ns={'s':'http://www.sitemaps.org/schemas/sitemap/0.9'}
+          urls=[e.text for e in root.findall('s:url/s:loc',ns)]
+          assert len(urls)==len(set(urls)), 'Duplicate sitemap URLs'
+          assert all(origin+path in urls for path in ['/','/catalog','/gmachim','/how-it-works','/community']), 'Missing public navigation pages'
+          assert all(u.startswith(origin+'/') for u in urls), 'Unexpected sitemap origin'
+          print(json.dumps({'robots':'ok','sitemap':'ok','urls':len(urls),'gmachs':sum('/gmach/' in u for u in urls),'items':sum('/item/' in u for u in urls),'categories':sum('/category/' in u for u in urls),'areas':sum('/area/' in u for u in urls)}))
+          PY
       - name: Read-only production load gate
         if: github.event_name == 'workflow_dispatch' && steps.quota_guard.outputs.active != 'true'
         env:
