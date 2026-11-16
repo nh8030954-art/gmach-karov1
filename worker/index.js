@@ -302,7 +302,7 @@ async function importItems(request,env){
 
 
 function publicSnapshotCacheKey(value) {
-  const url=new URL(value);url.searchParams.set('__privacy','contact-preferences-2026-10-07');
+  const url=new URL(value);url.searchParams.set('__privacy','category-catalog-refresh-2026-11-16');
   return new Request(url.toString(),{method:'GET',headers:{Accept:'application/json'}});
 }
 async function invalidatePublicSnapshotRoots(origin) {
