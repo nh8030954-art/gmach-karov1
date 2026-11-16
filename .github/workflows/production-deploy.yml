@@ -125,6 +125,11 @@ jobs:
               exit "$STATUS"
             fi
           fi
+      - name: Ensure Brit Milah event subcategory is present
+        run: |
+          npx wrangler d1 execute DB --remote --file migrations/0039_events_brit_milah.sql
+          npx wrangler d1 execute DB --remote --command "SELECT id,parent_id,name_he,status FROM categories WHERE id='events-brit-milah'" --json > brit-milah-category-state.json
+          node -e "const rows=require('./brit-milah-category-state.json')[0].results;if(rows.length!==1||rows[0].parent_id!=='events'||rows[0].name_he!=='ברית מילה'||rows[0].status!=='active')throw new Error('Brit Milah category verification failed');console.log(rows[0])"
       - name: Ensure visitor analytics and reversible admin schema
         if: steps.migration_changes.outputs.changed == 'true'
         run: |
